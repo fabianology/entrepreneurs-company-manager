@@ -175,31 +175,20 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
             {/* Supplemental Services Accordion */}
             <div className="border-t border-white/5">
-              <div className="flex items-center pr-6">
-                <button
-                  onClick={() => addSubServiceToSubscription(sub)}
-                  className="pl-6 h-14 flex items-center justify-center text-[#EBC351] hover:text-white transition-colors group/add"
-                  title="Add Supplemental Service"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => toggleExpanded(sub.id)}
-                  className="flex-1 h-14 flex items-center justify-between text-[#EBC351] group"
-                >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-[11px] font-black uppercase tracking-[0.15em]">Supplemental Services</span>
-                    <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                      {sub.subServices?.length || 0}
-                    </div>
+              <button
+                onClick={() => toggleExpanded(sub.id)}
+                className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em]">Supplemental Services</span>
+                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                    {sub.subServices?.length || 0}
                   </div>
-                  <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
+                </div>
+                <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
               {expandedSubs.has(sub.id) && sub.subServices && (
                 <div className="px-6 pb-6 space-y-4 animate-fadeIn">
