@@ -27,6 +27,7 @@ export interface Account {
   nextBillingDate?: string;
   renew?: 'Auto' | 'Manual';
   status?: 'Active' | 'Inactive' | 'Trial';
+  lastUpdated?: number; // timestamp
 }
 
 export interface SubService {
@@ -50,6 +51,9 @@ export interface Subscription {
   subServices?: SubService[];
   email?: string;
   emailPurpose?: string;
+  website?: string;
+  twoFactorAuth?: string; // e.g. 'Authenticator', 'SMS', 'None'
+  lastUpdated?: number; // timestamp
 }
 
 export interface FinancialCard {

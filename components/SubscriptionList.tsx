@@ -34,7 +34,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       renew: 'Auto',
       subServices: [],
       email: '',
-      emailPurpose: ''
+      emailPurpose: '',
+      twoFactorAuth: 'None',
+      website: ''
     });
   };
 
@@ -43,25 +45,27 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     setEditingSubscription(sub);
   };
 
-  const openEditWithNewSubService = (sub: Subscription) => {
-    const newSubService: SubService = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: '',
-      cost: 0,
-      status: 'Active'
-    };
-    setEditingSubscription({
-      ...sub,
-      subServices: [...(sub.subServices || []), newSubService]
-    });
+  const toggleExpanded = (id: string) => {
+    const newSet = new Set(expandedSubs);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedSubs(newSet);
+  };
+
+  const toggleEmailExpanded = (id: string) => {
+    const newSet = new Set(expandedEmails);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedEmails(newSet);
   };
 
   const handleSaveModal = () => {
     if (editingSubscription) {
+      const updates = { ...editingSubscription, lastUpdated: Date.now() };
       if (editingSubscription.id) {
-        onUpdateSubscription(editingSubscription.id, editingSubscription);
+        onUpdateSubscription(editingSubscription.id, updates);
       } else if (onAddSubscription) {
-        onAddSubscription(editingSubscription);
+        onAddSubscription(updates);
       }
       setEditingSubscription(null);
     }
@@ -81,163 +85,195 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     });
   };
 
-  const handleUpdateSubService = (index: number, updates: Partial<SubService>) => {
-    if (!editingSubscription || !editingSubscription.subServices) return;
-    const newSubs = [...editingSubscription.subServices];
-    newSubs[index] = { ...newSubs[index], ...updates };
-    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-  };
-
-  const handleDeleteSubService = (index: number) => {
-    if (!editingSubscription || !editingSubscription.subServices) return;
-    const newSubs = editingSubscription.subServices.filter((_, i) => i !== index);
-    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-  };
-
-  const toggleExpanded = (id: string) => {
-    const newSet = new Set(expandedSubs);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setExpandedSubs(newSet);
-  };
-
-  const toggleEmailExpanded = (id: string) => {
-    const newSet = new Set(expandedEmails);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
-    setExpandedEmails(newSet);
-  };
-
-  const openDatePicker = () => {
-    try {
-      if (datePickerRef.current) {
-        if (typeof datePickerRef.current.showPicker === 'function') {
-          datePickerRef.current.showPicker();
-        } else {
-          datePickerRef.current.focus();
-        }
-      }
-    } catch (e) {
-      console.warn('Could not open date picker', e);
-    }
-  };
-
-  // Stats Calculations
-  const totalMonthlyBurn = subscriptions.reduce((acc, s) => {
-    const parentCost = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
-    const subsCost = (s.subServices || []).reduce((sum, sub) => sum + sub.cost, 0);
-    const subBurn = s.billingCycle === 'Monthly' ? subsCost : subsCost / 12;
-    return acc + parentCost + subBurn;
-  }, 0);
-
-  const activeToolsCount = subscriptions.reduce((acc, s) => {
-    let count = s.status === 'Active' ? 1 : 0;
-    count += (s.subServices || []).filter(sub => sub.status === 'Active').length;
-    return acc + count;
-  }, 0);
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Active': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-      case 'Cancelled': return 'bg-rose-50 text-rose-700 border-rose-100';
-      case 'Pending': return 'bg-amber-50 text-amber-700 border-amber-100';
-      default: return 'bg-slate-50 text-slate-500 border-slate-100';
-    }
+  const formatDate = (ts?: number) => {
+    if (!ts) return 'Unknown';
+    const date = new Date(ts);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center px-1">
-        <h3 className="text-lg font-bold text-slate-800">Tech Stack & Subscriptions</h3>
-        {onAddSubscription && (
-          <button
-            onClick={handleAddNew}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm active:scale-95"
-          >
-            + Add Tool
-          </button>
-        )}
+    <div className="bg-black min-h-screen text-white p-4 space-y-8">
+      {/* Action Bar */}
+      <div className="flex justify-end pr-2">
+        <button
+          onClick={handleAddNew}
+          className="bg-[#1C1C1E] text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Account</span>
+        </button>
       </div>
 
-      {/* Pop-up Edit/Add Modal */}
+      {/* Subscription cards List */}
+      <div className="space-y-4">
+        {subscriptions.map(sub => (
+          <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl">
+            {/* Main Info */}
+            <div className="p-6 space-y-6">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center space-x-4">
+                  <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
+                    <span className="text-white font-black text-xl opacity-80">{sub.name.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black tracking-tight text-white uppercase">{sub.name}</h3>
+                    <p className="text-[11px] text-white/40 font-bold tracking-wide">{sub.website || 'website.com'}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-black text-white">${sub.cost.toFixed(2)}</p>
+                  <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="flex items-center space-x-2">
+                <div className="h-2 w-2 rounded-full bg-[#1FE400] shadow-[0_0_8px_#1FE400]"></div>
+                <span className="text-[#1FE400] text-[11px] font-black uppercase tracking-[0.1em]">Auto Renew</span>
+              </div>
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-y-6 gap-x-8 pt-2">
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid From</p>
+                  <p className="text-xs font-black text-white">{sub.paymentMethod || 'Amex ••• 8474'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Next Renewal</p>
+                  <p className="text-xs font-black text-white">{sub.nextRenewal}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">2FA Status</p>
+                  <p className="text-xs font-black text-white">{sub.twoFactorAuth || 'Authenticator'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Last Updated</p>
+                  <p className="text-xs font-black text-white">{formatDate(sub.lastUpdated)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Supplemental Services Accordion */}
+            <div className="border-t border-white/5">
+              <button
+                onClick={() => toggleExpanded(sub.id)}
+                className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em]">Supplemental Services</span>
+                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                    {sub.subServices?.length || 0}
+                  </div>
+                </div>
+                <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {expandedSubs.has(sub.id) && sub.subServices && (
+                <div className="px-6 pb-6 space-y-4 animate-fadeIn">
+                  {sub.subServices.map((child, idx) => (
+                    <div key={idx} className="flex justify-between items-center group/item">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] opacity-50"></div>
+                        <span className="text-xs font-bold text-white/90">{child.name}</span>
+                        <span className="text-[9px] font-black text-[#1FE400] uppercase tracking-tighter opacity-80">Active</span>
+                      </div>
+                      <span className="text-xs font-black text-white">${child.cost.toFixed(2)}</span>
+                    </div>
+                  ))}
+                  <button className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition">+ add item</button>
+                </div>
+              )}
+            </div>
+
+            {/* Email Logic Accordion */}
+            <div className="border-t border-white/5">
+              <button
+                onClick={() => toggleEmailExpanded(sub.id)}
+                className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group bg-white/2"
+              >
+                <span className="text-[11px] font-black uppercase tracking-[0.15em]">Linked Emails</span>
+                <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedEmails.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {expandedEmails.has(sub.id) && (
+                <div className="px-6 pb-6 space-y-4 animate-fadeIn">
+                  <div className="space-y-4 border-l-2 border-[#EBC351]/20 pl-4 ml-1">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest font-mono">PRIMARY EMAIL</p>
+                      <p className="text-xs font-black text-white">{sub.email || 'founder@company.com'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest font-mono">PURPOSE</p>
+                      <p className="text-xs font-bold text-white/70 italic leading-relaxed">
+                        "{sub.emailPurpose || 'Admin ownership and secondary billing alerts'}"
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex space-x-4 pt-2">
+                    <button className="text-[9px] font-black text-white/30 uppercase tracking-widest hover:text-[#EBC351] transition">+ add note</button>
+                    <button onClick={() => setEditingSubscription(sub)} className="text-[9px] font-black text-white/30 uppercase tracking-widest hover:text-[#EBC351] transition">+ edit</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Stats Summary Section */}
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
+          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Monthly Burn</p>
+          <p className="text-2xl font-black text-white tracking-tighter">
+            ${subscriptions.reduce((acc, s) => acc + (s.billingCycle === 'Monthly' ? s.cost : s.cost / 12), 0).toFixed(0)}
+          </p>
+        </div>
+        <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
+          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Active Stack</p>
+          <p className="text-2xl font-black text-white tracking-tighter">
+            {subscriptions.length}
+          </p>
+        </div>
+      </div>
+
+      {/* Editing Modal */}
       {editingSubscription && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl text-slate-900 my-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white z-10 rounded-t-2xl">
-              <h3 className="text-xl font-bold text-slate-900">
-                {editingSubscription.id ? `${editingSubscription.name} Details` : 'Add Tech Stack'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-xl animate-fadeIn overflow-y-auto">
+          <div className="bg-[#1C1C1E] rounded-[32px] shadow-2xl w-full max-w-xl border border-white/10 overflow-hidden">
+            <div className="p-8 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-xl font-black tracking-tight text-white uppercase">
+                {editingSubscription.id ? 'Edit Service' : 'New Service'}
               </h3>
-              <button onClick={() => setEditingSubscription(null)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+              <button onClick={() => setEditingSubscription(null)} className="text-white/40 hover:text-white transition">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Service Name</label>
+            <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Service Name</label>
                   <input
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
                     value={editingSubscription.name || ''}
-                    placeholder="e.g. Jira"
+                    placeholder="e.g. Shopify"
                     onChange={e => setEditingSubscription({ ...editingSubscription, name: e.target.value })}
                   />
                 </div>
-
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 border-l-4 border-rose-800 bg-rose-50/30 p-4 rounded-r-lg">
-                  <div>
-                    <label className="block text-xs font-bold text-rose-800 uppercase mb-1">Associated Email</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
                     <input
-                      className="w-full px-3 py-2 border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none text-black bg-white"
-                      value={editingSubscription.email || ''}
-                      placeholder="e.g. founder@company.com"
-                      onChange={e => setEditingSubscription({ ...editingSubscription, email: e.target.value })}
+                      type="number"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                      value={editingSubscription.cost || ''}
+                      onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) })}
                     />
                   </div>
-                  <div className="flex flex-col gap-1 flex-1">
-                    <label className="block text-xs font-bold text-rose-800 uppercase mb-1 flex justify-between">
-                      Email Purpose / Context
-                      {editingSubscription.name && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const purpose = await generateSubscriptionEmailPurpose(editingSubscription.name);
-                            if (purpose) setEditingSubscription({ ...editingSubscription, emailPurpose: purpose });
-                          }}
-                          className="text-[9px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 normal-case font-bold"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                          AI Suggest
-                        </button>
-                      )}
-                    </label>
-                    <input
-                      className="w-full px-3 py-2 border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none text-black bg-white"
-                      value={editingSubscription.emailPurpose || ''}
-                      placeholder="e.g. Primary Admin & Billing"
-                      onChange={e => setEditingSubscription({ ...editingSubscription, emailPurpose: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="md:col-span-2 grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Cost</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-slate-400">$</span>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="w-full pl-6 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                        value={editingSubscription.cost || ''}
-                        onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) })}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Billing Cycle</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cycle</label>
                     <select
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
                       value={editingSubscription.billingCycle || 'Monthly'}
                       onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
                     >
@@ -246,350 +282,34 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </select>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Paid From</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Website URL</label>
                   <input
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    value={editingSubscription.paymentMethod || ''}
-                    placeholder="e.g. Visa 4242"
-                    onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    value={editingSubscription.website || ''}
+                    placeholder="shopify.com"
+                    onChange={e => setEditingSubscription({ ...editingSubscription, website: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    value={editingSubscription.status || 'Active'}
-                    onChange={e => setEditingSubscription({ ...editingSubscription, status: e.target.value as any })}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Cancelled">Cancelled</option>
-                    <option value="Pending">Pending</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Next Renewal</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white pr-10"
-                      placeholder="e.g. 1st or YYYY-MM-DD"
-                      value={editingSubscription.nextRenewal || ''}
-                      onChange={e => setEditingSubscription({ ...editingSubscription, nextRenewal: e.target.value })}
-                    />
-                    <button
-                      type="button"
-                      onClick={openDatePicker}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 focus:outline-none"
-                      title="Pick a date"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    </button>
-                    <input
-                      type="date"
-                      ref={datePickerRef}
-                      className="opacity-0 absolute bottom-0 left-0 w-1 h-1 pointer-events-none"
-                      tabIndex={-1}
-                      onChange={e => setEditingSubscription({ ...editingSubscription, nextRenewal: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Renew Type</label>
-                  <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    value={editingSubscription.renew || 'Auto'}
-                    onChange={e => setEditingSubscription({ ...editingSubscription, renew: e.target.value as any })}
-                  >
-                    <option value="Auto">Auto</option>
-                    <option value="Manual">Manual</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2 border-t border-slate-100 pt-4 mt-2">
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide">Add-ons / Affiliated Seats</label>
-                    <button
-                      type="button"
-                      onClick={handleAddSubService}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800"
-                    >
-                      + Add Line Item
-                    </button>
-                  </div>
-
-                  <div className="space-y-3">
-                    {(editingSubscription.subServices || []).map((sub, idx) => (
-                      <div key={idx} className="flex gap-3 items-start bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        <div className="flex-1 space-y-2">
-                          <input
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white text-sm"
-                            placeholder="Name (e.g. Extra Seat)"
-                            value={sub.name}
-                            onChange={e => handleUpdateSubService(idx, { name: e.target.value })}
-                          />
-                          <div className="flex gap-2">
-                            <div className="relative w-32">
-                              <span className="absolute left-3 top-2 text-slate-400 text-sm">$</span>
-                              <input
-                                type="number"
-                                className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white text-sm"
-                                placeholder="0.00"
-                                value={sub.cost}
-                                onChange={e => handleUpdateSubService(idx, { cost: parseFloat(e.target.value) })}
-                              />
-                            </div>
-                            <select
-                              className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white text-sm flex-1"
-                              value={sub.status}
-                              onChange={e => handleUpdateSubService(idx, { status: e.target.value as any })}
-                            >
-                              <option value="Active">Active</option>
-                              <option value="Cancelled">Cancelled</option>
-                              <option value="Pending">Pending</option>
-                            </select>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteSubService(idx)}
-                          className="text-slate-300 hover:text-rose-500 p-2"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                    ))}
-                    {(!editingSubscription.subServices || editingSubscription.subServices.length === 0) && (
-                      <p className="text-sm text-slate-400 italic">No add-ons currently tracked.</p>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">2FA Status</label>
+                  <input
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    value={editingSubscription.twoFactorAuth || ''}
+                    placeholder="Authenticator"
+                    onChange={e => setEditingSubscription({ ...editingSubscription, twoFactorAuth: e.target.value })}
+                  />
                 </div>
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="w-full md:w-auto">
-                {editingSubscription.id && onDeleteSubscription && (
-                  showDeleteConfirm ? (
-                    <div className="flex items-center space-x-3 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-100 w-full justify-between md:justify-start">
-                      <span className="text-xs font-bold text-rose-700 uppercase">Delete?</span>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            if (editingSubscription.id) onDeleteSubscription(editingSubscription.id);
-                            setEditingSubscription(null);
-                          }}
-                          className="text-xs bg-rose-600 text-white px-3 py-1.5 rounded font-bold hover:bg-rose-700 shadow-sm"
-                        >
-                          Yes
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(false)}
-                          className="text-xs text-slate-500 hover:text-slate-800 font-bold underline px-1"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="text-rose-500 text-sm font-medium hover:text-rose-700 transition-colors flex items-center group"
-                    >
-                      <svg className="w-4 h-4 mr-1 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      Remove Technology
-                    </button>
-                  )
-                )}
-              </div>
-              <div className="flex space-x-3 w-full md:w-auto justify-end">
-                <button
-                  onClick={() => setEditingSubscription(null)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveModal}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm hover:bg-indigo-700 transition"
-                >
-                  {editingSubscription.id ? 'Save Changes' : 'Add Tool'}
-                </button>
-              </div>
+            <div className="p-8 bg-black/20 border-t border-white/5 flex justify-end space-x-4">
+              <button onClick={() => setEditingSubscription(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+              <button onClick={handleSaveModal} className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Main Responsive Grid Layout for Subscriptions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {subscriptions.length === 0 ? (
-          <div className="md:col-span-2 py-16 text-center bg-white rounded-xl border border-slate-100 shadow-sm">
-            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
-            </div>
-            <p className="text-slate-500 font-medium">No tech stack tracked. Start by adding one above.</p>
-          </div>
-        ) : (
-          subscriptions.map(sub => {
-            const totalCost = sub.cost + (sub.subServices || []).reduce((acc, item) => acc + item.cost, 0);
-            const isEmailExpanded = expandedEmails.has(sub.id);
-
-            return (
-              <div
-                key={sub.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden flex flex-col"
-              >
-                {/* Card Header */}
-                <div className="p-4 border-b border-slate-50 flex justify-between items-start bg-gradient-to-r from-white to-slate-50/50">
-                  <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 bg-indigo-50 rounded-lg flex items-center justify-center font-bold text-indigo-600 uppercase text-sm flex-shrink-0">
-                      {sub.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <button
-                        onClick={() => handleEditSubscription(sub)}
-                        className="text-base font-bold text-slate-900 hover:text-indigo-600 hover:underline text-left transition-colors truncate w-full block"
-                      >
-                        {sub.name}
-                      </button>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded border ${getStatusColor(sub.status)}`}>
-                          {sub.status}
-                        </span>
-                        {sub.renew === 'Auto' && (
-                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded uppercase tracking-tighter">Auto-Renew</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <p className="text-base font-black text-slate-900">${totalCost.toFixed(2)}</p>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{sub.billingCycle}</p>
-                  </div>
-                </div>
-
-                {/* Card Body - Grid of Details */}
-                <div className="p-4 grid grid-cols-2 gap-y-4 gap-x-6 border-b border-slate-50">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Paid From</span>
-                    <span className="text-xs font-medium text-slate-700 truncate">{sub.paymentMethod || 'Not specified'}</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Next Renewal</span>
-                    <span className="text-xs font-medium text-slate-700">{sub.nextRenewal || 'TBD'}</span>
-                  </div>
-                </div>
-
-                {/* Card Footer - Sub-services Accordion */}
-                <div className="bg-slate-50/50 p-2 border-b border-slate-100">
-                  <div className="flex items-center justify-between px-2 py-1">
-                    <button
-                      onClick={() => toggleExpanded(sub.id)}
-                      className="flex items-center space-x-2 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-wider"
-                    >
-                      <span>Add-ons ({sub.subServices?.length || 0})</span>
-                      <svg className={`w-3 h-3 transform transition-transform ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-
-                    <button
-                      onClick={() => openEditWithNewSubService(sub)}
-                      className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 uppercase bg-white border border-slate-200 px-2 py-0.5 rounded shadow-sm transition-all active:scale-95"
-                    >
-                      + Add Line
-                    </button>
-                  </div>
-
-                  {expandedSubs.has(sub.id) && sub.subServices && sub.subServices.length > 0 && (
-                    <div className="px-2 pb-2 mt-2 space-y-1.5 animate-fadeIn">
-                      {sub.subServices.map((child, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-white border border-slate-100 rounded-lg p-2 shadow-xs">
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold text-slate-700 truncate">{child.name}</p>
-                            <span className={`text-[8px] font-bold uppercase ${child.status === 'Active' ? 'text-emerald-500' : 'text-slate-400'}`}>
-                              {child.status}
-                            </span>
-                          </div>
-                          <div className="text-right ml-2">
-                            <p className="text-xs font-bold text-slate-900">${child.cost.toFixed(2)}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* IDENTITY RECALL TAB - 40px Height, rose-800 Color */}
-                <div className="flex flex-col">
-                  <button
-                    onClick={() => toggleEmailExpanded(sub.id)}
-                    className="w-full h-[40px] bg-rose-800 hover:bg-rose-900 transition-colors flex items-center justify-between px-4 text-white group/tab"
-                  >
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em] drop-shadow-sm">Email Logic</span>
-                    <svg className={`w-4 h-4 transition-transform duration-300 ${isEmailExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                  </button>
-
-                  {isEmailExpanded && (
-                    <div className="p-4 bg-rose-50 animate-fadeIn border-t border-rose-100">
-                      <div className="flex flex-col space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center text-rose-800 flex-shrink-0">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-0.5">Account Email</p>
-                            <p className="text-sm font-bold text-slate-800 truncate">{sub.email || 'No email specified'}</p>
-                          </div>
-                        </div>
-
-                        <div className="pl-11 border-l-2 border-rose-200 py-1">
-                          <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-1">Email Purpose</p>
-                          <p className="text-xs text-slate-600 leading-relaxed font-medium italic">
-                            "{sub.emailPurpose || 'Explain what this email is used for in the service settings...'}"
-                          </p>
-                        </div>
-
-                        <div className="flex justify-end pt-1">
-                          <button
-                            onClick={() => handleEditSubscription(sub)}
-                            className="text-[9px] font-black text-rose-800 uppercase tracking-tighter hover:underline"
-                          >
-                            Edit Email Context
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* Stats Summary Section */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4 mt-8">
-        <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
-          <p className="text-[10px] md:text-xs font-bold text-indigo-500 uppercase tracking-wider mb-1">Total Burn</p>
-          <p className="text-lg md:text-2xl font-black text-slate-900">
-            ${totalMonthlyBurn.toFixed(0)}
-            <span className="text-[10px] md:text-xs font-normal text-slate-400 ml-0.5">/mo</span>
-          </p>
-        </div>
-        <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
-          <p className="text-[10px] md:text-xs font-bold text-emerald-500 uppercase tracking-wider mb-1">Active Tools</p>
-          <p className="text-lg md:text-2xl font-black text-slate-900">{activeToolsCount}</p>
-        </div>
-        <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center">
-          <p className="text-[10px] md:text-xs font-bold text-amber-500 uppercase tracking-wider mb-1">Auto-Renews</p>
-          <p className="text-lg md:text-2xl font-black text-slate-900">
-            {subscriptions.filter(s => s.status === 'Active' && s.renew === 'Auto').length}
-          </p>
-        </div>
-      </div>
     </div>
   );
 };
