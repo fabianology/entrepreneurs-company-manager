@@ -91,6 +91,28 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
+  const handleQuickAddSubService = (sub: Subscription, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSubscription(sub);
+    // Add a small delay to ensure editingSubscription is set before handleAddSubService runs logic
+    // Actually, setting state and then calling a function that uses that state is tricky.
+    // Let's modify handleAddSubService to accept an optional base subscription.
+  };
+
+  const addSubServiceToSubscription = (sub: Subscription) => {
+    const newSub: SubService = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: '',
+      cost: 0,
+      status: 'Active'
+    };
+    const updatedSub = {
+      ...sub,
+      subServices: [...(sub.subServices || []), newSub]
+    };
+    setEditingSubscription(updatedSub);
+  };
+
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-8">
       {/* Action Bar */}
@@ -125,7 +147,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-black text-white">${sub.cost.toFixed(2)}</p>
+                  <p className="text-xl font-black text-white">
+                    ${(sub.cost + (sub.subServices?.reduce((acc, s) => acc + s.cost, 0) || 0)).toFixed(2)}
+                  </p>
                   <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
                 </div>
               </div>
@@ -151,18 +175,31 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
             {/* Supplemental Services Accordion */}
             <div className="border-t border-white/5">
-              <button
-                onClick={() => toggleExpanded(sub.id)}
-                className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group"
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="text-[11px] font-black uppercase tracking-[0.15em]">Supplemental Services</span>
-                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                    {sub.subServices?.length || 0}
+              <div className="flex items-center pr-6">
+                <button
+                  onClick={() => addSubServiceToSubscription(sub)}
+                  className="pl-6 h-14 flex items-center justify-center text-[#EBC351] hover:text-white transition-colors group/add"
+                  title="Add Supplemental Service"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => toggleExpanded(sub.id)}
+                  className="flex-1 h-14 flex items-center justify-between text-[#EBC351] group"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-[11px] font-black uppercase tracking-[0.15em]">Supplemental Services</span>
+                    <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                      {sub.subServices?.length || 0}
+                    </div>
                   </div>
-                </div>
-                <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-              </button>
+                  <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
 
               {expandedSubs.has(sub.id) && sub.subServices && (
                 <div className="px-6 pb-6 space-y-4 animate-fadeIn">
@@ -176,7 +213,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       <span className="text-xs font-black text-white">${child.cost.toFixed(2)}</span>
                     </div>
                   ))}
-                  <button className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition">+ add item</button>
+                  <button
+                    onClick={() => addSubServiceToSubscription(sub)}
+                    className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
+                  >
+                    + add item
+                  </button>
                 </div>
               )}
             </div>
@@ -221,7 +263,11 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
         <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
           <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Monthly Burn</p>
           <p className="text-2xl font-black text-white tracking-tighter">
-            ${subscriptions.reduce((acc, s) => acc + (s.billingCycle === 'Monthly' ? s.cost : s.cost / 12), 0).toFixed(0)}
+            ${subscriptions.reduce((acc, s) => {
+              const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
+              const subServicesMonthly = s.subServices?.reduce((sum, ss) => sum + ss.cost, 0) || 0;
+              return acc + baseMonthly + subServicesMonthly;
+            }, 0).toFixed(0)}
           </p>
         </div>
         <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
@@ -295,6 +341,68 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     placeholder="Authenticator"
                     onChange={e => setEditingSubscription({ ...editingSubscription, twoFactorAuth: e.target.value })}
                   />
+                </div>
+
+                {/* Sub-services Management Section */}
+                <div className="pt-4 border-t border-white/5">
+                  <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest ml-1">Supplemental Services</h4>
+                    <button
+                      onClick={handleAddSubService}
+                      className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition"
+                    >
+                      + ADD SERVICE
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {(editingSubscription.subServices || []).map((child, idx) => (
+                      <div key={child.id} className="bg-white/2 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-end md:items-center border border-white/5 group/sub">
+                        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3 w-full">
+                          <div className="md:col-span-2">
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="Service Name (e.g. Storage)"
+                              value={child.name}
+                              onChange={e => {
+                                const newSubs = [...(editingSubscription.subServices || [])];
+                                newSubs[idx] = { ...newSubs[idx], name: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                              }}
+                            />
+                          </div>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-white/30 text-xs">$</span>
+                            <input
+                              type="number"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl pl-6 pr-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="0.00"
+                              value={child.cost || ''}
+                              onChange={e => {
+                                const newSubs = [...(editingSubscription.subServices || [])];
+                                newSubs[idx] = { ...newSubs[idx], cost: parseFloat(e.target.value) || 0 };
+                                setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
+                            setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                          }}
+                          className="text-white/20 hover:text-orange-500 transition-colors p-1"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                    {(!editingSubscription.subServices || editingSubscription.subServices.length === 0) && (
+                      <div className="text-center py-6 bg-white/2 border border-dashed border-white/10 rounded-2xl text-white/30 text-[10px] font-black uppercase tracking-widest">
+                        No supplemental services added
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
