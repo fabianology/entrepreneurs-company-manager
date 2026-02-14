@@ -212,34 +212,83 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               )}
             </div>
 
-            {/* Email Logic Accordion */}
+            {/* Linked Emails Accordion */}
             <div className="border-t border-white/5">
               <button
                 onClick={() => toggleEmailExpanded(sub.id)}
                 className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group bg-white/2"
               >
-                <span className="text-[11px] font-black uppercase tracking-[0.15em]">Linked Emails</span>
+                <div className="flex items-center space-x-3">
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em]">Linked Emails</span>
+                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                    {sub.linkedEmails?.length || 0}
+                  </div>
+                </div>
                 <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedEmails.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
               </button>
 
               {expandedEmails.has(sub.id) && (
-                <div className="px-6 pb-6 space-y-4 animate-fadeIn">
-                  <div className="space-y-4 border-l-2 border-[#EBC351]/20 pl-4 ml-1">
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest font-mono">PRIMARY EMAIL</p>
-                      <p className="text-xs font-black text-white">{sub.email || 'founder@company.com'}</p>
+                <div className="px-6 pb-8 space-y-8 animate-fadeIn">
+                  {(sub.linkedEmails || []).map((email, idx) => (
+                    <div key={email.id || idx} className="space-y-6 pt-4 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-6">
+                        {/* Row 1 */}
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Email</p>
+                          <p className="text-xs font-black text-white">{email.email}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Forwarding</p>
+                          <p className="text-xs font-black text-white">{email.forwarding || 'N/A'}</p>
+                        </div>
+
+                        {/* Row 2 */}
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used For</p>
+                          <p className="text-xs font-black text-white">{email.usedFor}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used In</p>
+                          <p className="text-xs font-black text-white">{email.usedIn}</p>
+                        </div>
+
+                        {/* Row 3 */}
+                        <div className="col-span-2 space-y-1">
+                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Access Method</p>
+                          <p className="text-xs font-black text-white">{email.accessMethod}</p>
+                        </div>
+
+                        {/* Row 4: Notes */}
+                        <div className="col-span-2 space-y-2">
+                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
+                          <div className="space-y-1">
+                            {email.notes.map((note, nIdx) => (
+                              <div key={nIdx} className="flex items-start space-x-2">
+                                <span className="text-[#EBC351] mt-1">•</span>
+                                <p className="text-xs text-white/80 leading-relaxed font-medium">{note}</p>
+                              </div>
+                            ))}
+                            <button className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest pt-1 hover:text-white transition-colors">
+                              + add note
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setEditingSubscription(sub)}
+                        className="absolute bottom-0 right-0 text-[10px] font-black text-[#EBC351] uppercase tracking-widest hover:text-white transition-colors p-1"
+                      >
+                        + edit
+                      </button>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest font-mono">PURPOSE</p>
-                      <p className="text-xs font-bold text-white/70 italic leading-relaxed">
-                        "{sub.emailPurpose || 'Admin ownership and secondary billing alerts'}"
-                      </p>
+                  ))}
+
+                  {(!sub.linkedEmails || sub.linkedEmails.length === 0) && (
+                    <div className="text-center py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">
+                      No linked emails found
                     </div>
-                  </div>
-                  <div className="flex space-x-4 pt-2">
-                    <button className="text-[9px] font-black text-white/30 uppercase tracking-widest hover:text-[#EBC351] transition">+ add note</button>
-                    <button onClick={() => setEditingSubscription(sub)} className="text-[9px] font-black text-white/30 uppercase tracking-widest hover:text-[#EBC351] transition">+ edit</button>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
@@ -285,7 +334,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Service Name</label>
                   <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                     value={editingSubscription.name || ''}
                     placeholder="e.g. Shopify"
                     onChange={e => setEditingSubscription({ ...editingSubscription, name: e.target.value })}
@@ -296,15 +345,15 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
                     <input
                       type="number"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                       value={editingSubscription.cost || ''}
-                      onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) })}
+                      onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cycle</label>
                     <select
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                       value={editingSubscription.billingCycle || 'Monthly'}
                       onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
                     >
@@ -316,7 +365,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Website URL</label>
                   <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                     value={editingSubscription.website || ''}
                     placeholder="shopify.com"
                     onChange={e => setEditingSubscription({ ...editingSubscription, website: e.target.value })}
@@ -325,7 +374,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">2FA Status</label>
                   <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                     value={editingSubscription.twoFactorAuth || ''}
                     placeholder="Authenticator"
                     onChange={e => setEditingSubscription({ ...editingSubscription, twoFactorAuth: e.target.value })}
@@ -333,8 +382,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
 
                 {/* Sub-services Management Section */}
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex justify-between items-center mb-4">
+                <div className="pt-8 border-t border-white/5">
+                  <div className="flex justify-between items-center mb-6">
                     <h4 className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest ml-1">Supplemental Services</h4>
                     <button
                       onClick={handleAddSubService}
@@ -344,9 +393,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </button>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {(editingSubscription.subServices || []).map((child, idx) => (
-                      <div key={child.id} className="bg-white/2 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-end md:items-center border border-white/5 group/sub">
+                      <div key={child.id} className="bg-white/2 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-end md:items-center border border-white/5 group/sub relative">
                         <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3 w-full">
                           <div className="md:col-span-2">
                             <input
@@ -393,12 +442,135 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     )}
                   </div>
                 </div>
+
+                {/* Linked Emails Management Section */}
+                <div className="pt-8 border-t border-white/5">
+                  <div className="flex justify-between items-center mb-6">
+                    <h4 className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest ml-1">Linked Emails</h4>
+                    <button
+                      onClick={() => {
+                        const newEmail = {
+                          id: Math.random().toString(36).substr(2, 9),
+                          email: '',
+                          forwarding: '',
+                          usedFor: '',
+                          usedIn: '',
+                          accessMethod: '',
+                          notes: []
+                        };
+                        setEditingSubscription({
+                          ...editingSubscription,
+                          linkedEmails: [...(editingSubscription.linkedEmails || []), newEmail]
+                        });
+                      }}
+                      className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition"
+                    >
+                      + ADD EMAIL
+                    </button>
+                  </div>
+
+                  <div className="space-y-6">
+                    {(editingSubscription.linkedEmails || []).map((email, idx) => (
+                      <div key={email.id} className="bg-white/2 p-6 rounded-3xl border border-white/5 space-y-4 relative group/email-edit">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Email Address</label>
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="email@example.com"
+                              value={email.email}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], email: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Forwarding</label>
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="N/A or Destination"
+                              value={email.forwarding}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], forwarding: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Used For</label>
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="e.g. Personal use"
+                              value={email.usedFor}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], usedFor: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Used In</label>
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="e.g. Shopify"
+                              value={email.usedIn}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], usedIn: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                          <div className="col-span-full space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Access Method</label>
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="e.g. Gmail, Apple Mail"
+                              value={email.accessMethod}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], accessMethod: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                          <div className="col-span-full space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Notes (one per line)</label>
+                            <textarea
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold h-24 resize-none"
+                              placeholder="Main email used for...&#10;Secondary contact..."
+                              value={email.notes.join('\n')}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], notes: e.target.value.split('\n') };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newEmails = editingSubscription.linkedEmails?.filter((_, i) => i !== idx);
+                            setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                          }}
+                          className="absolute top-4 right-4 text-white/20 hover:text-orange-500 transition-colors p-1"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="p-8 bg-black/20 border-t border-white/5 flex justify-end space-x-4">
               <button onClick={() => setEditingSubscription(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
-              <button onClick={handleSaveModal} className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
+              <button onClick={handleSaveModal} className="px-8 py-3 bg-[#EBC351] rounded-2xl text-[11px] font-black text-black uppercase tracking-widest shadow-lg shadow-[#EBC351]/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
             </div>
           </div>
         </div>

@@ -37,6 +37,16 @@ export interface SubService {
   status: 'Active' | 'Cancelled' | 'Pending';
 }
 
+export interface LinkedEmail {
+  id: string;
+  email: string;
+  forwarding: string;
+  usedFor: string;
+  usedIn: string;
+  accessMethod: string;
+  notes: string[];
+}
+
 export interface Subscription {
   id: string;
   companyId: string;
@@ -49,8 +59,7 @@ export interface Subscription {
   renew?: 'Auto' | 'Manual';
   status: 'Active' | 'Cancelled' | 'Pending';
   subServices?: SubService[];
-  email?: string;
-  emailPurpose?: string;
+  linkedEmails?: LinkedEmail[];
   website?: string;
   twoFactorAuth?: string; // e.g. 'Authenticator', 'SMS', 'None'
   lastUpdated?: number; // timestamp

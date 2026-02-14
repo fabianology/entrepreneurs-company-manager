@@ -136,16 +136,17 @@ const AccountList: React.FC<AccountListProps> = ({
           <div key={acc.id} className={`bg-[#1C1C1E] rounded-[24px] overflow-hidden border ${acc.status === 'Active' ? 'border-[#0091FF]' : 'border-white/5'} shadow-2xl flex flex-col`}>
             {/* Header / Main Info - Clickable */}
             <div className="p-6 space-y-6">
-              <div
-                className="flex justify-between items-start cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => setEditingAccount(acc)}
-              >
+              <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-4">
-                  <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 overflow-hidden">
+                  <div
+                    className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 overflow-hidden cursor-pointer hover:bg-white/10 hover:scale-105 transition active:scale-95 group/logo"
+                    onClick={() => setEditingAccount(acc)}
+                    title="Edit account"
+                  >
                     {acc.platform.toLowerCase() === 'shopify' ? (
-                      <img src="https://cdn.worldvectorlogo.com/logos/shopify.svg" className="w-8 h-8" alt="Shopify" />
+                      <img src="https://cdn.worldvectorlogo.com/logos/shopify.svg" className="w-8 h-8 group-hover/logo:scale-110 transition-transform" alt="Shopify" />
                     ) : (
-                      <span className="text-white font-black text-xl opacity-80">{acc.platform.charAt(0)}</span>
+                      <span className="text-white font-black text-xl opacity-80 group-hover/logo:opacity-100 transition-opacity">{acc.platform.charAt(0)}</span>
                     )}
                   </div>
                   <div>
