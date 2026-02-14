@@ -633,7 +633,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex bg-black min-h-screen flex-col md:flex-row pb-24 md:pb-0 relative isolate text-white">
+    <div className="flex bg-black min-h-screen flex-col md:flex-row pb-64 md:pb-64 relative isolate text-white">
       <style>{`
         @keyframes blink {
           0%, 100% { opacity: 1; }
@@ -825,87 +825,113 @@ const App: React.FC = () => {
           )}
 
           <div
-            className="fixed bottom-8 left-0 right-0 mx-auto max-w-3xl px-4 z-50 flex items-end justify-center gap-3 pointer-events-none"
+            className="fixed bottom-8 left-0 right-0 mx-auto max-w-3xl px-4 z-50 flex flex-col items-center gap-4 pointer-events-none"
           >
-            <div className="relative pointer-events-auto">
-              {showQuickMenu && (
-                <div className="absolute bottom-full left-0 mb-4 w-64 bg-white/60 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
-                  <button
-                    onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); setShowQuickMenu(false); }}
-                    className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
-                  >
-                    <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                    Dashboard
-                  </button>
-                  <div className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Jump to Company</div>
-                  {state.companies.map(c => (
+            <div className="flex items-end justify-center gap-3 w-full">
+              <div className="relative pointer-events-auto">
+                {showQuickMenu && (
+                  <div className="absolute bottom-full left-0 mb-4 w-64 bg-white/60 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
                     <button
-                      key={c.id}
-                      onClick={() => { selectCompanyFromDashboard(c.id); setShowQuickMenu(false); }}
-                      className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
+                      onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); setShowQuickMenu(false); }}
+                      className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
                     >
-                      <div className="w-2 h-2 rounded-full ring-2 ring-white/50" style={{ backgroundColor: c.color }}></div>
-                      {c.name}
+                      <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                      Dashboard
                     </button>
-                  ))}
-                </div>
-              )}
-              <button
-                onClick={() => setShowQuickMenu(!showQuickMenu)}
-                className={`w-14 h-14 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/30 border-white/30 text-slate-700 hover:bg-white/50'}`}
-              >
-                {showQuickMenu ? (
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                ) : (
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                )}
-              </button>
-            </div>
-
-            <div className="relative group flex-1 max-w-2xl pointer-events-auto" ref={searchContainerRef}>
-              <div className="relative shadow-2xl rounded-full group transition-all duration-300 hover:scale-[1.01]">
-                <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none z-10">
-                  <svg className="h-6 w-6 text-stone-500 group-focus-within:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-
-                {!searchQuery && (
-                  <div
-                    className={`absolute inset-y-0 left-16 flex items-center pointer-events-none transition-opacity duration-200 ${isInputFocused ? 'opacity-100' : 'opacity-0'}`}
-                  >
-                    <div className="h-5 w-[2.5px] bg-indigo-500 animate-blink"></div>
+                    <div className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Jump to Company</div>
+                    {state.companies.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => { selectCompanyFromDashboard(c.id); setShowQuickMenu(false); }}
+                        className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
+                      >
+                        <div className="w-2 h-2 rounded-full ring-2 ring-white/50" style={{ backgroundColor: c.color }}></div>
+                        {c.name}
+                      </button>
+                    ))}
                   </div>
                 )}
-
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  className="block w-full pl-16 pr-16 py-4 bg-stone-950 border border-white/5 rounded-full text-base font-medium text-white placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-2xl"
-                  placeholder="Search"
-                  value={searchQuery}
-                  onFocus={() => {
-                    setIsInputFocused(true);
-                    if (searchQuery) setShowSearchDropdown(true);
-                  }}
-                  onBlur={() => setIsInputFocused(false)}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setShowSearchDropdown(!!e.target.value);
-                  }}
-                />
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center space-x-3 z-10">
-                  {searchQuery && (
-                    <button
-                      onClick={clearSearch}
-                      className="text-stone-500 hover:text-white transition-colors p-1"
-                    >
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                <button
+                  onClick={() => setShowQuickMenu(!showQuickMenu)}
+                  className={`w-14 h-14 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/30 border-white/30 text-slate-700 hover:bg-white/50'}`}
+                >
+                  {showQuickMenu ? (
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  ) : (
+                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                   )}
+                </button>
+              </div>
+
+              <div className="relative group flex-1 max-w-2xl pointer-events-auto" ref={searchContainerRef}>
+                <div className="relative shadow-2xl rounded-full group transition-all duration-300 hover:scale-[1.01]">
+                  <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none z-10">
+                    <svg className="h-6 w-6 text-stone-500 group-focus-within:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+
+                  {!searchQuery && (
+                    <div
+                      className={`absolute inset-y-0 left-16 flex items-center pointer-events-none transition-opacity duration-200 ${isInputFocused ? 'opacity-100' : 'opacity-0'}`}
+                    >
+                      <div className="h-5 w-[2.5px] bg-indigo-500 animate-blink"></div>
+                    </div>
+                  )}
+
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    className="block w-full pl-16 pr-16 py-4 bg-stone-950 border border-white/5 rounded-full text-base font-medium text-white placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-2xl"
+                    placeholder="Search"
+                    value={searchQuery}
+                    onFocus={() => {
+                      setIsInputFocused(true);
+                      if (searchQuery) setShowSearchDropdown(true);
+                    }}
+                    onBlur={() => setIsInputFocused(false)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setShowSearchDropdown(!!e.target.value);
+                    }}
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-4 flex items-center space-x-3 z-10">
+                    {searchQuery && (
+                      <button
+                        onClick={clearSearch}
+                        className="text-stone-500 hover:text-white transition-colors p-1"
+                      >
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+
+            {selectedCompanyId && activeView === 'company' && (
+              <div className="w-full max-w-xl mx-auto pointer-events-auto">
+                <div className="bg-stone-900/60 backdrop-blur-xl p-1.5 rounded-2xl shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5">
+                  {[
+                    { id: 'accounts', label: 'Logins' },
+                    { id: 'subscriptions', label: 'Services' },
+                    { id: 'financial', label: 'Financial' },
+                    { id: 'docs', label: 'Docs' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
+                      className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${activeTab === tab.id
+                        ? 'bg-[#EBC351] text-black shadow-lg scale-[1.02]'
+                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                        }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {activeView === 'dashboard' ? (
@@ -1052,27 +1078,6 @@ const App: React.FC = () => {
                     </div>
                   </header>
 
-                  <div className="sticky top-6 z-40 w-full max-w-xl mx-auto mb-10">
-                    <div className="bg-stone-100 p-1.5 rounded-2xl shadow-xl border border-white/40 flex justify-between items-center ring-1 ring-black/5">
-                      {[
-                        { id: 'accounts', label: 'Logins' },
-                        { id: 'subscriptions', label: 'Services' },
-                        { id: 'financial', label: 'Financial' },
-                        { id: 'docs', label: 'Docs' }
-                      ].map(tab => (
-                        <button
-                          key={tab.id}
-                          onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
-                          className={`relative z-10 flex-1 px-4 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === tab.id
-                            ? 'bg-stone-200 text-stone-900 shadow-sm'
-                            : 'text-stone-500 hover:text-stone-900 hover:bg-stone-200/50'
-                            }`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
 
                   <div className="mt-8">
                     {activeTab === 'subscriptions' && (
