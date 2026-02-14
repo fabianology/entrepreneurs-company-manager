@@ -6,7 +6,7 @@ import SubscriptionList from './components/SubscriptionList';
 import FinancialList from './components/FinancialList';
 import DocumentList from './components/DocumentList';
 import { AppState, Company, Account, Subscription, FinancialCard, Loan, Institution, CompanyDocument } from './types';
-import { analyzeSubscriptions, getEntrepreneurialQuote } from './services/geminiService';
+import { getEntrepreneurialQuote } from './services/geminiService';
 import { db } from './services/dbService';
 
 const BRAND_COLORS = [
@@ -27,14 +27,12 @@ const App: React.FC = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(() => localStorage.getItem('fs_selected_company'));
 
   // Initialize tab state, migrating old 'stack' value to 'accounts'
-  const [activeTab, setActiveTab] = useState<'accounts' | 'subscriptions' | 'financial' | 'docs' | 'insights'>(() => {
+  const [activeTab, setActiveTab] = useState<'accounts' | 'subscriptions' | 'financial' | 'docs'>(() => {
     const stored = localStorage.getItem('fs_tab');
     if (stored === 'stack') return 'accounts';
     return (stored as any) || 'accounts';
   });
 
-  const [geminiInsights, setGeminiInsights] = useState<string>('');
-  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [isEditingCompanyName, setIsEditingCompanyName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [showIconMenu, setShowIconMenu] = useState(false);
@@ -605,24 +603,10 @@ const App: React.FC = () => {
     }) : null);
   };
 
-  const generateInsights = useCallback(async () => {
-    if (!selectedCompanyId) return;
-    setIsGeneratingInsights(true);
-    const insights = await analyzeSubscriptions(companySubscriptions);
-    setGeminiInsights(insights || "No strategic insights available.");
-    setIsGeneratingInsights(false);
-  }, [selectedCompanyId, companySubscriptions]);
-
-  useEffect(() => {
-    if (activeTab === 'insights' && !geminiInsights && !isGeneratingInsights) {
-      generateInsights();
-    }
-  }, [activeTab, geminiInsights, isGeneratingInsights, generateInsights]);
 
   const selectCompanyFromDashboard = (id: string) => {
     setSelectedCompanyId(id);
     setActiveView('company');
-    setGeminiInsights('');
     setActiveTab('accounts');
     setIsEditingCompanyName(false);
     setIsEditingDescription(false);
@@ -1074,8 +1058,7 @@ const App: React.FC = () => {
                         { id: 'accounts', label: 'Logins' },
                         { id: 'subscriptions', label: 'Services' },
                         { id: 'financial', label: 'Financial' },
-                        { id: 'docs', label: 'Docs' },
-                        { id: 'insights', label: 'Insights' }
+                        { id: 'docs', label: 'Docs' }
                       ].map(tab => (
                         <button
                           key={tab.id}
@@ -1110,7 +1093,6 @@ const App: React.FC = () => {
                           onUpdateAccount={handleUpdateAccount}
                           onDeleteAccount={handleDeleteAccount}
                           subscriptions={state.subscriptions}
-                          geminiInsights={geminiInsights}
                         />
                       </div>
                     )}

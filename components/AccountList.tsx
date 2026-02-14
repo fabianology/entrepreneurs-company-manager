@@ -5,7 +5,6 @@ import { Account, Subscription } from '../types';
 interface AccountListProps {
   accounts: Account[];
   subscriptions: Subscription[];
-  geminiInsights?: string;
   onAddAccount: (account: Partial<Account>) => void;
   onUpdateAccount: (id: string, updates: Partial<Account>) => void;
   onDeleteAccount: (id: string) => void;

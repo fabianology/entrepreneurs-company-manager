@@ -112,8 +112,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             <div className="p-6 space-y-6">
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-4">
-                  <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10">
-                    <span className="text-white font-black text-xl opacity-80">{sub.name.charAt(0)}</span>
+                  <div
+                    className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 cursor-pointer hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300 group/logo"
+                    onClick={() => setEditingSubscription(sub)}
+                    title="Edit Service"
+                  >
+                    <span className="text-white font-black text-xl opacity-80 group-hover/logo:text-[#1FE400] transition-colors">{sub.name.charAt(0)}</span>
                   </div>
                   <div>
                     <h3 className="text-lg font-black tracking-tight text-white uppercase">{sub.name}</h3>
