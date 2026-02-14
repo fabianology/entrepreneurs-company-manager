@@ -830,22 +830,22 @@ const App: React.FC = () => {
             <div className="flex items-end justify-center gap-3 w-full">
               <div className="relative pointer-events-auto">
                 {showQuickMenu && (
-                  <div className="absolute bottom-full left-0 mb-4 w-64 bg-white/60 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
+                  <div className="absolute bottom-full left-0 mb-4 w-72 bg-black/60 backdrop-blur-3xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-[2rem] overflow-hidden p-2.5 animate-fadeIn flex flex-col gap-1.5">
                     <button
                       onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); setShowQuickMenu(false); }}
-                      className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
+                      className={`text-left px-4 py-3.5 rounded-2xl text-sm font-bold tracking-tight transition-all flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'hover:bg-white/5 text-white/70 hover:text-white'}`}
                     >
                       <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                       Dashboard
                     </button>
-                    <div className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Jump to Company</div>
+                    <div className="px-4 py-1 text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">Jump to Company</div>
                     {state.companies.map(c => (
                       <button
                         key={c.id}
                         onClick={() => { selectCompanyFromDashboard(c.id); setShowQuickMenu(false); }}
-                        className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
+                        className={`text-left px-4 py-3 rounded-2xl text-sm font-bold tracking-tight transition-all flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-white/10 text-white ring-1 ring-white/20' : 'hover:bg-white/5 text-white/60 hover:text-white'}`}
                       >
-                        <div className="w-2 h-2 rounded-full ring-2 ring-white/50" style={{ backgroundColor: c.color }}></div>
+                        <div className="w-2.5 h-2.5 rounded-full ring-2 ring-white/10" style={{ backgroundColor: c.color }}></div>
                         {c.name}
                       </button>
                     ))}
@@ -853,12 +853,12 @@ const App: React.FC = () => {
                 )}
                 <button
                   onClick={() => setShowQuickMenu(!showQuickMenu)}
-                  className={`w-14 h-14 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/30 border-white/30 text-slate-700 hover:bg-white/50'}`}
+                  className={`w-14 h-14 rounded-full backdrop-blur-3xl border shadow-2xl flex items-center justify-center transition-all duration-500 hover:scale-110 active:scale-90 ${showQuickMenu ? 'bg-indigo-600 border-indigo-400 text-white rotate-90' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
                 >
                   {showQuickMenu ? (
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                   ) : (
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 8h16M4 16h16" /></svg>
                   )}
                 </button>
               </div>
@@ -882,8 +882,8 @@ const App: React.FC = () => {
                   <input
                     ref={searchInputRef}
                     type="text"
-                    className="block w-full pl-16 pr-16 py-4 bg-stone-950 border border-white/5 rounded-full text-base font-medium text-white placeholder-stone-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-2xl"
-                    placeholder="Search"
+                    className="block w-full pl-16 pr-16 py-4.5 bg-black/30 backdrop-blur-3xl border border-white/10 rounded-full text-lg font-bold text-white placeholder-white/30 focus:outline-none focus:ring-4 focus:ring-indigo-500/20 transition-all shadow-[0_20px_50px_rgba(0,0,0,0.4)]"
+                    placeholder="Search anything..."
                     value={searchQuery}
                     onFocus={() => {
                       setIsInputFocused(true);
@@ -911,7 +911,7 @@ const App: React.FC = () => {
 
             {selectedCompanyId && activeView === 'company' && (
               <div className="w-full max-w-xl mx-auto pointer-events-auto">
-                <div className="bg-stone-900/60 backdrop-blur-xl p-1.5 rounded-2xl shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5">
+                <div className="bg-black/40 backdrop-blur-3xl p-2 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 flex justify-between items-center ring-1 ring-white/5">
                   {[
                     { id: 'accounts', label: 'Logins' },
                     { id: 'subscriptions', label: 'Services' },
@@ -921,9 +921,9 @@ const App: React.FC = () => {
                     <button
                       key={tab.id}
                       onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
-                      className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${activeTab === tab.id
-                        ? 'bg-[#EBC351] text-black shadow-lg scale-[1.02]'
-                        : 'text-white/40 hover:text-white hover:bg-white/5'
+                      className={`relative z-10 flex-1 px-5 py-3 text-[11px] font-black uppercase tracking-[0.2em] rounded-2xl transition-all duration-500 ${activeTab === tab.id
+                        ? 'bg-white text-black shadow-[0_10px_20px_rgba(255,255,255,0.1)] scale-[1.05] z-20'
+                        : 'text-white/30 hover:text-white/70 hover:bg-white/5'
                         }`}
                     >
                       {tab.label}
