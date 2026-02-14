@@ -191,7 +191,7 @@ const AccountList: React.FC<AccountListProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Last Updated</p>
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Last Serviced</p>
                   <p className="text-xs font-black text-white">{acc.lastUpdated ? new Date(acc.lastUpdated).toLocaleDateString() : '1/23/2022'}</p>
                 </div>
               </div>

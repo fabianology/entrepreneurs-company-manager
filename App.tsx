@@ -281,7 +281,7 @@ const App: React.FC = () => {
       return {
         ...prev,
         companies: updatedCompanies,
-        accounts: prev.accounts.map(a => a.id === id ? { ...a, ...updates } : a),
+        accounts: prev.accounts.map(a => a.id === id ? { ...a, ...updates, lastUpdated: Date.now() } : a),
         subscriptions: updatedSubscriptions
       };
     });
@@ -311,7 +311,7 @@ const App: React.FC = () => {
       return {
         ...prev,
         companies: prev.companies.map(c => c.id === sub?.companyId ? { ...c, lastModified: Date.now() } : c),
-        subscriptions: prev.subscriptions.map(s => s.id === id ? { ...s, ...updates } : s)
+        subscriptions: prev.subscriptions.map(s => s.id === id ? { ...s, ...updates, lastUpdated: Date.now() } : s)
       };
     });
   };
