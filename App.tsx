@@ -649,7 +649,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex bg-zinc-200 min-h-screen flex-col md:flex-row pb-24 md:pb-0 relative isolate">
+    <div className="flex bg-black min-h-screen flex-col md:flex-row pb-24 md:pb-0 relative isolate text-white">
       <style>{`
         @keyframes blink {
           0%, 100% { opacity: 1; }
@@ -679,7 +679,7 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 md:ml-64 relative transition-all duration-300">
-        <div className="absolute top-0 left-0 right-0 h-[35vh] bg-stone-950 z-0"></div>
+        <div className="absolute top-0 left-0 right-0 h-[35vh] bg-[#000000] z-0"></div>
 
         <div className="relative z-10 p-4 md:p-8 max-w-6xl mx-auto space-y-6">
 
@@ -1081,8 +1081,8 @@ const App: React.FC = () => {
                           key={tab.id}
                           onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
                           className={`relative z-10 flex-1 px-4 py-2 text-xs md:text-sm font-bold rounded-xl transition-all duration-300 ${activeTab === tab.id
-                              ? 'bg-stone-200 text-stone-900 shadow-sm'
-                              : 'text-stone-500 hover:text-stone-900 hover:bg-stone-200/50'
+                            ? 'bg-stone-200 text-stone-900 shadow-sm'
+                            : 'text-stone-500 hover:text-stone-900 hover:bg-stone-200/50'
                             }`}
                         >
                           {tab.label}
