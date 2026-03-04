@@ -351,11 +351,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <div className="p-6 border-b border-white/5">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-white overflow-hidden border border-white/10">
+                      <div className="w-10 h-10 flex items-center justify-center text-white overflow-hidden">
                         {inst.loginUrl ? (
                           <img
                             src={getFaviconUrl(inst.loginUrl) || ''}
-                            className="w-7 h-7 object-contain"
+                            className="w-10 h-10 object-contain"
                             alt=""
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
@@ -365,7 +365,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           />
                         ) : null}
                         <svg
-                          className="w-6 h-6"
+                          className="w-8 h-8 opacity-40 shrink-0"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
