@@ -20,6 +20,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set());
   const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const datePickerRef = useRef<HTMLInputElement>(null);
 
   const handleAddNew = () => {
@@ -57,6 +58,13 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setExpandedEmails(newSet);
+  };
+
+  const toggleDetailExpanded = (emailId: string) => {
+    const newSet = new Set(expandedDetails);
+    if (newSet.has(emailId)) newSet.delete(emailId);
+    else newSet.add(emailId);
+    setExpandedDetails(newSet);
   };
 
   const handleSaveModal = () => {
@@ -246,60 +254,85 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
               {expandedEmails.has(sub.id) && (
                 <div className="px-6 pb-8 space-y-8 animate-fadeIn">
-                  {(sub.linkedEmails || []).map((email, idx) => (
-                    <div key={email.id || idx} className="space-y-6 pt-4 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
-                      <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                        {/* Row 1 */}
-                        <div className="space-y-1">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Email</p>
-                          <p className="text-xs font-black text-white">{email.email}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Forwarding</p>
-                          <p className="text-xs font-black text-white">{email.forwarding || 'N/A'}</p>
-                        </div>
-
-                        {/* Row 2 */}
-                        <div className="space-y-1">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used For</p>
-                          <p className="text-xs font-black text-white">{email.usedFor}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used In</p>
-                          <p className="text-xs font-black text-white">{email.usedIn}</p>
-                        </div>
-
-                        {/* Row 3 */}
-                        <div className="col-span-2 space-y-1">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Access Method</p>
-                          <p className="text-xs font-black text-white">{email.accessMethod}</p>
-                        </div>
-
-                        {/* Row 4: Notes */}
-                        <div className="col-span-2 space-y-2">
-                          <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
+                  {(sub.linkedEmails || []).map((email, idx) => {
+                    const emailId = email.id || String(idx);
+                    const isExpanded = expandedDetails.has(emailId);
+                    return (
+                      <div key={emailId} className="pt-4 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
+                        {/* Header Toggle */}
+                        <button
+                          onClick={() => toggleDetailExpanded(emailId)}
+                          className="w-full text-left grid grid-cols-[1fr,1fr,auto] gap-x-8 py-2 hover:bg-white/5 transition-colors rounded-xl px-4 -mx-4 group/toggle"
+                        >
                           <div className="space-y-1">
-                            {email.notes.map((note, nIdx) => (
-                              <div key={nIdx} className="flex items-start space-x-2">
-                                <span className="text-[#EBC351] mt-1">•</span>
-                                <p className="text-xs text-white/80 leading-relaxed font-medium">{note}</p>
+                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Email</p>
+                            <p className="text-xs font-black text-white truncate">{email.email}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used For</p>
+                            <p className="text-xs font-black text-white truncate">{email.usedFor}</p>
+                          </div>
+                          <div className="flex items-center">
+                            <svg
+                              className={`w-3 h-3 text-white/20 group-hover/toggle:text-[#EBC351] transform transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'rotate-180 text-[#EBC351]' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+
+                        {/* Collapsible Drawer */}
+                        <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'max-h-[500px] opacity-100 mt-6 pb-2' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-6 px-4 -mx-4">
+                            {/* Row 2 */}
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Forwarding</p>
+                              <p className="text-xs font-black text-white">{email.forwarding || 'N/A'}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used In</p>
+                              <p className="text-xs font-black text-white">{email.usedIn}</p>
+                            </div>
+
+                            {/* Row 3 */}
+                            <div className="col-span-2 space-y-1">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Access Method</p>
+                              <p className="text-xs font-black text-white">{email.accessMethod}</p>
+                            </div>
+
+                            {/* Row 4: Notes */}
+                            <div className="col-span-2 space-y-2">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
+                              <div className="space-y-1">
+                                {email.notes.map((note, nIdx) => (
+                                  <div key={nIdx} className="flex items-start space-x-2">
+                                    <span className="text-[#EBC351] mt-1">•</span>
+                                    <p className="text-xs text-white/80 leading-relaxed font-medium">{note}</p>
+                                  </div>
+                                ))}
+                                <button className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest pt-1 hover:text-white transition-colors">
+                                  + add note
+                                </button>
                               </div>
-                            ))}
-                            <button className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest pt-1 hover:text-white transition-colors">
-                              + add note
-                            </button>
+                            </div>
+
+                            <div className="col-span-2 pt-2 flex justify-end">
+                              <button
+                                onClick={() => setEditingSubscription(sub)}
+                                className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest hover:text-white transition-colors py-1 flex items-center space-x-1"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                <span>Edit Account</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      <button
-                        onClick={() => setEditingSubscription(sub)}
-                        className="absolute bottom-0 right-0 text-[10px] font-black text-[#EBC351] uppercase tracking-widest hover:text-white transition-colors p-1"
-                      >
-                        + edit
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <button
                     onClick={() => addEmailToSubscription(sub)}
@@ -511,19 +544,6 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Forwarding</label>
-                            <input
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="N/A or Destination"
-                              value={email.forwarding}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], forwarding: e.target.value };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-2">
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Used For</label>
                             <input
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
@@ -532,6 +552,19 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               onChange={e => {
                                 const newEmails = [...(editingSubscription.linkedEmails || [])];
                                 newEmails[idx] = { ...newEmails[idx], usedFor: e.target.value };
+                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                              }}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Forwarding</label>
+                            <input
+                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              placeholder="N/A or Destination"
+                              value={email.forwarding}
+                              onChange={e => {
+                                const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                newEmails[idx] = { ...newEmails[idx], forwarding: e.target.value };
                                 setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
                               }}
                             />
