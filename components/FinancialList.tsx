@@ -213,13 +213,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
   };
 
   return (
-    <div className="space-y-12 animate-fadeIn">
+    <div className="bg-black min-h-screen text-white p-4 space-y-12 animate-fadeIn">
       {/* --- PAYMENT METHODS --- */}
       <section className="space-y-6">
         <div className="flex justify-between items-center px-1">
           <div className="flex flex-col">
-            <h3 className="text-lg font-bold text-slate-800">Payment Methods</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <h3 className="text-lg font-black text-white">Payment Methods</h3>
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
               {isWalletExpanded ? 'Drag down to collapse' : 'Click stack to expand'}
             </p>
           </div>
@@ -227,16 +227,16 @@ const FinancialList: React.FC<FinancialListProps> = ({
             {isWalletExpanded && (
               <button
                 onClick={() => setIsWalletExpanded(false)}
-                className="text-indigo-600 text-sm font-bold hover:underline"
+                className="text-orange-500 text-[10px] font-black uppercase tracking-widest hover:text-orange-400 transition"
               >
                 Collapse
               </button>
             )}
             <button
               onClick={handleAddNewCard}
-              className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm active:scale-95"
+              className="bg-[#1C1C1E] text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5 active:scale-95"
             >
-              + Add Card
+              <span>+ Add Card</span>
             </button>
           </div>
         </div>
@@ -319,16 +319,16 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- BANKING INSTITUTIONS --- */}
       <section className="space-y-6">
-        <div className="flex justify-between items-center px-1 border-t border-slate-200 pt-8">
+        <div className="flex justify-between items-center px-1 border-t border-white/10 pt-8">
           <div className="flex flex-col">
-            <h3 className="text-lg font-bold text-slate-800">Banking Institutions</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Login & Linked Accounts</p>
+            <h3 className="text-lg font-black text-white">Banking Institutions</h3>
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Login & Linked Accounts</p>
           </div>
           <button
             onClick={handleAddNewInstitution}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
+            className="bg-[#1C1C1E] text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5 active:scale-95"
           >
-            + Add Institution
+            <span>+ Add Bank</span>
           </button>
         </div>
 
@@ -338,12 +338,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
             return (
               <div
                 key={inst.id}
-                className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow"
+                className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors"
               >
-                <div className="p-5 border-b border-slate-50 bg-gradient-to-br from-slate-50/50 to-white">
-                  <div className="flex justify-between items-start mb-4">
+                <div className="p-6 border-b border-white/5">
+                  <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white overflow-hidden shadow-sm">
+                      <div className="w-12 h-12 bg-white/5 rounded-xl flex items-center justify-center text-white overflow-hidden border border-white/10">
                         {inst.loginUrl ? (
                           <img
                             src={getFaviconUrl(inst.loginUrl) || ''}
@@ -367,66 +367,62 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         </svg>
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-900">{inst.name}</h4>
+                        <h4 className="font-black text-white text-base">{inst.name}</h4>
                         {inst.loginUrl && (
-                          <a href={inst.loginUrl} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 hover:underline flex items-center gap-1">
+                          <a href={inst.loginUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[#EBC351] hover:text-[#EBC351]/80 hover:underline flex items-center gap-1 font-black uppercase tracking-widest mt-1">
                             Launch Portal
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                           </a>
                         )}
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-black text-slate-900">${totalBalance.toLocaleString()}</p>
-                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Liquidity</p>
+                      <p className="text-xl font-black text-white">${totalBalance.toLocaleString()}</p>
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-1">Total Liquidity</p>
                     </div>
                   </div>
 
-                  <div className="bg-slate-50 rounded-xl p-3 space-y-2 border border-slate-100">
+                  <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/5">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-400 font-medium uppercase tracking-wide">Username / Email</span>
-                      <span className="text-slate-700 font-bold">{inst.username || inst.email || '-'}</span>
+                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Username / Email</span>
+                      <span className="font-black text-white truncate max-w-[150px]">{inst.username || inst.email || '-'}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-400 font-medium uppercase tracking-wide">Password</span>
+                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Password</span>
                       <div className="flex items-center space-x-2">
-                        <span className="text-slate-700 font-mono tracking-wider">{showPasswords.has(inst.id) ? (inst.password || '-') : '••••••••'}</span>
-                        <button onClick={() => togglePassword(inst.id)} className="text-slate-300 hover:text-indigo-500">
-                          {showPasswords.has(inst.id) ? (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242" /></svg>
-                          ) : (
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          )}
+                        <span className="font-black text-white font-mono tracking-wider truncate max-w-[120px]">{showPasswords.has(inst.id) ? (inst.password || '-') : '••••••••'}</span>
+                        <button onClick={() => togglePassword(inst.id)} className="text-[9px] font-black text-[#EBC351] uppercase ml-2">
+                          {showPasswords.has(inst.id) ? 'Hide' : 'Show'}
                         </button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-4 space-y-3">
+                <div className="p-6 space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Linked Accounts</span>
-                    <button onClick={() => setEditingInstitution(inst)} className="text-[10px] font-bold text-indigo-600 uppercase hover:text-indigo-800">Manage</button>
+                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Linked Accounts</span>
+                    <button onClick={() => setEditingInstitution(inst)} className="text-[9px] font-black text-[#EBC351] uppercase hover:text-[#EBC351]/80">Manage</button>
                   </div>
                   <div className="space-y-2">
-                    {inst.accounts.map(acc => (
-                      <div key={acc.id} className="flex justify-between items-center bg-slate-50/50 border border-slate-100 p-2.5 rounded-lg hover:bg-slate-50 transition">
+                    {inst.accounts.map((acc, aIdx) => (
+                      <div key={acc.id || aIdx} className="flex justify-between items-center bg-white/5 border border-white/5 p-3 rounded-xl hover:bg-white/10 transition cursor-default">
                         <div className="flex items-center space-x-3">
-                          <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-emerald-400' : acc.type === 'Credit Card' ? 'bg-rose-400' : 'bg-blue-400'}`}></span>
+                          <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
                           <div>
-                            <p className="text-xs font-bold text-slate-800">{acc.name}</p>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] text-slate-400 font-mono">••{acc.last4}</span>
-                              <span className="text-[9px] text-slate-400 uppercase">• {acc.type}</span>
+                            <p className="text-xs font-black text-white truncate max-w-[120px]">{acc.name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[9px] font-black text-white/40 font-mono tracking-widest">••{acc.last4}</span>
+                              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">• {acc.type}</span>
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs font-black text-slate-700">${acc.balance.toLocaleString()}</p>
+                          <p className="text-xs font-black text-white tracking-widest">${acc.balance.toLocaleString()}</p>
                         </div>
                       </div>
                     ))}
-                    {inst.accounts.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">No linked accounts.</p>}
+                    {inst.accounts.length === 0 && <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center py-4">No linked accounts</p>}
                   </div>
                 </div>
               </div>
@@ -437,28 +433,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- LOANS SECTION --- */}
       <section className="space-y-6">
-        <div className="flex justify-between items-center border-t border-slate-200 pt-8">
+        <div className="flex justify-between items-center border-t border-white/10 pt-8 px-1">
           <div className="flex flex-col">
-            <h3 className="text-lg font-bold text-slate-800">Loans & Debt</h3>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amortization</p>
+            <h3 className="text-lg font-black text-white">Loans & Debt</h3>
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Amortization</p>
           </div>
           <button
             onClick={() => onAddLoan({ lender: 'New Lender', principalAmount: 0, remainingBalance: 0 })}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition"
+            className="bg-[#1C1C1E] text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5 active:scale-95"
           >
-            + Add Loan
+            <span>+ Add Loan</span>
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loans.map(loan => (
-            <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col cursor-pointer hover:shadow-lg transition">
-              <div className="flex justify-between mb-4">
-                <h4 className="font-bold text-slate-800">{loan.name}</h4>
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-tighter bg-emerald-50 px-2 py-0.5 rounded-full">{loan.status}</span>
+            <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] p-6 shadow-2xl border border-white/5 flex flex-col cursor-pointer hover:border-white/10 transition-colors">
+              <div className="flex justify-between mb-6">
+                <h4 className="font-black text-white text-base">{loan.name}</h4>
+                <span className="text-[9px] font-black text-[#EBC351] uppercase tracking-[0.2em] bg-[#EBC351]/10 px-2.5 py-1 rounded-full">{loan.status}</span>
               </div>
-              <p className="text-xs text-slate-400 font-medium mb-1 uppercase tracking-widest">{loan.lender}</p>
-              <p className="text-xl font-black text-slate-900 mb-6">${loan.remainingBalance.toLocaleString()}</p>
-              <div className="mt-auto flex justify-between pt-4 border-t border-slate-50 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.lender}</p>
+              <p className="text-2xl font-black text-white mb-8">${loan.remainingBalance.toLocaleString()}</p>
+              <div className="mt-auto flex justify-between pt-6 border-t border-white/5 text-[10px] font-black uppercase tracking-widest text-white/40">
                 <span>{loan.interestRate}% Rate</span>
                 <span>${loan.monthlyPayment}/mo</span>
               </div>
@@ -469,48 +465,48 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT INSTITUTION MODAL --- */}
       {editingInstitution && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900">{editingInstitution.id ? 'Edit Bank' : 'Add Bank'}</h3>
-              <button onClick={() => setEditingInstitution(null)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
+          <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto border border-white/10">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-lg font-black text-white tracking-wide">{editingInstitution.id ? 'Edit Bank' : 'Add Bank'}</h3>
+              <button onClick={() => setEditingInstitution(null)} className="text-white/40 hover:text-white transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bank / Institution Name</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.name || ''} placeholder="e.g. Mercury" onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })} />
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Bank / Institution Name</label>
+                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.name || ''} placeholder="e.g. Mercury" onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Login Email/User</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.username || ''} placeholder="user@example.com" onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })} />
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login Email/User</label>
+                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.username || ''} placeholder="user@example.com" onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" type="text" value={editingInstitution.password || ''} placeholder="••••••" onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })} />
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Password</label>
+                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" type="text" value={editingInstitution.password || ''} placeholder="••••••" onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })} />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Login Portal URL</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.loginUrl || ''} placeholder="https://bank.com/login" onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })} />
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login Portal URL</label>
+                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.loginUrl || ''} placeholder="https://bank.com/login" onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })} />
                 </div>
               </div>
 
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Linked Accounts</h4>
-                  <button onClick={handleAddInstAccount} className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100">+ Add Account</button>
+              <div className="border-t border-white/5 pt-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h4 className="text-[9px] font-black text-white/40 uppercase tracking-widest">Linked Accounts</h4>
+                  <button onClick={handleAddInstAccount} className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition uppercase tracking-widest">+ Add Account</button>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {(editingInstitution.accounts || []).map((acc, idx) => (
-                    <div key={idx} className="bg-slate-50 p-3 rounded-lg flex flex-col md:flex-row gap-3 items-end md:items-center border border-slate-100">
-                      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
+                    <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-end md:items-center border border-white/5">
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                         <div className="md:col-span-1">
-                          <input className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" placeholder="Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                          <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
                         </div>
                         <div className="md:col-span-1">
-                          <select className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500 bg-white" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
+                          <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
                             <option value="Checking">Checking</option>
                             <option value="Savings">Savings</option>
                             <option value="Investing">Investing</option>
@@ -521,33 +517,33 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           </select>
                         </div>
                         <div className="md:col-span-1">
-                          <input className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                          <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
                         </div>
                         <div className="md:col-span-1 relative">
-                          <span className="absolute left-2 top-1.5 text-slate-400 text-xs">$</span>
-                          <input className="w-full pl-5 px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                          <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
+                          <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
                         </div>
                       </div>
-                      <button onClick={() => handleDeleteInstAccount(idx)} className="text-slate-400 hover:text-rose-600 p-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      <button onClick={() => handleDeleteInstAccount(idx)} className="text-white/20 hover:text-orange-500 p-2 transition">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   ))}
                   {(!editingInstitution.accounts || editingInstitution.accounts.length === 0) && (
-                    <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
-                      No accounts linked yet. Add Checking, Savings, etc.
+                    <div className="text-center py-8 border border-dashed border-white/10 rounded-xl text-[10px] font-black text-white/20 uppercase tracking-widest bg-white/5">
+                      No accounts linked yet
                     </div>
                   )}
                 </div>
               </div>
             </div>
-            <div className="p-6 bg-slate-50 border-t flex justify-between items-center">
+            <div className="p-6 border-t border-white/5 flex justify-between items-center bg-black/20">
               {editingInstitution.id && (
-                <button onClick={() => { onDeleteInstitution(editingInstitution.id!); setEditingInstitution(null); }} className="text-rose-500 text-sm font-bold hover:text-rose-700">Delete Bank</button>
+                <button onClick={() => { onDeleteInstitution(editingInstitution.id!); setEditingInstitution(null); }} className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest transition">Delete Bank</button>
               )}
-              <div className="flex space-x-3 ml-auto">
-                <button onClick={() => setEditingInstitution(null)} className="px-4 py-2 text-slate-500 font-bold hover:text-slate-700">Cancel</button>
-                <button onClick={handleSaveInstitution} className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm hover:bg-indigo-700">Save Bank</button>
+              <div className="flex space-x-4 ml-auto">
+                <button onClick={() => setEditingInstitution(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+                <button onClick={handleSaveInstitution} className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Bank</button>
               </div>
             </div>
           </div>
@@ -556,33 +552,33 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT CARD MODAL --- */}
       {editingCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
-              <h3 className="text-xl font-bold text-slate-900">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
+          <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto border border-white/10">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-lg font-black text-white tracking-wide">
                 {editingCard.id ? 'Edit Card Details' : 'Add New Card'}
               </h3>
-              <button onClick={() => setEditingCard(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setEditingCard(null)} className="text-white/40 hover:text-white transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Nickname</label>
+                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Nickname</label>
                 <input
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                   placeholder="e.g. Amex Gold - Advertising"
                   value={editingCard.name || ''}
                   onChange={e => setEditingCard({ ...editingCard, name: e.target.value })}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Network</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Network</label>
                   <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                     value={editingCard.network || 'Visa'}
                     onChange={e => setEditingCard({ ...editingCard, network: e.target.value as any })}
                   >
@@ -594,9 +590,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Type</label>
                   <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                     value={editingCard.type || 'Credit'}
                     onChange={e => setEditingCard({ ...editingCard, type: e.target.value as any })}
                   >
@@ -607,23 +603,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Holder Name</label>
+                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Holder Name</label>
                 <input
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                   placeholder="NAME ON CARD"
                   value={editingCard.cardHolder || ''}
                   onChange={e => setEditingCard({ ...editingCard, cardHolder: e.target.value })}
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-6">
                 <div className="col-span-2">
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Number (Last 4)</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Number (Last 4)</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-400 font-mono text-sm">•••• •••• ••••</span>
+                    <span className="absolute left-4 top-3.5 text-white/40 font-mono text-sm font-black tracking-widest">•••• •••• ••••</span>
                     <input
                       maxLength={4}
-                      className="w-full pl-36 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white font-mono"
+                      className="w-full pl-40 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold font-mono tracking-widest transition-colors"
                       placeholder="1234"
                       value={editingCard.last4 || ''}
                       onChange={e => setEditingCard({ ...editingCard, last4: e.target.value.replace(/\D/g, '') })}
@@ -631,9 +627,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expiry</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Expiry</label>
                   <input
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white text-center font-mono"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold text-center font-mono tracking-widest transition-colors"
                     placeholder="MM/YY"
                     maxLength={5}
                     value={editingCard.expiry || ''}
@@ -642,23 +638,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Credit Limit / Balance</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Credit Limit / Balance</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
                     <input
                       type="number"
-                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
                       value={editingCard.limit || ''}
                       onChange={e => setEditingCard({ ...editingCard, limit: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Status</label>
                   <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                     value={editingCard.status || 'Active'}
                     onChange={e => setEditingCard({ ...editingCard, status: e.target.value as any })}
                   >
@@ -670,20 +666,20 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="p-6 border-t border-white/5 bg-black/20 flex items-center justify-between">
               <div>
                 {editingCard.id && (
                   showDeleteConfirm ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3">
                       <button
                         onClick={() => { onDeleteCard(editingCard.id!); setEditingCard(null); }}
-                        className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
+                        className="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition"
                       >
                         Confirm
                       </button>
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="text-slate-500 text-xs font-bold underline"
+                        className="text-[10px] font-black text-white/40 hover:text-white uppercase tracking-widest transition"
                       >
                         Cancel
                       </button>
@@ -691,23 +687,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   ) : (
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="text-rose-500 text-sm font-bold hover:text-rose-700"
+                      className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest transition"
                     >
                       Remove Card
                     </button>
                   )
                 )}
               </div>
-              <div className="flex space-x-3">
+              <div className="flex space-x-4">
                 <button
                   onClick={() => setEditingCard(null)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
+                  className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveCardModal}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm hover:bg-indigo-700 transition"
+                  className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition"
                 >
                   Save Card
                 </button>
@@ -719,57 +715,57 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT LOAN MODAL --- */}
       {editingLoan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden my-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
-              <h3 className="text-xl font-bold text-slate-900">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
+          <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto border border-white/10">
+            <div className="p-6 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-lg font-black text-white tracking-wide">
                 {editingLoan.id ? 'Edit Loan Details' : 'Add New Financing'}
               </h3>
-              <button onClick={() => setEditingLoan(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setEditingLoan(null)} className="text-white/40 hover:text-white transition">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lender / Institution</label>
+                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
                 <input
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                   placeholder="e.g. Silicon Valley Bank"
                   value={editingLoan.lender || ''}
                   onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Loan Nickname</label>
+                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Nickname</label>
                 <input
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                   placeholder="e.g. Series A Venture Debt"
                   value={editingLoan.name || ''}
                   onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Original Principal</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Original Principal</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
                     <input
                       type="number"
-                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
                       value={editingLoan.principalAmount || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, principalAmount: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Current Balance</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Current Balance</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
                     <input
                       type="number"
-                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
                       value={editingLoan.remainingBalance || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, remainingBalance: parseFloat(e.target.value) })}
                     />
@@ -777,25 +773,25 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monthly Payment</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Monthly Payment</label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
                     <input
                       type="number"
-                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
                       value={editingLoan.monthlyPayment || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, monthlyPayment: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Interest Rate (%)</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Rate (%)</label>
                   <input
                     type="number"
                     step="0.1"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                     placeholder="5.5"
                     value={editingLoan.interestRate || ''}
                     onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
@@ -803,20 +799,20 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Term Length</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Term Length</label>
                   <input
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                     placeholder="e.g. 36 Months"
                     value={editingLoan.term || ''}
                     onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Status</label>
                   <select
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
                     value={editingLoan.status || 'Active'}
                     onChange={e => setEditingLoan({ ...editingLoan, status: e.target.value as any })}
                   >
@@ -828,20 +824,20 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div className="p-6 border-t border-white/5 bg-black/20 flex items-center justify-between">
               <div>
                 {editingLoan.id && (
                   showDeleteConfirm ? (
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3">
                       <button
                         onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); }}
-                        className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
+                        className="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition"
                       >
                         Confirm
                       </button>
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="text-slate-500 text-xs font-bold underline"
+                        className="text-[10px] font-black text-white/40 hover:text-white uppercase tracking-widest transition"
                       >
                         Cancel
                       </button>
@@ -849,23 +845,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   ) : (
                     <button
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="text-rose-500 text-sm font-bold hover:text-rose-700"
+                      className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest transition"
                     >
                       Remove Loan
                     </button>
                   )
                 )}
               </div>
-              <div className="flex space-x-3">
+              <div className="flex space-x-4">
                 <button
                   onClick={() => setEditingLoan(null)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
+                  className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveLoanModal}
-                  className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold shadow-sm hover:bg-emerald-700 transition"
+                  className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition"
                 >
                   Save Loan
                 </button>
