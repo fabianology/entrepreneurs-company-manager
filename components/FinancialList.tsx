@@ -439,26 +439,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   </button>
 
-                  <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${expandedInstitutions.has(inst.id) ? 'max-h-[1000px] opacity-100 p-6 pt-0' : 'max-h-0 opacity-0'}`}>
-                    <div className="space-y-2">
-                      {inst.accounts.map((acc, aIdx) => (
-                        <div key={acc.id || aIdx} className="flex justify-between items-center py-3 px-1 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition cursor-default">
-                          <div className="flex items-center space-x-3">
-                            <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
-                            <div>
-                              <p className="text-xs font-black text-white truncate max-w-[120px]">{acc.name}</p>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[9px] font-black text-white/40 font-mono tracking-widest">••{acc.last4}</span>
-                                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">• {acc.type}</span>
+                  <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${expandedInstitutions.has(inst.id) ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                    <div className="overflow-hidden">
+                      <div className="p-6 pt-0 space-y-2">
+                        {inst.accounts.map((acc, aIdx) => (
+                          <div key={acc.id || aIdx} className="flex justify-between items-center py-3 px-1 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition cursor-default">
+                            <div className="flex items-center space-x-3">
+                              <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
+                              <div>
+                                <p className="text-xs font-black text-white truncate max-w-[120px]">{acc.name}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[9px] font-black text-white/40 font-mono tracking-widest">••{acc.last4}</span>
+                                  <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">• {acc.type}</span>
+                                </div>
                               </div>
                             </div>
+                            <div className="text-right">
+                              <p className="text-xs font-black text-white tracking-widest">${acc.balance.toLocaleString()}</p>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-xs font-black text-white tracking-widest">${acc.balance.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      ))}
-                      {inst.accounts.length === 0 && <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center py-4">No linked accounts</p>}
+                        ))}
+                        {inst.accounts.length === 0 && <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center py-4">No linked accounts</p>}
+                      </div>
                     </div>
                   </div>
                 </div>
