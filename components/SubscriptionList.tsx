@@ -113,6 +113,23 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     setEditingSubscription(updatedSub);
   };
 
+  const addEmailToSubscription = (sub: Subscription) => {
+    const newEmail = {
+      id: Math.random().toString(36).substr(2, 9),
+      email: '',
+      forwarding: '',
+      usedFor: '',
+      usedIn: '',
+      accessMethod: '',
+      notes: []
+    };
+    const updatedSub = {
+      ...sub,
+      linkedEmails: [...(sub.linkedEmails || []), newEmail]
+    };
+    setEditingSubscription(updatedSub);
+  };
+
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-8">
       {/* Action Bar */}
@@ -283,6 +300,13 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       </button>
                     </div>
                   ))}
+
+                  <button
+                    onClick={() => addEmailToSubscription(sub)}
+                    className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
+                  >
+                    + add email
+                  </button>
 
                   {(!sub.linkedEmails || sub.linkedEmails.length === 0) && (
                     <div className="text-center py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">

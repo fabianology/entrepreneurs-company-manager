@@ -17,11 +17,11 @@ interface FinancialListProps {
   onDeleteInstitution: (id: string) => void;
 }
 
-const FinancialList: React.FC<FinancialListProps> = ({ 
-  cards, 
+const FinancialList: React.FC<FinancialListProps> = ({
+  cards,
   loans,
   institutions,
-  onAddCard, 
+  onAddCard,
   onUpdateCard,
   onDeleteCard,
   onAddLoan,
@@ -37,7 +37,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isWalletExpanded, setIsWalletExpanded] = useState(false);
   const [showPasswords, setShowPasswords] = useState<Set<string>>(new Set());
-  
+
   // Drag states
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -48,7 +48,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!isWalletExpanded) return;
     if ((e.target as HTMLElement).closest('button')) return;
-    
+
     setIsDragging(true);
     dragStartY.current = e.clientY;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -67,11 +67,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const handlePointerUp = (e: React.PointerEvent) => {
     if (!isDragging) return;
     setIsDragging(false);
-    
+
     if (dragY > 100) {
       setIsWalletExpanded(false);
     }
-    
+
     setDragY(0);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   };
@@ -154,9 +154,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const handleSaveCardModal = () => {
     if (editingCard) {
       if (editingCard.id) {
-         onUpdateCard(editingCard.id, editingCard);
+        onUpdateCard(editingCard.id, editingCard);
       } else {
-         onAddCard(editingCard);
+        onAddCard(editingCard);
       }
       setEditingCard(null);
     }
@@ -202,7 +202,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   };
 
   const getCardGradient = (network: string | undefined) => {
-    switch(network) {
+    switch (network) {
       case 'Amex': return 'from-blue-600 to-cyan-500';
       case 'Mastercard': return 'from-slate-800 to-orange-900';
       case 'Visa': return 'from-indigo-700 to-purple-800';
@@ -224,14 +224,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
           </div>
           <div className="flex items-center gap-3">
             {isWalletExpanded && (
-              <button 
+              <button
                 onClick={() => setIsWalletExpanded(false)}
                 className="text-indigo-600 text-sm font-bold hover:underline"
               >
                 Collapse
               </button>
             )}
-            <button 
+            <button
               onClick={handleAddNewCard}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm active:scale-95"
             >
@@ -239,7 +239,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             </button>
           </div>
         </div>
-        <div 
+        <div
           ref={walletContainerRef}
           className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[300px]'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
           onClick={() => !isWalletExpanded && setIsWalletExpanded(true)}
@@ -253,9 +253,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
           }}
         >
           {cards.length === 0 ? (
-            <button 
+            <button
               onClick={handleAddNewCard}
-              className="w-full h-56 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors bg-white/50"
+              className="w-full max-w-[400px] mx-auto h-56 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors bg-white/50"
             >
               <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
               <span className="font-bold text-sm">Add Your First Card</span>
@@ -263,15 +263,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
           ) : (
             <div className={`relative ${isWalletExpanded ? 'flex flex-col gap-4' : ''}`}>
               {cards.map((card, index) => {
-                const stackOffset = index * 45; 
+                const stackOffset = index * 45;
                 const stackScale = 1 - (cards.length - 1 - index) * 0.02;
                 const stackZ = index;
                 return (
-                  <div 
+                  <div
                     key={card.id}
                     onClick={(e) => handleCardClick(card, e)}
                     className={`
-                      w-full h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
+                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
                       ${getCardGradient(card.network)}
                       transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
@@ -291,12 +291,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <span className="font-black text-xl italic tracking-tighter opacity-90">{card.network}</span>
                     </div>
                     <div className="flex items-center space-x-3 mb-8">
-                       <div className="w-11 h-8 bg-yellow-200/20 rounded-md border border-yellow-100/30 flex items-center justify-center">
-                          <div className="w-6 h-4 border border-yellow-100/40 rounded-sm"></div>
-                       </div>
-                       <div className="text-xl font-mono tracking-[0.2em] opacity-90">
-                          •••• •••• •••• {card.last4}
-                       </div>
+                      <div className="w-11 h-8 bg-yellow-200/20 rounded-md border border-yellow-100/30 flex items-center justify-center">
+                        <div className="w-6 h-4 border border-yellow-100/40 rounded-sm"></div>
+                      </div>
+                      <div className="text-xl font-mono tracking-[0.2em] opacity-90">
+                        •••• •••• •••• {card.last4}
+                      </div>
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
@@ -323,7 +323,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             <h3 className="text-lg font-bold text-slate-800">Banking Institutions</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Login & Linked Accounts</p>
           </div>
-          <button 
+          <button
             onClick={handleAddNewInstitution}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
           >
@@ -335,7 +335,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
           {institutions.map(inst => {
             const totalBalance = inst.accounts.reduce((sum, acc) => sum + acc.balance, 0);
             return (
-              <div 
+              <div
                 key={inst.id}
                 className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition-shadow"
               >
@@ -349,8 +349,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         <h4 className="font-bold text-slate-900">{inst.name}</h4>
                         {inst.loginUrl && (
                           <a href={inst.loginUrl} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 hover:underline flex items-center gap-1">
-                             Launch Portal
-                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                            Launch Portal
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                           </a>
                         )}
                       </div>
@@ -395,8 +395,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           <div>
                             <p className="text-xs font-bold text-slate-800">{acc.name}</p>
                             <div className="flex items-center gap-1.5">
-                               <span className="text-[9px] text-slate-400 font-mono">••{acc.last4}</span>
-                               <span className="text-[9px] text-slate-400 uppercase">• {acc.type}</span>
+                              <span className="text-[9px] text-slate-400 font-mono">••{acc.last4}</span>
+                              <span className="text-[9px] text-slate-400 uppercase">• {acc.type}</span>
                             </div>
                           </div>
                         </div>
@@ -421,7 +421,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             <h3 className="text-lg font-bold text-slate-800">Loans & Debt</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amortization</p>
           </div>
-          <button 
+          <button
             onClick={() => onAddLoan({ lender: 'New Lender', principalAmount: 0, remainingBalance: 0 })}
             className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-emerald-700 transition"
           >
@@ -460,19 +460,19 @@ const FinancialList: React.FC<FinancialListProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Bank / Institution Name</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.name || ''} placeholder="e.g. Mercury" onChange={e => setEditingInstitution({...editingInstitution, name: e.target.value})} />
+                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.name || ''} placeholder="e.g. Mercury" onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Login Email/User</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.username || ''} placeholder="user@example.com" onChange={e => setEditingInstitution({...editingInstitution, username: e.target.value})} />
+                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.username || ''} placeholder="user@example.com" onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" type="text" value={editingInstitution.password || ''} placeholder="••••••" onChange={e => setEditingInstitution({...editingInstitution, password: e.target.value})} />
+                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" type="text" value={editingInstitution.password || ''} placeholder="••••••" onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })} />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Login Portal URL</label>
-                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.loginUrl || ''} placeholder="https://bank.com/login" onChange={e => setEditingInstitution({...editingInstitution, loginUrl: e.target.value})} />
+                  <input className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" value={editingInstitution.loginUrl || ''} placeholder="https://bank.com/login" onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })} />
                 </div>
               </div>
 
@@ -486,25 +486,25 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <div key={idx} className="bg-slate-50 p-3 rounded-lg flex flex-col md:flex-row gap-3 items-end md:items-center border border-slate-100">
                       <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
                         <div className="md:col-span-1">
-                             <input className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" placeholder="Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, {name: e.target.value})} />
+                          <input className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" placeholder="Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
                         </div>
                         <div className="md:col-span-1">
-                             <select className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500 bg-white" value={acc.type} onChange={e => handleUpdateInstAccount(idx, {type: e.target.value as any})}>
-                                <option value="Checking">Checking</option>
-                                <option value="Savings">Savings</option>
-                                <option value="Investing">Investing</option>
-                                <option value="Credit Card">Credit Card</option>
-                                <option value="Debit Card">Debit Card</option>
-                                <option value="CD">CD</option>
-                                <option value="Other">Other</option>
-                              </select>
+                          <select className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500 bg-white" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
+                            <option value="Checking">Checking</option>
+                            <option value="Savings">Savings</option>
+                            <option value="Investing">Investing</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Debit Card">Debit Card</option>
+                            <option value="CD">CD</option>
+                            <option value="Other">Other</option>
+                          </select>
                         </div>
                         <div className="md:col-span-1">
-                             <input className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, {last4: e.target.value})} />
+                          <input className="w-full px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
                         </div>
                         <div className="md:col-span-1 relative">
-                             <span className="absolute left-2 top-1.5 text-slate-400 text-xs">$</span>
-                             <input className="w-full pl-5 px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, {balance: parseFloat(e.target.value)})} />
+                          <span className="absolute left-2 top-1.5 text-slate-400 text-xs">$</span>
+                          <input className="w-full pl-5 px-2 py-1.5 text-xs border rounded outline-none focus:border-indigo-500" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
                         </div>
                       </div>
                       <button onClick={() => handleDeleteInstAccount(idx)} className="text-slate-400 hover:text-rose-600 p-1">
@@ -513,9 +513,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   ))}
                   {(!editingInstitution.accounts || editingInstitution.accounts.length === 0) && (
-                     <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
-                        No accounts linked yet. Add Checking, Savings, etc.
-                     </div>
+                    <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-slate-400 text-xs">
+                      No accounts linked yet. Add Checking, Savings, etc.
+                    </div>
                   )}
                 </div>
               </div>
@@ -545,152 +545,152 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Nickname</label>
-                  <input 
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Nickname</label>
+                <input
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  placeholder="e.g. Amex Gold - Advertising"
+                  value={editingCard.name || ''}
+                  onChange={e => setEditingCard({ ...editingCard, name: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Network</label>
+                  <select
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="e.g. Amex Gold - Advertising"
-                    value={editingCard.name || ''}
-                    onChange={e => setEditingCard({...editingCard, name: e.target.value})}
-                  />
-               </div>
-               
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Network</label>
-                    <select
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                      value={editingCard.network || 'Visa'}
-                      onChange={e => setEditingCard({...editingCard, network: e.target.value as any})}
-                    >
-                      <option value="Visa">Visa</option>
-                      <option value="Mastercard">Mastercard</option>
-                      <option value="Amex">Amex</option>
-                      <option value="Discover">Discover</option>
-                      <option value="Other">Other</option>
-                    </select>
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
-                    <select
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                      value={editingCard.type || 'Credit'}
-                      onChange={e => setEditingCard({...editingCard, type: e.target.value as any})}
-                    >
-                      <option value="Credit">Credit</option>
-                      <option value="Debit">Debit</option>
-                    </select>
-                 </div>
-               </div>
-
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Holder Name</label>
-                  <input 
+                    value={editingCard.network || 'Visa'}
+                    onChange={e => setEditingCard({ ...editingCard, network: e.target.value as any })}
+                  >
+                    <option value="Visa">Visa</option>
+                    <option value="Mastercard">Mastercard</option>
+                    <option value="Amex">Amex</option>
+                    <option value="Discover">Discover</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
+                  <select
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="NAME ON CARD"
-                    value={editingCard.cardHolder || ''}
-                    onChange={e => setEditingCard({...editingCard, cardHolder: e.target.value})}
+                    value={editingCard.type || 'Credit'}
+                    onChange={e => setEditingCard({ ...editingCard, type: e.target.value as any })}
+                  >
+                    <option value="Credit">Credit</option>
+                    <option value="Debit">Debit</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Holder Name</label>
+                <input
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  placeholder="NAME ON CARD"
+                  value={editingCard.cardHolder || ''}
+                  onChange={e => setEditingCard({ ...editingCard, cardHolder: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Number (Last 4)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400 font-mono text-sm">•••• •••• ••••</span>
+                    <input
+                      maxLength={4}
+                      className="w-full pl-36 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white font-mono"
+                      placeholder="1234"
+                      value={editingCard.last4 || ''}
+                      onChange={e => setEditingCard({ ...editingCard, last4: e.target.value.replace(/\D/g, '') })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expiry</label>
+                  <input
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white text-center font-mono"
+                    placeholder="MM/YY"
+                    maxLength={5}
+                    value={editingCard.expiry || ''}
+                    onChange={e => setEditingCard({ ...editingCard, expiry: e.target.value })}
                   />
-               </div>
+                </div>
+              </div>
 
-               <div className="grid grid-cols-3 gap-4">
-                  <div className="col-span-2">
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Card Number (Last 4)</label>
-                     <div className="relative">
-                        <span className="absolute left-3 top-2 text-slate-400 font-mono text-sm">•••• •••• ••••</span>
-                        <input 
-                          maxLength={4}
-                          className="w-full pl-36 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white font-mono"
-                          placeholder="1234"
-                          value={editingCard.last4 || ''}
-                          onChange={e => setEditingCard({...editingCard, last4: e.target.value.replace(/\D/g,'')})}
-                        />
-                     </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Credit Limit / Balance</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <input
+                      type="number"
+                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      value={editingCard.limit || ''}
+                      onChange={e => setEditingCard({ ...editingCard, limit: parseFloat(e.target.value) })}
+                    />
                   </div>
-                  <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expiry</label>
-                     <input 
-                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white text-center font-mono"
-                       placeholder="MM/YY"
-                       maxLength={5}
-                       value={editingCard.expiry || ''}
-                       onChange={e => setEditingCard({...editingCard, expiry: e.target.value})}
-                     />
-                  </div>
-               </div>
-
-               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Credit Limit / Balance</label>
-                     <div className="relative">
-                        <span className="absolute left-3 top-2 text-slate-400">$</span>
-                        <input 
-                          type="number"
-                          className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                          value={editingCard.limit || ''}
-                          onChange={e => setEditingCard({...editingCard, limit: parseFloat(e.target.value)})}
-                        />
-                     </div>
-                  </div>
-                  <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                     <select
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                        value={editingCard.status || 'Active'}
-                        onChange={e => setEditingCard({...editingCard, status: e.target.value as any})}
-                     >
-                        <option value="Active">Active</option>
-                        <option value="Frozen">Frozen</option>
-                        <option value="Expired">Expired</option>
-                     </select>
-                  </div>
-               </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                  <select
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    value={editingCard.status || 'Active'}
+                    onChange={e => setEditingCard({ ...editingCard, status: e.target.value as any })}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Frozen">Frozen</option>
+                    <option value="Expired">Expired</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-               <div>
-                  {editingCard.id && (
-                     showDeleteConfirm ? (
-                        <div className="flex items-center space-x-2">
-                           <button 
-                              onClick={() => { onDeleteCard(editingCard.id!); setEditingCard(null); }}
-                              className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
-                           >
-                              Confirm
-                           </button>
-                           <button 
-                              onClick={() => setShowDeleteConfirm(false)}
-                              className="text-slate-500 text-xs font-bold underline"
-                           >
-                              Cancel
-                           </button>
-                        </div>
-                     ) : (
-                        <button 
-                           onClick={() => setShowDeleteConfirm(true)}
-                           className="text-rose-500 text-sm font-bold hover:text-rose-700"
-                        >
-                           Remove Card
-                        </button>
-                     )
-                  )}
-               </div>
-               <div className="flex space-x-3">
-                  <button 
-                     onClick={() => setEditingCard(null)}
-                     className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
-                  >
-                     Cancel
-                  </button>
-                  <button 
-                     onClick={handleSaveCardModal}
-                     className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm hover:bg-indigo-700 transition"
-                  >
-                     Save Card
-                  </button>
-               </div>
+              <div>
+                {editingCard.id && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => { onDeleteCard(editingCard.id!); setEditingCard(null); }}
+                        className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="text-slate-500 text-xs font-bold underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-rose-500 text-sm font-bold hover:text-rose-700"
+                    >
+                      Remove Card
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setEditingCard(null)}
+                  className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveCardModal}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm hover:bg-indigo-700 transition"
+                >
+                  Save Card
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -708,147 +708,147 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            
+
             <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lender / Institution</label>
-                  <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="e.g. Silicon Valley Bank"
-                    value={editingLoan.lender || ''}
-                    onChange={e => setEditingLoan({...editingLoan, lender: e.target.value})}
-                  />
-               </div>
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Loan Nickname</label>
-                  <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="e.g. Series A Venture Debt"
-                    value={editingLoan.name || ''}
-                    onChange={e => setEditingLoan({...editingLoan, name: e.target.value})}
-                  />
-               </div>
-               
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Original Principal</label>
-                    <div className="relative">
-                        <span className="absolute left-3 top-2 text-slate-400">$</span>
-                        <input 
-                          type="number"
-                          className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                          value={editingLoan.principalAmount || ''}
-                          onChange={e => setEditingLoan({...editingLoan, principalAmount: parseFloat(e.target.value)})}
-                        />
-                    </div>
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Current Balance</label>
-                    <div className="relative">
-                        <span className="absolute left-3 top-2 text-slate-400">$</span>
-                        <input 
-                          type="number"
-                          className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                          value={editingLoan.remainingBalance || ''}
-                          onChange={e => setEditingLoan({...editingLoan, remainingBalance: parseFloat(e.target.value)})}
-                        />
-                    </div>
-                 </div>
-               </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Lender / Institution</label>
+                <input
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  placeholder="e.g. Silicon Valley Bank"
+                  value={editingLoan.lender || ''}
+                  onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Loan Nickname</label>
+                <input
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                  placeholder="e.g. Series A Venture Debt"
+                  value={editingLoan.name || ''}
+                  onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
+                />
+              </div>
 
-               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monthly Payment</label>
-                     <div className="relative">
-                        <span className="absolute left-3 top-2 text-slate-400">$</span>
-                        <input 
-                          type="number"
-                          className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                          value={editingLoan.monthlyPayment || ''}
-                          onChange={e => setEditingLoan({...editingLoan, monthlyPayment: parseFloat(e.target.value)})}
-                        />
-                     </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Original Principal</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <input
+                      type="number"
+                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      value={editingLoan.principalAmount || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, principalAmount: parseFloat(e.target.value) })}
+                    />
                   </div>
-                  <div>
-                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Interest Rate (%)</label>
-                     <input 
-                       type="number"
-                       step="0.1"
-                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                       placeholder="5.5"
-                       value={editingLoan.interestRate || ''}
-                       onChange={e => setEditingLoan({...editingLoan, interestRate: parseFloat(e.target.value)})}
-                     />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Current Balance</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <input
+                      type="number"
+                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      value={editingLoan.remainingBalance || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, remainingBalance: parseFloat(e.target.value) })}
+                    />
                   </div>
-               </div>
+                </div>
+              </div>
 
-               <div className="grid grid-cols-2 gap-4">
-                   <div>
-                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Term Length</label>
-                       <input 
-                         className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                         placeholder="e.g. 36 Months"
-                         value={editingLoan.term || ''}
-                         onChange={e => setEditingLoan({...editingLoan, term: e.target.value})}
-                       />
-                   </div>
-                   <div>
-                       <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
-                       <select
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                          value={editingLoan.status || 'Active'}
-                          onChange={e => setEditingLoan({...editingLoan, status: e.target.value as any})}
-                       >
-                          <option value="Active">Active</option>
-                          <option value="Paid Off">Paid Off</option>
-                          <option value="Default">Default</option>
-                       </select>
-                   </div>
-               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Monthly Payment</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-slate-400">$</span>
+                    <input
+                      type="number"
+                      className="w-full pl-6 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                      value={editingLoan.monthlyPayment || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, monthlyPayment: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Interest Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    placeholder="5.5"
+                    value={editingLoan.interestRate || ''}
+                    onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Term Length</label>
+                  <input
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    placeholder="e.g. 36 Months"
+                    value={editingLoan.term || ''}
+                    onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Status</label>
+                  <select
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
+                    value={editingLoan.status || 'Active'}
+                    onChange={e => setEditingLoan({ ...editingLoan, status: e.target.value as any })}
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Paid Off">Paid Off</option>
+                    <option value="Default">Default</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="p-6 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-               <div>
-                  {editingLoan.id && (
-                     showDeleteConfirm ? (
-                        <div className="flex items-center space-x-2">
-                           <button 
-                              onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); }}
-                              className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
-                           >
-                              Confirm
-                           </button>
-                           <button 
-                              onClick={() => setShowDeleteConfirm(false)}
-                              className="text-slate-500 text-xs font-bold underline"
-                           >
-                              Cancel
-                           </button>
-                        </div>
-                     ) : (
-                        <button 
-                           onClick={() => setShowDeleteConfirm(true)}
-                           className="text-rose-500 text-sm font-bold hover:text-rose-700"
-                        >
-                           Remove Loan
-                        </button>
-                     )
-                  )}
-               </div>
-               <div className="flex space-x-3">
-                  <button 
-                     onClick={() => setEditingLoan(null)}
-                     className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
-                  >
-                     Cancel
-                  </button>
-                  <button 
-                     onClick={handleSaveLoanModal}
-                     className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold shadow-sm hover:bg-emerald-700 transition"
-                  >
-                     Save Loan
-                  </button>
-               </div>
+              <div>
+                {editingLoan.id && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); }}
+                        className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="text-slate-500 text-xs font-bold underline"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-rose-500 text-sm font-bold hover:text-rose-700"
+                    >
+                      Remove Loan
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setEditingLoan(null)}
+                  className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveLoanModal}
+                  className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold shadow-sm hover:bg-emerald-700 transition"
+                >
+                  Save Loan
+                </button>
+              </div>
             </div>
           </div>
         </div>
