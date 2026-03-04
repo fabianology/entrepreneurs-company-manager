@@ -290,12 +290,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               </button>
 
               {expandedEmails.has(sub.id) && (
-                <div className="px-6 pb-8 space-y-8 animate-fadeIn">
+                <div className="px-6 pb-8 space-y-1 animate-fadeIn">
                   {(sub.linkedEmails || []).map((email, idx) => {
                     const emailId = email.id || String(idx);
                     const isExpanded = expandedDetails.has(emailId);
                     return (
-                      <div key={emailId} className="pt-4 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
+                      <div key={emailId} className="pt-2 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
                         {/* Header Toggle */}
                         <button
                           onClick={() => toggleDetailExpanded(emailId)}
@@ -322,7 +322,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         </button>
 
                         {/* Collapsible Drawer */}
-                        <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'max-h-[500px] opacity-100 mt-6 pb-2' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
+                        <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'max-h-[500px] opacity-100 mt-4 pb-2' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
                           <div className="grid grid-cols-2 gap-x-8 gap-y-6 px-4 -mx-4">
                             {/* Row 2 */}
                             <div className="space-y-1">
