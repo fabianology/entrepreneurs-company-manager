@@ -38,6 +38,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isWalletExpanded, setIsWalletExpanded] = useState(false);
   const [showPasswords, setShowPasswords] = useState<Set<string>>(new Set());
+  const [expandedInstitutions, setExpandedInstitutions] = useState<Set<string>>(new Set());
 
   // Drag states
   const [dragY, setDragY] = useState(0);
@@ -83,6 +84,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setShowPasswords(newSet);
+  };
+
+  const toggleInstitutionExpanded = (id: string) => {
+    const newSet = new Set(expandedInstitutions);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedInstitutions(newSet);
   };
 
   const handleAddNewInstitution = () => {
@@ -399,30 +407,59 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
 
-                <div className="p-6 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Linked Accounts</span>
-                    <button onClick={() => setEditingInstitution(inst)} className="text-[9px] font-black text-[#EBC351] uppercase hover:text-[#EBC351]/80">Manage</button>
-                  </div>
-                  <div className="space-y-2">
-                    {inst.accounts.map((acc, aIdx) => (
-                      <div key={acc.id || aIdx} className="flex justify-between items-center bg-white/5 border border-white/5 p-3 rounded-xl hover:bg-white/10 transition cursor-default">
-                        <div className="flex items-center space-x-3">
-                          <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
-                          <div>
-                            <p className="text-xs font-black text-white truncate max-w-[120px]">{acc.name}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[9px] font-black text-white/40 font-mono tracking-widest">••{acc.last4}</span>
-                              <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">• {acc.type}</span>
+                <div className="border-t border-white/5">
+                  <button
+                    onClick={() => toggleInstitutionExpanded(inst.id)}
+                    className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group hover:bg-white/[0.02] transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <span className="text-[11px] font-black uppercase tracking-[0.15em]">Linked Accounts</span>
+                      <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                        {inst.accounts.length}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingInstitution(inst);
+                        }}
+                        className="text-[9px] font-black text-[#EBC351] uppercase hover:text-white transition"
+                      >
+                        Manage
+                      </button>
+                      <svg
+                        className={`w-4 h-4 transform transition-transform duration-300 ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedInstitutions.has(inst.id) ? 'max-h-[1000px] opacity-100 p-6 pt-0' : 'max-h-0 opacity-0'}`}>
+                    <div className="space-y-2">
+                      {inst.accounts.map((acc, aIdx) => (
+                        <div key={acc.id || aIdx} className="flex justify-between items-center bg-white/5 border border-white/5 p-3 rounded-xl hover:bg-white/10 transition cursor-default">
+                          <div className="flex items-center space-x-3">
+                            <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
+                            <div>
+                              <p className="text-xs font-black text-white truncate max-w-[120px]">{acc.name}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[9px] font-black text-white/40 font-mono tracking-widest">••{acc.last4}</span>
+                                <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">• {acc.type}</span>
+                              </div>
                             </div>
                           </div>
+                          <div className="text-right">
+                            <p className="text-xs font-black text-white tracking-widest">${acc.balance.toLocaleString()}</p>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs font-black text-white tracking-widest">${acc.balance.toLocaleString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                    {inst.accounts.length === 0 && <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center py-4">No linked accounts</p>}
+                      ))}
+                      {inst.accounts.length === 0 && <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center py-4">No linked accounts</p>}
+                    </div>
                   </div>
                 </div>
               </div>
