@@ -513,21 +513,24 @@ const App: React.FC = () => {
     });
   };
 
-  const handleDeleteCompany = () => {
-    if (!selectedCompanyId || !state) return;
+  const handleDeleteCompany = (id?: string) => {
+    const targetId = id || selectedCompanyId;
+    if (!targetId || !state) return;
 
     setState(prev => prev ? ({
-      companies: prev.companies.filter(c => c.id !== selectedCompanyId),
-      accounts: prev.accounts.filter(a => a.companyId !== selectedCompanyId),
-      subscriptions: prev.subscriptions.filter(s => s.companyId !== selectedCompanyId),
-      financialCards: prev.financialCards.filter(c => c.companyId !== selectedCompanyId),
-      loans: prev.loans.filter(l => l.companyId !== selectedCompanyId),
-      institutions: (prev.institutions || []).filter(i => i.companyId !== selectedCompanyId),
-      documents: (prev.documents || []).filter(d => d.companyId !== selectedCompanyId)
+      companies: prev.companies.filter(c => c.id !== targetId),
+      accounts: prev.accounts.filter(a => a.companyId !== targetId),
+      subscriptions: prev.subscriptions.filter(s => s.companyId !== targetId),
+      financialCards: prev.financialCards.filter(c => c.companyId !== targetId),
+      loans: prev.loans.filter(l => l.companyId !== targetId),
+      institutions: (prev.institutions || []).filter(i => i.companyId !== targetId),
+      documents: (prev.documents || []).filter(d => d.companyId !== targetId)
     }) : null);
 
-    setSelectedCompanyId(null);
-    setActiveView('dashboard');
+    if (targetId === selectedCompanyId) {
+      setSelectedCompanyId(null);
+      setActiveView('dashboard');
+    }
     setShowDeleteCompanyConfirm(false);
   };
 
@@ -940,6 +943,7 @@ const App: React.FC = () => {
               onSelectCompany={selectCompanyFromDashboard}
               onAddCompany={handleAddCompany}
               onUpdateCompany={handleUpdateCompany}
+              onDeleteCompany={handleDeleteCompany}
             />
           ) : (
             <div className="space-y-8 animate-fadeIn">
@@ -986,95 +990,16 @@ const App: React.FC = () => {
                             </div>
                           )}
                         </div>
-                        {isEditingCompanyName ? (
-                          <div className="flex items-center space-x-2 flex-1 w-full">
-                            <input
-                              autoFocus
-                              type="text"
-                              className="text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b-2 border-indigo-600 outline-none w-full max-w-md px-1"
-                              value={selectedCompany.name}
-                              onChange={(e) => handleUpdateCompany(selectedCompany.id, { name: e.target.value })}
-                              onBlur={() => setIsEditingCompanyName(false)}
-                              onKeyDown={(e) => e.key === 'Enter' && setIsEditingCompanyName(false)}
-                            />
-                            <button
-                              onClick={() => setIsEditingCompanyName(false)}
-                              className="text-xs font-bold text-indigo-600 uppercase whitespace-nowrap"
-                            >
-                              Done
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center space-x-3 w-full overflow-hidden">
-                            <h2 className={`text-2xl md:text-3xl font-bold truncate ${selectedCompanyId ? 'text-white drop-shadow-md' : 'text-slate-900'}`}>{selectedCompany.name}</h2>
-                            <button
-                              onClick={() => setIsEditingCompanyName(true)}
-                              className="text-white/70 hover:text-white flex-shrink-0 transition-colors"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                            </button>
-
-                            {showDeleteCompanyConfirm ? (
-                              <div className="flex items-center space-x-2 animate-fadeIn bg-slate-50 p-1 rounded-lg border border-slate-100 ml-2">
-                                <span className="text-xs font-bold text-slate-500 ml-1 whitespace-nowrap">Delete?</span>
-                                <button
-                                  onClick={handleDeleteCompany}
-                                  className="bg-rose-600 text-white px-3 py-1 rounded-md text-xs font-bold hover:bg-rose-700 transition"
-                                >
-                                  Yes
-                                </button>
-                                <button
-                                  onClick={() => setShowDeleteCompanyConfirm(false)}
-                                  className="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-md text-xs font-bold hover:bg-slate-50 transition"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setShowDeleteCompanyConfirm(true)}
-                                className="text-white/70 hover:text-white transition-colors p-1"
-                                title="Delete Company"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            )}
-                          </div>
-                        )}
+                        <div className="flex items-center space-x-3 w-full overflow-hidden">
+                          <h2 className={`text-2xl md:text-3xl font-bold truncate ${selectedCompanyId ? 'text-white' : 'text-slate-900'}`}>{selectedCompany.name}</h2>
+                        </div>
                       </div>
 
-                      {isEditingDescription ? (
-                        <div className="flex flex-col space-y-2 w-full md:w-[60%]">
-                          <textarea
-                            autoFocus
-                            className="w-full text-base text-slate-600 bg-white border border-slate-200 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 outline-none"
-                            rows={2}
-                            value={selectedCompany.description}
-                            placeholder="Mission statement 🚀"
-                            onChange={(e) => handleUpdateCompany(selectedCompany.id, { description: e.target.value })}
-                            onBlur={() => setIsEditingDescription(false)}
-                          />
-                          <div className="flex justify-end">
-                            <button
-                              onClick={() => setIsEditingDescription(false)}
-                              className="text-xs font-bold text-indigo-600 uppercase bg-indigo-50 px-3 py-1 rounded-md"
-                            >
-                              Save Mission
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="group flex items-start space-x-2 w-full md:w-[60%] cursor-pointer" onClick={() => setIsEditingDescription(true)}>
-                          <p className={`text-base leading-relaxed ${selectedCompany.description ? 'text-white/90' : 'text-white/60 italic'}`}>
-                            {selectedCompany.description || "Mission statement 🚀"}
-                          </p>
-                          <button className="mt-1 text-white/50 opacity-0 group-hover:opacity-100 transition-opacity hover:text-white">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-start space-x-2 w-full md:w-[60%]">
+                        <p className={`text-base leading-relaxed ${selectedCompany.description ? 'text-white/90' : 'text-white/60 italic'}`}>
+                          {selectedCompany.description || "Mission statement 🚀"}
+                        </p>
+                      </div>
                     </div>
                   </header>
 

@@ -133,7 +133,7 @@ const AccountList: React.FC<AccountListProps> = ({
       {/* Account Cards List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {accounts.map(acc => (
-          <div key={acc.id} className={`bg-[#1C1C1E] rounded-[24px] overflow-hidden border ${acc.status === 'Active' ? 'border-[#0091FF]' : 'border-white/5'} shadow-2xl flex flex-col`}>
+          <div key={acc.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl flex flex-col">
             {/* Header / Main Info - Clickable */}
             <div className="p-6 space-y-6">
               <div className="flex justify-between items-start">

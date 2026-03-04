@@ -7,6 +7,7 @@ interface DashboardProps {
   onSelectCompany: (id: string) => void;
   onAddCompany: (company: Omit<Company, 'id'>) => void;
   onUpdateCompany: (id: string, updates: Partial<Company>) => void;
+  onDeleteCompany: (id: string) => void;
 }
 
 const BRAND_COLORS = [
@@ -48,10 +49,11 @@ const getTimeAgo = (timestamp?: number) => {
   return `${diffInDays}d ago`;
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddCompany, onUpdateCompany }) => {
+const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddCompany, onUpdateCompany, onDeleteCompany }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Partial<Company> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const initialCompanyState: Partial<Company> = {
     name: '',
@@ -66,6 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
   const openAddModal = () => {
     setEditingCompany(null);
     setFormState(initialCompanyState);
+    setShowDeleteConfirm(false);
     setIsModalOpen(true);
   };
 
@@ -73,6 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
     e.stopPropagation();
     setEditingCompany(company);
     setFormState({ ...company });
+    setShowDeleteConfirm(false);
     setIsModalOpen(true);
   };
 
@@ -242,20 +246,51 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                 </div>
               </div>
             </div>
-            <div className="p-8 border-t border-white/5 bg-black/20 flex justify-end items-center space-x-6">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-xs font-black text-white/40 uppercase tracking-widest hover:text-white transition-colors"
-              >
-                Discard
-              </button>
-              <button
-                onClick={handleSaveCompany}
-                disabled={!formState.name}
-                className="px-8 py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-[#1FE400] transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
-              >
-                {editingCompany ? 'Commit Changes' : 'Launch Entity'}
-              </button>
+            <div className="p-8 border-t border-white/5 bg-black/20 flex justify-between items-center">
+              <div className="flex-1">
+                {editingCompany && editingCompany.id && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center space-x-3">
+                      <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Confirm?</span>
+                      <button
+                        onClick={() => { onDeleteCompany(editingCompany.id!); setIsModalOpen(false); }}
+                        className="text-[10px] font-black text-white hover:text-rose-500 uppercase tracking-widest transition-colors"
+                      >
+                        YES
+                      </button>
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="text-[10px] font-black text-white/20 hover:text-white uppercase tracking-widest transition-colors"
+                      >
+                        NO
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-[10px] font-black text-white/20 hover:text-rose-500 uppercase tracking-widest transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      Delete
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="flex items-center space-x-6">
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-xs font-black text-white/40 uppercase tracking-widest hover:text-white transition-colors"
+                >
+                  Discard
+                </button>
+                <button
+                  onClick={handleSaveCompany}
+                  disabled={!formState.name}
+                  className="px-8 py-4 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl hover:bg-[#1FE400] transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
+                >
+                  {editingCompany ? 'Commit Changes' : 'Launch Entity'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -276,19 +311,25 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
             const companyBanks = state.institutions.filter(i => i.companyId === company.id);
             const companyDocs = state.documents.filter(d => d.companyId === company.id);
 
-            const financialCount = companyCards.length + companyLoans.length + (companyBanks.length * 2); // Weight banks slightly higher
+            const financialCount = companyCards.length + companyLoans.length + (companyBanks.length * 2);
+
+            const monthlyBurn = companySubs.reduce((acc, s) => {
+              const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
+              const subServicesMonthly = s.subServices?.reduce((sum, ss) => sum + ss.cost, 0) || 0;
+              return acc + baseMonthly + subServicesMonthly;
+            }, 0);
 
             return (
               <div
                 key={company.id}
                 onClick={() => onSelectCompany(company.id)}
-                className="group relative bg-[#1C1C1E] rounded-[2rem] shadow-2xl border border-white/5 hover:border-[#1FE400]/30 transition-all duration-300 flex flex-col justify-between overflow-hidden cursor-pointer"
+                className="group relative bg-[#1C1C1E] rounded-[2rem] shadow-2xl border border-white/5 flex flex-col justify-between overflow-hidden cursor-pointer"
               >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-4 min-w-0">
                       <div
-                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black flex-shrink-0 overflow-hidden bg-cover bg-center shadow-inner border border-white/5 transition-transform group-hover:scale-105 cursor-pointer"
+                        className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black flex-shrink-0 overflow-hidden bg-cover bg-center shadow-inner border border-white/5 cursor-pointer"
                         onClick={(e) => { e.stopPropagation(); openEditModal(e, company); }}
                         style={{
                           backgroundColor: company.logoUrl ? 'white' : company.color,
@@ -298,7 +339,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                         {!company.logoUrl && <span className="text-2xl">{company.name.charAt(0)}</span>}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-xl font-black text-white group-hover:text-[#1FE400] transition-colors tracking-tight leading-tight truncate">{company.name}</h4>
+                        <h4 className="text-xl font-black text-white tracking-tight leading-tight truncate">{company.name}</h4>
                         <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">{company.structure}</p>
                       </div>
                     </div>
@@ -312,41 +353,48 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                     </div>
                   </div>
 
-                  <div className="flex flex-col space-y-1 mb-8">
-                    <div className="flex items-center text-[10px] font-black tracking-tight text-white/30 uppercase">
-                      <svg className="w-3 h-3 mr-1.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                      Last Modified: <span className="text-white/70 ml-1.5 font-bold">{getTimeAgo(company.lastModified)}</span>
+                  <div className="flex items-center justify-start mb-8">
+                    <div className="flex flex-col space-y-1">
+                      <div className="flex items-center text-[10px] font-black tracking-tight text-white/30 uppercase">
+                        <svg className="w-3 h-3 mr-1.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        Last Modified: <span className="text-white/70 ml-1.5 font-bold">{getTimeAgo(company.lastModified)}</span>
+                      </div>
+                      <div className="flex items-center text-[10px] font-black tracking-tight text-white/30 uppercase">
+                        <svg className="w-3 h-3 mr-1.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        Last Viewed: <span className="text-white/70 ml-1.5 font-bold">{getTimeAgo(company.lastViewed)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center text-[10px] font-black tracking-tight text-white/30 uppercase">
-                      <svg className="w-3 h-3 mr-1.5 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                      Last Viewed: <span className="text-white/70 ml-1.5 font-bold">{getTimeAgo(company.lastViewed)}</span>
+
+                    <div className="flex flex-col items-start border-l border-white/5 pl-4 ml-[80px]">
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-0.5">Burn /mo</p>
+                      <p className="text-lg font-black text-white tracking-tighter leading-none">${monthlyBurn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
                 </div>
 
                 <div
-                  className="grid grid-cols-4 gap-2 p-6 pt-6 border-t border-white/5 bg-black/20 hover:bg-[#1FE400]/5 transition-colors group/stats"
+                  className="grid grid-cols-4 gap-2 p-6 pt-6 border-t border-white/5 bg-black/20"
                 >
                   <div className="flex flex-col min-w-0">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate group-hover/stats:text-white/50 transition-colors">Logins</p>
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate">Logins</p>
                     <div className="flex items-baseline space-x-1">
                       <p className="text-lg font-black text-white">{companyAccounts.length}</p>
                     </div>
                   </div>
                   <div className="flex flex-col border-l border-white/5 pl-2 min-w-0">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate group-hover/stats:text-[#1FE400]/50 transition-colors">Services</p>
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate">Services</p>
                     <div className="flex items-baseline space-x-1">
                       <p className="text-lg font-black text-[#1FE400]">{companySubs.length}</p>
                     </div>
                   </div>
                   <div className="flex flex-col border-l border-white/5 pl-2 min-w-0">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate group-hover/stats:text-[#EBC351]/50 transition-colors">Finance</p>
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate">Finance</p>
                     <div className="flex items-baseline space-x-1">
                       <p className="text-lg font-black text-[#EBC351]">{financialCount}</p>
                     </div>
                   </div>
                   <div className="flex flex-col border-l border-white/5 pl-2 min-w-0">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate group-hover/stats:text-[#0091FF]/50 transition-colors">Docs</p>
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate">Docs</p>
                     <div className="flex items-baseline space-x-1">
                       <p className="text-lg font-black text-[#0091FF]">{companyDocs.length}</p>
                     </div>

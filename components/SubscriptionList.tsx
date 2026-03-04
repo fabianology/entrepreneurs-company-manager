@@ -137,14 +137,33 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     };
     setEditingSubscription(updatedSub);
   };
+  const monthlyBurn = subscriptions.reduce((acc, s) => {
+    const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
+    const subServicesMonthly = s.subServices?.reduce((sum, ss) => sum + ss.cost, 0) || 0;
+    return acc + baseMonthly + subServicesMonthly;
+  }, 0);
+
+  const activeStack = subscriptions.length;
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-8">
       {/* Action Bar */}
-      <div className="flex justify-end pr-2">
+      <div className="flex items-center justify-between pr-2">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#1C1C1E] h-[48px] px-5 rounded-xl border border-white/5 flex items-center gap-4 shadow-lg shrink-0">
+            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest text-nowrap">burn /mo</span>
+            <span className="text-base font-black text-white tracking-tight">${monthlyBurn.toFixed(0)}</span>
+          </div>
+
+          <div className="bg-[#1C1C1E] h-[48px] px-5 rounded-xl border border-white/5 flex items-center gap-4 shadow-lg shrink-0">
+            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest text-nowrap">stacks</span>
+            <span className="text-base font-black text-white tracking-tight">{activeStack}</span>
+          </div>
+        </div>
+
         <button
           onClick={handleAddNew}
-          className="bg-[#1C1C1E] text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
+          className="bg-[#1C1C1E] text-white px-5 h-[48px] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5 shadow-2xl"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Account</span>
@@ -351,26 +370,6 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Stats Summary Section */}
-      <div className="grid grid-cols-2 gap-4 mt-4">
-        <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Monthly Burn</p>
-          <p className="text-2xl font-black text-white tracking-tighter">
-            ${subscriptions.reduce((acc, s) => {
-              const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
-              const subServicesMonthly = s.subServices?.reduce((sum, ss) => sum + ss.cost, 0) || 0;
-              return acc + baseMonthly + subServicesMonthly;
-            }, 0).toFixed(0)}
-          </p>
-        </div>
-        <div className="bg-[#1C1C1E] p-6 rounded-[24px] border border-white/5">
-          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Active Stack</p>
-          <p className="text-2xl font-black text-white tracking-tighter">
-            {subscriptions.length}
-          </p>
-        </div>
       </div>
 
       {/* Editing Modal */}
