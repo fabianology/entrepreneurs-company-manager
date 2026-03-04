@@ -212,7 +212,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   const getCardGradient = (network: string | undefined) => {
     switch (network) {
-      case 'Amex': return 'from-blue-600 to-cyan-500';
+      case 'Amex': return 'bg-[#0A0A0B]'; // Deep matte charcoal
       case 'Mastercard': return 'from-slate-800 to-orange-900';
       case 'Visa': return 'from-indigo-700 to-purple-800';
       case 'Discover': return 'from-orange-500 to-amber-600';
@@ -299,8 +299,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     key={card.id}
                     onClick={(e) => handleCardClick(card, e)}
                     className={`
-                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
-                      ${getCardGradient(card.network)}
+                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer
+                      ${card.network === 'Amex'
+                        ? 'bg-[#0A0A0B] border-2 border-[#C0C0C0]/30 overflow-hidden silver-brushed relative'
+                        : `bg-gradient-to-br ${getCardGradient(card.network)}`}
                       transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
                     `}
@@ -311,29 +313,54 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       boxShadow: !isWalletExpanded ? '0 -10px 20px -5px rgba(0,0,0,0.3)' : '0 10px 30px -10px rgba(0,0,0,0.2)'
                     }}
                   >
-                    <div className="flex justify-between items-start mb-8">
+                    {/* Amex Texture & Logo Overlay */}
+                    {card.network === 'Amex' && (
+                      <>
+                        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'repeating-linear-gradient(45deg, #eee, #eee 1px, transparent 1px, transparent 4px)' }}></div>
+                        <div className="absolute right-[-10%] top-[10%] opacity-5 pointer-events-none">
+                          <svg width="240" height="240" viewBox="0 0 100 100" fill="#C0C0C0" className="transform -rotate-12">
+                            <circle cx="50" cy="50" r="45" stroke="#C0C0C0" strokeWidth="1" fill="none" opacity="0.3" />
+                            <path d="M50 20 L60 40 L40 40 Z" /> {/* Simplified Centurion Icon */}
+                          </svg>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex justify-between items-start mb-8 relative z-10">
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{card.type}</span>
-                        <span className="font-bold text-lg tracking-tight truncate max-w-[200px]">{card.name}</span>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${card.network === 'Amex' ? 'text-[#C0C0C0]' : 'opacity-70'}`}>
+                          {card.network === 'Amex' ? 'CENTURION' : card.type}
+                        </span>
+                        <span className={`font-bold text-lg tracking-tight truncate max-w-[200px] ${card.network === 'Amex' ? 'text-[#E5E4E2]' : ''}`}>
+                          {card.name}
+                        </span>
                       </div>
-                      <span className="font-black text-xl italic tracking-tighter opacity-90">{card.network}</span>
+                      <span className={`font-black text-xl italic tracking-tighter ${card.network === 'Amex' ? 'text-[#C0C0C0]' : 'opacity-90'}`}>
+                        {card.network === 'Amex' ? 'AMEX' : card.network}
+                      </span>
                     </div>
-                    <div className="flex items-center space-x-3 mb-8">
-                      <div className="w-11 h-8 bg-yellow-200/20 rounded-md border border-yellow-100/30 flex items-center justify-center">
-                        <div className="w-6 h-4 border border-yellow-100/40 rounded-sm"></div>
+
+                    <div className="flex items-center space-x-3 mb-8 relative z-10">
+                      <div className={`w-11 h-8 rounded-md border flex items-center justify-center ${card.network === 'Amex' ? 'bg-[#C0C0C0]/20 border-[#C0C0C0]/40' : 'bg-yellow-200/20 border-yellow-100/30'}`}>
+                        <div className={`w-6 h-4 border rounded-sm ${card.network === 'Amex' ? 'border-[#C0C0C0]/40' : 'border-yellow-100/40'}`}></div>
                       </div>
-                      <div className="text-xl font-mono tracking-[0.2em] opacity-90">
+                      <div className={`text-xl font-mono tracking-[0.2em] ${card.network === 'Amex' ? 'text-[#E5E4E2]' : 'opacity-90'}`}>
                         •••• •••• •••• {card.last4}
                       </div>
                     </div>
-                    <div className="flex justify-between items-end">
+
+                    <div className="flex justify-between items-end relative z-10">
                       <div>
-                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Card Holder</p>
-                        <p className="font-bold tracking-wide uppercase text-xs truncate max-w-[150px]">{card.cardHolder}</p>
+                        <p className={`text-[9px] uppercase font-bold tracking-widest mb-1 ${card.network === 'Amex' ? 'text-[#C0C0C0]' : 'opacity-60'}`}>Card Holder</p>
+                        <p className={`font-bold tracking-wide uppercase text-xs truncate max-w-[150px] ${card.network === 'Amex' ? 'text-[#E5E4E2]' : ''}`}>{card.cardHolder}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Expires</p>
-                        <p className="font-mono font-bold text-sm">{card.expiry}</p>
+                        <p className={`text-[8px] uppercase font-bold tracking-[0.2em] mb-1 ${card.network === 'Amex' ? 'text-[#C0C0C0] opacity-100' : 'opacity-60'}`}>
+                          {card.network === 'Amex' ? 'PLATINUM' : 'Expires'}
+                        </p>
+                        <p className={`font-mono font-bold text-sm ${card.network === 'Amex' ? 'text-[#E5E4E2]' : ''}`}>
+                          {card.network === 'Amex' ? card.expiry : card.expiry}
+                        </p>
                       </div>
                     </div>
                   </div>
