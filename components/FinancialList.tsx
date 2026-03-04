@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../types';
 import { getFaviconUrl } from '../services/logoService';
+import { getCardDesign } from '../services/cardDesignService';
 
 interface FinancialListProps {
   cards: FinancialCard[];
@@ -210,15 +211,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
     }
   };
 
-  const getCardGradient = (network: string | undefined) => {
-    switch (network) {
-      case 'Amex': return 'bg-[#0A0A0B]'; // Deep matte charcoal
-      case 'Mastercard': return 'from-slate-800 to-orange-900';
-      case 'Visa': return 'from-indigo-700 to-purple-800';
-      case 'Discover': return 'from-orange-500 to-amber-600';
-      default: return 'from-slate-700 to-slate-900';
-    }
-  };
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-12 animate-fadeIn">
@@ -291,6 +283,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
           ) : (
             <div className={`relative ${isWalletExpanded ? 'flex flex-col gap-4' : ''}`}>
               {cards.map((card, index) => {
+                const design = getCardDesign(card.name, card.network);
                 const stackOffset = index * 45;
                 const stackScale = 1 - (cards.length - 1 - index) * 0.02;
                 const stackZ = index;
@@ -299,10 +292,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     key={card.id}
                     onClick={(e) => handleCardClick(card, e)}
                     className={`
-                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer
-                      ${card.network === 'Amex'
-                        ? 'bg-[#0A0A0B] border-2 border-[#C0C0C0]/30 overflow-hidden silver-brushed relative'
-                        : `bg-gradient-to-br ${getCardGradient(card.network)}`}
+                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 shadow-2xl cursor-pointer bg-gradient-to-br 
+                      ${design.gradient}
+                      ${design.textColor || 'text-white'}
                       transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
                     `}
@@ -313,100 +305,29 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       boxShadow: !isWalletExpanded ? '0 -10px 20px -5px rgba(0,0,0,0.3)' : '0 10px 30px -10px rgba(0,0,0,0.2)'
                     }}
                   >
-                    {/* Amex Texture & Portrait Overlay */}
-                    {card.network === 'Amex' && (
-                      <>
-                        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ background: 'repeating-linear-gradient(45deg, #222, #222 1px, transparent 1px, transparent 3px)' }}></div>
-                        <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ background: 'linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)' }}></div>
-
-                        {/* Central Centurion Portrait */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-30 pointer-events-none overflow-hidden mt-4">
-                          <div className="relative w-48 h-48 border-[1.5px] border-[#E5E4E2]/20 rounded-full flex items-center justify-center">
-                            <svg width="140" height="140" viewBox="0 0 100 100" fill="#E5E4E2">
-                              <path d="M50 5 C25 5 5 25 5 50 C5 75 25 95 50 95 C75 95 95 75 95 50 C95 25 75 5 50 5 Z M50 15 C60 15 70 20 75 30 L65 35 C60 30 55 25 50 25 C45 25 40 30 35 35 L25 30 C30 20 40 15 50 15 Z M50 85 C40 85 30 80 25 70 L35 65 C40 70 45 75 50 75 C55 75 60 70 65 65 L75 70 C70 80 60 85 50 85 Z M50 35 C55 35 60 40 60 45 C60 50 55 55 50 55 C45 55 40 50 40 45 C40 40 45 35 50 35 Z" opacity="0.6" />
-                              <path d="M48 45 L52 45 L50 60 Z" fill="#E5E4E2" />
-                              <path d="M40 38 Q50 35 60 38 L60 42 Q50 39 40 42 Z" fill="#E5E4E2" />
-                            </svg>
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <div className="relative z-10 h-full flex flex-col justify-between">
-                      {/* Top Branding */}
-                      <div className="flex justify-between items-start">
-                        <div className="flex flex-col">
-                          {card.network === 'Amex' ? (
-                            <span className="text-[11px] font-black tracking-[0.25em] text-[#C0C0C0] antialiased">CENTURION</span>
-                          ) : (
-                            <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{card.type}</span>
-                          )}
-                        </div>
-                        {card.network !== 'Amex' && (
-                          <span className="font-black text-xl italic tracking-tighter opacity-90">{card.network}</span>
-                        )}
+                    <div className="flex justify-between items-start mb-8">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{card.type}</span>
+                        <span className="font-bold text-lg tracking-tight truncate max-w-[200px]">{card.name}</span>
                       </div>
-
-                      {/* Middle: Chip & Embossed Card Number */}
-                      <div className="flex flex-col -mt-4">
-                        <div className="flex items-center space-x-5">
-                          {/* Silver Metallic Chip */}
-                          <div className={`w-12 h-9 rounded-md border shadow-2xl flex items-center justify-center ${card.network === 'Amex' ? 'bg-gradient-to-br from-[#E5E4E2] to-[#888] border-[#C0C0C0]/50 shrink-0' : 'bg-yellow-200/20 border-yellow-100/30'}`}>
-                            <div className={`w-7 h-5 border rounded-sm grid grid-cols-3 gap-0.5 p-0.5 ${card.network === 'Amex' ? 'border-black/10' : 'border-yellow-100/40'}`}>
-                              {[...Array(6)].map((_, i) => <div key={i} className="bg-black/10 rounded-[1px]"></div>)}
-                            </div>
-                          </div>
-
-                          {/* Dynamic Card Number */}
-                          <div className={`text-2xl font-mono tracking-[0.2em] ${card.network === 'Amex' ? 'text-[#E5E4E2] drop-shadow-[0_2px_1px_rgba(0,0,0,0.9)]' : 'opacity-90'}`}>
-                            {card.network === 'Amex' ? (
-                              <span className="flex items-baseline gap-4">
-                                <span className="text-xl">3759</span>
-                                <span className="text-xl">876543</span>
-                                <span className="text-xl">2{card.last4}</span>
-                              </span>
-                            ) : `•••• •••• •••• ${card.last4}`}
-                          </div>
-                        </div>
+                      <span className={`font-black text-xl italic tracking-tighter opacity-90 ${design.logoColor || ''}`}>{card.network}</span>
+                    </div>
+                    <div className="flex items-center space-x-3 mb-8">
+                      <div className={`w-11 h-8 rounded-md border flex items-center justify-center ${design.textColor === 'text-slate-800' ? 'bg-slate-800/10 border-slate-800/20' : 'bg-yellow-200/20 border-yellow-100/30'}`}>
+                        <div className={`w-6 h-4 border rounded-sm ${design.textColor === 'text-slate-800' ? 'border-slate-800/30' : 'border-yellow-100/40'}`}></div>
                       </div>
-
-                      {/* Bottom Section */}
-                      <div className="flex justify-between items-end">
-                        <div className="flex flex-col gap-3">
-                          {card.network === 'Amex' && (
-                            <div className="flex flex-col -space-y-1">
-                              <span className="text-[6px] text-[#C0C0C0] font-black tracking-[0.1em] uppercase">Member Since</span>
-                              <span className="text-[10px] text-[#E5E4E2] font-mono font-bold drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">09</span>
-                            </div>
-                          )}
-
-                          <div className={`flex flex-col ${card.network === 'Amex' ? 'items-center absolute left-1/2 -translate-x-1/2 bottom-3 w-max' : ''}`}>
-                            {card.network === 'Amex' && (
-                              <span className="text-[10px] text-[#C0C0C0] font-black tracking-[0.15em] mb-1 scale-x-110">AMERICAN EXPRESS</span>
-                            )}
-                            <p className={`font-black tracking-[0.1em] uppercase text-[11px] ${card.network === 'Amex' ? 'text-[#E5E4E2] drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : 'text-xs truncate max-w-[200px]'}`}>
-                              {card.cardHolder}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="text-right flex flex-col items-end gap-3">
-                          <div className="flex flex-col items-end -space-y-1 mr-2">
-                            <span className={`text-[6px] uppercase font-black tracking-[0.15em] ${card.network === 'Amex' ? 'text-[#C0C0C0]' : 'opacity-60'}`}>
-                              {card.network === 'Amex' ? 'Valid Thru' : 'Expires'}
-                            </span>
-                            <span className={`font-mono font-bold text-[11px] ${card.network === 'Amex' ? 'text-[#E5E4E2] drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]' : 'text-sm'}`}>
-                              {card.expiry}
-                            </span>
-                          </div>
-
-                          {card.network === 'Amex' && (
-                            <div className="flex flex-col items-center justify-center border border-[#E5E4E2]/40 px-1 py-0.5 bg-gradient-to-br from-white/10 to-transparent shadow-inner">
-                              <span className="text-[12px] font-black tracking-[-0.05em] text-[#E5E4E2] leading-none">AM EX</span>
-                              <span className="text-[5px] font-black tracking-[0.3em] text-[#C0C0C0] -mt-0.5 ml-0.5">PLATINUM</span>
-                            </div>
-                          )}
-                        </div>
+                      <div className="text-xl font-mono tracking-[0.2em] opacity-90">
+                        •••• •••• •••• {card.last4}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Card Holder</p>
+                        <p className="font-bold tracking-wide uppercase text-xs truncate max-w-[150px]">{card.cardHolder}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Expires</p>
+                        <p className="font-mono font-bold text-sm">{card.expiry}</p>
                       </div>
                     </div>
                   </div>

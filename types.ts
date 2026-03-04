@@ -77,6 +77,9 @@ export interface FinancialCard {
   type: 'Credit' | 'Debit';
   status: 'Active' | 'Frozen' | 'Expired';
   limit?: number;
+  issuer?: string; // e.g. "Chase", "American Express"
+  logoUrl?: string;
+  designColor?: string;
 }
 
 export interface InstitutionAccount {
