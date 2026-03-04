@@ -390,7 +390,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   </div>
 
-                  <div className="bg-white/5 rounded-xl p-4 space-y-3 border border-white/5">
+                  <div className="space-y-4 pt-4 px-1">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Username / Email</span>
                       <span className="font-black text-white truncate max-w-[150px]">{inst.username || inst.email || '-'}</span>
