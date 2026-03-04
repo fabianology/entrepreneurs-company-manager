@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Subscription, SubService } from '../types';
+import { getFaviconUrl } from '../services/logoService';
 import { generateSubscriptionEmailPurpose } from '../services/geminiService';
 
 interface SubscriptionListProps {
@@ -179,11 +180,28 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               <div className="flex justify-between items-start">
                 <div className="flex items-center space-x-4">
                   <div
-                    className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 cursor-pointer hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300 group/logo"
+                    className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 cursor-pointer hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300 group/logo overflow-hidden"
                     onClick={() => setEditingSubscription(sub)}
                     title="Edit Service"
                   >
-                    <span className="text-white font-black text-xl opacity-80 group-hover/logo:text-[#1FE400] transition-colors">{sub.name.charAt(0)}</span>
+                    {sub.website ? (
+                      <img
+                        src={getFaviconUrl(sub.website) || ''}
+                        className="w-8 h-8 object-contain"
+                        alt=""
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className="text-white font-black text-xl opacity-80 group-hover/logo:text-[#1FE400] transition-colors"
+                      style={{ display: sub.website ? 'none' : 'flex' }}
+                    >
+                      {sub.name.charAt(0)}
+                    </span>
                   </div>
                   <div>
                     <h3 className="text-lg font-black tracking-tight text-white uppercase">{sub.name}</h3>

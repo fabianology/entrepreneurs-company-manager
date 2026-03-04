@@ -1,6 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Account, Subscription } from '../types';
+import { getFaviconUrl } from '../services/logoService';
 
 interface AccountListProps {
   accounts: Account[];
@@ -22,6 +23,9 @@ const AccountList: React.FC<AccountListProps> = ({
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [showModalPassword, setShowModalPassword] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [longPressAccount, setLongPressAccount] = useState<Account | null>(null);
+  const [lastCopiedField, setLastCopiedField] = useState<{ id: string, field: 'email' | 'password' } | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleAddNew = () => {
     setShowDeleteConfirm(false);
@@ -117,6 +121,40 @@ const AccountList: React.FC<AccountListProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const startLongPress = (acc: Account) => {
+    longPressTimer.current = setTimeout(() => {
+      // Auto-copy password on long-press
+      if (acc.password) {
+        navigator.clipboard.writeText(acc.password);
+        setCopiedId(acc.id);
+        setTimeout(() => setCopiedId(null), 2000);
+      }
+
+      togglePasswordVisibility(acc.id);
+      setLongPressAccount(acc);
+
+      // Auto-dismiss the overlay/state after 2 seconds
+      setTimeout(() => setLongPressAccount(null), 2000);
+
+      if ('vibrate' in navigator) navigator.vibrate(50);
+    }, 500);
+  };
+
+  const endLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  const handleFieldCopy = (id: string, text: string, field: 'email' | 'password') => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setLastCopiedField({ id, field });
+    setTimeout(() => setLastCopiedField(null), 2000);
+    if ('vibrate' in navigator) navigator.vibrate(30);
+  };
+
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-8">
       {/* Action Bar */}
@@ -133,7 +171,26 @@ const AccountList: React.FC<AccountListProps> = ({
       {/* Account Cards List */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {accounts.map(acc => (
-          <div key={acc.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl flex flex-col">
+          <div
+            key={acc.id}
+            className={`bg-[#1C1C1E] rounded-[24px] overflow-hidden border transition-all duration-300 shadow-2xl flex flex-col cursor-pointer select-none
+              ${longPressAccount?.id === acc.id ? 'ring-2 ring-orange-500/50 scale-[0.98] border-orange-500/30' : 'border-white/5'}
+            `}
+            onMouseDown={() => startLongPress(acc)}
+            onMouseUp={endLongPress}
+            onMouseLeave={endLongPress}
+            onTouchStart={() => startLongPress(acc)}
+            onTouchEnd={endLongPress}
+          >
+            {/* Inline Card Overlay for Copy Feedback */}
+            {longPressAccount?.id === acc.id && (
+              <div className="absolute inset-0 z-10 bg-black/60 backdrop-blur-md flex flex-col items-center justify-center animate-fadeIn">
+                <div className="bg-orange-500 p-3 rounded-full mb-3 shadow-lg shadow-orange-500/40 animate-scaleIn">
+                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <span className="text-[10px] font-black text-white uppercase tracking-[0.3em] animate-fadeIn">Password Copied</span>
+              </div>
+            )}
             {/* Header / Main Info - Clickable */}
             <div className="p-6 space-y-6">
               <div className="flex justify-between items-start">
@@ -145,6 +202,25 @@ const AccountList: React.FC<AccountListProps> = ({
                   >
                     {acc.platform.toLowerCase() === 'shopify' ? (
                       <img src="https://cdn.worldvectorlogo.com/logos/shopify.svg" className="w-8 h-8 group-hover/logo:scale-110 transition-transform" alt="Shopify" />
+                    ) : acc.website ? (
+                      <>
+                        <img
+                          src={getFaviconUrl(acc.website) || ''}
+                          className="w-8 h-8 object-contain"
+                          alt=""
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                        <span
+                          className="text-white font-black text-xl opacity-80 group-hover/logo:opacity-100 transition-opacity"
+                          style={{ display: 'none' }}
+                        >
+                          {acc.platform.charAt(0)}
+                        </span>
+                      </>
                     ) : (
                       <span className="text-white font-black text-xl opacity-80 group-hover/logo:opacity-100 transition-opacity">{acc.platform.charAt(0)}</span>
                     )}
@@ -165,16 +241,26 @@ const AccountList: React.FC<AccountListProps> = ({
 
               {/* Login Data Grid */}
               <div className="grid grid-cols-2 gap-y-6 gap-x-8">
-                <div className="space-y-1 group/field">
+                <div
+                  className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
+                  onClick={() => handleFieldCopy(acc.id, acc.email, 'email')}
+                >
                   <div className="flex justify-between items-center">
-                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Email / Identity</p>
+                    <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === acc.id && lastCopiedField.field === 'email' ? 'text-orange-500' : 'text-white/40'}`}>
+                      {lastCopiedField?.id === acc.id && lastCopiedField.field === 'email' ? 'Copied!' : 'Email / Identity'}
+                    </p>
                   </div>
                   <p className="text-xs font-black text-white truncate">{acc.email}</p>
                 </div>
 
-                <div className="space-y-1 group/pass">
+                <div
+                  className="space-y-1 group/pass cursor-pointer active:opacity-60 transition-opacity"
+                  onClick={() => handleFieldCopy(acc.id, acc.password || '', 'password')}
+                >
                   <div className="flex justify-between items-center">
-                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Password</p>
+                    <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === acc.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
+                      {lastCopiedField?.id === acc.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                    </p>
                     <div className="flex space-x-2 opacity-0 group-hover/pass:opacity-100 transition-opacity">
                       <button onClick={(e) => { e.stopPropagation(); togglePasswordVisibility(acc.id); }} className="text-[9px] font-black text-[#EBC351] uppercase">
                         {visiblePasswords.has(acc.id) ? 'Hide' : 'Show'}
@@ -398,6 +484,7 @@ const AccountList: React.FC<AccountListProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };

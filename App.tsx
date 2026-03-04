@@ -8,6 +8,7 @@ import DocumentList from './components/DocumentList';
 import { AppState, Company, Account, Subscription, FinancialCard, Loan, Institution, CompanyDocument } from './types';
 import { getEntrepreneurialQuote } from './services/geminiService';
 import { db } from './services/dbService';
+import { getFaviconUrl } from './services/logoService';
 
 const BRAND_COLORS = [
   '#4f46e5', // Indigo
@@ -35,7 +36,6 @@ const App: React.FC = () => {
 
   const [isEditingCompanyName, setIsEditingCompanyName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [showIconMenu, setShowIconMenu] = useState(false);
   const [showDeleteCompanyConfirm, setShowDeleteCompanyConfirm] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [quote, setQuote] = useState<string>('');
@@ -54,7 +54,6 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
 
-  const iconMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchResultsRef = useRef<HTMLDivElement>(null);
@@ -238,18 +237,6 @@ const App: React.FC = () => {
   };
 
 
-  // Close icon menu if clicked outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (iconMenuRef.current && !iconMenuRef.current.contains(event.target as Node)) {
-        setShowIconMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   const handleUpdateCompany = (id: string, updates: Partial<Company>) => {
     if (!state) return;
@@ -613,7 +600,6 @@ const App: React.FC = () => {
     setActiveTab('accounts');
     setIsEditingCompanyName(false);
     setIsEditingDescription(false);
-    setShowIconMenu(false);
     setShowDeleteCompanyConfirm(false);
     setSearchQuery('');
 
@@ -952,43 +938,33 @@ const App: React.FC = () => {
                   <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                     <div className="flex-1 w-full">
                       <div className="flex items-center space-x-3 mb-2">
-                        <div className="relative" ref={iconMenuRef}>
+                        <div className="relative">
                           <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 cursor-pointer overflow-hidden ring-offset-2 hover:ring-2 ring-indigo-200 transition-all shadow-sm"
-                            style={{ backgroundColor: selectedCompany.logoUrl ? 'transparent' : selectedCompany.color }}
-                            onClick={() => setShowIconMenu(!showIconMenu)}
-                            title="Change Icon or Color"
+                            className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 overflow-hidden ring-offset-2 transition-all shadow-sm"
+                            style={{
+                              backgroundColor: selectedCompany.logoUrl ? 'white' : (selectedCompany.website ? 'white' : selectedCompany.color)
+                            }}
                           >
                             {selectedCompany.logoUrl ? (
                               <img src={selectedCompany.logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                            ) : (
-                              <span className="text-xl">{selectedCompany.name.charAt(0)}</span>
-                            )}
-                          </div>
-
-                          {showIconMenu && (
-                            <div className="absolute top-14 left-0 bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-64 z-50 animate-fadeIn">
-                              <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Brand Color</h4>
-                              <div className="grid grid-cols-5 gap-2 mb-4">
-                                {BRAND_COLORS.map(color => (
-                                  <button
-                                    key={color}
-                                    onClick={() => handleUpdateCompany(selectedCompany.id, { color, logoUrl: '' })}
-                                    className={`w-8 h-8 rounded-full border border-slate-100 ${selectedCompany.color === color && !selectedCompany.logoUrl ? 'ring-2 ring-offset-1 ring-slate-800' : ''}`}
-                                    style={{ backgroundColor: color }}
-                                  />
-                                ))}
-                              </div>
-                              <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Or Logo URL</h4>
-                              <input
-                                type="text"
-                                className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                                placeholder="https://example.com/logo.png"
-                                value={selectedCompany.logoUrl || ''}
-                                onChange={(e) => handleUpdateCompany(selectedCompany.id, { logoUrl: e.target.value })}
+                            ) : selectedCompany.website ? (
+                              <img
+                                src={getFaviconUrl(selectedCompany.website) || ''}
+                                className="w-8 h-8 object-contain"
+                                alt=""
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  (e.target as HTMLImageElement).nextElementSibling!.setAttribute('style', 'display: block');
+                                }}
                               />
-                            </div>
-                          )}
+                            ) : null}
+                            <span
+                              className="text-xl"
+                              style={{ display: !selectedCompany.logoUrl && selectedCompany.website ? 'none' : 'block' }}
+                            >
+                              {selectedCompany.name.charAt(0)}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex items-center space-x-3 w-full overflow-hidden">
                           <h2 className={`text-2xl md:text-3xl font-bold truncate ${selectedCompanyId ? 'text-white' : 'text-slate-900'}`}>{selectedCompany.name}</h2>

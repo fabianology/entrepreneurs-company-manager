@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../types';
+import { getFaviconUrl } from '../services/logoService';
 
 interface FinancialListProps {
   cards: FinancialCard[];
@@ -342,8 +343,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <div className="p-5 border-b border-slate-50 bg-gradient-to-br from-slate-50/50 to-white">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                      <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white overflow-hidden shadow-sm">
+                        {inst.loginUrl ? (
+                          <img
+                            src={getFaviconUrl(inst.loginUrl) || ''}
+                            className="w-7 h-7 object-contain"
+                            alt=""
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <svg
+                          className="w-6 h-6"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          style={{ display: inst.loginUrl ? 'none' : 'flex' }}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-900">{inst.name}</h4>

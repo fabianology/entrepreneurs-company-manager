@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { AppState, Company } from '../types';
+import { getFaviconUrl } from '../services/logoService';
 
 interface DashboardProps {
   state: AppState;
@@ -60,7 +61,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
     structure: 'LLC',
     description: '',
     color: BRAND_COLORS[0],
-    logoUrl: ''
+    logoUrl: '',
+    website: ''
   };
 
   const [formState, setFormState] = useState<Partial<Company>>(initialCompanyState);
@@ -126,7 +128,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
           structure: formState.structure || 'LLC',
           description: formState.description || '',
           color: formState.color || BRAND_COLORS[0],
-          logoUrl: formState.logoUrl
+          logoUrl: formState.logoUrl,
+          website: formState.website
         });
       }
       setIsModalOpen(false);
@@ -208,6 +211,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                     >
                       {formState.logoUrl ? (
                         <img src={formState.logoUrl} alt="Logo Preview" className="w-full h-full object-cover" />
+                      ) : formState.website ? (
+                        <div className="w-full h-full flex items-center justify-center bg-white p-2 text-black">
+                          <img
+                            src={getFaviconUrl(formState.website) || ''}
+                            alt="Logo Discovery"
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                              (e.target as HTMLImageElement).parentElement!.nextElementSibling!.setAttribute('style', `display: flex; background-color: ${formState.color || '#333'}`);
+                            }}
+                          />
+                          <div className="w-full h-full flex items-center justify-center transition-colors" style={{ display: 'none' }}>
+                            <span className="text-white font-black text-2xl">{formState.name?.charAt(0) || '?'}</span>
+                          </div>
+                        </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center transition-colors" style={{ backgroundColor: formState.color || '#333' }}>
                           <span className="text-white font-black text-2xl">{formState.name?.charAt(0) || '?'}</span>
@@ -216,14 +234,27 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                     </div>
                   </div>
 
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9px] font-black text-white/20 uppercase tracking-widest ml-1">Logo from URL</label>
+                      <input
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#1FE400]/40 transition font-bold placeholder:text-white/10"
+                        placeholder="e.g. service.com"
+                        value={formState.website || ''}
+                        onChange={(e) => setFormState({ ...formState, website: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <div className="h-px bg-white/5 flex-1"></div>
+                      <span className="text-[8px] font-black text-white/10 uppercase tracking-widest">Or</span>
+                      <div className="h-px bg-white/5 flex-1"></div>
+                    </div>
+
                     <label className="cursor-pointer flex flex-col items-start group">
-                      <span className={`text-[10px] font-bold ${isDragging ? 'text-[#1FE400]' : 'text-white/40'} uppercase mb-1 tracking-tight`}>
-                        {isDragging ? 'Release to upload' : 'Drag & drop logo'}
-                      </span>
-                      <span className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/10 rounded-xl font-black text-[10px] text-white/70 uppercase tracking-widest group-hover:bg-[#1FE400] group-hover:text-black transition-all shadow-sm">
+                      <span className="inline-flex items-center px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl font-black text-[10px] text-white/60 uppercase tracking-widest group-hover:bg-white/10 group-hover:text-white transition-all shadow-sm">
                         <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                        Browse Media
+                        Upload Media
                       </span>
                       <input
                         type="file"
@@ -332,11 +363,28 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                         className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-black flex-shrink-0 overflow-hidden bg-cover bg-center shadow-inner border border-white/5 cursor-pointer"
                         onClick={(e) => { e.stopPropagation(); openEditModal(e, company); }}
                         style={{
-                          backgroundColor: company.logoUrl ? 'white' : company.color,
+                          backgroundColor: company.logoUrl ? 'white' : (company.website ? 'white' : company.color),
                           backgroundImage: company.logoUrl ? `url(${company.logoUrl})` : 'none'
                         }}
                       >
-                        {!company.logoUrl && <span className="text-2xl">{company.name.charAt(0)}</span>}
+                        {!company.logoUrl && company.website && (
+                          <img
+                            src={getFaviconUrl(company.website) || ''}
+                            className="w-8 h-8 object-contain"
+                            alt=""
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'block';
+                            }}
+                          />
+                        )}
+                        <span
+                          className="text-2xl"
+                          style={{ display: !company.logoUrl && company.website ? 'none' : 'block' }}
+                        >
+                          {company.name.charAt(0)}
+                        </span>
                       </div>
                       <div className="min-w-0">
                         <h4 className="text-xl font-black text-white tracking-tight leading-tight truncate">{company.name}</h4>

@@ -6,6 +6,7 @@ export interface Company {
   description: string;
   color: string;
   logoUrl?: string;
+  website?: string;
   lastModified?: number; // timestamp
   lastViewed?: number; // timestamp
 }
