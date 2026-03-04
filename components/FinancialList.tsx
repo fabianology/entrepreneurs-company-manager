@@ -269,14 +269,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
         </div>
         <div
           ref={walletContainerRef}
-          className={`relative ${isWalletExpanded ? 'space-y-4' : 'h-[300px]'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
+          className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[300px] overflow-hidden'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
           onClick={() => !isWalletExpanded && setIsWalletExpanded(true)}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
           style={{
-            transform: isWalletExpanded ? `translateY(${dragY}px)` : 'none'
+            transform: isWalletExpanded ? `translateY(${dragY}px)` : 'none',
+            transition: isDragging ? 'none' : 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
           {cards.length === 0 ? (
@@ -300,7 +301,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     className={`
                       w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
                       ${getCardGradient(card.network)}
-                      ${!isWalletExpanded ? 'absolute left-0 right-0' : 'relative'}
+                      transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
+                      ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
                     `}
                     style={{
                       top: !isWalletExpanded ? `${stackOffset}px` : '0',
