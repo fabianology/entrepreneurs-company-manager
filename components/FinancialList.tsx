@@ -429,7 +429,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         Manage
                       </button>
                       <svg
-                        className={`w-4 h-4 transform transition-transform duration-300 ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`}
+                        className={`w-4 h-4 transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -439,7 +439,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   </button>
 
-                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedInstitutions.has(inst.id) ? 'max-h-[1000px] opacity-100 p-6 pt-0' : 'max-h-0 opacity-0'}`}>
+                  <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${expandedInstitutions.has(inst.id) ? 'max-h-[1000px] opacity-100 p-6 pt-0' : 'max-h-0 opacity-0'}`}>
                     <div className="space-y-2">
                       {inst.accounts.map((acc, aIdx) => (
                         <div key={acc.id || aIdx} className="flex justify-between items-center py-3 px-1 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition cursor-default">
