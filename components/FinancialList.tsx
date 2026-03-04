@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../types';
 import { getFaviconUrl } from '../services/logoService';
-import { getCardDesign } from '../services/cardDesignService';
 
 interface FinancialListProps {
   cards: FinancialCard[];
@@ -211,6 +210,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
     }
   };
 
+  const getCardGradient = (network: string | undefined) => {
+    switch (network) {
+      case 'Amex': return 'from-blue-600 to-cyan-500';
+      case 'Mastercard': return 'from-slate-800 to-orange-900';
+      case 'Visa': return 'from-indigo-700 to-purple-800';
+      case 'Discover': return 'from-orange-500 to-amber-600';
+      default: return 'from-slate-700 to-slate-900';
+    }
+  };
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-12 animate-fadeIn">
@@ -261,7 +269,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
         </div>
         <div
           ref={walletContainerRef}
-          className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[300px] overflow-hidden'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
+          className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[400px] overflow-hidden'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
           onClick={() => !isWalletExpanded && setIsWalletExpanded(true)}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -283,7 +291,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
           ) : (
             <div className={`relative ${isWalletExpanded ? 'flex flex-col gap-4' : ''}`}>
               {cards.map((card, index) => {
-                const design = getCardDesign(card.name, card.network);
                 const stackOffset = index * 45;
                 const stackScale = 1 - (cards.length - 1 - index) * 0.02;
                 const stackZ = index;
@@ -292,9 +299,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     key={card.id}
                     onClick={(e) => handleCardClick(card, e)}
                     className={`
-                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 shadow-2xl cursor-pointer bg-gradient-to-br 
-                      ${design.gradient}
-                      ${design.textColor || 'text-white'}
+                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
+                      ${getCardGradient(card.network)}
                       transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
                     `}
@@ -310,11 +316,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{card.type}</span>
                         <span className="font-bold text-lg tracking-tight truncate max-w-[200px]">{card.name}</span>
                       </div>
-                      <span className={`font-black text-xl italic tracking-tighter opacity-90 ${design.logoColor || ''}`}>{card.network}</span>
+                      <span className="font-black text-xl italic tracking-tighter opacity-90">{card.network}</span>
                     </div>
                     <div className="flex items-center space-x-3 mb-8">
-                      <div className={`w-11 h-8 rounded-md border flex items-center justify-center ${design.textColor === 'text-slate-800' ? 'bg-slate-800/10 border-slate-800/20' : 'bg-yellow-200/20 border-yellow-100/30'}`}>
-                        <div className={`w-6 h-4 border rounded-sm ${design.textColor === 'text-slate-800' ? 'border-slate-800/30' : 'border-yellow-100/40'}`}></div>
+                      <div className="w-11 h-8 bg-yellow-200/20 rounded-md border border-yellow-100/30 flex items-center justify-center">
+                        <div className="w-6 h-4 border border-yellow-100/40 rounded-sm"></div>
                       </div>
                       <div className="text-xl font-mono tracking-[0.2em] opacity-90">
                         •••• •••• •••• {card.last4}
