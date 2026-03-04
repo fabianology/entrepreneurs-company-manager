@@ -442,7 +442,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedInstitutions.has(inst.id) ? 'max-h-[1000px] opacity-100 p-6 pt-0' : 'max-h-0 opacity-0'}`}>
                     <div className="space-y-2">
                       {inst.accounts.map((acc, aIdx) => (
-                        <div key={acc.id || aIdx} className="flex justify-between items-center bg-white/5 border border-white/5 p-3 rounded-xl hover:bg-white/10 transition cursor-default">
+                        <div key={acc.id || aIdx} className="flex justify-between items-center py-3 px-1 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition cursor-default">
                           <div className="flex items-center space-x-3">
                             <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
                             <div>
