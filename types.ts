@@ -85,6 +85,12 @@ export interface InstitutionAccount {
   type: 'Checking' | 'Savings' | 'Investing' | 'CD' | 'Credit Card' | 'Debit Card' | 'Other';
   last4: string;
   balance: number;
+  // Card-specific parameters
+  cardHolder?: string;
+  expiry?: string;
+  network?: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' | 'Other';
+  status?: 'Active' | 'Frozen' | 'Expired';
+  limit?: number;
 }
 
 export interface Institution {

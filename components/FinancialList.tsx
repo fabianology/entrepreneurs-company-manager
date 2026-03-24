@@ -107,6 +107,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   const handleSaveInstitution = () => {
     if (editingInstitution) {
+      // Auto-sync bank cards to global payment methods
+      const instCards = editingInstitution.accounts?.filter(a => a.type === 'Credit Card' || a.type === 'Debit Card') || [];
+      instCards.forEach(acc => {
+        const cardData: Partial<FinancialCard> = {
+          id: acc.id,
+          name: acc.name || `${editingInstitution.name} Card`,
+          cardHolder: acc.cardHolder || '',
+          last4: acc.last4 || '',
+          expiry: acc.expiry || '',
+          network: (acc.network as any) || 'Visa',
+          type: acc.type === 'Credit Card' ? 'Credit' : 'Debit',
+          status: (acc.status as any) || 'Active',
+          limit: acc.limit || 0
+        };
+        const exists = cards.find(c => c.id === acc.id);
+        if (exists) {
+          onUpdateCard(acc.id, cardData);
+        } else {
+          onAddCard(cardData);
+        }
+      });
+
       if (editingInstitution.id) {
         onUpdateInstitution(editingInstitution.id, editingInstitution);
       } else {
@@ -116,12 +138,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
     }
   };
 
-  const handleAddInstAccount = () => {
+  const handleAddInstAccount = (defaultType: string = 'Checking') => {
     if (!editingInstitution) return;
     const newAcc: InstitutionAccount = {
       id: Math.random().toString(36).substr(2, 9),
       name: '',
-      type: 'Checking',
+      type: defaultType as any,
       last4: '',
       balance: 0
     };
@@ -269,7 +291,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
         </div>
         <div
           ref={walletContainerRef}
-          className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[400px] overflow-hidden'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
+          className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[300px] overflow-hidden'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
           onClick={() => !isWalletExpanded && setIsWalletExpanded(true)}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -364,11 +386,17 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <div className="p-6 border-b border-white/5">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 flex items-center justify-center text-white overflow-hidden">
+                      <div 
+                        className="w-14 h-14 bg-white/5 flex items-center justify-center text-white overflow-hidden cursor-pointer p-1 -ml-1 rounded-2xl border border-white/10 hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingInstitution(inst);
+                        }}
+                      >
                         {inst.loginUrl ? (
                           <img
                             src={getFaviconUrl(inst.loginUrl) || ''}
-                            className="w-10 h-10 object-contain"
+                            className="w-8 h-8 object-contain"
                             alt=""
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
@@ -390,7 +418,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <div>
                         <h4 className="font-black text-white text-base">{inst.name}</h4>
                         {inst.loginUrl && (
-                          <a href={inst.loginUrl} target="_blank" rel="noreferrer" className="text-[10px] text-[#EBC351] hover:text-[#EBC351]/80 hover:underline flex items-center gap-1 font-black uppercase tracking-widest mt-1">
+                          <a href={inst.loginUrl} target="_blank" rel="noreferrer" className="text-[10px] text-white/40 hover:text-white/80 hover:underline flex items-center gap-1 font-black uppercase tracking-widest mt-1">
                             Launch Portal
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                           </a>
@@ -540,42 +568,131 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="border-t border-white/5 pt-8">
+                <div className="mb-8">
+                  <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
+                    <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
+                    <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Card</span>
+                  </button>
+
+                  {/* Cards List */}
+                  <div className="space-y-4 mt-6">
+                    {(editingInstitution.accounts || []).map((acc, idx) => {
+                      if (acc.type !== 'Credit Card' && acc.type !== 'Debit Card') return null;
+                      return (
+                        <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
+                          <div className="flex-1 w-full space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+                              <div className="md:col-span-1">
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Card Nickname" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                              </div>
+                              <div className="md:col-span-1">
+                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
+                                  <option value="Credit Card">Credit Card</option>
+                                  <option value="Debit Card">Debit Card</option>
+                                  <option value="Checking">Checking</option>
+                                  <option value="Savings">Savings</option>
+                                  <option value="Investing">Investing</option>
+                                  <option value="CD">CD</option>
+                                  <option value="Other">Other</option>
+                                </select>
+                              </div>
+                              <div className="md:col-span-1">
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                              </div>
+                              <div className="md:col-span-1 relative">
+                                <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
+                                <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                              </div>
+                            </div>
+                            
+                            <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
+                              <div className="md:col-span-1">
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Holder</label>
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="NAME" value={acc.cardHolder || ''} onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })} />
+                              </div>
+                              <div className="md:col-span-1">
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Network</label>
+                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.network || 'Visa'} onChange={e => handleUpdateInstAccount(idx, { network: e.target.value as any })}>
+                                  <option value="Visa">Visa</option>
+                                  <option value="Mastercard">Mastercard</option>
+                                  <option value="Amex">Amex</option>
+                                  <option value="Discover">Discover</option>
+                                  <option value="Other">Other</option>
+                                </select>
+                              </div>
+                              <div className="md:col-span-1">
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Expiry</label>
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="MM/YY" maxLength={5} value={acc.expiry || ''} onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })} />
+                              </div>
+                              <div className="md:col-span-1">
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Status</label>
+                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.status || 'Active'} onChange={e => handleUpdateInstAccount(idx, { status: e.target.value as any })}>
+                                  <option value="Active">Active</option>
+                                  <option value="Frozen">Frozen</option>
+                                  <option value="Expired">Expired</option>
+                                </select>
+                              </div>
+                              {acc.type === 'Credit Card' && (
+                                <div className="md:col-span-2">
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Credit Limit</label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
+                                    <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Limit" value={acc.limit || ''} onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <button onClick={() => handleDeleteInstAccount(idx)} className="text-white/20 hover:text-orange-500 p-2 transition self-start mt-1">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="flex justify-between items-center mb-6">
                   <h4 className="text-[9px] font-black text-white/40 uppercase tracking-widest">Linked Accounts</h4>
-                  <button onClick={handleAddInstAccount} className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition uppercase tracking-widest">+ Add Account</button>
+                  <button onClick={() => handleAddInstAccount('Checking')} className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition uppercase tracking-widest">+ Add Account</button>
                 </div>
                 <div className="space-y-4">
-                  {(editingInstitution.accounts || []).map((acc, idx) => (
-                    <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-end md:items-center border border-white/5">
-                      <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                        <div className="md:col-span-1">
-                          <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                  {(editingInstitution.accounts || []).map((acc, idx) => {
+                    if (acc.type === 'Credit Card' || acc.type === 'Debit Card') return null;
+                    return (
+                      <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
+                        <div className="flex-1 w-full space-y-4">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+                            <div className="md:col-span-1">
+                              <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Account Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                            </div>
+                            <div className="md:col-span-1">
+                              <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
+                                <option value="Checking">Checking</option>
+                                <option value="Savings">Savings</option>
+                                <option value="Investing">Investing</option>
+                                <option value="Credit Card">Credit Card</option>
+                                <option value="Debit Card">Debit Card</option>
+                                <option value="CD">CD</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </div>
+                            <div className="md:col-span-1">
+                              <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                            </div>
+                            <div className="md:col-span-1 relative">
+                              <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
+                              <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                            </div>
+                          </div>
                         </div>
-                        <div className="md:col-span-1">
-                          <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
-                            <option value="Checking">Checking</option>
-                            <option value="Savings">Savings</option>
-                            <option value="Investing">Investing</option>
-                            <option value="Credit Card">Credit Card</option>
-                            <option value="Debit Card">Debit Card</option>
-                            <option value="CD">CD</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                        <div className="md:col-span-1">
-                          <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
-                        </div>
-                        <div className="md:col-span-1 relative">
-                          <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
-                          <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
-                        </div>
+                        <button onClick={() => handleDeleteInstAccount(idx)} className="text-white/20 hover:text-orange-500 p-2 transition self-start mt-1">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
                       </div>
-                      <button onClick={() => handleDeleteInstAccount(idx)} className="text-white/20 hover:text-orange-500 p-2 transition">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      </button>
-                    </div>
-                  ))}
-                  {(!editingInstitution.accounts || editingInstitution.accounts.length === 0) && (
+                    );
+                  })}
+                  {(!editingInstitution.accounts || editingInstitution.accounts.filter(a => a.type !== 'Credit Card' && a.type !== 'Debit Card').length === 0) && (
                     <div className="text-center py-8 border border-dashed border-white/10 rounded-xl text-[10px] font-black text-white/20 uppercase tracking-widest bg-white/5">
                       No accounts linked yet
                     </div>
