@@ -328,7 +328,10 @@ const App: React.FC = () => {
       network: card.network || 'Visa',
       type: card.type || 'Credit',
       status: card.status || 'Active',
-      limit: card.limit || 0
+      limit: card.limit || 0,
+      paidFrom: card.paidFrom || '',
+      paidOn: card.paidOn || '',
+      autopay: card.autopay || 'N/A'
     };
     setState(prev => prev ? ({
       ...prev,
@@ -357,7 +360,10 @@ const App: React.FC = () => {
               network: updates.network !== undefined ? updates.network : a.network,
               type: updates.type === 'Credit' ? 'Credit Card' : updates.type === 'Debit' ? (a.type === 'Debit (Linked)' || a.type === 'FSA' || a.type === 'HSA' ? a.type : 'Debit Card') : a.type,
               status: updates.status !== undefined ? updates.status : a.status,
-              limit: updates.limit !== undefined ? updates.limit : a.limit
+              limit: updates.limit !== undefined ? updates.limit : a.limit,
+              paidFrom: updates.paidFrom !== undefined ? updates.paidFrom : a.paidFrom,
+              paidOn: updates.paidOn !== undefined ? updates.paidOn : a.paidOn,
+              autopay: updates.autopay !== undefined ? updates.autopay : a.autopay
             } : a)
           };
         }

@@ -77,6 +77,9 @@ export interface FinancialCard {
   type: 'Credit' | 'Debit';
   status: 'Active' | 'Frozen' | 'Expired';
   limit?: number;
+  paidFrom?: string;
+  paidOn?: string;
+  autopay?: 'Yes' | 'No' | 'N/A';
 }
 
 export interface InstitutionAccount {
@@ -92,6 +95,9 @@ export interface InstitutionAccount {
   network?: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' | 'Other';
   status?: 'Active' | 'Frozen' | 'Expired';
   limit?: number;
+  paidFrom?: string;
+  paidOn?: string;
+  autopay?: 'Yes' | 'No' | 'N/A';
 }
 
 export interface Institution {

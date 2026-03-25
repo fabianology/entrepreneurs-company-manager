@@ -147,7 +147,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
           network: (acc.network as any) || 'Visa',
           type: acc.type === 'Credit Card' ? 'Credit' : 'Debit',
           status: (acc.status as any) || 'Active',
-          limit: acc.limit || 0
+          limit: acc.limit || 0,
+          paidFrom: acc.paidFrom || '',
+          paidOn: acc.paidOn || '',
+          autopay: acc.autopay || 'N/A'
         };
         const exists = cards.find(c => c.id === acc.id);
         if (exists) {
@@ -642,16 +645,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="1234" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
                               </div>
                               <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Balance</label>
-                                <div className="relative flex items-center">
-                                  <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
-                                    <option value="USD" className="bg-[#1C1C1E]">$</option>
-                                    <option value="EUR" className="bg-[#1C1C1E]">€</option>
-                                    <option value="GBP" className="bg-[#1C1C1E]">£</option>
-                                    <option value="CAD" className="bg-[#1C1C1E]">C$</option>
-                                  </select>
-                                  <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="0.00" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
-                                </div>
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Autopay</label>
+                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.autopay || 'N/A'} onChange={e => handleUpdateInstAccount(idx, { autopay: e.target.value as any })}>
+                                  <option value="Yes">Yes</option>
+                                  <option value="No">No</option>
+                                  <option value="N/A">N/A</option>
+                                </select>
                               </div>
                             </div>
                             
@@ -691,20 +690,55 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   <option value="Expired">Expired</option>
                                 </select>
                               </div>
-                              {acc.type === 'Credit Card' && (
                                 <div className="md:col-span-2">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Credit Limit</label>
-                                  <div className="relative flex items-center">
-                                    <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
-                                      <option value="USD" className="bg-[#1C1C1E]">$</option>
-                                      <option value="EUR" className="bg-[#1C1C1E]">€</option>
-                                      <option value="GBP" className="bg-[#1C1C1E]">£</option>
-                                      <option value="CAD" className="bg-[#1C1C1E]">C$</option>
-                                    </select>
-                                    <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Limit" value={acc.limit || ''} onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })} />
-                                  </div>
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid From</label>
+                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. Chase Checking" value={acc.paidFrom || ''} onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })} />
                                 </div>
-                              )}
+                                <div className="md:col-span-2">
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid On</label>
+                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. 15th of Month" value={acc.paidOn || ''} onChange={e => handleUpdateInstAccount(idx, { paidOn: e.target.value })} />
+                                </div>
+                                {acc.type === 'Credit Card' ? (
+                                  <>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Balance</label>
+                                      <div className="relative flex items-center">
+                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                          <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                          <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                          <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                          <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                        </select>
+                                        <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="0.00" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                                      </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Credit Limit</label>
+                                      <div className="relative flex items-center">
+                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                          <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                          <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                          <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                          <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                        </select>
+                                        <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Limit" value={acc.limit || ''} onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })} />
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="md:col-span-2">
+                                    <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Balance</label>
+                                    <div className="relative flex items-center">
+                                      <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                        <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                        <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                        <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                        <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                      </select>
+                                      <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="0.00" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1104,31 +1138,30 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
             <div className="p-6 border-t border-white/5 bg-black/20 flex items-center justify-between">
               <div>
-                {editingLoan.id && (
-                  showDeleteConfirm ? (
-                    <div className="flex items-center space-x-3">
+              {editingLoan.id && (
+                showDeleteConfirm ? (
+                  <div className="flex items-center bg-orange-500/10 rounded-xl p-1.5 border border-orange-500/30 gap-3">
+                    <span className="text-[10px] font-black text-orange-500 uppercase px-2 whitespace-nowrap">Confirm?</span>
+                    <div className="flex gap-1">
                       <button
-                        onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); }}
-                        className="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition"
-                      >
-                        Confirm
-                      </button>
+                        onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); setShowDeleteConfirm(false); }}
+                        className="text-[10px] font-black text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
+                      >YES</button>
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="text-[10px] font-black text-white/40 hover:text-white uppercase tracking-widest transition"
-                      >
-                        Cancel
-                      </button>
+                        className="text-[10px] font-black text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
+                      >NO</button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest transition"
-                    >
-                      Remove Loan
-                    </button>
-                  )
-                )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-white/20 hover:text-orange-500 p-3 transition rounded-xl hover:bg-white/5 border border-transparent flex items-center justify-center active:scale-95"
+                  >
+                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                )
+              )}
               </div>
               <div className="flex space-x-4">
                 <button
