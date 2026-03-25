@@ -123,6 +123,18 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   const handleSaveInstitution = () => {
     if (editingInstitution) {
+      // Clean up globally synced cards that were removed from the modal
+      const originalInst = institutions.find(i => i.id === editingInstitution.id);
+      if (originalInst) {
+        const originalCardIds = originalInst.accounts
+          .filter(a => ['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(a.type))
+          .map(a => a.id);
+        const newCardIds = editingInstitution.accounts?.map(a => a.id) || [];
+        
+        const deletedCardIds = originalCardIds.filter(id => !newCardIds.includes(id));
+        deletedCardIds.forEach(id => onDeleteCard(id));
+      }
+
       // Auto-sync bank cards to global payment methods
       const instCards = editingInstitution.accounts?.filter(a => ['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(a.type)) || [];
       instCards.forEach(acc => {

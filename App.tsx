@@ -319,7 +319,7 @@ const App: React.FC = () => {
   const handleAddFinancialCard = (card: Partial<FinancialCard>) => {
     if (!selectedCompanyId || !state) return;
     const newCard: FinancialCard = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: card.id || Math.random().toString(36).substr(2, 9),
       companyId: selectedCompanyId,
       name: card.name || 'New Card',
       cardHolder: card.cardHolder || '',
@@ -342,10 +342,33 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return null;
       const card = prev.financialCards.find(c => c.id === id);
+
+      // Inverse sync: Update the card inside any linked institution
+      const updatedInstitutions = (prev.institutions || []).map(inst => {
+        if (inst.accounts.some(a => a.id === id)) {
+          return {
+            ...inst,
+            accounts: inst.accounts.map(a => a.id === id ? { 
+              ...a, 
+              name: updates.name !== undefined ? updates.name : a.name,
+              last4: updates.last4 !== undefined ? updates.last4 : a.last4,
+              expiry: updates.expiry !== undefined ? updates.expiry : a.expiry,
+              cardHolder: updates.cardHolder !== undefined ? updates.cardHolder : a.cardHolder,
+              network: updates.network !== undefined ? updates.network : a.network,
+              type: updates.type === 'Credit' ? 'Credit Card' : updates.type === 'Debit' ? (a.type === 'Debit (Linked)' || a.type === 'FSA' || a.type === 'HSA' ? a.type : 'Debit Card') : a.type,
+              status: updates.status !== undefined ? updates.status : a.status,
+              limit: updates.limit !== undefined ? updates.limit : a.limit
+            } : a)
+          };
+        }
+        return inst;
+      });
+
       return {
         ...prev,
         companies: prev.companies.map(c => c.id === card?.companyId ? { ...c, lastModified: Date.now() } : c),
-        financialCards: prev.financialCards.map(c => c.id === id ? { ...c, ...updates } : c)
+        financialCards: prev.financialCards.map(c => c.id === id ? { ...c, ...updates } : c),
+        institutions: updatedInstitutions
       };
     });
   };
@@ -355,10 +378,17 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return null;
       const card = prev.financialCards.find(c => c.id === id);
+      
+      const updatedInstitutions = (prev.institutions || []).map(inst => ({
+        ...inst,
+        accounts: inst.accounts.filter(a => a.id !== id)
+      }));
+
       return {
         ...prev,
         companies: prev.companies.map(c => c.id === card?.companyId ? { ...c, lastModified: Date.now() } : c),
-        financialCards: prev.financialCards.filter(c => c.id !== id)
+        financialCards: prev.financialCards.filter(c => c.id !== id),
+        institutions: updatedInstitutions
       };
     });
   };
