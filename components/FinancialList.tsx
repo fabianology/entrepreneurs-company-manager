@@ -39,8 +39,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [isWalletExpanded, setIsWalletExpanded] = useState(false);
   const [showPasswords, setShowPasswords] = useState<Set<string>>(new Set());
   const [expandedInstitutions, setExpandedInstitutions] = useState<Set<string>>(new Set());
+  const [lastCopiedField, setLastCopiedField] = useState<{ id: string, field: 'username' | 'password' } | null>(null);
 
-  // Drag states
+  const handleFieldCopy = (id: string, text: string, field: 'username' | 'password') => {
+    if (!text || text === '-') return;
+    navigator.clipboard.writeText(text);
+    setLastCopiedField({ id, field });
+    setTimeout(() => setLastCopiedField(null), 2000);
+    if ('vibrate' in navigator) navigator.vibrate(30);
+  };
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef(0);
@@ -432,15 +439,25 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
 
                   <div className="space-y-4 pt-4 px-1">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Username / Email</span>
+                    <div
+                      className="flex justify-between items-center text-xs group/field cursor-pointer active:opacity-60 transition-opacity"
+                      onClick={() => handleFieldCopy(inst.id, inst.username || inst.email || '', 'username')}
+                    >
+                      <span className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'text-orange-500' : 'text-white/40'}`}>
+                        {lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'Copied!' : 'Username / Email'}
+                      </span>
                       <span className="font-black text-white truncate max-w-[150px]">{inst.username || inst.email || '-'}</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">Password</span>
+                    <div
+                      className="flex justify-between items-center text-xs group/pass cursor-pointer active:opacity-60 transition-opacity"
+                      onClick={() => handleFieldCopy(inst.id, inst.password || '', 'password')}
+                    >
+                      <span className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
+                        {lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                      </span>
                       <div className="flex items-center space-x-2">
                         <span className="font-black text-white font-mono tracking-wider truncate max-w-[120px]">{showPasswords.has(inst.id) ? (inst.password || '-') : '••••••••'}</span>
-                        <button onClick={() => togglePassword(inst.id)} className="text-[9px] font-black text-[#EBC351] uppercase ml-2">
+                        <button onClick={(e) => { e.stopPropagation(); togglePassword(inst.id); }} className="text-[9px] font-black text-[#EBC351] uppercase ml-2 opacity-0 group-hover/pass:opacity-100 transition-opacity">
                           {showPasswords.has(inst.id) ? 'Hide' : 'Show'}
                         </button>
                       </div>
@@ -587,11 +604,17 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               </div>
                               <div className="md:col-span-1">
                                 <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
-                                  <option value="Credit Card">Credit Card</option>
-                                  <option value="Debit Card">Debit Card</option>
+
                                   <option value="Checking">Checking</option>
                                   <option value="Savings">Savings</option>
                                   <option value="Investing">Investing</option>
+                                  <option value="401(k)">401(k)</option>
+                                  <option value="Roth 401(k)">Roth 401(k)</option>
+                                  <option value="IRA">IRA</option>
+                                  <option value="Roth IRA">Roth IRA</option>
+                                  <option value="Rollover IRA">Rollover IRA</option>
+                                  <option value="SEP IRA">SEP IRA</option>
+                                  <option value="529">529</option>
                                   <option value="CD">CD</option>
                                   <option value="Other">Other</option>
                                 </select>
@@ -599,9 +622,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               <div className="md:col-span-1">
                                 <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
                               </div>
-                              <div className="md:col-span-1 relative">
-                                <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
-                                <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                              <div className="md:col-span-1 relative flex items-center">
+                                <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                  <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                  <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                  <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                  <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                </select>
+                                <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
                               </div>
                             </div>
                             
@@ -635,9 +663,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               {acc.type === 'Credit Card' && (
                                 <div className="md:col-span-2">
                                   <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Credit Limit</label>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
-                                    <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Limit" value={acc.limit || ''} onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })} />
+                                  <div className="relative flex items-center">
+                                    <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                      <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                      <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                      <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                      <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                    </select>
+                                    <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Limit" value={acc.limit || ''} onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })} />
                                   </div>
                                 </div>
                               )}
@@ -652,9 +685,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
 
+                <div className="mb-8 pt-4 border-t border-white/5">
+                  <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
+                    <span className="text-2xl group-hover:scale-110 transition-transform">🏦</span>
+                    <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
+                  </button>
+                </div>
+
                 <div className="flex justify-between items-center mb-6">
                   <h4 className="text-[9px] font-black text-white/40 uppercase tracking-widest">Linked Accounts</h4>
-                  <button onClick={() => handleAddInstAccount('Checking')} className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition uppercase tracking-widest">+ Add Account</button>
                 </div>
                 <div className="space-y-4">
                   {(editingInstitution.accounts || []).map((acc, idx) => {
@@ -671,18 +710,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 <option value="Checking">Checking</option>
                                 <option value="Savings">Savings</option>
                                 <option value="Investing">Investing</option>
-                                <option value="Credit Card">Credit Card</option>
-                                <option value="Debit Card">Debit Card</option>
+                                <option value="401(k)">401(k)</option>
+                                <option value="Roth 401(k)">Roth 401(k)</option>
+                                <option value="IRA">IRA</option>
+                                <option value="Roth IRA">Roth IRA</option>
+                                <option value="Rollover IRA">Rollover IRA</option>
+                                <option value="SEP IRA">SEP IRA</option>
+                                <option value="529">529</option>
                                 <option value="CD">CD</option>
                                 <option value="Other">Other</option>
                               </select>
                             </div>
                             <div className="md:col-span-1">
-                              <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                              <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Account Number" value={acc.last4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
                             </div>
-                            <div className="md:col-span-1 relative">
-                              <span className="absolute left-3 top-2 text-white/40 text-xs font-bold">$</span>
-                              <input className="w-full pl-6 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                            <div className="md:col-span-1 relative flex items-center">
+                              <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                              </select>
+                              <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
                             </div>
                           </div>
                         </div>
