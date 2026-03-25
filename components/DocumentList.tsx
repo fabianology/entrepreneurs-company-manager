@@ -271,12 +271,17 @@ const DocumentList: React.FC<DocumentListProps> = ({
             </div>
         ))}
         {documents.length === 0 && (
-             <div className="col-span-1 md:col-span-3 py-12 text-center border-2 border-dashed border-slate-100 rounded-xl">
-                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                   <svg className="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                </div>
-                <p className="text-slate-400 font-medium text-sm">No documents found.</p>
-             </div>
+          <div className="md:col-span-3">
+            <button
+              onClick={handleAddNew}
+              className="w-full max-w-[400px] mx-auto h-[216px] rounded-[32px] border border-dashed border-slate-300 flex flex-col items-center justify-center bg-slate-50 hover:bg-slate-100 hover:border-indigo-400 transition-all duration-300 group shadow-sm mt-8"
+            >
+              <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-sm border border-slate-100">
+                <span className="text-2xl">📄</span>
+              </div>
+              <span className="text-[10px] font-black text-slate-400 group-hover:text-indigo-600 uppercase tracking-[0.2em] transition-colors">+ Add Your First Document</span>
+            </button>
+          </div>
         )}
       </div>
     </div>

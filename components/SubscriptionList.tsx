@@ -173,6 +173,17 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
       {/* Subscription cards List */}
       <div className="space-y-4">
+        {subscriptions.length === 0 && (
+          <button
+            onClick={handleAddNew}
+            className="w-full max-w-[400px] mx-auto h-[216px] rounded-[32px] border border-dashed border-white/20 flex flex-col items-center justify-center bg-[#1C1C1E]/50 hover:bg-[#1C1C1E] hover:border-[#EBC351]/50 transition-all duration-300 group shadow-2xl mt-4"
+          >
+            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+              <span className="text-2xl">🌐</span>
+            </div>
+            <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-[0.2em] transition-colors">+ Add Your First Service</span>
+          </button>
+        )}
         {subscriptions.map(sub => (
           <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl">
             {/* Main Info */}
@@ -647,9 +658,24 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               </div>
             </div>
 
-            <div className="p-8 bg-black/20 border-t border-white/5 flex justify-end space-x-4">
-              <button onClick={() => setEditingSubscription(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
-              <button onClick={handleSaveModal} className="px-8 py-3 bg-[#EBC351] rounded-2xl text-[11px] font-black text-black uppercase tracking-widest shadow-lg shadow-[#EBC351]/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
+            <div className="p-8 bg-black/20 border-t border-white/5 flex justify-between items-center">
+              <div className="flex-1">
+                {editingSubscription.id && onDeleteSubscription && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center space-x-3">
+                      <span className="text-[10px] font-black text-orange-500 uppercase">Confirm?</span>
+                      <button onClick={() => { onDeleteSubscription(editingSubscription.id!); setEditingSubscription(null); }} className="text-[10px] font-black text-white hover:text-orange-500">YES</button>
+                      <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-black text-white/20 hover:text-white">NO</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowDeleteConfirm(true)} className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest">Delete</button>
+                  )
+                )}
+              </div>
+              <div className="flex space-x-4">
+                <button onClick={() => setEditingSubscription(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+                <button onClick={handleSaveModal} className="px-8 py-3 bg-[#EBC351] rounded-2xl text-[11px] font-black text-black uppercase tracking-widest shadow-lg shadow-[#EBC351]/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
+              </div>
             </div>
           </div>
         </div>

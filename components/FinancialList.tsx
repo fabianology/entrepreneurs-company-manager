@@ -40,6 +40,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [showPasswords, setShowPasswords] = useState<Set<string>>(new Set());
   const [expandedInstitutions, setExpandedInstitutions] = useState<Set<string>>(new Set());
   const [lastCopiedField, setLastCopiedField] = useState<{ id: string, field: 'username' | 'password' } | null>(null);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<number | null>(null);
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
+
+  const toggleAccountExpanded = (idx: number) => {
+    const newSet = new Set(expandedAccounts);
+    if (newSet.has(idx)) newSet.delete(idx);
+    else newSet.add(idx);
+    setExpandedAccounts(newSet);
+  };
 
   const handleFieldCopy = (id: string, text: string, field: 'username' | 'password') => {
     if (!text || text === '-') return;
@@ -115,7 +124,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const handleSaveInstitution = () => {
     if (editingInstitution) {
       // Auto-sync bank cards to global payment methods
-      const instCards = editingInstitution.accounts?.filter(a => a.type === 'Credit Card' || a.type === 'Debit Card') || [];
+      const instCards = editingInstitution.accounts?.filter(a => ['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(a.type)) || [];
       instCards.forEach(acc => {
         const cardData: Partial<FinancialCard> = {
           id: acc.id,
@@ -282,10 +291,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
       <section className="space-y-6">
         <div className="flex justify-between items-center px-1">
           <div className="flex flex-col">
-            <h3 className="text-lg font-black text-white">Payment Methods</h3>
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">
-              {isWalletExpanded ? 'Drag down to collapse' : 'Click stack to expand'}
-            </p>
+            <h3 className="text-lg font-black text-white/40">Payment Methods</h3>
           </div>
           {isWalletExpanded && (
             <button
@@ -312,10 +318,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
           {cards.length === 0 ? (
             <button
               onClick={handleAddNewCard}
-              className="w-full max-w-[400px] mx-auto h-56 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors bg-white/50"
+              className="w-full max-w-[400px] mx-auto h-[216px] rounded-[32px] border border-dashed border-white/20 flex flex-col items-center justify-center bg-[#1C1C1E]/50 hover:bg-[#1C1C1E] hover:border-[#EBC351]/50 transition-all duration-300 group shadow-2xl"
             >
-              <svg className="w-10 h-10 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
-              <span className="font-bold text-sm">Add Your First Card</span>
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                <span className="text-2xl">💳</span>
+              </div>
+              <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-[0.2em] transition-colors">+ Add Your First Card</span>
             </button>
           ) : (
             <div className={`relative ${isWalletExpanded ? 'flex flex-col gap-4' : ''}`}>
@@ -377,8 +385,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
       <section className="space-y-6">
         <div className="flex justify-between items-center px-1 border-t border-white/10 pt-8">
           <div className="flex flex-col">
-            <h3 className="text-lg font-black text-white">Banking Institutions</h3>
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Login & Linked Accounts</p>
+            <h3 className="text-lg font-black text-white/40">Financial Institutions</h3>
           </div>
         </div>
 
@@ -438,29 +445,36 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-4 pt-4 px-1">
+                  <div className="grid grid-cols-2 gap-y-6 gap-x-8 pt-4 px-1">
                     <div
-                      className="flex justify-between items-center text-xs group/field cursor-pointer active:opacity-60 transition-opacity"
+                      className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
                       onClick={() => handleFieldCopy(inst.id, inst.username || inst.email || '', 'username')}
                     >
-                      <span className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'text-orange-500' : 'text-white/40'}`}>
-                        {lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'Copied!' : 'Username / Email'}
-                      </span>
-                      <span className="font-black text-white truncate max-w-[150px]">{inst.username || inst.email || '-'}</span>
+                      <div className="flex justify-between items-center">
+                        <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'text-orange-500' : 'text-white/40'}`}>
+                          {lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'Copied!' : 'Username / Email'}
+                        </p>
+                      </div>
+                      <p className="text-xs font-black text-white truncate">{inst.username || inst.email || '-'}</p>
                     </div>
+
                     <div
-                      className="flex justify-between items-center text-xs group/pass cursor-pointer active:opacity-60 transition-opacity"
+                      className="space-y-1 group/pass cursor-pointer active:opacity-60 transition-opacity"
                       onClick={() => handleFieldCopy(inst.id, inst.password || '', 'password')}
                     >
-                      <span className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
-                        {lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-black text-white font-mono tracking-wider truncate max-w-[120px]">{showPasswords.has(inst.id) ? (inst.password || '-') : '••••••••'}</span>
-                        <button onClick={(e) => { e.stopPropagation(); togglePassword(inst.id); }} className="text-[9px] font-black text-[#EBC351] uppercase ml-2 opacity-0 group-hover/pass:opacity-100 transition-opacity">
-                          {showPasswords.has(inst.id) ? 'Hide' : 'Show'}
-                        </button>
+                      <div className="flex justify-between items-center">
+                        <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
+                          {lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                        </p>
+                        <div className="flex space-x-2 opacity-0 group-hover/pass:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); togglePassword(inst.id); }} className="text-[9px] font-black text-[#EBC351] uppercase">
+                            {showPasswords.has(inst.id) ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
                       </div>
+                      <p className="text-xs font-black text-white font-mono tracking-wider truncate">
+                        {showPasswords.has(inst.id) ? (inst.password || '-') : '••••••••'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -532,8 +546,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
       <section className="space-y-6">
         <div className="flex justify-between items-center border-t border-white/10 pt-8 px-1">
           <div className="flex flex-col">
-            <h3 className="text-lg font-black text-white">Loans & Debt</h3>
-            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Amortization</p>
+            <h3 className="text-lg font-black text-white/40">Loans & Debt</h3>
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -564,7 +577,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-8 max-h-[60dvh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Bank / Institution Name</label>
@@ -594,46 +607,52 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   {/* Cards List */}
                   <div className="space-y-4 mt-6">
                     {(editingInstitution.accounts || []).map((acc, idx) => {
-                      if (acc.type !== 'Credit Card' && acc.type !== 'Debit Card') return null;
+                      if (!['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                       return (
                         <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
                           <div className="flex-1 w-full space-y-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                               <div className="md:col-span-1">
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Card Nickname" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Nickname</label>
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. Chase Sapphire" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
                               </div>
                               <div className="md:col-span-1">
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Type</label>
                                 <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
-
-                                  <option value="Checking">Checking</option>
-                                  <option value="Savings">Savings</option>
-                                  <option value="Investing">Investing</option>
-                                  <option value="401(k)">401(k)</option>
-                                  <option value="Roth 401(k)">Roth 401(k)</option>
-                                  <option value="IRA">IRA</option>
-                                  <option value="Roth IRA">Roth IRA</option>
-                                  <option value="Rollover IRA">Rollover IRA</option>
-                                  <option value="SEP IRA">SEP IRA</option>
-                                  <option value="529">529</option>
-                                  <option value="CD">CD</option>
-                                  <option value="Other">Other</option>
+                                  <option value="Credit Card">Credit Card</option>
+                                  <option value="Debit (Linked)">Debit (Linked)</option>
+                                  <option value="FSA">FSA</option>
+                                  <option value="HSA">HSA</option>
                                 </select>
                               </div>
                               <div className="md:col-span-1">
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Last 4" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Last 4</label>
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="1234" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
                               </div>
-                              <div className="md:col-span-1 relative flex items-center">
-                                <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
-                                  <option value="USD" className="bg-[#1C1C1E]">$</option>
-                                  <option value="EUR" className="bg-[#1C1C1E]">€</option>
-                                  <option value="GBP" className="bg-[#1C1C1E]">£</option>
-                                  <option value="CAD" className="bg-[#1C1C1E]">C$</option>
-                                </select>
-                                <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                              <div className="md:col-span-1">
+                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Balance</label>
+                                <div className="relative flex items-center">
+                                  <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                    <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                    <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                    <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                    <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                  </select>
+                                  <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="0.00" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                                </div>
                               </div>
                             </div>
                             
-                            <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
+                            {/* Toggle Button for Details */}
+                            <div className="pt-3 border-t border-white/5 flex justify-center mt-2">
+                              <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[9px] font-black uppercase flex items-center gap-1 hover:text-white transition-colors">
+                                {expandedAccounts.has(idx) ? 'Minimize' : 'Expand Details'}
+                                <svg className={`w-3 h-3 transform transition-transform ${expandedAccounts.has(idx) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+                              </button>
+                            </div>
+
+                            {expandedAccounts.has(idx) && (
+                              <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
                               <div className="md:col-span-1">
                                 <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Holder</label>
                                 <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="NAME" value={acc.cardHolder || ''} onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })} />
@@ -674,11 +693,26 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   </div>
                                 </div>
                               )}
-                            </div>
+                              </div>
+                            )}
                           </div>
-                          <button onClick={() => handleDeleteInstAccount(idx)} className="text-white/20 hover:text-orange-500 p-2 transition self-start mt-1">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
+                          
+                          <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
+                            {confirmDeleteAccount === idx ? (
+                              <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-xl p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
+                                <span className="text-[10px] md:text-[8px] font-black text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
+                                <div className="flex gap-2 md:gap-1">
+                                  <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-black text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">YES</button>
+                                  <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-black text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">NO</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-xl w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
+                                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                <span className="md:hidden text-[10px] font-black uppercase tracking-widest">Remove Card</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -692,12 +726,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </button>
                 </div>
 
-                <div className="flex justify-between items-center mb-6">
-                  <h4 className="text-[9px] font-black text-white/40 uppercase tracking-widest">Linked Accounts</h4>
-                </div>
+
                 <div className="space-y-4">
                   {(editingInstitution.accounts || []).map((acc, idx) => {
-                    if (acc.type === 'Credit Card' || acc.type === 'Debit Card') return null;
+                    if (['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                     return (
                       <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
                         <div className="flex-1 w-full space-y-4">
@@ -735,23 +767,45 @@ const FinancialList: React.FC<FinancialListProps> = ({
                             </div>
                           </div>
                         </div>
-                        <button onClick={() => handleDeleteInstAccount(idx)} className="text-white/20 hover:text-orange-500 p-2 transition self-start mt-1">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
+                        
+                        <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
+                          {confirmDeleteAccount === idx ? (
+                            <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-xl p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
+                              <span className="text-[10px] md:text-[8px] font-black text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
+                              <div className="flex gap-2 md:gap-1">
+                                <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-black text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">YES</button>
+                                <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-black text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">NO</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-xl w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
+                              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              <span className="md:hidden text-[10px] font-black uppercase tracking-widest">Remove Account</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
-                  {(!editingInstitution.accounts || editingInstitution.accounts.filter(a => a.type !== 'Credit Card' && a.type !== 'Debit Card').length === 0) && (
-                    <div className="text-center py-8 border border-dashed border-white/10 rounded-xl text-[10px] font-black text-white/20 uppercase tracking-widest bg-white/5">
-                      No accounts linked yet
-                    </div>
-                  )}
+
                 </div>
               </div>
             </div>
             <div className="p-6 border-t border-white/5 flex justify-between items-center bg-black/20">
               {editingInstitution.id && (
-                <button onClick={() => { onDeleteInstitution(editingInstitution.id!); setEditingInstitution(null); }} className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest transition">Delete Bank</button>
+                showDeleteConfirm ? (
+                  <div className="flex items-center bg-orange-500/10 rounded-xl p-1.5 border border-orange-500/30 gap-3">
+                    <span className="text-[10px] font-black text-orange-500 uppercase px-2">Confirm?</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => { onDeleteInstitution(editingInstitution.id!); setEditingInstitution(null); setShowDeleteConfirm(false); }} className="text-[10px] font-black text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors">YES</button>
+                      <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-black text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors">NO</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setShowDeleteConfirm(true)} className="text-white/20 hover:text-orange-500 p-3 transition rounded-xl hover:bg-white/5 border border-transparent flex items-center justify-center">
+                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                )
               )}
               <div className="flex space-x-4 ml-auto">
                 <button onClick={() => setEditingInstitution(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>

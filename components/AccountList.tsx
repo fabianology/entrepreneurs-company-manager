@@ -331,11 +331,16 @@ const AccountList: React.FC<AccountListProps> = ({
         ))}
 
         {accounts.length === 0 && (
-          <div className="md:col-span-2 py-16 text-center bg-[#1C1C1E] rounded-[32px] border border-white/5">
-            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            </div>
-            <p className="text-white/40 font-bold">No login accounts tracked.</p>
+          <div className="md:col-span-2">
+            <button
+              onClick={handleAddNew}
+              className="w-full max-w-[400px] mx-auto h-[216px] rounded-[32px] border border-dashed border-white/20 flex flex-col items-center justify-center bg-[#1C1C1E]/50 hover:bg-[#1C1C1E] hover:border-[#EBC351]/50 transition-all duration-300 group shadow-2xl"
+            >
+              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                <span className="text-2xl">🔑</span>
+              </div>
+              <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-[0.2em] transition-colors">+ Add Your First Login</span>
+            </button>
           </div>
         )}
       </div>

@@ -82,7 +82,7 @@ export interface FinancialCard {
 export interface InstitutionAccount {
   id: string;
   name: string;
-  type: 'Checking' | 'Savings' | 'Investing' | 'CD' | 'Credit Card' | 'Debit Card' | '401(k)' | 'Roth 401(k)' | 'IRA' | 'Roth IRA' | 'Rollover IRA' | 'SEP IRA' | '529' | 'Other';
+  type: 'Checking' | 'Savings' | 'Investing' | 'CD' | 'Credit Card' | 'Debit Card' | 'Debit (Linked)' | 'FSA' | 'HSA' | '401(k)' | 'Roth 401(k)' | 'IRA' | 'Roth IRA' | 'Rollover IRA' | 'SEP IRA' | '529' | 'Other';
   last4: string;
   balance: number;
   currency?: string;
