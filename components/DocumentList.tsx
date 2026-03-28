@@ -68,13 +68,13 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <div className="flex justify-between items-center px-1">
-        <h3 className="text-lg font-bold text-slate-800">Company Documents</h3>
-        <button 
+      <div className="flex justify-end pr-2">
+        <button
           onClick={handleAddNew}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition shadow-sm active:scale-95"
+          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
         >
-          + Add Document
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Document</span>
         </button>
       </div>
 

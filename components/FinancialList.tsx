@@ -279,26 +279,26 @@ const FinancialList: React.FC<FinancialListProps> = ({
       <div className="grid grid-cols-3 gap-3 pr-2">
         <button
           onClick={handleAddNewInstitution}
-          className="bg-[#1C1C1E] text-white px-4 h-[48px] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95 shadow-xl"
+          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95"
         >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-          <span className="flex items-center gap-1.5"><span className="text-lg">🏦</span> <span className="text-white">bank</span></span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Institution</span>
         </button>
 
         <button
           onClick={handleAddNewCard}
-          className="bg-[#1C1C1E] text-white px-4 h-[48px] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95 shadow-xl"
+          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95"
         >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-          <span className="flex items-center gap-1.5"><span className="text-lg">💳</span> <span className="text-white">card</span></span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Cards</span>
         </button>
 
         <button
           onClick={handleAddNewLoan}
-          className="bg-[#1C1C1E] text-white px-4 h-[48px] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95 shadow-xl"
+          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95"
         >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-          <span className="flex items-center gap-1.5"><span className="text-lg">💰</span> <span className="text-white">loan</span></span>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Loan</span>
         </button>
       </div>
 
