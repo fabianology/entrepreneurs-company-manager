@@ -584,12 +584,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT INSTITUTION MODAL --- */}
       {editingInstitution && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
+        <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
           <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto border border-white/10">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-lg font-black text-white tracking-wide">{editingInstitution.id ? 'Edit Bank' : 'Add Bank'}</h3>
+            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-base font-black text-white tracking-wide">{editingInstitution.id ? 'Edit Bank' : 'Add Bank'}</h3>
               <button onClick={() => setEditingInstitution(null)} className="text-white/40 hover:text-white transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-6 space-y-8 max-h-[60dvh] overflow-y-auto custom-scrollbar">
@@ -837,7 +837,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
             </div>
-            <div className="p-6 border-t border-white/5 flex justify-between items-center bg-black/20">
+            <div className="px-6 py-3 border-t border-white/5 flex justify-between items-center bg-black/20">
               {editingInstitution.id && (
                 showDeleteConfirm ? (
                   <div className="flex items-center bg-orange-500/10 rounded-xl p-1.5 border border-orange-500/30 gap-3">
@@ -864,14 +864,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT CARD MODAL --- */}
       {editingCard && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
+        <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
           <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto border border-white/10">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-lg font-black text-white tracking-wide">
+            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-base font-black text-white tracking-wide">
                 {editingCard.id ? 'Edit Card Details' : 'Add New Card'}
               </h3>
               <button onClick={() => setEditingCard(null)} className="text-white/40 hover:text-white transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
@@ -978,7 +978,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-white/5 bg-black/20 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
               <div>
                 {editingCard.id && (
                   showDeleteConfirm ? (
@@ -1027,14 +1027,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT LOAN MODAL --- */}
       {editingLoan && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
+        <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
           <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto border border-white/10">
-            <div className="p-6 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-lg font-black text-white tracking-wide">
+            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-base font-black text-white tracking-wide">
                 {editingLoan.id ? 'Edit Loan Details' : 'Add New Financing'}
               </h3>
               <button onClick={() => setEditingLoan(null)} className="text-white/40 hover:text-white transition">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
@@ -1136,7 +1136,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
             </div>
 
-            <div className="p-6 border-t border-white/5 bg-black/20 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
               <div>
               {editingLoan.id && (
                 showDeleteConfirm ? (

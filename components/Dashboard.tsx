@@ -140,12 +140,12 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
     <div className="space-y-8 animate-fadeIn bg-black min-h-screen">
       {/* Add/Edit Company Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
+        <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
           <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg text-white border border-white/10 overflow-hidden my-auto">
-            <div className="p-8 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-xl font-black text-white uppercase tracking-widest">{editingCompany ? 'Edit Entity Profile' : 'Register New Entity'}</h3>
+            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
+              <h3 className="text-base font-black text-white uppercase tracking-widest">{editingCompany ? 'Edit Entity Profile' : 'Register New Entity'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-white/20 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
@@ -277,7 +277,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                 </div>
               </div>
             </div>
-            <div className="p-8 border-t border-white/5 bg-black/20 flex justify-between items-center">
+            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex justify-between items-center">
               <div className="flex-1">
                 {editingCompany && editingCompany.id && (
                   showDeleteConfirm ? (

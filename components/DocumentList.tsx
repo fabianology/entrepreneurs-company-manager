@@ -80,14 +80,14 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
       {/* Edit/Add Modal */}
       {editingDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto">
+        <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg text-slate-900 my-auto">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-900">
+            <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-base font-bold text-slate-900">
                 {editingDoc.id ? 'Edit Document' : 'Add Document'}
               </h3>
               <button onClick={() => setEditingDoc(null)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             
@@ -185,7 +185,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                </div>
             </div>
 
-            <div className="p-6 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-between items-center">
+            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-between items-center">
               <div>
                   {editingDoc.id && (
                      showDeleteConfirm ? (
