@@ -711,15 +711,15 @@ const App: React.FC = () => {
           {showSearchDropdown && globalSearchResults && (
             <div
               ref={searchResultsRef}
-              className="fixed bottom-0 left-0 right-0 z-40 h-[60vh] bg-white/85 backdrop-blur-2xl border-t border-white/50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.2)] rounded-t-[2.5rem] flex flex-col overflow-hidden animate-slideUp"
+              className="fixed bottom-0 left-0 right-0 z-40 h-[60vh] bg-[#111111]/95 backdrop-blur-2xl border-t border-white/10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.6)] rounded-t-[2.5rem] flex flex-col overflow-hidden animate-slideUp"
             >
               <div className="w-full flex justify-center pt-4 pb-2 pointer-events-none">
-                <div className="w-12 h-1.5 bg-slate-300/50 rounded-full"></div>
+                <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-32 max-w-3xl mx-auto w-full">
                 {!globalSearchResults.hasResults ? (
-                  <div className="flex flex-col items-center justify-center h-48 text-slate-400">
+                  <div className="flex flex-col items-center justify-center h-48 text-white/40">
                     <svg className="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     <p className="font-semibold text-lg">No results found</p>
                     <p className="text-sm opacity-70">Try searching for a company, service, or email.</p>
@@ -728,22 +728,22 @@ const App: React.FC = () => {
                   <div className="space-y-8">
                     {globalSearchResults.companies.length > 0 && (
                       <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">Companies</h4>
+                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2">Companies</h4>
                         <div className="grid grid-cols-1 gap-2">
                           {globalSearchResults.companies.map(c => (
                             <div
                               key={c.id}
                               onClick={() => handleGlobalResultClick('company', c.id, c.id)}
-                              className="group flex items-center p-3 rounded-2xl hover:bg-white/50 border border-transparent hover:border-slate-200/50 transition-all cursor-pointer"
+                              className="group flex items-center p-3 rounded-2xl hover:bg-white/5 border border-transparent hover:border-white/10 transition-all cursor-pointer"
                             >
                               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold shadow-sm mr-4" style={{ backgroundColor: c.color }}>
                                 {c.name.charAt(0)}
                               </div>
                               <div>
-                                <p className="font-bold text-slate-800 text-base">{c.name}</p>
-                                <p className="text-xs text-slate-500 font-medium">{c.structure}</p>
+                                <p className="font-bold text-white text-base">{c.name}</p>
+                                <p className="text-xs text-white/40 font-medium">{c.structure}</p>
                               </div>
-                              <svg className="w-5 h-5 text-slate-300 ml-auto group-hover:text-indigo-500 transform group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                              <svg className="w-5 h-5 text-white/20 ml-auto group-hover:text-[#EBC351] transform group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                             </div>
                           ))}
                         </div>
@@ -752,35 +752,35 @@ const App: React.FC = () => {
 
                     {globalSearchResults.accounts.length > 0 && (
                       <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">Accounts & Logins</h4>
-                        <div className="bg-white/40 rounded-2xl border border-white/50 divide-y divide-slate-100 overflow-hidden">
+                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2">Accounts & Logins</h4>
+                        <div className="bg-white/5 rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
                           {globalSearchResults.accounts.map(a => (
                             <div
                               key={a.id}
                               onClick={() => handleGlobalResultClick('account', a.id, a.companyId)}
-                              className="p-4 hover:bg-white/60 cursor-pointer flex items-center justify-between transition-colors group"
+                              className="p-4 hover:bg-white/10 cursor-pointer flex items-center justify-between transition-colors group"
                             >
                               <div className="flex items-center space-x-4 min-w-0 flex-1">
-                                <div className="bg-white p-2 rounded-xl shadow-sm text-indigo-600 flex-shrink-0">
+                                <div className="bg-white/10 p-2 rounded-xl text-[#EBC351] flex-shrink-0">
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex justify-between items-start">
                                     <div>
-                                      <p className="font-bold text-slate-800 text-sm truncate">{a.platform}</p>
-                                      <p className="text-xs text-slate-500 truncate font-medium">{a.email}</p>
+                                      <p className="font-bold text-white text-sm truncate">{a.platform}</p>
+                                      <p className="text-xs text-white/40 truncate font-medium">{a.email}</p>
                                     </div>
                                   </div>
 
                                   <div className="flex items-center gap-2 mt-1.5" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center bg-slate-100/80 rounded-md px-2 py-1 border border-slate-200/50">
-                                      <span className="text-[10px] font-mono text-slate-600 w-16 truncate">
+                                    <div className="flex items-center bg-white/10 rounded-md px-2 py-1 border border-white/10">
+                                      <span className="text-[10px] font-mono text-white/60 w-16 truncate">
                                         {visibleSearchPasswords.has(a.id) ? (a.password || '-') : '••••••••'}
                                       </span>
                                     </div>
                                     <button
                                       onClick={(e) => toggleSearchPassword(a.id, e)}
-                                      className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors"
+                                      className="p-1 text-white/40 hover:text-[#EBC351] hover:bg-white/10 rounded-md transition-colors"
                                     >
                                       {visibleSearchPasswords.has(a.id) ? (
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
@@ -790,7 +790,7 @@ const App: React.FC = () => {
                                     </button>
                                     <button
                                       onClick={(e) => copySearchPassword(a.password || '', a.id, e)}
-                                      className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-md transition-colors"
+                                      className="p-1 text-white/40 hover:text-[#EBC351] hover:bg-white/10 rounded-md transition-colors"
                                     >
                                       {copiedSearchId === a.id ? (
                                         <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
@@ -802,10 +802,10 @@ const App: React.FC = () => {
                                 </div>
                               </div>
                               <div className="flex items-center flex-shrink-0 ml-4">
-                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-500 mr-2 max-w-[100px] truncate">
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/10 text-white/40 mr-2 max-w-[100px] truncate">
                                   {a.companyName}
                                 </span>
-                                <svg className="w-4 h-4 text-slate-300 group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                <svg className="w-4 h-4 text-white/20 group-hover:text-[#EBC351]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                               </div>
                             </div>
                           ))}
@@ -815,28 +815,28 @@ const App: React.FC = () => {
 
                     {globalSearchResults.subscriptions.length > 0 && (
                       <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest pl-2">Subscriptions</h4>
-                        <div className="bg-white/40 rounded-2xl border border-white/50 divide-y divide-slate-100 overflow-hidden">
+                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2">Subscriptions</h4>
+                        <div className="bg-white/5 rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
                           {globalSearchResults.subscriptions.map(s => (
                             <div
                               key={s.id}
                               onClick={() => handleGlobalResultClick('sub', s.id, s.companyId)}
-                              className="p-4 hover:bg-white/60 cursor-pointer flex items-center justify-between transition-colors group"
+                              className="p-4 hover:bg-white/10 cursor-pointer flex items-center justify-between transition-colors group"
                             >
                               <div className="flex items-center space-x-4">
-                                <div className="bg-white p-2 rounded-xl shadow-sm text-emerald-600">
+                                <div className="bg-white/10 p-2 rounded-xl text-[#1FE400]">
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                                 </div>
                                 <div>
-                                  <p className="font-bold text-slate-800 text-sm">{s.name}</p>
-                                  <p className="text-xs text-slate-500 font-mono font-bold">${s.cost}/mo</p>
+                                  <p className="font-bold text-white text-sm">{s.name}</p>
+                                  <p className="text-xs text-white/40 font-mono font-bold">${s.cost}/mo</p>
                                 </div>
                               </div>
                               <div className="flex items-center">
-                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-500 mr-2 max-w-[100px] truncate">
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/10 text-white/40 mr-2 max-w-[100px] truncate">
                                   {s.companyName}
                                 </span>
-                                <svg className="w-4 h-4 text-slate-300 group-hover:text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                                <svg className="w-4 h-4 text-white/20 group-hover:text-[#1FE400]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                               </div>
                             </div>
                           ))}
@@ -849,28 +849,29 @@ const App: React.FC = () => {
             </div>
           )}
 
+
           <div
             className="fixed bottom-8 left-0 right-0 mx-auto max-w-3xl px-4 z-50 flex flex-col items-center gap-4 pointer-events-none"
           >
             <div className="flex items-end justify-center gap-3 w-full">
               <div className="relative pointer-events-auto">
                 {showQuickMenu && (
-                  <div className="absolute bottom-full left-0 mb-4 w-64 bg-white/60 backdrop-blur-xl border border-white/40 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
+                  <div className="absolute bottom-full left-0 mb-4 w-64 bg-[#111111]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
                     <button
                       onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); setShowQuickMenu(false); }}
-                      className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
+                      className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-[#EBC351] text-black shadow-md' : 'hover:bg-white/5 text-white/70'}`}
                     >
                       <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
                       Dashboard
                     </button>
-                    <div className="px-2 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Jump to Company</div>
+                    <div className="px-2 py-1 text-[10px] font-bold text-white/30 uppercase tracking-wider">Jump to Company</div>
                     {state.companies.map(c => (
                       <button
                         key={c.id}
                         onClick={() => { selectCompanyFromDashboard(c.id); setShowQuickMenu(false); }}
-                        className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-indigo-600 text-white shadow-md' : 'hover:bg-white/40 text-slate-700'}`}
+                        className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-[#EBC351] text-black shadow-md' : 'hover:bg-white/5 text-white/70'}`}
                       >
-                        <div className="w-2 h-2 rounded-full ring-2 ring-white/50" style={{ backgroundColor: c.color }}></div>
+                        <div className="w-2 h-2 rounded-full ring-2 ring-white/10" style={{ backgroundColor: c.color }}></div>
                         {c.name}
                       </button>
                     ))}
