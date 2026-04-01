@@ -1047,19 +1047,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
             <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div className="flex justify-center pb-2">
-                <div className="flex bg-black/40 p-1 rounded-full border border-white/5">
-                  <button
-                    onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
-                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
-                  >
-                    Lender
-                  </button>
-                  <button
-                    onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
-                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
-                  >
-                    Lendee
-                  </button>
+                <div className={`flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px] ${editingLoan.id ? 'pointer-events-none' : ''}`}>
+                  {(!editingLoan.id || editingLoan.role === 'Lender') && (
+                    <button
+                      onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
+                      className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
+                    >
+                      Lender
+                    </button>
+                  )}
+                  {(!editingLoan.id || editingLoan.role === 'Lendee' || !editingLoan.role) && (
+                    <button
+                      onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
+                      className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
+                    >
+                      Lendee
+                    </button>
+                  )}
                 </div>
               </div>
 
