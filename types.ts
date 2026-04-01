@@ -70,10 +70,13 @@ export interface FinancialCard {
   id: string;
   companyId: string;
   name: string; // Nickname e.g. "Amex Gold"
-  cardHolder: string;
+  login?: string;
+  password?: string;
+  institutionName?: string;
+  cardHolder?: string;
   last4: string;
   expiry: string; // MM/YY
-  network: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' | 'Other';
+  network?: 'Visa' | 'Mastercard' | 'Amex' | 'Discover' | 'Other';
   type: 'Credit' | 'Debit';
   status: 'Active' | 'Frozen' | 'Expired';
   limit?: number;

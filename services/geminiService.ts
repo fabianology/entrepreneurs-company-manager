@@ -2,7 +2,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 // Initialize Gemini API according to guidelines, using process.env.API_KEY directly
 const getAiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 };
 
 const FALLBACK_QUOTES = [

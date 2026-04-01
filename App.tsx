@@ -484,9 +484,14 @@ const App: React.FC = () => {
     setState(prev => {
       if (!prev) return null;
       const inst = prev.institutions.find(i => i.id === id);
+      if (!inst) return prev;
+      
+      const accountIds = inst.accounts.map(a => a.id);
+
       return {
         ...prev,
-        companies: prev.companies.map(c => c.id === inst?.companyId ? { ...c, lastModified: Date.now() } : c),
+        companies: prev.companies.map(c => c.id === inst.companyId ? { ...c, lastModified: Date.now() } : c),
+        financialCards: prev.financialCards.filter(c => !accountIds.includes(c.id)),
         institutions: prev.institutions.filter(i => i.id !== id)
       };
     });
@@ -693,7 +698,7 @@ const App: React.FC = () => {
         <div className="relative z-10 p-4 md:p-8 max-w-6xl mx-auto space-y-6">
 
           {activeView === 'dashboard' && (
-            <div className="pt-8 pb-4 text-center">
+            <div className="pt-2 pb-4 text-center">
               <button
                 onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); }}
                 className="text-3xl md:text-5xl font-black tracking-tighter text-white drop-shadow-sm hover:opacity-80 transition-opacity focus:outline-none"
@@ -947,7 +952,7 @@ const App: React.FC = () => {
                     <button
                       key={tab.id}
                       onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
-                      className={`relative z-10 flex-1 px-4 py-2.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${activeTab === tab.id
+                      className={`relative z-10 flex-1 px-4 py-3.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${activeTab === tab.id
                         ? `backdrop-blur-xl text-white scale-[1.02] border ${tab.activeClass}`
                         : 'text-white/40 hover:text-white hover:bg-white/5'
                         }`}
@@ -1007,17 +1012,11 @@ const App: React.FC = () => {
                           <h2 className={`text-2xl md:text-3xl font-bold truncate ${selectedCompanyId ? 'text-white' : 'text-slate-900'}`}>{selectedCompany.name}</h2>
                         </div>
                       </div>
-
-                      <div className="flex items-start space-x-2 w-full md:w-[60%]">
-                        <p className={`text-base leading-relaxed ${selectedCompany.description ? 'text-white/90' : 'text-white/60 italic'}`}>
-                          {selectedCompany.description || "Mission statement 🚀"}
-                        </p>
-                      </div>
                     </div>
                   </header>
 
 
-                  <div className="mt-8">
+                  <div className="mt-2">
                     {activeTab === 'subscriptions' && (
                       <div className="space-y-8 animate-fadeIn">
                         <SubscriptionList

@@ -59,7 +59,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
   const initialCompanyState: Partial<Company> = {
     name: '',
     structure: 'LLC',
-    description: '',
     color: BRAND_COLORS[0],
     logoUrl: '',
     website: ''
@@ -126,7 +125,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
         onAddCompany({
           name: formState.name,
           structure: formState.structure || 'LLC',
-          description: formState.description || '',
           color: formState.color || BRAND_COLORS[0],
           logoUrl: formState.logoUrl,
           website: formState.website
@@ -171,16 +169,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">Purpose / Vision</label>
-                <textarea
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#1FE400]/50 transition font-bold"
-                  placeholder="A brief mission statement..."
-                  rows={3}
-                  value={formState.description}
-                  onChange={(e) => setFormState({ ...formState, description: e.target.value })}
-                />
-              </div>
+
               <div className="space-y-4">
                 <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">Identity Color</label>
                 <div className="flex flex-wrap gap-2 mb-4">

@@ -141,10 +141,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
         const cardData: Partial<FinancialCard> = {
           id: acc.id,
           name: acc.name || `${editingInstitution.name} Card`,
-          cardHolder: acc.cardHolder || '',
+          institutionName: editingInstitution.name || '',
           last4: acc.last4 || '',
           expiry: acc.expiry || '',
-          network: (acc.network as any) || 'Visa',
           type: acc.type === 'Credit Card' ? 'Credit' : 'Debit',
           status: (acc.status as any) || 'Active',
           limit: acc.limit || 0,
@@ -888,18 +887,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Network</label>
-                  <select
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Institution Name</label>
+                  <input
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                    value={editingCard.network || 'Visa'}
-                    onChange={e => setEditingCard({ ...editingCard, network: e.target.value as any })}
-                  >
-                    <option value="Visa">Visa</option>
-                    <option value="Mastercard">Mastercard</option>
-                    <option value="Amex">Amex</option>
-                    <option value="Discover">Discover</option>
-                    <option value="Other">Other</option>
-                  </select>
+                    placeholder="e.g. Chase, Amex"
+                    value={editingCard.institutionName || ''}
+                    onChange={e => setEditingCard({ ...editingCard, institutionName: e.target.value })}
+                  />
                 </div>
                 <div>
                   <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Type</label>
@@ -914,14 +908,26 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Holder Name</label>
-                <input
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                  placeholder="NAME ON CARD"
-                  value={editingCard.cardHolder || ''}
-                  onChange={e => setEditingCard({ ...editingCard, cardHolder: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login</label>
+                  <input
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    placeholder="username or email"
+                    value={editingCard.login || ''}
+                    onChange={e => setEditingCard({ ...editingCard, login: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Password</label>
+                  <input
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    type="password"
+                    placeholder="••••••••"
+                    value={editingCard.password || ''}
+                    onChange={e => setEditingCard({ ...editingCard, password: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-6">

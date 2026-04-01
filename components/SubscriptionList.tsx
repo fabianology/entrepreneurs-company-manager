@@ -151,15 +151,16 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       {/* Action Bar */}
       <div className="flex items-center justify-between pr-2">
         <div className="flex items-center gap-3">
-          <div className="bg-[#1C1C1E] h-[38px] px-4 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
-            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest text-nowrap">burn /mo</span>
-            <span className="text-sm font-black text-white tracking-tight">${monthlyBurn.toFixed(0)}</span>
+          <div className="bg-[#1C1C1E] px-4 py-3.5 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
+            <span className="text-xs font-black text-white/40 uppercase tracking-widest text-nowrap">burn /mo</span>
+            <span className="text-xs font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
           </div>
-          <div className="bg-[#1C1C1E] h-[38px] px-4 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
-            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest text-nowrap">stacks</span>
-            <span className="text-sm font-black text-white tracking-tight">{activeStack}</span>
+          <div className="bg-[#1C1C1E] px-4 py-3.5 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
+            <span className="text-xs font-black text-white/40 uppercase tracking-widest text-nowrap">stacks</span>
+            <span className="text-xs font-black text-white tracking-widest">{activeStack}</span>
           </div>
         </div>
+
         <button
           onClick={handleAddNew}
           className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
@@ -232,19 +233,32 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
               {/* Status Badge */}
               <div className="flex items-center space-x-2">
-                <div className="h-2 w-2 rounded-full bg-[#1FE400] shadow-[0_0_8px_#1FE400]"></div>
-                <span className="text-[#1FE400] text-[11px] font-black uppercase tracking-[0.1em]">Auto Renew</span>
+                {sub.renew === 'Manual' ? (
+                  <>
+                    <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
+                    <span className="text-red-500 text-[11px] font-black uppercase tracking-[0.1em]">Manual Renew</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-2 w-2 rounded-full bg-[#1FE400] shadow-[0_0_8px_#1FE400]"></div>
+                    <span className="text-[#1FE400] text-[11px] font-black uppercase tracking-[0.1em]">Auto Renew</span>
+                  </>
+                )}
               </div>
 
               {/* Info Grid */}
-              <div className="grid grid-cols-2 gap-y-6 gap-x-8 pt-2">
+              <div className="grid grid-cols-3 gap-y-6 gap-x-4 pt-2">
                 <div className="space-y-1">
                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid From</p>
-                  <p className="text-xs font-black text-white">{sub.paymentMethod || 'Amex ••• 8474'}</p>
+                  <p className="text-xs font-black text-white">{sub.paymentMethod || '—'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Next Renewal</p>
-                  <p className="text-xs font-black text-white">{sub.nextRenewal}</p>
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid On</p>
+                  <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Cycle</p>
+                  <p className="text-xs font-black text-white">{sub.billingCycle === 'Yearly' ? 'Annually' : sub.billingCycle || '—'}</p>
                 </div>
               </div>
             </div>
@@ -428,7 +442,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     onChange={e => setEditingSubscription({ ...editingSubscription, name: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
                     <input
@@ -439,6 +453,24 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid On</label>
+                    {editingSubscription.billingCycle === 'Yearly' ? (
+                      <input
+                        type="date"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                        value={editingSubscription.nextRenewal || ''}
+                        onChange={e => setEditingSubscription({ ...editingSubscription, nextRenewal: e.target.value })}
+                      />
+                    ) : (
+                      <input
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                        value={editingSubscription.nextRenewal || ''}
+                        placeholder="15th"
+                        onChange={e => setEditingSubscription({ ...editingSubscription, nextRenewal: e.target.value })}
+                      />
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cycle</label>
                     <select
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
@@ -446,7 +478,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
                     >
                       <option value="Monthly">Monthly</option>
-                      <option value="Yearly">Yearly</option>
+                      <option value="Yearly">Annually</option>
                     </select>
                   </div>
                 </div>
@@ -459,14 +491,40 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     onChange={e => setEditingSubscription({ ...editingSubscription, website: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">2FA Status</label>
-                  <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                    value={editingSubscription.twoFactorAuth || ''}
-                    placeholder="Authenticator"
-                    onChange={e => setEditingSubscription({ ...editingSubscription, twoFactorAuth: e.target.value })}
-                  />
+                <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid From</label>
+                    <input
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                      value={editingSubscription.paymentMethod || ''}
+                      placeholder="e.g. Amex Gold"
+                      onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Auto Renew</label>
+                    <div className="flex items-center h-[52px] px-2">
+                      <div
+                        className="relative flex items-center w-full bg-white/5 border border-white/10 rounded-2xl p-1 cursor-pointer select-none"
+                        onClick={() => setEditingSubscription({ ...editingSubscription, renew: editingSubscription.renew === 'Manual' ? 'Auto' : 'Manual' })}
+                      >
+                        {/* Sliding pill */}
+                        <div
+                          className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                          style={{
+                            left: editingSubscription.renew === 'Manual' ? 'calc(50% + 2px)' : '4px',
+                            background: editingSubscription.renew === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
+                          }}
+                        />
+                        <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${
+                          editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'
+                        }`}>Auto</span>
+                        <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${
+                          editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'
+                        }`}>Manual</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Sub-services Management Section */}
