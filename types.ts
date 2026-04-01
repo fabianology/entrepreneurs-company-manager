@@ -117,11 +117,13 @@ export interface Institution {
 export interface Loan {
   id: string;
   companyId: string;
+  role?: 'Lender' | 'Lendee';
   lender: string; // e.g. "Chase Bank"
   name: string; // e.g. "Startup Loan"
   principalAmount: number;
   remainingBalance: number;
-  interestRate: number; // percentage
+  interestType?: 'Percentage' | 'Fixed';
+  interestRate: number; // percentage or fixed amount
   term: string; // e.g. "36 months"
   monthlyPayment: number;
   startDate: string;

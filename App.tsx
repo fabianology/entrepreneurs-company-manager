@@ -404,6 +404,7 @@ const App: React.FC = () => {
     const newLoan: Loan = {
       id: Math.random().toString(36).substr(2, 9),
       companyId: selectedCompanyId,
+      role: loan.role || 'Lendee',
       lender: loan.lender || 'Bank',
       name: loan.name || 'New Loan',
       principalAmount: loan.principalAmount || 0,

@@ -239,6 +239,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const handleAddNewLoan = () => {
     setShowDeleteConfirm(false);
     setEditingLoan({
+      role: 'Lendee',
       lender: '',
       name: '',
       principalAmount: 0,
@@ -1045,24 +1046,77 @@ const FinancialList: React.FC<FinancialListProps> = ({
             </div>
 
             <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-              <div>
-                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
-                <input
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                  placeholder="e.g. Silicon Valley Bank"
-                  value={editingLoan.lender || ''}
-                  onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
-                />
+              <div className="flex justify-center pb-2">
+                <div className="flex bg-black/40 p-1 rounded-full border border-white/5">
+                  <button
+                    onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
+                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                  >
+                    Lender
+                  </button>
+                  <button
+                    onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
+                    className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                  >
+                    Lendee
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Nickname</label>
-                <input
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                  placeholder="e.g. Series A Venture Debt"
-                  value={editingLoan.name || ''}
-                  onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
-                />
-              </div>
+
+              {editingLoan.role === 'Lender' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lent To</label>
+                      <input
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        placeholder="e.g. Acme Corp"
+                        value={editingLoan.lender || ''}
+                        onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Name</label>
+                      <input
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        placeholder="e.g. Bridge Loan"
+                        value={editingLoan.name || ''}
+                        onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Terms</label>
+                    <input
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                      placeholder="e.g. 36 Months"
+                      value={editingLoan.term || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
+                    <input
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                      placeholder="e.g. Silicon Valley Bank"
+                      value={editingLoan.lender || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Nickname</label>
+                    <input
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                      placeholder="e.g. Series A Venture Debt"
+                      value={editingLoan.name || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
@@ -1104,41 +1158,81 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Rate (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                    placeholder="5.5"
-                    value={editingLoan.interestRate || ''}
-                    onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
-                  />
-                </div>
+                {editingLoan.role === 'Lender' ? (
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Type</label>
+                    <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[42px] items-center">
+                      <button
+                        onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Percentage' })}
+                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                      >
+                        Interest %
+                      </button>
+                      <button
+                        onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Fixed' })}
+                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                      >
+                        Fixed
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Rate (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                      placeholder="5.5"
+                      value={editingLoan.interestRate || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Term Length</label>
-                  <input
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                    placeholder="e.g. 36 Months"
-                    value={editingLoan.term || ''}
-                    onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Status</label>
-                  <select
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                    value={editingLoan.status || 'Active'}
-                    onChange={e => setEditingLoan({ ...editingLoan, status: e.target.value as any })}
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Paid Off">Paid Off</option>
-                    <option value="Default">Default</option>
-                  </select>
-                </div>
+                {editingLoan.role === 'Lender' ? (
+                  <div className="col-span-2 md:col-span-1">
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">
+                       {editingLoan.interestType === 'Fixed' ? 'Fixed Amount' : 'Interest Rate (%)'}
+                    </label>
+                    <div className="relative">
+                      {editingLoan.interestType === 'Fixed' && <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>}
+                      <input
+                        type="number"
+                        step={editingLoan.interestType === 'Fixed' ? "1" : "0.1"}
+                        className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-8' : ''} px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors`}
+                        value={editingLoan.interestRate || ''}
+                        onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Term Length</label>
+                      <input
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        placeholder="e.g. 36 Months"
+                        value={editingLoan.term || ''}
+                        onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Status</label>
+                      <select
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        value={editingLoan.status || 'Active'}
+                        onChange={e => setEditingLoan({ ...editingLoan, status: e.target.value as any })}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Paid Off">Paid Off</option>
+                        <option value="Default">Default</option>
+                      </select>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
