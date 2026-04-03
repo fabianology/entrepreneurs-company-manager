@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../types';
 import { getFaviconUrl } from '../services/logoService';
+import { jsPDF } from 'jspdf';
 
 interface FinancialListProps {
   cards: FinancialCard[];
@@ -357,6 +358,206 @@ const FinancialList: React.FC<FinancialListProps> = ({
     const interestPct = totalCost > 0 ? (totalInterest / totalCost) * 100 : 0;
 
     return { monthlyPayment: payment, totalInterest, totalCost, totalPrincipal: principal, principalPct, interestPct, schedule, scheduleFrequency };
+  };
+
+  const generatePromissoryNote = (loan: Partial<Loan>) => {
+    try {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+    const W = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentW = W - margin * 2;
+    let y = margin;
+
+    const fmt = (n: number) => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const amort = calcAmortization(loan);
+    const totalMonths = (loan.termYears || 0) * 12 + (loan.termMonths || 0);
+    let maturityDisplay = loan.maturityDate || '';
+    if (!maturityDisplay && loan.startDate && totalMonths > 0) {
+      const d = new Date(loan.startDate);
+      d.setMonth(d.getMonth() + totalMonths);
+      maturityDisplay = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    // ── Header Bar ──
+    doc.setFillColor(28, 28, 30);
+    doc.rect(0, 0, W, 22, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(180, 180, 180);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PROMISSORY NOTE', margin, 10);
+    doc.setTextColor(235, 195, 81);
+    doc.text('CONFIDENTIAL', W - margin, 10, { align: 'right' });
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.text(loan.name || 'Loan Agreement', W / 2, 16, { align: 'center' });
+    y = 32;
+
+    // ── Date line ──
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Date: ${loan.startDate || new Date().toLocaleDateString()}`, margin, y);
+    y += 10;
+
+    // ── Parties section ──
+    doc.setFillColor(245, 245, 247);
+    doc.roundedRect(margin, y, contentW, 22, 3, 3, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.setFont('helvetica', 'bold');
+    doc.text('LENDER (Creditor)', margin + 4, y + 6);
+    doc.text('BORROWER (Debtor)', W / 2 + 4, y + 6);
+    doc.setFontSize(10);
+    doc.setTextColor(20, 20, 20);
+    doc.text('Lender / Creditor', margin + 4, y + 14);
+    doc.text(loan.lender || '___________________', W / 2 + 4, y + 14);
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(W / 2, y + 2, W / 2, y + 20);
+    y += 30;
+
+    // ── Key Terms ──
+    const drawRow = (label: string, value: string, xOffset = 0, yPos = y) => {
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(120, 120, 120);
+      doc.text(label.toUpperCase(), margin + xOffset, yPos);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(20, 20, 20);
+      doc.text(value, margin + xOffset, yPos + 5);
+    };
+
+    // Row 1: Principal | Interest | Total
+    drawRow('Principal Amount', fmt(loan.principalAmount || 0), 0, y);
+    drawRow(loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Rate', loan.interestType === 'Fixed' ? fmt(loan.interestRate || 0) : `${loan.interestRate || 0}% APR`, contentW / 3, y);
+    drawRow('Total Cost of Loan', fmt((loan.principalAmount || 0) + (amort?.totalInterest || 0)), (contentW / 3) * 2, y);
+    y += 16;
+
+    // Row 2: Term | Loan Date | Maturity
+    const termStr = [loan.termYears ? `${loan.termYears} yr` : '', loan.termMonths ? `${loan.termMonths} mo` : ''].filter(Boolean).join(' ') || 'N/A';
+    drawRow('Loan Term', termStr, 0, y);
+    drawRow('Loan Date', loan.startDate || 'N/A', contentW / 3, y);
+    drawRow('Maturity Date', maturityDisplay || 'N/A', (contentW / 3) * 2, y);
+    y += 16;
+
+    // Payment
+    if (amort && amort.monthlyPayment > 0) {
+      const freq = amort.scheduleFrequency || 'Monthly';
+      drawRow(`${freq} Payment`, fmt(amort.monthlyPayment), 0, y);
+      y += 16;
+    }
+
+    // Divider
+    doc.setDrawColor(220, 220, 220);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, W - margin, y);
+    y += 8;
+
+    // ── Loan Summary ──
+    if (loan.term) {
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(120, 120, 120);
+      doc.text('LOAN SUMMARY / TERMS', margin, y);
+      y += 5;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(40, 40, 40);
+      const lines = doc.splitTextToSize(loan.term, contentW);
+      doc.text(lines, margin, y);
+      y += lines.length * 5 + 6;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y, W - margin, y);
+      y += 8;
+    }
+
+    // ── Promise language ──
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(50, 50, 50);
+    const promise = `FOR VALUE RECEIVED, the Borrower named above, promises to pay to the order of the Lender named above the principal sum of ${fmt(loan.principalAmount || 0)}${ loan.interestType === 'Fixed' ? `, plus a fixed fee of ${fmt(loan.interestRate || 0)}` : `, together with interest at the rate of ${loan.interestRate || 0}% per annum`}, in accordance with the terms set forth herein. This note shall be governed by the laws of the applicable jurisdiction. In the event of default, the entire remaining balance shall become immediately due and payable. The Borrower waives presentment, demand, protest, and notice of dishonor.`;
+    const promiseLines = doc.splitTextToSize(promise, contentW);
+    doc.text(promiseLines, margin, y);
+    y += promiseLines.length * 5 + 10;
+
+    // ── Amortization Schedule ──
+    if (amort && amort.schedule.length > 0) {
+      if (y > 200) { doc.addPage(); y = margin; }
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(120, 120, 120);
+      doc.text('AMORTIZATION SCHEDULE', margin, y);
+      y += 5;
+
+      const colW = contentW / 5;
+      const headers = ['Period', 'Payment', 'Principal', 'Interest', 'Balance'];
+      doc.setFillColor(28, 28, 30);
+      doc.rect(margin, y, contentW, 6, 'F');
+      doc.setFontSize(6.5);
+      doc.setTextColor(200, 200, 200);
+      headers.forEach((h, i) => {
+        const align = i === 0 ? 'left' : 'right';
+        const x = i === 0 ? margin + 2 : margin + colW * i + colW - 2;
+        doc.text(h, x, y + 4, { align });
+      });
+      y += 7;
+
+      const rowsToShow = Math.min(amort.schedule.length, 120);
+      amort.schedule.slice(0, rowsToShow).forEach((row, idx) => {
+        if (y > 265) { doc.addPage(); y = margin; }
+        if (idx % 2 === 0) {
+          doc.setFillColor(248, 248, 250);
+          doc.rect(margin, y - 1, contentW, 5.5, 'F');
+        }
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(40, 40, 40);
+        doc.text(String(row.month), margin + 2, y + 3);
+        doc.text(fmt(row.payment), margin + colW * 2 - 2, y + 3, { align: 'right' });
+        doc.text(fmt(row.principal), margin + colW * 3 - 2, y + 3, { align: 'right' });
+        doc.text(fmt(row.interest), margin + colW * 4 - 2, y + 3, { align: 'right' });
+        doc.text(fmt(row.balance), margin + contentW - 2, y + 3, { align: 'right' });
+        y += 5.5;
+      });
+      if (amort.schedule.length > rowsToShow) {
+        doc.setFontSize(7);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`... ${amort.schedule.length - rowsToShow} more periods omitted`, margin, y + 4);
+        y += 8;
+      }
+    }
+
+    // ── Signature Block ──
+    const sigY = Math.max(y + 10, 230);
+    if (sigY > 250) { doc.addPage(); }
+    const finalSigY = sigY > 250 ? margin + 20 : sigY;
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    // Lender sig
+    doc.line(margin, finalSigY + 14, margin + 70, finalSigY + 14);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(100, 100, 100);
+    doc.text('LENDER SIGNATURE', margin, finalSigY + 19);
+    doc.text('Date: _______________', margin, finalSigY + 24);
+    // Borrower sig
+    doc.line(W - margin - 70, finalSigY + 14, W - margin, finalSigY + 14);
+    doc.text('BORROWER SIGNATURE', W - margin - 70, finalSigY + 19);
+    doc.text('Date: _______________', W - margin - 70, finalSigY + 24);
+
+    // ── Footer ──
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(160, 160, 160);
+    doc.text('This document is generated for informational purposes. Consult a legal professional before signing.', W / 2, 275, { align: 'center' });
+
+    const filename = `Promissory_Note_${(loan.name || 'Loan').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(filename);
+    } catch (err) {
+      console.error('Promissory note generation failed:', err);
+      alert('PDF generation failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   const amortizationData = editingLoan ? calcAmortization() : null;
@@ -1265,6 +1466,21 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Summary</label>
+                    <textarea
+                      rows={2}
+                      style={{
+                        backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
+                        backgroundAttachment: 'local',
+                        lineHeight: '20px'
+                      }}
+                      className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
+                      placeholder="e.g. 36 Months summary..."
+                      value={editingLoan.term || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
+                    />
+                  </div>
                 </>
               )}
 
@@ -1443,30 +1659,19 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className={editingLoan.role !== 'Lender' ? '' : 'grid grid-cols-2 gap-6'}>
-                {editingLoan.role === 'Lender' ? (
-                  <div className="hidden">
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Summary</label>
-                      <textarea
-                        rows={2}
-                        style={{
-                          backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
-                          backgroundAttachment: 'local',
-                          lineHeight: '20px'
-                        }}
-                        className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
-                        placeholder="e.g. 36 Months summary..."
-                        value={editingLoan.term || ''}
-                        onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
+              {editingLoan.role === 'Lender' && (
+                <div className="pt-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); generatePromissoryNote(editingLoan); }}
+                    className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white/70 uppercase tracking-widest hover:bg-white/10 hover:text-white active:scale-95 transition flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Generate Promissory Note
+                  </button>
+                </div>
+              )}
+
+
 
               {amortizationData && (
                 <div className="pt-6 mt-6 border-t border-white/5 space-y-6 animate-fadeIn">
