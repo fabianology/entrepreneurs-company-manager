@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../types';
 import { getFaviconUrl } from '../services/logoService';
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 
 interface FinancialListProps {
   cards: FinancialCard[];
@@ -141,7 +141,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
           .filter(a => ['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(a.type))
           .map(a => a.id);
         const newCardIds = editingInstitution.accounts?.map(a => a.id) || [];
-        
+
         const deletedCardIds = originalCardIds.filter(id => !newCardIds.includes(id));
         deletedCardIds.forEach(id => onDeleteCard(id));
       }
@@ -298,15 +298,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
       const totalCost = principal + rate;
       const principalPct = totalCost > 0 ? (principal / totalCost) * 100 : 0;
       const interestPct = totalCost > 0 ? (rate / totalCost) * 100 : 0;
-      return { 
-        monthlyPayment: 0, 
-        totalInterest: rate, 
-        totalCost, 
-        totalPrincipal: principal, 
-        principalPct, 
-        interestPct, 
-        schedule: [], 
-        scheduleFrequency 
+      return {
+        monthlyPayment: 0,
+        totalInterest: rate,
+        totalCost,
+        totalPrincipal: principal,
+        principalPct,
+        interestPct,
+        schedule: [],
+        scheduleFrequency
       };
     }
 
@@ -319,11 +319,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
     let totalPeriods = totalMonths; // Monthly default
     let periodsPerYear = 12;
     if (scheduleFrequency === 'Weekly') {
-       totalPeriods = Math.round((totalMonths / 12) * 52);
-       periodsPerYear = 52;
+      totalPeriods = Math.round((totalMonths / 12) * 52);
+      periodsPerYear = 52;
     } else if (scheduleFrequency === 'Yearly') {
-       totalPeriods = Math.ceil(totalMonths / 12);
-       periodsPerYear = 1;
+      totalPeriods = Math.ceil(totalMonths / 12);
+      periodsPerYear = 1;
     }
 
     if (totalPeriods <= 0) return null;
@@ -361,7 +361,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
   };
 
   const generatePromissoryNote = (loan: Partial<Loan>) => {
-    try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
     const W = doc.internal.pageSize.getWidth();
     const margin = 20;
@@ -476,7 +475,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
-    const promise = `FOR VALUE RECEIVED, the Borrower named above, promises to pay to the order of the Lender named above the principal sum of ${fmt(loan.principalAmount || 0)}${ loan.interestType === 'Fixed' ? `, plus a fixed fee of ${fmt(loan.interestRate || 0)}` : `, together with interest at the rate of ${loan.interestRate || 0}% per annum`}, in accordance with the terms set forth herein. This note shall be governed by the laws of the applicable jurisdiction. In the event of default, the entire remaining balance shall become immediately due and payable. The Borrower waives presentment, demand, protest, and notice of dishonor.`;
+    const promise = `FOR VALUE RECEIVED, the Borrower named above, promises to pay to the order of the Lender named above the principal sum of ${fmt(loan.principalAmount || 0)}${loan.interestType === 'Fixed' ? `, plus a fixed fee of ${fmt(loan.interestRate || 0)}` : `, together with interest at the rate of ${loan.interestRate || 0}% per annum`}, in accordance with the terms set forth herein. This note shall be governed by the laws of the applicable jurisdiction. In the event of default, the entire remaining balance shall become immediately due and payable. The Borrower waives presentment, demand, protest, and notice of dishonor.`;
     const promiseLines = doc.splitTextToSize(promise, contentW);
     doc.text(promiseLines, margin, y);
     y += promiseLines.length * 5 + 10;
@@ -552,12 +551,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
     doc.setTextColor(160, 160, 160);
     doc.text('This document is generated for informational purposes. Consult a legal professional before signing.', W / 2, 275, { align: 'center' });
 
-    const filename = `Promissory_Note_${(loan.name || 'Loan').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const filename = `Promissory_Note_${(loan.name || 'Loan').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
     doc.save(filename);
-    } catch (err) {
-      console.error('Promissory note generation failed:', err);
-      alert('PDF generation failed: ' + (err instanceof Error ? err.message : String(err)));
-    }
   };
 
   const amortizationData = editingLoan ? calcAmortization() : null;
@@ -704,7 +699,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <div className="p-6 border-b border-white/5">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
-                      <div 
+                      <div
                         className="w-14 h-14 bg-white/5 flex items-center justify-center text-white overflow-hidden cursor-pointer p-1 -ml-1 rounded-2xl border border-white/10 hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -857,67 +852,68 @@ const FinancialList: React.FC<FinancialListProps> = ({
           {loans.map(loan => {
             const amort = calcAmortization(loan);
             return (
-            <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
-              <div className="p-6 border-b border-white/5 flex-1">
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center space-x-3">
+              <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
+                <div className="p-6 border-b border-white/5 flex-1">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h4 className="font-black text-white text-base">{loan.name}</h4>
+                          {loan.role && (
+                            <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] border border-white/10 px-2 py-0.5 rounded-full">{loan.role}</span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center space-x-1.5 pt-1 uppercase font-black tracking-widest text-[10px]">
+                          <span className="text-white/40">
+                            {loan.role === 'Lender' ? 'Lent To: ' : ''}{loan.lender || 'Unknown'}
+                          </span>
+                          <span className="text-white/20">|</span>
+                          <span className={(loan.paidOffDate || loan.status === 'Paid Off') ? 'text-emerald-500' : 'text-[#EBC351]'}>
+                            {loan.paidOffDate ? 'Paid Off' : loan.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-1">Loan Amount</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-y-6 gap-x-2 pt-2 px-1 mb-6">
                     <div>
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h4 className="font-black text-white text-base">{loan.name}</h4>
-                        {loan.role && (
-                          <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] border border-white/10 px-2 py-0.5 rounded-full">{loan.role}</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center space-x-1.5 pt-1 uppercase font-black tracking-widest text-[10px]">
-                        <span className="text-white/40">
-                          {loan.role === 'Lender' ? 'Lent To: ' : ''}{loan.lender || 'Unknown'}
-                        </span>
-                        <span className="text-white/20">|</span>
-                        <span className={(loan.paidOffDate || loan.status === 'Paid Off') ? 'text-emerald-500' : 'text-[#EBC351]'}>
-                          {loan.paidOffDate ? 'Paid Off' : loan.status}
-                        </span>
-                      </div>
+                      <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">Loan Date</p>
+                      <p className="text-[13px] font-black text-white">{loan.startDate || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Paid'}</p>
+                      <p className="text-sm font-black text-white">${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">Total Amount</p>
+                      <p className="text-sm font-black text-white">${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xl font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
-                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-1">Loan Amount</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 gap-y-6 gap-x-2 pt-2 px-1 mb-6">
-                  <div>
-                    <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">Loan Date</p>
-                    <p className="text-[13px] font-black text-white">{loan.startDate || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Paid'}</p>
-                    <p className="text-sm font-black text-white">${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">Total Amount</p>
-                    <p className="text-sm font-black text-white">${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                  </div>
+
+                  {amort && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                        <span className="text-[#EBC351]">Principal ${amort.totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                        <span className="text-orange-500">{loan.interestType === 'Fixed' ? 'Fee' : 'Interest'} ${amort.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex shadow-inner">
+                        <div className="h-full bg-[#EBC351] transition-all" style={{ width: `${amort.principalPct}%` }}></div>
+                        <div className="h-full bg-orange-500 transition-all" style={{ width: `${amort.interestPct}%` }}></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {amort && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest">
-                      <span className="text-[#EBC351]">Principal ${amort.totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                      <span className="text-orange-500">{loan.interestType === 'Fixed' ? 'Fee' : 'Interest'} ${amort.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex shadow-inner">
-                      <div className="h-full bg-[#EBC351] transition-all" style={{ width: `${amort.principalPct}%` }}></div>
-                      <div className="h-full bg-orange-500 transition-all" style={{ width: `${amort.interestPct}%` }}></div>
-                    </div>
-                  </div>
-                )}
+
               </div>
-
-
-            </div>
-          )})}
+            )
+          })}
         </div>
       </section>
 
@@ -992,7 +988,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 </select>
                               </div>
                             </div>
-                            
+
                             {/* Toggle Button for Details */}
                             <div className="pt-3 border-t border-white/5 flex justify-center mt-2">
                               <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[9px] font-black uppercase flex items-center gap-1 hover:text-white transition-colors">
@@ -1003,32 +999,32 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                             {expandedAccounts.has(idx) && (
                               <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Holder</label>
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="NAME" value={acc.cardHolder || ''} onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })} />
-                              </div>
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Network</label>
-                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.network || 'Visa'} onChange={e => handleUpdateInstAccount(idx, { network: e.target.value as any })}>
-                                  <option value="Visa">Visa</option>
-                                  <option value="Mastercard">Mastercard</option>
-                                  <option value="Amex">Amex</option>
-                                  <option value="Discover">Discover</option>
-                                  <option value="Other">Other</option>
-                                </select>
-                              </div>
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Expiry</label>
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="MM/YY" maxLength={5} value={acc.expiry || ''} onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })} />
-                              </div>
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Status</label>
-                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.status || 'Active'} onChange={e => handleUpdateInstAccount(idx, { status: e.target.value as any })}>
-                                  <option value="Active">Active</option>
-                                  <option value="Frozen">Frozen</option>
-                                  <option value="Expired">Expired</option>
-                                </select>
-                              </div>
+                                <div className="md:col-span-1">
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Holder</label>
+                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="NAME" value={acc.cardHolder || ''} onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })} />
+                                </div>
+                                <div className="md:col-span-1">
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Network</label>
+                                  <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.network || 'Visa'} onChange={e => handleUpdateInstAccount(idx, { network: e.target.value as any })}>
+                                    <option value="Visa">Visa</option>
+                                    <option value="Mastercard">Mastercard</option>
+                                    <option value="Amex">Amex</option>
+                                    <option value="Discover">Discover</option>
+                                    <option value="Other">Other</option>
+                                  </select>
+                                </div>
+                                <div className="md:col-span-1">
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Expiry</label>
+                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="MM/YY" maxLength={5} value={acc.expiry || ''} onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })} />
+                                </div>
+                                <div className="md:col-span-1">
+                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Status</label>
+                                  <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.status || 'Active'} onChange={e => handleUpdateInstAccount(idx, { status: e.target.value as any })}>
+                                    <option value="Active">Active</option>
+                                    <option value="Frozen">Frozen</option>
+                                    <option value="Expired">Expired</option>
+                                  </select>
+                                </div>
                                 <div className="md:col-span-2">
                                   <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid From</label>
                                   <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. Chase Checking" value={acc.paidFrom || ''} onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })} />
@@ -1081,7 +1077,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               </div>
                             )}
                           </div>
-                          
+
                           <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
                             {confirmDeleteAccount === idx ? (
                               <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-xl p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
@@ -1105,13 +1101,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
 
                 <div className="mb-8 pt-4 border-t border-white/5">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
                       <span className="text-2xl group-hover:scale-110 transition-transform">🏦</span>
                       <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
                     </button>
-                    <button 
-                      onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name })} 
+                    <button
+                      onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name, _fromBank: true } as any)}
                       className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group"
                     >
                       <span className="text-2xl group-hover:scale-110 transition-transform">💸</span>
@@ -1161,7 +1157,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
                           {confirmDeleteAccount === idx ? (
                             <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-xl p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
@@ -1182,48 +1178,84 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     );
                   })}
 
-                  {loans.filter(loan => loan.lender === editingInstitution.name).map(loan => {
-                    const amort = calcAmortization(loan);
-                    return (
-                      <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-white/5 p-4 rounded-xl flex flex-col gap-4 border border-white/5 relative group cursor-pointer hover:border-white/10 transition">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-black text-white text-sm">{loan.name}</h4>
-                            <div className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2 mt-1">
-                              <span className="border border-white/10 px-1.5 rounded-[4px]">{loan.role || 'Lendee'}</span>
-                              <span className={loan.paidOffDate || loan.status === 'Paid Off' ? 'text-emerald-500' : 'text-[#EBC351]'}>
+                </div>
+
+                {/* --- LOAN CARDS inside bank modal --- */}
+                {loans.filter(l => l.lender === editingInstitution.name).length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest px-1">💸 Loans
+                    </p>
+                    {loans.filter(l => l.lender === editingInstitution.name).map(loan => {
+                      const amort = calcAmortization(loan);
+                      return (
+                        <div
+                          key={loan.id}
+                          onClick={() => setEditingLoan(loan)}
+                          className="bg-white/5 p-4 rounded-xl flex flex-col gap-3 border border-white/5 cursor-pointer hover:border-[#EBC351]/30 hover:bg-white/[0.07] transition-all group"
+                        >
+                          {/* Header row */}
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-black text-white">{loan.name}</p>
+                                <span className="text-[8px] font-black text-white/30 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded-full">
+                                  {loan.role || 'Lendee'}
+                                </span>
+                              </div>
+                              <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${
+                                loan.paidOffDate || loan.status === 'Paid Off' ? 'text-emerald-500' : 'text-[#EBC351]'
+                              }`}>
                                 {loan.paidOffDate ? 'Paid Off' : loan.status}
-                              </span>
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
+                              <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Loan Amount</p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
-                            <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mt-1">Loan Amount</p>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-3 gap-y-2 gap-x-2 border-t border-white/5 pt-3">
-                          <div>
-                            <p className="text-[8px] font-black text-white/40 mb-1 uppercase tracking-widest">Loan Date</p>
-                            <p className="text-xs font-bold text-white">{loan.startDate || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-[8px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Paid'}</p>
-                            <p className="text-xs font-bold text-white">${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          </div>
-                          <div>
-                            <p className="text-[8px] font-black text-white/40 mb-1 uppercase tracking-widest">Total Amount</p>
-                            <p className="text-xs font-bold text-white">${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          </div>
-                        </div>
 
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-black bg-[#EBC351] px-3 py-1 rounded-full shadow-lg">Edit Loan</span>
+                          {/* Stats row */}
+                          <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-3">
+                            <div>
+                              <p className="text-[8px] font-black text-white/40 mb-0.5 uppercase tracking-widest">Loan Date</p>
+                              <p className="text-xs font-bold text-white">{loan.startDate || '—'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-white/40 mb-0.5 uppercase tracking-widest">
+                                {loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest'}
+                              </p>
+                              <p className="text-xs font-bold text-white">
+                                ${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[8px] font-black text-white/40 mb-0.5 uppercase tracking-widest">Total</p>
+                              <p className="text-xs font-bold text-white">
+                                ${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Progress bar */}
+                          {amort && (
+                            <div className="space-y-1.5">
+                              <div className="flex justify-between text-[7px] font-black uppercase tracking-widest">
+                                <span className="text-[#EBC351]">Principal {amort.principalPct.toFixed(0)}%</span>
+                                <span className="text-orange-500">{loan.interestType === 'Fixed' ? 'Fee' : 'Interest'} {amort.interestPct.toFixed(0)}%</span>
+                              </div>
+                              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden flex">
+                                <div className="h-full bg-[#EBC351]" style={{ width: `${amort.principalPct}%` }} />
+                                <div className="h-full bg-orange-500" style={{ width: `${amort.interestPct}%` }} />
+                              </div>
+                            </div>
+                          )}
+
+                          <p className="text-[8px] font-black text-[#EBC351]/60 uppercase tracking-widest group-hover:text-[#EBC351] transition text-center">Tap to edit →</p>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
             <div className="px-6 py-3 border-t border-white/5 flex justify-between items-center bg-black/20">
@@ -1436,24 +1468,27 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
             <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div className="flex justify-center pb-2">
-                <div className={`flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px] ${(editingLoan.id || editingInstitution) ? 'pointer-events-none' : ''}`}>
-                  {((!editingLoan.id && !editingInstitution) || editingLoan.role === 'Lender') && (
-                    <button
-                      onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
-                      className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
-                    >
-                      Lender
-                    </button>
-                  )}
-                  {((!editingLoan.id && !editingInstitution) || editingLoan.role === 'Lendee' || !editingLoan.role || editingInstitution) && (
-                    <button
-                      onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
-                      className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
-                    >
-                      Lendee
-                    </button>
-                  )}
-                </div>
+                {/* When opened from bank, lock to Lendee-only — no toggle shown */}
+                {!(editingLoan as any)._fromBank && (
+                  <div className={`flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px] ${editingLoan.id ? 'pointer-events-none' : ''}`}>
+                    {(!editingLoan.id || editingLoan.role === 'Lender') && (
+                      <button
+                        onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
+                        className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
+                      >
+                        Lender
+                      </button>
+                    )}
+                    {(!editingLoan.id || editingLoan.role === 'Lendee' || !editingLoan.role) && (
+                      <button
+                        onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
+                        className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
+                      >
+                        Lendee
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {editingLoan.role === 'Lender' ? (
@@ -1634,7 +1669,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <div>
                   <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Term</label>
                   <div className="flex space-x-2">
-                    <select 
+                    <select
                       className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
                       value={editingLoan.termYears || 0}
                       onChange={e => {
@@ -1652,10 +1687,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     >
                       <option value={0} className="bg-[#1C1C1E]">0 Years</option>
                       {[...Array(30)].map((_, i) => (
-                         <option key={i+1} value={i+1} className="bg-[#1C1C1E]">{i+1} Years</option>
+                        <option key={i + 1} value={i + 1} className="bg-[#1C1C1E]">{i + 1} Years</option>
                       ))}
                     </select>
-                    <select 
+                    <select
                       className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
                       value={editingLoan.termMonths || 0}
                       onChange={e => {
@@ -1673,7 +1708,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     >
                       <option value={0} className="bg-[#1C1C1E]">0 Months</option>
                       {[...Array(11)].map((_, i) => (
-                         <option key={i+1} value={i+1} className="bg-[#1C1C1E]">{i+1} Months</option>
+                        <option key={i + 1} value={i + 1} className="bg-[#1C1C1E]">{i + 1} Months</option>
                       ))}
                     </select>
                   </div>
@@ -1708,18 +1743,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
               </div>
-
-              {editingLoan.role === 'Lender' && (
-                <div className="pt-2">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); generatePromissoryNote(editingLoan); }}
-                    className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black text-white/70 uppercase tracking-widest hover:bg-white/10 hover:text-white active:scale-95 transition flex items-center justify-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Generate Promissory Note
-                  </button>
-                </div>
-              )}
 
 
 
@@ -1761,7 +1784,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <span>{showAmortizationTable ? 'Hide Schedule' : 'Amortization Schedule'}</span>
                       <svg className={`w-4 h-4 transform transition-transform ${showAmortizationTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                    
+
                     {showAmortizationTable && (
                       <div className="mt-4 border border-white/10 rounded-xl overflow-hidden animate-fadeIn">
                         <div className="max-h-[300px] overflow-y-auto custom-scrollbar bg-black/20">
@@ -1799,32 +1822,41 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
             <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
               <div>
-              {editingLoan.id && (
-                showDeleteConfirm ? (
-                  <div className="flex items-center bg-orange-500/10 rounded-xl p-1.5 border border-orange-500/30 gap-3">
-                    <span className="text-[10px] font-black text-orange-500 uppercase px-2 whitespace-nowrap">Confirm?</span>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); setShowDeleteConfirm(false); }}
-                        className="text-[10px] font-black text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
-                      >YES</button>
-                      <button
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="text-[10px] font-black text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
-                      >NO</button>
+                {editingLoan.id && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center bg-orange-500/10 rounded-xl p-1.5 border border-orange-500/30 gap-3">
+                      <span className="text-[10px] font-black text-orange-500 uppercase px-2 whitespace-nowrap">Confirm?</span>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); setShowDeleteConfirm(false); }}
+                          className="text-[10px] font-black text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
+                        >YES</button>
+                        <button
+                          onClick={() => setShowDeleteConfirm(false)}
+                          className="text-[10px] font-black text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
+                        >NO</button>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="text-white/20 hover:text-orange-500 p-3 transition rounded-xl hover:bg-white/5 border border-transparent flex items-center justify-center active:scale-95"
-                  >
-                    <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  </button>
-                )
-              )}
+                  ) : (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="text-white/20 hover:text-orange-500 p-3 transition rounded-xl hover:bg-white/5 border border-transparent flex items-center justify-center active:scale-95"
+                    >
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  )
+                )}
               </div>
               <div className="flex space-x-4">
+                {editingLoan.role === 'Lender' && (
+                  <button
+                    onClick={() => generatePromissoryNote(editingLoan)}
+                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] font-black text-white/70 uppercase tracking-widest hover:bg-white/10 hover:text-white active:scale-95 transition flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Promissory Note
+                  </button>
+                )}
                 <button
                   onClick={() => setEditingLoan(null)}
                   className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition"
