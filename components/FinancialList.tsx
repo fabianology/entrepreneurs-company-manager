@@ -1105,10 +1105,19 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
 
                 <div className="mb-8 pt-4 border-t border-white/5">
-                  <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
-                    <span className="text-2xl group-hover:scale-110 transition-transform">🏦</span>
-                    <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
-                  </button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
+                      <span className="text-2xl group-hover:scale-110 transition-transform">🏦</span>
+                      <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
+                    </button>
+                    <button 
+                      onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name })} 
+                      className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group"
+                    >
+                      <span className="text-2xl group-hover:scale-110 transition-transform">💸</span>
+                      <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Loan</span>
+                    </button>
+                  </div>
                 </div>
 
 
@@ -1173,6 +1182,47 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     );
                   })}
 
+                  {loans.filter(loan => loan.lender === editingInstitution.name).map(loan => {
+                    const amort = calcAmortization(loan);
+                    return (
+                      <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-white/5 p-4 rounded-xl flex flex-col gap-4 border border-white/5 relative group cursor-pointer hover:border-white/10 transition">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-black text-white text-sm">{loan.name}</h4>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-white/40 flex items-center gap-2 mt-1">
+                              <span className="border border-white/10 px-1.5 rounded-[4px]">{loan.role || 'Lendee'}</span>
+                              <span className={loan.paidOffDate || loan.status === 'Paid Off' ? 'text-emerald-500' : 'text-[#EBC351]'}>
+                                {loan.paidOffDate ? 'Paid Off' : loan.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
+                            <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mt-1">Loan Amount</p>
+                          </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-y-2 gap-x-2 border-t border-white/5 pt-3">
+                          <div>
+                            <p className="text-[8px] font-black text-white/40 mb-1 uppercase tracking-widest">Loan Date</p>
+                            <p className="text-xs font-bold text-white">{loan.startDate || '—'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[8px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Paid'}</p>
+                            <p className="text-xs font-bold text-white">${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          </div>
+                          <div>
+                            <p className="text-[8px] font-black text-white/40 mb-1 uppercase tracking-widest">Total Amount</p>
+                            <p className="text-xs font-bold text-white">${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                          </div>
+                        </div>
+
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-black bg-[#EBC351] px-3 py-1 rounded-full shadow-lg">Edit Loan</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -1386,8 +1436,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
             <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
               <div className="flex justify-center pb-2">
-                <div className={`flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px] ${editingLoan.id ? 'pointer-events-none' : ''}`}>
-                  {(!editingLoan.id || editingLoan.role === 'Lender') && (
+                <div className={`flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px] ${(editingLoan.id || editingInstitution) ? 'pointer-events-none' : ''}`}>
+                  {((!editingLoan.id && !editingInstitution) || editingLoan.role === 'Lender') && (
                     <button
                       onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
                       className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
@@ -1395,7 +1445,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       Lender
                     </button>
                   )}
-                  {(!editingLoan.id || editingLoan.role === 'Lendee' || !editingLoan.role) && (
+                  {((!editingLoan.id && !editingInstitution) || editingLoan.role === 'Lendee' || !editingLoan.role || editingInstitution) && (
                     <button
                       onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
                       className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
