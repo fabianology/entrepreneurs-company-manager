@@ -125,8 +125,12 @@ export interface Loan {
   interestType?: 'Percentage' | 'Fixed';
   interestRate: number; // percentage or fixed amount
   term: string; // e.g. "36 months"
+  termYears?: number;
+  termMonths?: number;
+  scheduleFrequency?: 'Weekly' | 'Monthly' | 'Yearly';
   monthlyPayment: number;
   startDate: string;
+  paidOffDate?: string;
   status: 'Active' | 'Paid Off' | 'Default';
 }
 

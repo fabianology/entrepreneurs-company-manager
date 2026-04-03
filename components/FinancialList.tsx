@@ -42,6 +42,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [lastCopiedField, setLastCopiedField] = useState<{ id: string, field: 'username' | 'password' } | null>(null);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
+  const [showAmortizationTable, setShowAmortizationTable] = useState(false);
 
   const toggleAccountExpanded = (idx: number) => {
     const newSet = new Set(expandedAccounts);
@@ -272,6 +273,81 @@ const FinancialList: React.FC<FinancialListProps> = ({
       default: return 'from-slate-700 to-slate-900';
     }
   };
+
+  const calcAmortization = () => {
+    if (!editingLoan) return null;
+    const principal = editingLoan.principalAmount || 0;
+    const rate = editingLoan.interestRate || 0;
+    const isFixed = editingLoan.interestType === 'Fixed';
+    const totalMonths = (editingLoan.termYears || 0) * 12 + (editingLoan.termMonths || 0);
+    const scheduleFrequency = editingLoan.scheduleFrequency || 'Monthly';
+
+    if (principal <= 0 || totalMonths <= 0) return null;
+
+    let schedule = [];
+    let payment = 0;
+    let totalInterest = 0;
+
+    let totalPeriods = totalMonths; // Monthly default
+    let periodsPerYear = 12;
+    if (scheduleFrequency === 'Weekly') {
+       totalPeriods = Math.round((totalMonths / 12) * 52);
+       periodsPerYear = 52;
+    } else if (scheduleFrequency === 'Yearly') {
+       totalPeriods = Math.ceil(totalMonths / 12);
+       periodsPerYear = 1;
+    }
+
+    if (totalPeriods <= 0) return null;
+
+    if (isFixed) {
+      totalInterest = rate;
+      const totalCost = principal + totalInterest;
+      payment = totalCost / totalPeriods;
+      
+      let balance = principal;
+      let interestPerPeriod = totalInterest / totalPeriods;
+      let principalPerPeriod = principal / totalPeriods;
+
+      for (let i = 1; i <= totalPeriods; i++) {
+        balance -= principalPerPeriod;
+        schedule.push({ month: i, payment: payment, principal: principalPerPeriod, interest: interestPerPeriod, balance: Math.max(0, balance) });
+      }
+    } else {
+      const perPeriodRate = (rate / 100) / periodsPerYear;
+      if (perPeriodRate <= 0) {
+        payment = principal / totalPeriods;
+        let balance = principal;
+        for (let i = 1; i <= totalPeriods; i++) {
+          balance -= payment;
+          schedule.push({ month: i, payment: payment, principal: payment, interest: 0, balance: Math.max(0, balance) });
+        }
+      } else {
+        payment = principal * (perPeriodRate * Math.pow(1 + perPeriodRate, totalPeriods)) / (Math.pow(1 + perPeriodRate, totalPeriods) - 1);
+        let balance = principal;
+        for (let i = 1; i <= totalPeriods; i++) {
+          const interest = balance * perPeriodRate;
+          const principalPayment = payment - interest;
+          balance -= principalPayment;
+          totalInterest += interest;
+          schedule.push({ month: i, payment: payment, principal: principalPayment, interest: interest, balance: Math.max(0, balance) });
+        }
+      }
+    }
+
+    if (schedule.length > 5000) {
+      // Prevent browser freeze for very long daily scheduled loans
+      schedule = schedule.slice(0, 5000);
+    }
+
+    const totalCost = principal + totalInterest;
+    const principalPct = totalCost > 0 ? (principal / totalCost) * 100 : 0;
+    const interestPct = totalCost > 0 ? (totalInterest / totalCost) * 100 : 0;
+
+    return { monthlyPayment: payment, totalInterest, totalCost, totalPrincipal: principal, principalPct, interestPct, schedule, scheduleFrequency };
+  };
+
+  const amortizationData = editingLoan ? calcAmortization() : null;
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-12 animate-fadeIn">
@@ -1090,10 +1166,16 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Terms</label>
-                    <input
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                      placeholder="e.g. 36 Months"
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Summary</label>
+                    <textarea
+                      rows={2}
+                      style={{
+                        backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
+                        backgroundAttachment: 'local',
+                        lineHeight: '20px'
+                      }}
+                      className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
+                      placeholder="e.g. 36 Months summary..."
                       value={editingLoan.term || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
                     />
@@ -1122,9 +1204,30 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </>
               )}
 
+              <div className="grid grid-cols-2 gap-6 pb-6">
+                <div>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lent On</label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
+                    value={editingLoan.startDate || ''}
+                    onChange={e => setEditingLoan({ ...editingLoan, startDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Paid Off</label>
+                  <input
+                    type="date"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
+                    value={editingLoan.paidOffDate || ''}
+                    onChange={e => setEditingLoan({ ...editingLoan, paidOffDate: e.target.value })}
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Original Principal</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Amount</label>
                   <div className="relative">
                     <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
                     <input
@@ -1136,89 +1239,98 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Current Balance</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
-                    <input
-                      type="number"
-                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
-                      value={editingLoan.remainingBalance || ''}
-                      onChange={e => setEditingLoan({ ...editingLoan, remainingBalance: parseFloat(e.target.value) })}
-                    />
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Type</label>
+                  <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[42px] items-center">
+                    <button
+                      onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Percentage' })}
+                      className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                    >
+                      Interest
+                    </button>
+                    <button
+                      onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Fixed' })}
+                      className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                    >
+                      Fixed
+                    </button>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Monthly Payment</label>
-                  <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
-                    <input
-                      type="number"
-                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
-                      value={editingLoan.monthlyPayment || ''}
-                      onChange={e => setEditingLoan({ ...editingLoan, monthlyPayment: parseFloat(e.target.value) })}
-                    />
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Term</label>
+                  <div className="flex space-x-2">
+                    <select 
+                      className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
+                      value={editingLoan.termYears || 0}
+                      onChange={e => setEditingLoan({ ...editingLoan, termYears: parseInt(e.target.value) })}
+                    >
+                      <option value={0} className="bg-[#1C1C1E]">0 Years</option>
+                      {[...Array(30)].map((_, i) => (
+                         <option key={i+1} value={i+1} className="bg-[#1C1C1E]">{i+1} Years</option>
+                      ))}
+                    </select>
+                    <select 
+                      className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
+                      value={editingLoan.termMonths || 0}
+                      onChange={e => setEditingLoan({ ...editingLoan, termMonths: parseInt(e.target.value) })}
+                    >
+                      <option value={0} className="bg-[#1C1C1E]">0 Months</option>
+                      {[...Array(11)].map((_, i) => (
+                         <option key={i+1} value={i+1} className="bg-[#1C1C1E]">{i+1} Months</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-                {editingLoan.role === 'Lender' ? (
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Type</label>
-                    <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[42px] items-center">
-                      <button
-                        onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Percentage' })}
-                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
-                      >
-                        Interest %
-                      </button>
-                      <button
-                        onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Fixed' })}
-                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
-                      >
-                        Fixed
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Rate (%)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                      placeholder="5.5"
-                      value={editingLoan.interestRate || ''}
-                      onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-6">
-                {editingLoan.role === 'Lender' ? (
-                  <div className="col-span-2 md:col-span-1">
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">
-                       {editingLoan.interestType === 'Fixed' ? 'Fixed Amount' : 'Interest Rate (%)'}
-                    </label>
-                    <div className="relative">
+                <div>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">
+                    {editingLoan.interestType === 'Fixed' ? 'Fixed' : 'APR'}
+                  </label>
+                  <div className="flex space-x-2">
+                    <div className="relative flex-1">
                       {editingLoan.interestType === 'Fixed' && <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>}
                       <input
                         type="number"
                         step={editingLoan.interestType === 'Fixed' ? "1" : "0.1"}
                         className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-8' : ''} px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors`}
                         value={editingLoan.interestRate || ''}
-                        onChange={e => setEditingLoan({ ...editingLoan, interestRate: parseFloat(e.target.value) })}
+                        placeholder={editingLoan.interestType === 'Fixed' ? "e.g. 500" : "e.g. 5.5"}
+                        onChange={e => setEditingLoan({ ...editingLoan, interestRate: e.target.value ? parseFloat(e.target.value) : 0 })}
                       />
                     </div>
+                    {editingLoan.interestType !== 'Fixed' && (
+                      <select
+                        className="flex-1 px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
+                        value={editingLoan.scheduleFrequency || 'Monthly'}
+                        onChange={e => setEditingLoan({ ...editingLoan, scheduleFrequency: e.target.value as any })}
+                      >
+                        <option value="Weekly">Weekly</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Yearly">Yearly</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                {editingLoan.role === 'Lender' ? (
+                  <div className="hidden">
                   </div>
                 ) : (
                   <>
                     <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Term Length</label>
-                      <input
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                        placeholder="e.g. 36 Months"
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Summary</label>
+                      <textarea
+                        rows={2}
+                        style={{
+                          backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
+                          backgroundAttachment: 'local',
+                          lineHeight: '20px'
+                        }}
+                        className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
+                        placeholder="e.g. 36 Months summary..."
                         value={editingLoan.term || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
                       />
@@ -1238,6 +1350,79 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </>
                 )}
               </div>
+
+              {amortizationData && (
+                <div className="pt-6 mt-6 border-t border-white/5 space-y-6 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">
+                        {amortizationData.scheduleFrequency === 'Weekly' ? 'Weekly' : amortizationData.scheduleFrequency === 'Yearly' ? 'Yearly' : 'Monthly'} Payment
+                      </p>
+                      <p className="text-xl font-black text-white">${amortizationData.monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">Total Cost of Loan</p>
+                      <p className="text-base font-black text-white">${amortizationData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
+                      <span className="text-[#EBC351]">Principal ({amortizationData.principalPct.toFixed(1)}%)</span>
+                      <span className="text-orange-500">Interest ({amortizationData.interestPct.toFixed(1)}%)</span>
+                    </div>
+                    <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden flex shadow-inner">
+                      <div className="h-full bg-[#EBC351] transition-all duration-1000 ease-out" style={{ width: `${amortizationData.principalPct}%` }}></div>
+                      <div className="h-full bg-orange-500 transition-all duration-1000 ease-out" style={{ width: `${amortizationData.interestPct}%` }}></div>
+                    </div>
+                    <div className="flex justify-between text-xs font-black">
+                      <span className="text-white">${amortizationData.totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="text-white">${amortizationData.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => setShowAmortizationTable(!showAmortizationTable)}
+                      className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition flex items-center justify-center space-x-2 active:scale-95"
+                    >
+                      <span>{showAmortizationTable ? 'Hide Schedule' : 'Amortization Schedule'}</span>
+                      <svg className={`w-4 h-4 transform transition-transform ${showAmortizationTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    
+                    {showAmortizationTable && (
+                      <div className="mt-4 border border-white/10 rounded-xl overflow-hidden animate-fadeIn">
+                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar bg-black/20">
+                          <table className="w-full text-left text-xs text-white">
+                            <thead className="bg-[#1C1C1E] sticky top-0 z-10 shadow-md">
+                              <tr>
+                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5">
+                                  {amortizationData.scheduleFrequency === 'Weekly' ? 'Wk.' : amortizationData.scheduleFrequency === 'Yearly' ? 'Yr.' : 'Mo.'}
+                                </th>
+                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5 text-right">Payment</th>
+                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-[#EBC351] border-b border-white/5 text-right">Principal</th>
+                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-orange-500 border-b border-white/5 text-right">Interest</th>
+                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5 text-right">Balance</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/5 font-mono">
+                              {amortizationData.schedule.map((row) => (
+                                <tr key={row.month} className="hover:bg-white/5 transition-colors">
+                                  <td className="px-4 py-2 opacity-50">{row.month}</td>
+                                  <td className="px-4 py-2 text-right opacity-90">${row.payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-4 py-2 text-right text-[#EBC351]">${row.principal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-4 py-2 text-right text-orange-500">${row.interest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-4 py-2 text-right font-bold">${row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
