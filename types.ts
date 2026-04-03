@@ -130,6 +130,7 @@ export interface Loan {
   scheduleFrequency?: 'Weekly' | 'Monthly' | 'Yearly';
   monthlyPayment: number;
   startDate: string;
+  maturityDate?: string;
   paidOffDate?: string;
   status: 'Active' | 'Paid Off' | 'Default';
 }

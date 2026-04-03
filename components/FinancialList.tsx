@@ -43,6 +43,15 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
   const [showAmortizationTable, setShowAmortizationTable] = useState(false);
+  const [expandedSchedules, setExpandedSchedules] = useState<Set<string>>(new Set());
+
+  const toggleSchedule = (loanId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newSet = new Set(expandedSchedules);
+    if (newSet.has(loanId)) newSet.delete(loanId);
+    else newSet.add(loanId);
+    setExpandedSchedules(newSet);
+  };
 
   const toggleAccountExpanded = (idx: number) => {
     const newSet = new Set(expandedAccounts);
@@ -274,15 +283,33 @@ const FinancialList: React.FC<FinancialListProps> = ({
     }
   };
 
-  const calcAmortization = () => {
-    if (!editingLoan) return null;
-    const principal = editingLoan.principalAmount || 0;
-    const rate = editingLoan.interestRate || 0;
-    const isFixed = editingLoan.interestType === 'Fixed';
-    const totalMonths = (editingLoan.termYears || 0) * 12 + (editingLoan.termMonths || 0);
-    const scheduleFrequency = editingLoan.scheduleFrequency || 'Monthly';
+  const calcAmortization = (loan: Partial<Loan> | null = editingLoan) => {
+    if (!loan) return null;
+    const principal = loan.principalAmount || 0;
+    const rate = loan.interestRate || 0;
+    const isFixed = loan.interestType === 'Fixed';
+    const totalMonths = (loan.termYears || 0) * 12 + (loan.termMonths || 0);
+    const scheduleFrequency = loan.scheduleFrequency || 'Monthly';
 
-    if (principal <= 0 || totalMonths <= 0) return null;
+    if (principal <= 0) return null;
+
+    if (isFixed) {
+      const totalCost = principal + rate;
+      const principalPct = totalCost > 0 ? (principal / totalCost) * 100 : 0;
+      const interestPct = totalCost > 0 ? (rate / totalCost) * 100 : 0;
+      return { 
+        monthlyPayment: 0, 
+        totalInterest: rate, 
+        totalCost, 
+        totalPrincipal: principal, 
+        principalPct, 
+        interestPct, 
+        schedule: [], 
+        scheduleFrequency 
+      };
+    }
+
+    if (totalMonths <= 0) return null;
 
     let schedule = [];
     let payment = 0;
@@ -300,38 +327,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
     if (totalPeriods <= 0) return null;
 
-    if (isFixed) {
-      totalInterest = rate;
-      const totalCost = principal + totalInterest;
-      payment = totalCost / totalPeriods;
-      
+    const perPeriodRate = (rate / 100) / periodsPerYear;
+    if (perPeriodRate <= 0) {
+      payment = principal / totalPeriods;
       let balance = principal;
-      let interestPerPeriod = totalInterest / totalPeriods;
-      let principalPerPeriod = principal / totalPeriods;
-
       for (let i = 1; i <= totalPeriods; i++) {
-        balance -= principalPerPeriod;
-        schedule.push({ month: i, payment: payment, principal: principalPerPeriod, interest: interestPerPeriod, balance: Math.max(0, balance) });
+        balance -= payment;
+        schedule.push({ month: i, payment: payment, principal: payment, interest: 0, balance: Math.max(0, balance) });
       }
     } else {
-      const perPeriodRate = (rate / 100) / periodsPerYear;
-      if (perPeriodRate <= 0) {
-        payment = principal / totalPeriods;
-        let balance = principal;
-        for (let i = 1; i <= totalPeriods; i++) {
-          balance -= payment;
-          schedule.push({ month: i, payment: payment, principal: payment, interest: 0, balance: Math.max(0, balance) });
-        }
-      } else {
-        payment = principal * (perPeriodRate * Math.pow(1 + perPeriodRate, totalPeriods)) / (Math.pow(1 + perPeriodRate, totalPeriods) - 1);
-        let balance = principal;
-        for (let i = 1; i <= totalPeriods; i++) {
-          const interest = balance * perPeriodRate;
-          const principalPayment = payment - interest;
-          balance -= principalPayment;
-          totalInterest += interest;
-          schedule.push({ month: i, payment: payment, principal: principalPayment, interest: interest, balance: Math.max(0, balance) });
-        }
+      payment = principal * (perPeriodRate * Math.pow(1 + perPeriodRate, totalPeriods)) / (Math.pow(1 + perPeriodRate, totalPeriods) - 1);
+      let balance = principal;
+      for (let i = 1; i <= totalPeriods; i++) {
+        const interest = balance * perPeriodRate;
+        const principalPayment = payment - interest;
+        balance -= principalPayment;
+        totalInterest += interest;
+        schedule.push({ month: i, payment: payment, principal: principalPayment, interest: interest, balance: Math.max(0, balance) });
       }
     }
 
@@ -641,20 +653,70 @@ const FinancialList: React.FC<FinancialListProps> = ({
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loans.map(loan => (
-            <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] p-6 shadow-2xl border border-white/5 flex flex-col cursor-pointer hover:border-white/10 transition-colors">
-              <div className="flex justify-between mb-6">
-                <h4 className="font-black text-white text-base">{loan.name}</h4>
-                <span className="text-[9px] font-black text-[#EBC351] uppercase tracking-[0.2em] bg-[#EBC351]/10 px-2.5 py-1 rounded-full">{loan.status}</span>
+          {loans.map(loan => {
+            const amort = calcAmortization(loan);
+            return (
+            <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
+              <div className="p-6 border-b border-white/5 flex-1">
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h4 className="font-black text-white text-base">{loan.name}</h4>
+                        {loan.role && (
+                          <span className="text-[8px] font-black text-white/40 uppercase tracking-[0.2em] border border-white/10 px-2 py-0.5 rounded-full">{loan.role}</span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-1.5 pt-1 uppercase font-black tracking-widest text-[10px]">
+                        <span className="text-white/40">
+                          {loan.role === 'Lender' ? 'Lent To: ' : ''}{loan.lender || 'Unknown'}
+                        </span>
+                        <span className="text-white/20">|</span>
+                        <span className={(loan.paidOffDate || loan.status === 'Paid Off') ? 'text-emerald-500' : 'text-[#EBC351]'}>
+                          {loan.paidOffDate ? 'Paid Off' : loan.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
+                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-1">Loan Amount</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-y-6 gap-x-2 pt-2 px-1 mb-6">
+                  <div>
+                    <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">Loan Date</p>
+                    <p className="text-[13px] font-black text-white">{loan.startDate || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Paid'}</p>
+                    <p className="text-sm font-black text-white">${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">Total Amount</p>
+                    <p className="text-sm font-black text-white">${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                  </div>
+                </div>
+
+                {amort && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest">
+                      <span className="text-[#EBC351]">Principal ${amort.totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                      <span className="text-orange-500">{loan.interestType === 'Fixed' ? 'Fee' : 'Interest'} ${amort.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden flex shadow-inner">
+                      <div className="h-full bg-[#EBC351] transition-all" style={{ width: `${amort.principalPct}%` }}></div>
+                      <div className="h-full bg-orange-500 transition-all" style={{ width: `${amort.interestPct}%` }}></div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="text-[9px] font-black text-white/40 mb-1 uppercase tracking-widest">{loan.lender}</p>
-              <p className="text-2xl font-black text-white mb-8">${loan.remainingBalance.toLocaleString()}</p>
-              <div className="mt-auto flex justify-between pt-6 border-t border-white/5 text-[10px] font-black uppercase tracking-widest text-white/40">
-                <span>{loan.interestRate}% Rate</span>
-                <span>${loan.monthlyPayment}/mo</span>
-              </div>
+
+
             </div>
-          ))}
+          )})}
         </div>
       </section>
 
@@ -1183,44 +1245,77 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </>
               ) : (
                 <>
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
-                    <input
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                      placeholder="e.g. Silicon Valley Bank"
-                      value={editingLoan.lender || ''}
-                      onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Nickname</label>
-                    <input
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                      placeholder="e.g. Series A Venture Debt"
-                      value={editingLoan.name || ''}
-                      onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
-                    />
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
+                      <input
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        placeholder="e.g. Silicon Valley Bank"
+                        value={editingLoan.lender || ''}
+                        onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan ID</label>
+                      <input
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        placeholder="e.g. Series A Venture Debt"
+                        value={editingLoan.name || ''}
+                        onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </>
               )}
 
               <div className="grid grid-cols-2 gap-6 pb-6">
                 <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lent On</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Date</label>
                   <input
                     type="date"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
                     value={editingLoan.startDate || ''}
-                    onChange={e => setEditingLoan({ ...editingLoan, startDate: e.target.value })}
+                    onChange={e => {
+                      const newStart = e.target.value;
+                      const totalMonths = (editingLoan.termYears || 0) * 12 + (editingLoan.termMonths || 0);
+                      let newMaturity = editingLoan.maturityDate;
+                      if (newStart && totalMonths > 0) {
+                        const d = new Date(newStart);
+                        d.setMonth(d.getMonth() + totalMonths);
+                        newMaturity = d.toISOString().split('T')[0];
+                      }
+                      setEditingLoan({ ...editingLoan, startDate: newStart, maturityDate: newMaturity });
+                    }}
                   />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Paid Off</label>
+                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Maturity Date</label>
                   <input
                     type="date"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
-                    value={editingLoan.paidOffDate || ''}
-                    onChange={e => setEditingLoan({ ...editingLoan, paidOffDate: e.target.value })}
+                    value={(() => {
+                      const totalMonths = (editingLoan.termYears || 0) * 12 + (editingLoan.termMonths || 0);
+                      if (editingLoan.startDate && totalMonths > 0) {
+                        const d = new Date(editingLoan.startDate);
+                        d.setMonth(d.getMonth() + totalMonths);
+                        return d.toISOString().split('T')[0];
+                      }
+                      return editingLoan.maturityDate || '';
+                    })()}
+                    onChange={e => {
+                      const matDate = e.target.value;
+                      if (editingLoan.startDate && matDate) {
+                        const start = new Date(editingLoan.startDate);
+                        const end = new Date(matDate);
+                        let months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+                        if (months < 0) months = 0;
+                        const yrs = Math.floor(months / 12);
+                        const mos = months % 12;
+                        setEditingLoan({ ...editingLoan, maturityDate: matDate, termYears: yrs, termMonths: mos });
+                      } else {
+                        setEditingLoan({ ...editingLoan, maturityDate: matDate });
+                      }
+                    }}
                   />
                 </div>
               </div>
@@ -1238,23 +1333,35 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Type</label>
-                  <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[42px] items-center">
-                    <button
-                      onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Percentage' })}
-                      className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
-                    >
-                      Interest
-                    </button>
-                    <button
-                      onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Fixed' })}
-                      className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
-                    >
-                      Fixed
-                    </button>
+                {editingLoan.role !== 'Lender' ? (
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Paid Off</label>
+                    <input
+                      type="date"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
+                      value={editingLoan.paidOffDate || ''}
+                      onChange={e => setEditingLoan({ ...editingLoan, paidOffDate: e.target.value })}
+                    />
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Type</label>
+                    <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[42px] items-center">
+                      <button
+                        onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Percentage' })}
+                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                      >
+                        Interest
+                      </button>
+                      <button
+                        onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Fixed' })}
+                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                      >
+                        Fixed
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-6">
@@ -1264,7 +1371,18 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <select 
                       className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
                       value={editingLoan.termYears || 0}
-                      onChange={e => setEditingLoan({ ...editingLoan, termYears: parseInt(e.target.value) })}
+                      onChange={e => {
+                        const yrs = parseInt(e.target.value);
+                        const mos = editingLoan.termMonths || 0;
+                        const totalMonths = yrs * 12 + mos;
+                        let newMaturity = editingLoan.maturityDate;
+                        if (editingLoan.startDate && totalMonths > 0) {
+                          const d = new Date(editingLoan.startDate);
+                          d.setMonth(d.getMonth() + totalMonths);
+                          newMaturity = d.toISOString().split('T')[0];
+                        }
+                        setEditingLoan({ ...editingLoan, termYears: yrs, maturityDate: newMaturity });
+                      }}
                     >
                       <option value={0} className="bg-[#1C1C1E]">0 Years</option>
                       {[...Array(30)].map((_, i) => (
@@ -1274,7 +1392,18 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <select 
                       className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
                       value={editingLoan.termMonths || 0}
-                      onChange={e => setEditingLoan({ ...editingLoan, termMonths: parseInt(e.target.value) })}
+                      onChange={e => {
+                        const mos = parseInt(e.target.value);
+                        const yrs = editingLoan.termYears || 0;
+                        const totalMonths = yrs * 12 + mos;
+                        let newMaturity = editingLoan.maturityDate;
+                        if (editingLoan.startDate && totalMonths > 0) {
+                          const d = new Date(editingLoan.startDate);
+                          d.setMonth(d.getMonth() + totalMonths);
+                          newMaturity = d.toISOString().split('T')[0];
+                        }
+                        setEditingLoan({ ...editingLoan, termMonths: mos, maturityDate: newMaturity });
+                      }}
                     >
                       <option value={0} className="bg-[#1C1C1E]">0 Months</option>
                       {[...Array(11)].map((_, i) => (
@@ -1314,7 +1443,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
+              <div className={editingLoan.role !== 'Lender' ? '' : 'grid grid-cols-2 gap-6'}>
                 {editingLoan.role === 'Lender' ? (
                   <div className="hidden">
                   </div>
@@ -1334,18 +1463,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         value={editingLoan.term || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
                       />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Status</label>
-                      <select
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                        value={editingLoan.status || 'Active'}
-                        onChange={e => setEditingLoan({ ...editingLoan, status: e.target.value as any })}
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Paid Off">Paid Off</option>
-                        <option value="Default">Default</option>
-                      </select>
                     </div>
                   </>
                 )}
