@@ -213,91 +213,101 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
           </button>
         )}
         {subscriptions.map(sub => (
-          <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl">
-            {/* Main Info */}
-            <div className="p-6 space-y-6">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center space-x-4">
-                  <div
-                    className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 cursor-pointer hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300 group/logo overflow-hidden"
-                    onClick={() => setEditingSubscription(sub)}
-                    title="Edit Service"
-                  >
-                    {sub.website ? (
-                      <img
-                        src={getFaviconUrl(sub.website) || ''}
-                        className="w-8 h-8 object-contain"
-                        alt=""
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <span
-                      className="text-white font-black text-xl opacity-80 group-hover/logo:text-[#1FE400] transition-colors"
-                      style={{ display: sub.website ? 'none' : 'flex' }}
-                    >
-                      {sub.name.charAt(0)}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black tracking-tight text-white uppercase">{sub.name}</h3>
-                    <div className="flex items-center space-x-2 mt-1.5 transition-all duration-300">
-                      {sub.renew === 'Manual' ? (
-                        <>
-                          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                          <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Manual Renew</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
-                          <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
-                        </>
-                      )}
+           <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-300 hover:border-white/10">
+              {/* Main Info */}
+              <div 
+                className="p-6 space-y-6 cursor-pointer group/card hover:bg-white/[0.02] transition-colors"
+                onClick={() => setEditingSubscription(sub)}
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 group-hover/card:border-[#EBC351]/30 transition-all duration-300 overflow-hidden">
+                      {sub.website ? (
+                        <img
+                          src={getFaviconUrl(sub.website) || ''}
+                          className="w-8 h-8 object-contain"
+                          alt=""
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="text-white font-black text-xl opacity-80 group-hover/card:text-[#EBC351] transition-colors"
+                        style={{ display: sub.website ? 'none' : 'flex' }}
+                      >
+                        {sub.name.charAt(0)}
+                      </span>
+                    </div>
+                    <div>
+                      <a 
+                        href={sub.website ? (sub.website.startsWith('http') ? sub.website : `https://${sub.website}`) : '#'} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="flex items-center gap-2 group/name"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-black tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors">{sub.name}</h3>
+                        {sub.website && (
+                          <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        )}
+                      </a>
+                      <div className="flex items-center space-x-2 mt-1.5 transition-all duration-300">
+                        {sub.renew === 'Manual' ? (
+                          <>
+                            <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
+                            <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Manual Renew</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
+                            <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xl font-black text-white">
-                    ${(sub.cost + (sub.subServices?.reduce((sum, ss) => {
-                      if (ss.status === 'Paused') return sum;
-                      if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
-                      if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
-                      if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
-                      return sum + ss.cost;
-                    }, 0) || 0)).toFixed(2)}
-                  </p>
-                  <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-y-6 gap-x-4 pt-2">
-                <div 
-                  className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
-                  onClick={(e) => handleFieldCopy(sub.id, sub.loginId || '', 'login', e)}
-                >
-                  <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'text-orange-500' : 'text-white/40'}`}>
-                    {lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'Copied!' : 'Login ID'}
-                  </p>
-                  <p className="text-xs font-black text-white truncate max-w-[140px]">{sub.loginId || '—'}</p>
-                </div>
-
-                <div 
-                  className="space-y-1 group/pass cursor-pointer active:opacity-60 transition-opacity"
-                  onClick={(e) => handleFieldCopy(sub.id, sub.password || '', 'password', e)}
-                >
-                  <div className="flex items-center gap-2">
-                    <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
-                      {lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                  <div className="text-right">
+                    <p className="text-xl font-black text-white">
+                      ${(sub.cost + (sub.subServices?.reduce((sum, ss) => {
+                        if (ss.status === 'Paused') return sum;
+                        if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
+                        if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
+                        if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
+                        return sum + ss.cost;
+                      }, 0) || 0)).toFixed(2)}
                     </p>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); togglePasswordVisibility(sub.id); }} 
-                      className="text-white/20 hover:text-[#EBC351] transition-colors"
-                    >
+                    <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-y-6 gap-x-4 pt-2">
+                  <div 
+                    className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
+                    onClick={(e) => handleFieldCopy(sub.id, sub.loginId || '', 'login', e)}
+                  >
+                    <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'text-orange-500' : 'text-white/40'}`}>
+                      {lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'Copied!' : 'Login ID'}
+                    </p>
+                    <p className="text-xs font-black text-white truncate max-w-[140px]">{sub.loginId || '—'}</p>
+                  </div>
+
+                  <div 
+                    className="space-y-1 group/pass cursor-pointer active:opacity-60 transition-opacity"
+                    onClick={(e) => handleFieldCopy(sub.id, sub.password || '', 'password', e)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
+                        {lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                      </p>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); togglePasswordVisibility(sub.id); }} 
+                        className="text-white/20 hover:text-[#EBC351] transition-colors"
+                      >
                         {visiblePasswords.has(sub.id) ? (
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
                         ) : (
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         )}
@@ -308,27 +318,15 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex items-center justify-center pt-1.5 row-span-2">
-                  <a 
-                    href={sub.website ? (sub.website.startsWith('http') ? sub.website : `https://${sub.website}`) : '#'} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="text-white/20 hover:text-[#EBC351] transition-all duration-300 transform hover:scale-110"
-                    title={sub.website || 'No website'}
-                  >
-                    <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
-                  </a>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid From</p>
+                    <p className="text-xs font-black text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Due On</p>
+                    <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
+                  </div>
                 </div>
-
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid From</p>
-                  <p className="text-xs font-black text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Due On</p>
-                  <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
-                </div>
-              </div>
             </div>
 
             {/* Supplemental Services Accordion */}
