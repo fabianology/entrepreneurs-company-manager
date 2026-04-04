@@ -22,6 +22,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const [expandedSubs, setExpandedSubs] = useState<Set<string>>(new Set());
   const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
+  const [expandedSecurity, setExpandedSecurity] = useState(false);
   const datePickerRef = useRef<HTMLInputElement>(null);
 
   const handleAddNew = () => {
@@ -35,10 +36,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       nextRenewal: '',
       renew: 'Auto',
       subServices: [],
-      email: '',
-      emailPurpose: '',
+      loginId: '',
+      password: '',
       twoFactorAuth: 'None',
-      website: ''
+      recoveryMethod: '',
+      website: '',
+      pricingModel: 'paid'
     });
   };
 
@@ -432,17 +435,46 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             </div>
 
             <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Service Name</label>
-                  <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                    value={editingSubscription.name || ''}
-                    placeholder="e.g. Shopify"
-                    onChange={e => setEditingSubscription({ ...editingSubscription, name: e.target.value })}
-                  />
+              <div className="flex justify-center pb-2">
+                <div className="flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px]">
+                  <button
+                    onClick={() => setEditingSubscription({ ...editingSubscription, pricingModel: 'free' })}
+                    className={`py-2 px-6 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingSubscription.pricingModel === 'free' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                  >
+                    Free
+                  </button>
+                  <button
+                    onClick={() => setEditingSubscription({ ...editingSubscription, pricingModel: 'paid' })}
+                    className={`py-2 px-6 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingSubscription.pricingModel === 'paid' || !editingSubscription.pricingModel ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                  >
+                    Paid
+                  </button>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Subscription</label>
+                    <input
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                      value={editingSubscription.name || ''}
+                      placeholder="Shopify"
+                      onChange={e => setEditingSubscription({ ...editingSubscription, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Website</label>
+                    <input
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                      value={editingSubscription.website || ''}
+                      placeholder="shopify.com"
+                      onChange={e => setEditingSubscription({ ...editingSubscription, website: e.target.value })}
+                    />
+                  </div>
+                </div>
+                {editingSubscription.pricingModel !== 'free' && (
+                  <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
                     <div className="relative">
@@ -484,23 +516,37 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       <option value="Yearly">Yearly</option>
                     </select>
                   </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Login ID</label>
+                    <input
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                      value={editingSubscription.loginId || ''}
+                      placeholder="admin"
+                      onChange={e => setEditingSubscription({ ...editingSubscription, loginId: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Password</label>
+                    <input
+                      type="password"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                      value={editingSubscription.password || ''}
+                      placeholder="••••••••"
+                      onChange={e => setEditingSubscription({ ...editingSubscription, password: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Website URL</label>
-                  <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                    value={editingSubscription.website || ''}
-                    placeholder="shopify.com"
-                    onChange={e => setEditingSubscription({ ...editingSubscription, website: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4 items-end">
+                {editingSubscription.pricingModel !== 'free' && (
+                  <div className="grid grid-cols-2 gap-4 items-end">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid From</label>
                     <input
                       className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                       value={editingSubscription.paymentMethod || ''}
-                      placeholder="e.g. Amex Gold"
+                      placeholder="Amex Gold"
                       onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
                     />
                   </div>
@@ -528,6 +574,55 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       </div>
                     </div>
                   </div>
+                  </div>
+                )}
+
+                {/* Security & Recovery Accordion */}
+                <div className="pt-4 border-t border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedSecurity(prev => !prev)}
+                    className="w-full flex justify-between items-center mb-1 group"
+                  >
+                    <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1 group-hover:text-white/60 transition-colors">
+                      Security &amp; Recovery
+                    </h4>
+                    <svg
+                      className={`w-3.5 h-3.5 text-white/30 transition-transform duration-300 ${expandedSecurity ? 'rotate-180' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {expandedSecurity && (
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">2FA</label>
+                        <select
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                          value={editingSubscription.twoFactorAuth || 'None'}
+                          onChange={e => setEditingSubscription({ ...editingSubscription, twoFactorAuth: e.target.value })}
+                        >
+                          <option value="None">None</option>
+                          <option value="Authenticator">Authenticator App</option>
+                          <option value="SMS">SMS</option>
+                          <option value="Email">Email</option>
+                          <option value="Hardware Key">Hardware Key</option>
+                          <option value="Backup Codes">Backup Codes</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Recovery</label>
+                        <input
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                          value={editingSubscription.recoveryMethod || ''}
+                          placeholder="Phone, email, backup code..."
+                          onChange={e => setEditingSubscription({ ...editingSubscription, recoveryMethod: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Sub-services Management Section */}
@@ -549,7 +644,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           <div className="md:col-span-2">
                             <input
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="Service Name (e.g. Storage)"
+                              placeholder="Service Name (Storage)"
                               value={child.name}
                               onChange={e => {
                                 const newSubs = [...(editingSubscription.subServices || [])];
@@ -584,11 +679,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         </button>
                       </div>
                     ))}
-                    {(!editingSubscription.subServices || editingSubscription.subServices.length === 0) && (
-                      <div className="text-center py-6 bg-white/2 border border-dashed border-white/10 rounded-2xl text-white/30 text-[10px] font-black uppercase tracking-widest">
-                        No supplemental services added
-                      </div>
-                    )}
+
                   </div>
                 </div>
 
@@ -639,7 +730,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Used For</label>
                             <input
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="e.g. Personal use"
+                              placeholder="Personal use"
                               value={email.usedFor}
                               onChange={e => {
                                 const newEmails = [...(editingSubscription.linkedEmails || [])];
@@ -665,7 +756,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Used In</label>
                             <input
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="e.g. Shopify"
+                              placeholder="Shopify"
                               value={email.usedIn}
                               onChange={e => {
                                 const newEmails = [...(editingSubscription.linkedEmails || [])];
@@ -678,7 +769,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Access Method</label>
                             <input
                               className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="e.g. Gmail, Apple Mail"
+                              placeholder="Gmail, Apple Mail"
                               value={email.accessMethod}
                               onChange={e => {
                                 const newEmails = [...(editingSubscription.linkedEmails || [])];

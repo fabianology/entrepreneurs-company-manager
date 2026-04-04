@@ -931,7 +931,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Bank / Institution Name</label>
-                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.name || ''} placeholder="e.g. Mercury" onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })} />
+                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.name || ''} placeholder="Mercury" onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login Email/User</label>
@@ -964,7 +964,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                               <div className="md:col-span-1">
                                 <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Nickname</label>
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. Chase Sapphire" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Chase Sapphire" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
                               </div>
                               <div className="md:col-span-1">
                                 <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Type</label>
@@ -1027,11 +1027,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 </div>
                                 <div className="md:col-span-2">
                                   <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid From</label>
-                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. Chase Checking" value={acc.paidFrom || ''} onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })} />
+                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Chase Checking" value={acc.paidFrom || ''} onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })} />
                                 </div>
                                 <div className="md:col-span-2">
                                   <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid On</label>
-                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="e.g. 15th of Month" value={acc.paidOn || ''} onChange={e => handleUpdateInstAccount(idx, { paidOn: e.target.value })} />
+                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="15th of Month" value={acc.paidOn || ''} onChange={e => handleUpdateInstAccount(idx, { paidOn: e.target.value })} />
                                 </div>
                                 {acc.type === 'Credit Card' ? (
                                   <>
@@ -1301,7 +1301,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Nickname</label>
                 <input
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                  placeholder="e.g. Amex Gold - Advertising"
+                  placeholder="Amex Gold - Advertising"
                   value={editingCard.name || ''}
                   onChange={e => setEditingCard({ ...editingCard, name: e.target.value })}
                 />
@@ -1312,7 +1312,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Institution Name</label>
                   <input
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                    placeholder="e.g. Chase, Amex"
+                    placeholder="Chase, Amex"
                     value={editingCard.institutionName || ''}
                     onChange={e => setEditingCard({ ...editingCard, institutionName: e.target.value })}
                   />
@@ -1498,7 +1498,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lent To</label>
                       <input
                         className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                        placeholder="e.g. Acme Corp"
+                        placeholder="Acme Corp"
                         value={editingLoan.lender || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                       />
@@ -1507,7 +1507,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Name</label>
                       <input
                         className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                        placeholder="e.g. Bridge Loan"
+                        placeholder="Bridge Loan"
                         value={editingLoan.name || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
                       />
@@ -1523,7 +1523,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         lineHeight: '20px'
                       }}
                       className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
-                      placeholder="e.g. 36 Months summary..."
+                      placeholder="36 Months summary..."
                       value={editingLoan.term || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
                     />
@@ -1536,7 +1536,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
                       <input
                         className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                        placeholder="e.g. Silicon Valley Bank"
+                        placeholder="Silicon Valley Bank"
                         value={editingLoan.lender || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                       />
@@ -1545,7 +1545,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan ID</label>
                       <input
                         className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
-                        placeholder="e.g. Series A Venture Debt"
+                        placeholder="Series A Venture Debt"
                         value={editingLoan.name || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
                       />
@@ -1561,7 +1561,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         lineHeight: '20px'
                       }}
                       className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
-                      placeholder="e.g. 36 Months summary..."
+                      placeholder="36 Months summary..."
                       value={editingLoan.term || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
                     />
@@ -1725,7 +1725,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         step={editingLoan.interestType === 'Fixed' ? "1" : "0.1"}
                         className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-8' : ''} px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors`}
                         value={editingLoan.interestRate || ''}
-                        placeholder={editingLoan.interestType === 'Fixed' ? "e.g. 500" : "e.g. 5.5"}
+                        placeholder={editingLoan.interestType === 'Fixed' ? "500" : "5.5"}
                         onChange={e => setEditingLoan({ ...editingLoan, interestRate: e.target.value ? parseFloat(e.target.value) : 0 })}
                       />
                     </div>

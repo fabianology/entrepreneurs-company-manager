@@ -96,7 +96,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Document Name</label>
                   <input 
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="e.g. Operating Agreement"
+                    placeholder="Operating Agreement"
                     value={editingDoc.name || ''}
                     onChange={e => setEditingDoc({...editingDoc, name: e.target.value})}
                   />

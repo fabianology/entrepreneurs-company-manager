@@ -365,7 +365,7 @@ const AccountList: React.FC<AccountListProps> = ({
                   <input
                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
                     value={editingAccount.platform || ''}
-                    placeholder="e.g. AWS"
+                    placeholder="AWS"
                     onChange={e => setEditingAccount({ ...editingAccount, platform: e.target.value })}
                   />
                 </div>

@@ -62,8 +62,12 @@ export interface Subscription {
   subServices?: SubService[];
   linkedEmails?: LinkedEmail[];
   website?: string;
-  twoFactorAuth?: string; // e.g. 'Authenticator', 'SMS', 'None'
+  loginId?: string;
+  password?: string;
+  twoFactorAuth?: string; // Authenticator, SMS, None
+  recoveryMethod?: string;
   lastUpdated?: number; // timestamp
+  pricingModel?: 'free' | 'paid';
 }
 
 export interface FinancialCard {

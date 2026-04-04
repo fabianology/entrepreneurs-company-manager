@@ -152,7 +152,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                 <input
                   autoFocus
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#1FE400]/50 transition font-bold"
-                  placeholder="e.g. Acme Holdings Inc."
+                  placeholder="Acme Holdings Inc."
                   value={formState.name}
                   onChange={(e) => setFormState({ ...formState, name: e.target.value })}
                 />
@@ -228,7 +228,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                       <label className="text-[9px] font-black text-white/20 uppercase tracking-widest ml-1">Logo from URL</label>
                       <input
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#1FE400]/40 transition font-bold placeholder:text-white/10"
-                        placeholder="e.g. service.com"
+                        placeholder="service.com"
                         value={formState.website || ''}
                         onChange={(e) => setFormState({ ...formState, website: e.target.value })}
                       />
