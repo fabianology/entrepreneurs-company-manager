@@ -253,12 +253,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   <p className="text-xs font-black text-white">{sub.paymentMethod || '—'}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid On</p>
+                  <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Due On</p>
                   <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Cycle</p>
-                  <p className="text-xs font-black text-white">{sub.billingCycle === 'Yearly' ? 'Annually' : sub.billingCycle || '—'}</p>
+                  <p className="text-xs font-black text-white">{sub.billingCycle || '—'}</p>
                 </div>
               </div>
             </div>
@@ -445,30 +445,33 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
-                    <input
-                      type="number"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                      value={editingSubscription.cost || ''}
-                      onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) || 0 })}
-                    />
+                    <div className="relative">
+                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-white/30 font-bold">$</span>
+                      <input
+                        type="text"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                        value={editingSubscription.cost || ''}
+                        placeholder="0.00"
+                        onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid On</label>
-                    {editingSubscription.billingCycle === 'Yearly' ? (
-                      <input
-                        type="date"
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                        value={editingSubscription.nextRenewal || ''}
-                        onChange={e => setEditingSubscription({ ...editingSubscription, nextRenewal: e.target.value })}
-                      />
-                    ) : (
-                      <input
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                        value={editingSubscription.nextRenewal || ''}
-                        placeholder="15th"
-                        onChange={e => setEditingSubscription({ ...editingSubscription, nextRenewal: e.target.value })}
-                      />
-                    )}
+                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Due On</label>
+                    <input
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                      value={editingSubscription.nextRenewal || ''}
+                      placeholder={editingSubscription.billingCycle === 'Yearly' ? 'MM/DD/YY' : '15th'}
+                      onChange={e => {
+                        let val = e.target.value;
+                        if (editingSubscription.billingCycle === 'Yearly') {
+                          val = val.replace(/\D/g, '').slice(0, 6);
+                          if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2);
+                          if (val.length > 5) val = val.slice(0, 5) + '/' + val.slice(5);
+                        }
+                        setEditingSubscription({ ...editingSubscription, nextRenewal: val });
+                      }}
+                    />
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cycle</label>
@@ -478,7 +481,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
                     >
                       <option value="Monthly">Monthly</option>
-                      <option value="Yearly">Annually</option>
+                      <option value="Yearly">Yearly</option>
                     </select>
                   </div>
                 </div>
@@ -555,11 +558,11 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               }}
                             />
                           </div>
-                          <div className="relative">
-                            <span className="absolute left-3 top-2 text-white/30 text-xs">$</span>
+                          <div className="relative w-full">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-xs font-bold">$</span>
                             <input
-                              type="number"
-                              className="w-full bg-white/5 border border-white/10 rounded-xl pl-6 pr-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              type="text"
+                              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
                               placeholder="0.00"
                               value={child.cost || ''}
                               onChange={e => {
