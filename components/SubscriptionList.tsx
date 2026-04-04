@@ -266,21 +266,25 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
                           </>
                         )}
-                        <span className="text-white/20 text-[9px] font-black uppercase tracking-widest ml-1">| {sub.pricingModel || 'Paid'}</span>
+                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest ml-1">| {sub.pricingModel || 'Paid'}</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xl font-black text-white">
-                      ${(sub.cost + (sub.subServices?.reduce((sum, ss) => {
-                        if (ss.status === 'Paused') return sum;
-                        if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
-                        if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
-                        if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
-                        return sum + ss.cost;
-                      }, 0) || 0)).toFixed(2)}
-                    </p>
-                    <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
+                    {sub.pricingModel !== 'free' && (
+                      <>
+                        <p className="text-xl font-black text-white">
+                          ${(sub.cost + (sub.subServices?.reduce((sum, ss) => {
+                            if (ss.status === 'Paused') return sum;
+                            if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
+                            if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
+                            if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
+                            return sum + ss.cost;
+                          }, 0) || 0)).toFixed(2)}
+                        </p>
+                        <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
+                      </>
+                    )}
                   </div>
                 </div>
 
