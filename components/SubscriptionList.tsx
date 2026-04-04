@@ -303,7 +303,26 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     <div key={idx} className="flex justify-between items-center group/item">
                       <div className="flex items-center space-x-3">
                         <div className={`h-1.5 w-1.5 rounded-full ${child.status === 'Paused' ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-all duration-300`}></div>
-                        <span className={`text-xs font-bold ${child.status === 'Paused' ? 'text-white/40' : 'text-white/90'}`}>{child.name}</span>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSubscription(sub);
+                            setTimeout(() => {
+                              const element = document.getElementById(`sub-service-${child.id}`);
+                              if (element) {
+                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                // Add a temporary highlight effect
+                                element.style.boxShadow = '0 0 0 2px #EBC351';
+                                setTimeout(() => {
+                                  element.style.boxShadow = 'none';
+                                }, 2000);
+                              }
+                            }, 100);
+                          }}
+                          className="text-xs font-bold cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
+                        >
+                          {child.name}
+                        </span>
                         <span className={`text-[9px] font-black uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
                           {child.status}
                         </span>
@@ -469,7 +488,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   </button>
                 </div>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -493,47 +512,47 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
                 {editingSubscription.pricingModel !== 'free' && (
                   <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
-                    <div className="relative">
-                      <span className="absolute left-5 top-1/2 -translate-y-1/2 text-white/30 font-bold">$</span>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
+                      <div className="relative">
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-white/30 font-bold">$</span>
+                        <input
+                          type="text"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                          value={editingSubscription.cost || ''}
+                          placeholder="0.00"
+                          onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) || 0 })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Due On</label>
                       <input
-                        type="text"
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-10 pr-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                        value={editingSubscription.cost || ''}
-                        placeholder="0.00"
-                        onChange={e => setEditingSubscription({ ...editingSubscription, cost: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                        value={editingSubscription.nextRenewal || ''}
+                        placeholder={editingSubscription.billingCycle === 'Yearly' ? 'MM/DD/YY' : '15th'}
+                        onChange={e => {
+                          let val = e.target.value;
+                          if (editingSubscription.billingCycle === 'Yearly') {
+                            val = val.replace(/\D/g, '').slice(0, 6);
+                            if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2);
+                            if (val.length > 5) val = val.slice(0, 5) + '/' + val.slice(5);
+                          }
+                          setEditingSubscription({ ...editingSubscription, nextRenewal: val });
+                        }}
                       />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Due On</label>
-                    <input
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                      value={editingSubscription.nextRenewal || ''}
-                      placeholder={editingSubscription.billingCycle === 'Yearly' ? 'MM/DD/YY' : '15th'}
-                      onChange={e => {
-                        let val = e.target.value;
-                        if (editingSubscription.billingCycle === 'Yearly') {
-                          val = val.replace(/\D/g, '').slice(0, 6);
-                          if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2);
-                          if (val.length > 5) val = val.slice(0, 5) + '/' + val.slice(5);
-                        }
-                        setEditingSubscription({ ...editingSubscription, nextRenewal: val });
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cycle</label>
-                    <select
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                      value={editingSubscription.billingCycle || 'Monthly'}
-                      onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
-                    >
-                      <option value="Monthly">Monthly</option>
-                      <option value="Yearly">Yearly</option>
-                    </select>
-                  </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Cycle</label>
+                      <select
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                        value={editingSubscription.billingCycle || 'Monthly'}
+                        onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
+                      >
+                        <option value="Monthly">Monthly</option>
+                        <option value="Yearly">Yearly</option>
+                      </select>
+                    </div>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
@@ -559,39 +578,37 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
                 {editingSubscription.pricingModel !== 'free' && (
                   <div className="grid grid-cols-2 gap-4 items-end">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid From</label>
-                    <input
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                      value={editingSubscription.paymentMethod || ''}
-                      placeholder="Amex Gold"
-                      onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Auto Renew</label>
-                    <div className="flex items-center h-[52px] px-2">
-                      <div
-                        className="relative flex items-center w-full bg-white/5 border border-white/10 rounded-2xl p-1 cursor-pointer select-none"
-                        onClick={() => setEditingSubscription({ ...editingSubscription, renew: editingSubscription.renew === 'Manual' ? 'Auto' : 'Manual' })}
-                      >
-                        {/* Sliding pill */}
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid From</label>
+                      <input
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                        value={editingSubscription.paymentMethod || ''}
+                        placeholder="Amex Gold"
+                        onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Auto Renew</label>
+                      <div className="flex items-center h-[52px] px-2">
                         <div
-                          className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                          style={{
-                            left: editingSubscription.renew === 'Manual' ? 'calc(50% + 2px)' : '4px',
-                            background: editingSubscription.renew === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
-                          }}
-                        />
-                        <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${
-                          editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'
-                        }`}>Auto</span>
-                        <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${
-                          editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'
-                        }`}>Manual</span>
+                          className="relative flex items-center w-full bg-white/5 border border-white/10 rounded-2xl p-1 cursor-pointer select-none"
+                          onClick={() => setEditingSubscription({ ...editingSubscription, renew: editingSubscription.renew === 'Manual' ? 'Auto' : 'Manual' })}
+                        >
+                          {/* Sliding pill */}
+                          <div
+                            className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                            style={{
+                              left: editingSubscription.renew === 'Manual' ? 'calc(50% + 2px)' : '4px',
+                              background: editingSubscription.renew === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
+                            }}
+                          />
+                          <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'
+                            }`}>Auto</span>
+                          <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'
+                            }`}>Manual</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
                   </div>
                 )}
 
@@ -657,7 +674,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                   <div className="space-y-4">
                     {(editingSubscription.subServices || []).map((child, idx) => (
-                      <div key={child.id} className="bg-white/2 p-5 rounded-2xl flex flex-col gap-4 group/sub relative transition-all duration-300 border-l-4 border-[#EBC351]">
+                      <div key={child.id} id={`sub-service-${child.id}`} className="bg-white/2 p-5 rounded-2xl flex flex-col gap-4 group/sub relative transition-all duration-300 border border-[#EBC351]/20">
                         <div className="flex-1 space-y-4">
                           <div className="flex gap-4 items-start">
                             <div className="flex-1 space-y-2">
@@ -717,16 +734,26 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                 <option value="Yearly">Yearly</option>
                               </select>
                             </div>
-                            <div className="col-span-3 md:col-span-3 lg:col-span-3 space-y-2 order-last md:order-none">
+                            <div className="col-span-3 md:col-span-3 lg:col-span-3 space-y-2 order-last md:order-none min-h-[64px]">
                               <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">What it's used for</label>
-                              <input
-                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                              <textarea
+                                rows={2}
+                                style={{
+                                  backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
+                                  backgroundAttachment: 'local',
+                                  lineHeight: '20px'
+                                }}
+                                className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-xs font-bold transition-colors resize-none overflow-hidden custom-scrollbar"
                                 placeholder="Backup storage, processing..."
                                 value={child.purpose || ''}
                                 onChange={e => {
-                                  const newSubs = [...(editingSubscription.subServices || [])];
-                                  newSubs[idx] = { ...newSubs[idx], purpose: e.target.value };
-                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  const val = e.target.value;
+                                  const lines = val.split('\n');
+                                  if (lines.length <= 2) {
+                                    const newSubs = [...(editingSubscription.subServices || [])];
+                                    newSubs[idx] = { ...newSubs[idx], purpose: val };
+                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  }
                                 }}
                               />
                             </div>
