@@ -60,7 +60,7 @@ export interface Subscription {
   paymentMethod?: string;
   nextRenewal: string;
   renew?: 'Auto' | 'Manual';
-  status: 'Active' | 'Cancelled' | 'Pending';
+  status: 'Active' | 'Cancelled' | 'Pending' | 'Paused';
   subServices?: SubService[];
   linkedEmails?: LinkedEmail[];
   website?: string;

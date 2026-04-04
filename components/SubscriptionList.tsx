@@ -221,7 +221,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-4">
-                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 group-hover/card:border-[#EBC351]/30 transition-all duration-300 overflow-hidden">
+                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden">
                       {sub.website ? (
                         <img
                           src={getFaviconUrl(sub.website) || ''}
@@ -255,18 +255,29 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         )}
                       </a>
                       <div className="flex items-center space-x-2 mt-1.5 transition-all duration-300">
-                        {sub.renew === 'Manual' ? (
+                        {sub.status === 'Paused' && (
+                          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
+                        )}
+                        {sub.pricingModel !== 'free' && sub.status !== 'Paused' ? (
                           <>
-                            <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                            <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Manual Renew</span>
+                            {sub.renew === 'Manual' ? (
+                              <>
+                                <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
+                                <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Manual Renew</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
+                                <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
+                              </>
+                            )}
+                            <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest ml-1">| Paid | {sub.status}</span>
                           </>
                         ) : (
-                          <>
-                            <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
-                            <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
-                          </>
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${sub.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                            {sub.pricingModel === 'free' ? 'Free' : 'Paid'} | {sub.status}
+                          </span>
                         )}
-                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest ml-1">| {sub.pricingModel || 'Paid'}</span>
                       </div>
                     </div>
                   </div>
@@ -632,6 +643,32 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       placeholder="••••••••"
                       onChange={e => setEditingSubscription({ ...editingSubscription, password: e.target.value })}
                     />
+                  </div>
+                </div>
+
+                <div className="flex justify-center pt-2">
+                  <div className="bg-[#242426] p-1 rounded-2xl flex w-64 border border-white/5 relative">
+                    <div 
+                      className="absolute inset-y-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                      style={{ 
+                        left: editingSubscription.status === 'Paused' ? 'calc(50% + 2px)' : '4px',
+                        backgroundColor: editingSubscription.status === 'Paused' ? '#ef4444' : '#EBC351'
+                      }}
+                    />
+                    <button
+                      className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest transition-colors duration-300 relative z-10 ${editingSubscription.status !== 'Paused' ? 'text-black' : 'text-white/40'}`}
+                      type="button"
+                      onClick={() => setEditingSubscription({...editingSubscription, status: 'Active'})}
+                    >
+                      Active
+                    </button>
+                    <button
+                      className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest transition-colors duration-300 relative z-10 ${editingSubscription.status === 'Paused' ? 'text-white' : 'text-white/40'}`}
+                      type="button"
+                      onClick={() => setEditingSubscription({...editingSubscription, status: 'Paused'})}
+                    >
+                      Paused
+                    </button>
                   </div>
                 </div>
                 {editingSubscription.pricingModel !== 'free' && (
