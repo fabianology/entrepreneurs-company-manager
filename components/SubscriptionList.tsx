@@ -89,6 +89,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       id: Math.random().toString(36).substr(2, 9),
       name: '',
       cost: 0,
+      billingCycle: 'Monthly',
+      purpose: '',
       status: 'Active'
     };
     setEditingSubscription({
@@ -116,6 +118,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       id: Math.random().toString(36).substr(2, 9),
       name: '',
       cost: 0,
+      billingCycle: 'Monthly',
+      purpose: '',
       status: 'Active'
     };
     const updatedSub = {
@@ -143,7 +147,11 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   };
   const monthlyBurn = subscriptions.reduce((acc, s) => {
     const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
-    const subServicesMonthly = s.subServices?.reduce((sum, ss) => sum + ss.cost, 0) || 0;
+    const subServicesMonthly = s.subServices?.reduce((sum, ss) => {
+      if (ss.status === 'Paused') return sum;
+      const ssMonthly = (ss.billingCycle === 'Yearly') ? (ss.cost / 12) : ss.cost;
+      return sum + ssMonthly;
+    }, 0) || 0;
     return acc + baseMonthly + subServicesMonthly;
   }, 0);
 
@@ -228,7 +236,13 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
                 <div className="text-right">
                   <p className="text-xl font-black text-white">
-                    ${(sub.cost + (sub.subServices?.reduce((acc, s) => acc + s.cost, 0) || 0)).toFixed(2)}
+                    ${(sub.cost + (sub.subServices?.reduce((sum, ss) => {
+                      if (ss.status === 'Paused') return sum;
+                      if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
+                      if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
+                      if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
+                      return sum + ss.cost;
+                    }, 0) || 0)).toFixed(2)}
                   </p>
                   <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
                 </div>
@@ -288,11 +302,15 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   {sub.subServices.map((child, idx) => (
                     <div key={idx} className="flex justify-between items-center group/item">
                       <div className="flex items-center space-x-3">
-                        <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] opacity-50"></div>
-                        <span className="text-xs font-bold text-white/90">{child.name}</span>
-                        <span className="text-[9px] font-black text-[#1FE400] uppercase tracking-tighter opacity-80">Active</span>
+                        <div className={`h-1.5 w-1.5 rounded-full ${child.status === 'Paused' ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-all duration-300`}></div>
+                        <span className={`text-xs font-bold ${child.status === 'Paused' ? 'text-white/40' : 'text-white/90'}`}>{child.name}</span>
+                        <span className={`text-[9px] font-black uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                          {child.status}
+                        </span>
                       </div>
-                      <span className="text-xs font-black text-white">${child.cost.toFixed(2)}</span>
+                      <span className={`text-xs font-black ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
+                        ${child.cost.toFixed(2)}
+                      </span>
                     </div>
                   ))}
                   <button
@@ -639,44 +657,108 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                   <div className="space-y-4">
                     {(editingSubscription.subServices || []).map((child, idx) => (
-                      <div key={child.id} className="bg-white/2 p-4 rounded-2xl flex flex-col md:flex-row gap-4 items-end md:items-center border border-white/5 group/sub relative">
-                        <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3 w-full">
-                          <div className="md:col-span-2">
-                            <input
-                              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="Service Name (Storage)"
-                              value={child.name}
-                              onChange={e => {
-                                const newSubs = [...(editingSubscription.subServices || [])];
-                                newSubs[idx] = { ...newSubs[idx], name: e.target.value };
+                      <div key={child.id} className="bg-white/2 p-5 rounded-2xl flex flex-col gap-4 group/sub relative transition-all duration-300 border-l-4 border-[#EBC351]">
+                        <div className="flex-1 space-y-4">
+                          <div className="flex gap-4 items-start">
+                            <div className="flex-1 space-y-2">
+                              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Service Name</label>
+                              <input
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                                placeholder="Service Name (Storage)"
+                                value={child.name}
+                                onChange={e => {
+                                  const newSubs = [...(editingSubscription.subServices || [])];
+                                  newSubs[idx] = { ...newSubs[idx], name: e.target.value };
+                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                }}
+                              />
+                            </div>
+                            <button
+                              onClick={() => {
+                                const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
                                 setEditingSubscription({ ...editingSubscription, subServices: newSubs });
                               }}
-                            />
+                              className="text-white/10 hover:text-orange-500 transition-colors p-1 mt-7"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                           </div>
-                          <div className="relative w-full">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-xs font-bold">$</span>
-                            <input
-                              type="text"
-                              className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-2 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
-                              placeholder="0.00"
-                              value={child.cost || ''}
-                              onChange={e => {
-                                const newSubs = [...(editingSubscription.subServices || [])];
-                                newSubs[idx] = { ...newSubs[idx], cost: parseFloat(e.target.value) || 0 };
-                                setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                              }}
-                            />
+
+                          <div className="grid grid-cols-3 md:grid-cols-6 gap-4 items-end">
+                            <div className="space-y-2">
+                              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Cost</label>
+                              <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30 text-xs font-bold">$</span>
+                                <input
+                                  type="text"
+                                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                                  placeholder="0.00"
+                                  value={child.cost || ''}
+                                  onChange={e => {
+                                    const newSubs = [...(editingSubscription.subServices || [])];
+                                    newSubs[idx] = { ...newSubs[idx], cost: parseFloat(e.target.value) || 0 };
+                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Billing Cycle</label>
+                              <select
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                                value={child.billingCycle || 'Monthly'}
+                                onChange={e => {
+                                  const newSubs = [...(editingSubscription.subServices || [])];
+                                  newSubs[idx] = { ...newSubs[idx], billingCycle: e.target.value as any };
+                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                }}
+                              >
+                                <option value="Monthly">Monthly</option>
+                                <option value="Yearly">Yearly</option>
+                              </select>
+                            </div>
+                            <div className="col-span-3 md:col-span-3 lg:col-span-3 space-y-2 order-last md:order-none">
+                              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">What it's used for</label>
+                              <input
+                                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#EBC351]/50 transition font-bold"
+                                placeholder="Backup storage, processing..."
+                                value={child.purpose || ''}
+                                onChange={e => {
+                                  const newSubs = [...(editingSubscription.subServices || [])];
+                                  newSubs[idx] = { ...newSubs[idx], purpose: e.target.value };
+                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Status</label>
+                              <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[38px] items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newSubs = [...(editingSubscription.subServices || [])];
+                                    newSubs[idx] = { ...newSubs[idx], status: 'Active' };
+                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  }}
+                                  className={`flex-1 h-full rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${child.status === 'Active' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
+                                >
+                                  Active
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newSubs = [...(editingSubscription.subServices || [])];
+                                    newSubs[idx] = { ...newSubs[idx], status: 'Paused' };
+                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  }}
+                                  className={`flex-1 h-full rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${child.status === 'Paused' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
+                                >
+                                  Paused
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
-                            setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                          }}
-                          className="text-white/20 hover:text-orange-500 transition-colors p-1"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
                       </div>
                     ))}
 

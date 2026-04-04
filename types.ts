@@ -35,7 +35,9 @@ export interface SubService {
   id: string;
   name: string;
   cost: number;
-  status: 'Active' | 'Cancelled' | 'Pending';
+  billingCycle: 'Monthly' | 'Yearly';
+  purpose?: string;
+  status: 'Active' | 'Cancelled' | 'Pending' | 'Paused';
 }
 
 export interface LinkedEmail {
