@@ -266,6 +266,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
                           </>
                         )}
+                        <span className="text-white/20 text-[9px] font-black uppercase tracking-widest ml-1">| {sub.pricingModel || 'Paid'}</span>
                       </div>
                     </div>
                   </div>
@@ -318,14 +319,18 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </p>
                   </div>
 
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Paid From</p>
-                    <p className="text-xs font-black text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Due On</p>
-                    <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
-                  </div>
+                  {sub.pricingModel !== 'free' && (
+                    <>
+                      <div className="space-y-1">
+                        <p className={`text-[9px] font-black text-white/40 uppercase tracking-widest`}>Paid From</p>
+                        <p className="text-xs font-black text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className={`text-[9px] font-black text-white/40 uppercase tracking-widest`}>Due On</p>
+                        <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
             </div>
 
@@ -626,7 +631,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   </div>
                 </div>
                 {editingSubscription.pricingModel !== 'free' && (
-                  <div className="grid grid-cols-2 gap-4 items-end">
+                  <div className="grid grid-cols-2 gap-4 items-end pb-2">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Paid From</label>
                       <input
@@ -643,7 +648,6 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           className="relative flex items-center w-full bg-white/5 border border-white/10 rounded-2xl p-1 cursor-pointer select-none"
                           onClick={() => setEditingSubscription({ ...editingSubscription, renew: editingSubscription.renew === 'Manual' ? 'Auto' : 'Manual' })}
                         >
-                          {/* Sliding pill */}
                           <div
                             className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
                             style={{
@@ -651,15 +655,37 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               background: editingSubscription.renew === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
                             }}
                           />
-                          <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'
-                            }`}>Auto</span>
-                          <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'
-                            }`}>Manual</span>
+                          <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'}`}>Auto</span>
+                          <span className={`relative z-10 flex-1 text-center text-[11px] font-black uppercase tracking-widest transition-colors duration-200 py-2 ${editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'}`}>Manual</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
+
+                <div className="space-y-2 pt-2">
+                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Notes</label>
+                  <div className="border border-white/10 rounded-2xl px-5 py-2">
+                    <textarea
+                      rows={3}
+                      style={{
+                        backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px, transparent 71px, rgba(255,255,255,0.1) 71px, rgba(255,255,255,0.1) 72px, transparent 72px)',
+                        backgroundAttachment: 'local',
+                        lineHeight: '20px'
+                      }}
+                      className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
+                      placeholder="Add any specific notes about this service..."
+                      value={editingSubscription.notes || ''}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const lines = val.split('\n');
+                        if (lines.length <= 3) {
+                          setEditingSubscription({ ...editingSubscription, notes: val });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
 
                 {/* Security & Recovery Accordion */}
                 <div className="pt-4 border-t border-white/5">

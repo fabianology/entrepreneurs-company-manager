@@ -70,6 +70,7 @@ export interface Subscription {
   recoveryMethod?: string;
   lastUpdated?: number; // timestamp
   pricingModel?: 'free' | 'paid';
+  notes?: string;
 }
 
 export interface FinancialCard {
