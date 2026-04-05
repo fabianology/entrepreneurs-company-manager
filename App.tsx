@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import AccountList from './components/AccountList';
+
 import SubscriptionList from './components/SubscriptionList';
 import FinancialList from './components/FinancialList';
 import DocumentList from './components/DocumentList';
@@ -28,10 +28,10 @@ const App: React.FC = () => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(() => localStorage.getItem('fs_selected_company'));
 
   // Initialize tab state, migrating old 'stack' value to 'accounts'
-  const [activeTab, setActiveTab] = useState<'accounts' | 'subscriptions' | 'financial' | 'docs'>(() => {
+  const [activeTab, setActiveTab] = useState<'subscriptions' | 'financial' | 'docs'>(() => {
     const stored = localStorage.getItem('fs_tab');
-    if (stored === 'stack') return 'accounts';
-    return (stored as any) || 'accounts';
+    if (stored === 'stack' || stored === 'accounts') return 'subscriptions';
+    return (stored as any) || 'subscriptions';
   });
 
   const [isEditingCompanyName, setIsEditingCompanyName] = useState(false);
@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const quickMenuRef = useRef<HTMLDivElement>(null);
 
   // Keyboard shortcut for search
   useEffect(() => {
@@ -94,6 +95,11 @@ const App: React.FC = () => {
         searchResultsRef.current && !searchResultsRef.current.contains(target)
       ) {
         setShowSearchDropdown(false);
+      }
+      if (
+        quickMenuRef.current && !quickMenuRef.current.contains(target)
+      ) {
+        setShowQuickMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -159,15 +165,7 @@ const App: React.FC = () => {
   const selectedCompany = state?.companies.find(c => c.id === selectedCompanyId);
 
   const companyAccounts = useMemo(() => {
-    const base = state?.accounts.filter(a => a.companyId === selectedCompanyId) || [];
-    if (!searchQuery) return base;
-    const q = searchQuery.toLowerCase();
-    return base.filter(a =>
-      a.platform.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q) ||
-      a.twoFactorAuth.toLowerCase().includes(q) ||
-      a.notes.some(note => note.toLowerCase().includes(q))
-    );
+    return state?.accounts.filter(a => a.companyId === selectedCompanyId) || [];
   }, [state?.accounts, selectedCompanyId, searchQuery]);
 
   const companySubscriptions = useMemo(() => {
@@ -192,18 +190,12 @@ const App: React.FC = () => {
 
     const companies = state.companies.filter(c => c.name.toLowerCase().includes(q));
 
-    const accounts = state.accounts.filter(a =>
-      a.platform.toLowerCase().includes(q) ||
-      a.email.toLowerCase().includes(q) ||
-      a.twoFactorAuth.toLowerCase().includes(q)
-    ).map(a => ({ ...a, companyName: state.companies.find(c => c.id === a.companyId)?.name, companyColor: state.companies.find(c => c.id === a.companyId)?.color }));
-
     const subscriptions = state.subscriptions.filter(s =>
       s.name.toLowerCase().includes(q)
     ).map(s => ({ ...s, companyName: state.companies.find(c => c.id === s.companyId)?.name, companyColor: state.companies.find(c => c.id === s.companyId)?.color }));
 
-    const hasResults = companies.length > 0 || accounts.length > 0 || subscriptions.length > 0;
-    return { companies, accounts, subscriptions, hasResults };
+    const hasResults = companies.length > 0 || subscriptions.length > 0;
+    return { companies, subscriptions, hasResults };
   }, [searchQuery, state]);
 
   const toggleSearchPassword = (id: string, e: React.MouseEvent) => {
@@ -223,15 +215,14 @@ const App: React.FC = () => {
     setTimeout(() => setCopiedSearchId(null), 2000);
   };
 
-  const handleGlobalResultClick = (type: 'company' | 'account' | 'sub', id: string, companyId: string) => {
+  const handleGlobalResultClick = (type: 'company' | 'sub', id: string, companyId: string) => {
     setSelectedCompanyId(companyId);
     setActiveView('company');
     setSearchQuery('');
     setShowSearchDropdown(false);
 
-    if (type === 'account') setActiveTab('accounts');
     if (type === 'sub') setActiveTab('subscriptions');
-    if (type === 'company') setActiveTab('accounts');
+    if (type === 'company') setActiveTab('subscriptions');
 
     handleUpdateCompany(companyId, { lastViewed: Date.now() });
   };
@@ -246,49 +237,7 @@ const App: React.FC = () => {
     }) : null);
   };
 
-  const handleUpdateAccount = (id: string, updates: Partial<Account>) => {
-    if (!state) return;
-    setState(prev => {
-      if (!prev) return null;
-      const account = prev.accounts.find(a => a.id === id);
-      if (!account) return prev;
 
-      const updatedCompanies = prev.companies.map(c => c.id === account.companyId ? { ...c, lastModified: Date.now() } : c);
-
-      const updatedSubscriptions = prev.subscriptions.map(s => {
-        if (s.companyId === account.companyId && s.name === account.platform) {
-          const newName = updates.platform || s.name;
-          const newCost = updates.subscriptionCost !== undefined ? updates.subscriptionCost : s.cost;
-          const newCycle = updates.subscriptionInterval === 'Yearly' ? 'Yearly' : 'Monthly';
-          return { ...s, name: newName, cost: newCost, billingCycle: newCycle as any };
-        }
-        return s;
-      });
-
-      return {
-        ...prev,
-        companies: updatedCompanies,
-        accounts: prev.accounts.map(a => a.id === id ? { ...a, ...updates, lastUpdated: Date.now() } : a),
-        subscriptions: updatedSubscriptions
-      };
-    });
-  };
-
-  const handleDeleteAccount = (id: string) => {
-    if (!state) return;
-    setState(prev => {
-      if (!prev) return null;
-      const accountToDelete = prev.accounts.find(a => a.id === id);
-      if (!accountToDelete) return prev;
-
-      return {
-        ...prev,
-        companies: prev.companies.map(c => c.id === accountToDelete.companyId ? { ...c, lastModified: Date.now() } : c),
-        accounts: prev.accounts.filter(a => a.id !== id),
-        subscriptions: prev.subscriptions.filter(s => !(s.companyId === accountToDelete.companyId && s.name === accountToDelete.platform))
-      };
-    });
-  };
 
   const handleUpdateSubscription = (id: string, updates: Partial<Subscription>) => {
     if (!state) return;
@@ -571,47 +520,7 @@ const App: React.FC = () => {
     }) : null);
   };
 
-  const handleAddAccount = (accountData: Partial<Account>) => {
-    if (!selectedCompanyId || !state) return;
-    const newAcc: Account = {
-      id: Math.random().toString(36).substr(2, 9),
-      companyId: selectedCompanyId,
-      platform: accountData.platform || 'New Platform',
-      website: accountData.website || '',
-      email: accountData.email || 'N/A',
-      twoFactorAuth: accountData.twoFactorAuth || 'None',
-      recoveryMethod: accountData.recoveryMethod || '',
-      password: '',
-      pricingModel: accountData.pricingModel || 'paid',
-      notes: accountData.notes || [],
-      subscriptionCost: accountData.subscriptionCost || 0,
-      subscriptionInterval: accountData.subscriptionInterval || 'Monthly',
-      paymentMethod: accountData.paymentMethod || '',
-      nextBillingDate: accountData.nextBillingDate || '',
-      renew: accountData.renew || 'Auto',
-      status: 'Active'
-    };
 
-    const newSub: Subscription = {
-      id: Math.random().toString(36).substr(2, 9),
-      companyId: selectedCompanyId,
-      name: newAcc.platform,
-      cost: newAcc.subscriptionCost || 0,
-      currency: 'USD',
-      billingCycle: newAcc.subscriptionInterval === 'Yearly' ? 'Yearly' : 'Monthly',
-      paymentMethod: newAcc.paymentMethod,
-      nextRenewal: newAcc.nextBillingDate || new Date().toISOString().split('T')[0],
-      renew: newAcc.renew,
-      status: newAcc.status === 'Inactive' ? 'Cancelled' : 'Active'
-    };
-
-    setState(prev => prev ? ({
-      ...prev,
-      companies: prev.companies.map(c => c.id === selectedCompanyId ? { ...c, lastModified: Date.now() } : c),
-      accounts: [...prev.accounts, newAcc],
-      subscriptions: [...prev.subscriptions, newSub]
-    }) : null);
-  };
 
   const handleAddSubscription = (subData: Partial<Subscription>) => {
     if (!selectedCompanyId || !state) return;
@@ -639,7 +548,7 @@ const App: React.FC = () => {
   const selectCompanyFromDashboard = (id: string) => {
     setSelectedCompanyId(id);
     setActiveView('company');
-    setActiveTab('accounts');
+    setActiveTab('subscriptions');
     setIsEditingCompanyName(false);
     setIsEditingDescription(false);
     setShowDeleteCompanyConfirm(false);
@@ -756,68 +665,7 @@ const App: React.FC = () => {
                       </div>
                     )}
 
-                    {globalSearchResults.accounts.length > 0 && (
-                      <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2">Accounts & Logins</h4>
-                        <div className="bg-white/5 rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
-                          {globalSearchResults.accounts.map(a => (
-                            <div
-                              key={a.id}
-                              onClick={() => handleGlobalResultClick('account', a.id, a.companyId)}
-                              className="p-4 hover:bg-white/10 cursor-pointer flex items-center justify-between transition-colors group"
-                            >
-                              <div className="flex items-center space-x-4 min-w-0 flex-1">
-                                <div className="bg-white/10 p-2 rounded-xl text-[#EBC351] flex-shrink-0">
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <p className="font-bold text-white text-sm truncate">{a.platform}</p>
-                                      <p className="text-xs text-white/40 truncate font-medium">{a.email}</p>
-                                    </div>
-                                  </div>
 
-                                  <div className="flex items-center gap-2 mt-1.5" onClick={(e) => e.stopPropagation()}>
-                                    <div className="flex items-center bg-white/10 rounded-md px-2 py-1 border border-white/10">
-                                      <span className="text-[10px] font-mono text-white/60 w-16 truncate">
-                                        {visibleSearchPasswords.has(a.id) ? (a.password || '-') : '••••••••'}
-                                      </span>
-                                    </div>
-                                    <button
-                                      onClick={(e) => toggleSearchPassword(a.id, e)}
-                                      className="p-1 text-white/40 hover:text-[#EBC351] hover:bg-white/10 rounded-md transition-colors"
-                                    >
-                                      {visibleSearchPasswords.has(a.id) ? (
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                                      ) : (
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                      )}
-                                    </button>
-                                    <button
-                                      onClick={(e) => copySearchPassword(a.password || '', a.id, e)}
-                                      className="p-1 text-white/40 hover:text-[#EBC351] hover:bg-white/10 rounded-md transition-colors"
-                                    >
-                                      {copiedSearchId === a.id ? (
-                                        <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                      ) : (
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /></svg>
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center flex-shrink-0 ml-4">
-                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/10 text-white/40 mr-2 max-w-[100px] truncate">
-                                  {a.companyName}
-                                </span>
-                                <svg className="w-4 h-4 text-white/20 group-hover:text-[#EBC351]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
                     {globalSearchResults.subscriptions.length > 0 && (
                       <div className="space-y-3">
@@ -860,7 +708,7 @@ const App: React.FC = () => {
             className="fixed bottom-8 left-0 right-0 mx-auto max-w-3xl px-4 z-50 flex flex-col items-center gap-4 pointer-events-none"
           >
             <div className="flex items-end justify-center gap-3 w-full">
-              <div className="relative pointer-events-auto">
+              <div className="relative pointer-events-auto" ref={quickMenuRef}>
                 {showQuickMenu && (
                   <div className="absolute bottom-full left-0 mb-4 w-64 bg-[#111111]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
                     <button
@@ -945,7 +793,7 @@ const App: React.FC = () => {
               <div className="w-full max-w-xl mx-auto pointer-events-auto">
                 <div className="bg-stone-900/60 backdrop-blur-xl p-1.5 rounded-2xl shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5">
                   {[
-                    { id: 'accounts', label: 'Logins', activeClass: 'bg-yellow-300/7 border-yellow-300/20 shadow-[0_2px_16px_0_rgba(253,224,71,0.06)]' },
+
                     { id: 'subscriptions', label: 'Services', activeClass: 'bg-blue-400/7 border-blue-300/20 shadow-[0_2px_16px_0_rgba(96,165,250,0.06)]' },
                     { id: 'financial', label: 'Financial', activeClass: 'bg-green-400/7 border-green-300/20 shadow-[0_2px_16px_0_rgba(74,222,128,0.06)]' },
                     { id: 'docs', label: 'Docs', activeClass: 'bg-white/7 border-white/20 shadow-[0_2px_16px_0_rgba(255,255,255,0.06)]' },
@@ -1028,17 +876,7 @@ const App: React.FC = () => {
                         />
                       </div>
                     )}
-                    {activeTab === 'accounts' && (
-                      <div className="space-y-8 animate-fadeIn">
-                        <AccountList
-                          accounts={companyAccounts}
-                          onAddAccount={handleAddAccount}
-                          onUpdateAccount={handleUpdateAccount}
-                          onDeleteAccount={handleDeleteAccount}
-                          subscriptions={state.subscriptions}
-                        />
-                      </div>
-                    )}
+
                     {activeTab === 'financial' && (
                       <FinancialList
                         cards={companyCards}

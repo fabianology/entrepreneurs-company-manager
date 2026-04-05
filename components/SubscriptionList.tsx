@@ -145,6 +145,14 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       subServices: [...(sub.subServices || []), newSub]
     };
     setEditingSubscription(updatedSub);
+    
+    // Scroll to the section in the modal
+    setTimeout(() => {
+      const element = document.getElementById('modal-supplemental-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const addEmailToSubscription = (sub: Subscription) => {
@@ -162,6 +170,14 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       linkedEmails: [...(sub.linkedEmails || []), newEmail]
     };
     setEditingSubscription(updatedSub);
+
+    // Scroll to the section in the modal
+    setTimeout(() => {
+      const element = document.getElementById('modal-emails-section');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
   const monthlyBurn = subscriptions.reduce((acc, s) => {
     const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
@@ -345,6 +361,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
                       </div>
                     </>
+                  )}
+                  {sub.notes && (
+                    <div className="col-span-2 space-y-1 pt-2">
+                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
+                      <p className="text-xs font-bold text-white/60 leading-tight whitespace-pre-wrap">{sub.notes}</p>
+                    </div>
                   )}
                 </div>
             </div>
@@ -777,7 +799,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
 
                 {/* Sub-services Management Section */}
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-white/5" id="modal-supplemental-section">
                   <div className="flex justify-between items-center mb-6">
                     <h4 className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest ml-1">Supplemental Services</h4>
                     <button
@@ -909,7 +931,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
 
                 {/* Linked Emails Management Section */}
-                <div className="pt-8 border-t border-white/5">
+                <div className="pt-8 border-t border-white/5" id="modal-emails-section">
                   <div className="flex justify-between items-center mb-6">
                     <h4 className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest ml-1">Linked Emails</h4>
                     <button

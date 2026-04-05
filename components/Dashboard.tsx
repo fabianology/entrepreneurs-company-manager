@@ -324,7 +324,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {state.companies.map((company) => {
-            const companyAccounts = state.accounts.filter(a => a.companyId === company.id);
             const companySubs = state.subscriptions.filter(s => s.companyId === company.id);
             const companyCards = state.financialCards.filter(c => c.companyId === company.id);
             const companyLoans = state.loans.filter(l => l.companyId === company.id);
@@ -413,9 +412,9 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                   className="grid grid-cols-4 gap-2 p-6 pt-6 border-t border-white/5 bg-black/20"
                 >
                   <div className="flex flex-col min-w-0">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate">Logins</p>
+                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest mb-1 truncate">Emails</p>
                     <div className="flex items-baseline space-x-1">
-                      <p className="text-lg font-black text-white">{companyAccounts.length}</p>
+                      <p className="text-lg font-black text-white">{companySubs.reduce((sum, s) => sum + (s.linkedEmails?.length || 0), 0)}</p>
                     </div>
                   </div>
                   <div className="flex flex-col border-l border-white/5 pl-2 min-w-0">
