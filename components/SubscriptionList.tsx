@@ -103,8 +103,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
   const handleAddSubService = () => {
     if (!editingSubscription) return;
+    const newId = Math.random().toString(36).substr(2, 9);
     const newSub: SubService = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: newId,
       name: '',
       cost: 0,
       billingCycle: 'Monthly',
@@ -115,6 +116,18 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       ...editingSubscription,
       subServices: [...(editingSubscription.subServices || []), newSub]
     });
+
+    // Auto-scroll to the new service section
+    setTimeout(() => {
+      const element = document.getElementById(`sub-service-${newId}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.style.boxShadow = '0 0 0 2px #EBC351';
+        setTimeout(() => {
+          element.style.boxShadow = 'none';
+        }, 2000);
+      }
+    }, 100);
   };
 
   const formatDate = (ts?: number) => {
@@ -462,6 +475,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       </div>
                       <span className={`text-xs font-black ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
                         ${child.cost.toFixed(2)}
+                        <span className="text-[9px] text-white/40 ml-1 font-black uppercase tracking-widest lowercase">
+                          /{child.billingCycle === 'Yearly' ? 'yr' : 'mo'}
+                        </span>
                       </span>
                     </div>
                   ))}
@@ -974,8 +990,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     <h4 className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest ml-1">Linked Emails</h4>
                     <button
                       onClick={() => {
+                        const newId = Math.random().toString(36).substr(2, 9);
                         const newEmail = {
-                          id: Math.random().toString(36).substr(2, 9),
+                          id: newId,
                           email: '',
                           forwarding: '',
                           usedFor: '',
@@ -987,6 +1004,18 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           ...editingSubscription,
                           linkedEmails: [...(editingSubscription.linkedEmails || []), newEmail]
                         });
+
+                        // Auto-scroll to the new email section
+                        setTimeout(() => {
+                          const element = document.getElementById(`linked-email-${newId}`);
+                          if (element) {
+                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            element.style.boxShadow = '0 0 0 2px #EBC351';
+                            setTimeout(() => {
+                              element.style.boxShadow = 'none';
+                            }, 2000);
+                          }
+                        }, 100);
                       }}
                       className="text-[10px] font-black text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition"
                     >
@@ -996,7 +1025,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                   <div className="space-y-6">
                     {(editingSubscription.linkedEmails || []).map((email, idx) => (
-                      <div key={email.id} className="bg-white/2 p-6 rounded-3xl border border-white/5 space-y-4 relative group/email-edit">
+                      <div key={email.id} id={`linked-email-${email.id}`} className="bg-white/2 p-6 rounded-3xl border border-white/5 space-y-4 relative group/email-edit transition-all duration-300">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <label className="text-[9px] font-black text-white/40 uppercase tracking-widest ml-1">Email Address</label>
