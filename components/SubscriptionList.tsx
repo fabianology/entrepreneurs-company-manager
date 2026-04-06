@@ -270,56 +270,72 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         )}
                       </a>
-                      <div className="flex items-center space-x-2 mt-1.5 transition-all duration-300">
-                        {sub.status === 'Paused' && (
-                          <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                        )}
-                        {sub.pricingModel !== 'free' && sub.status !== 'Paused' ? (
-                          <>
-                            {sub.renew === 'Manual' ? (
+                      {sub.pricingModel !== 'free' && (() => {
+                        const monthlyTotal = (sub.billingCycle === 'Monthly' ? sub.cost : 0) + (sub.subServices?.reduce((sum, ss) => {
+                          if (ss.status === 'Paused') return sum;
+                          return ss.billingCycle === 'Monthly' ? sum + ss.cost : sum;
+                        }, 0) || 0);
+
+                        const yearlyTotal = (sub.billingCycle === 'Yearly' ? sub.cost : 0) + (sub.subServices?.reduce((sum, ss) => {
+                          if (ss.status === 'Paused') return sum;
+                          return ss.billingCycle === 'Yearly' ? sum + ss.cost : sum;
+                        }, 0) || 0);
+
+                        const primaryTotal = sub.billingCycle === 'Monthly' ? monthlyTotal : yearlyTotal;
+                        const primaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ mo.' : 'recur/ yr.';
+                        const secondaryTotal = sub.billingCycle === 'Monthly' ? yearlyTotal : monthlyTotal;
+                        const secondaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ yr.' : 'recur/ mo.';
+
+                        return (
+                          <div className="mt-[2px] flex items-start gap-3">
+                            <div className="flex flex-col">
+                              <p className="text-base font-black text-white leading-tight">
+                                ${primaryTotal.toFixed(2)}
+                              </p>
+                              <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">{primaryLabel}</p>
+                            </div>
+                            
+                            {secondaryTotal > 0 && (
                               <>
-                                <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                                <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Manual Renew</span>
-                              </>
-                            ) : (
-                              <>
-                                <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
-                                <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Auto Renew</span>
+                                <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
+                                <div className="flex flex-col">
+                                  <p className="text-base font-black text-white leading-tight">${secondaryTotal.toFixed(2)}</p>
+                                  <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">{secondaryLabel}</p>
+                                </div>
                               </>
                             )}
-                            <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest ml-1">| Paid | {sub.status}</span>
-                          </>
-                        ) : (
-                          <span className={`text-[9px] font-black uppercase tracking-widest ${sub.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
-                            {sub.pricingModel === 'free' ? 'Free' : 'Paid'} | {sub.status}
-                          </span>
-                        )}
-                      </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
-                  <div className="text-right">
-                    {sub.pricingModel !== 'free' && (() => {
-                        const totalCost = sub.cost + (sub.subServices?.reduce((sum, ss) => {
-                          if (ss.status === 'Paused') return sum;
-                          if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
-                          if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
-                          if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
-                          return sum + ss.cost;
-                        }, 0) || 0);
-                        const altCost = sub.billingCycle === 'Monthly' ? totalCost * 12 : totalCost / 12;
-                        const altLabel = sub.billingCycle === 'Monthly' ? 'Yearly' : 'Monthly';
-                        return (
-                          <>
-                            <p className="text-base font-black text-white">
-                              ${totalCost.toFixed(2)}
-                            </p>
-                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
-                            <p className="text-base font-black text-white/25 mt-1">${altCost.toFixed(2)}</p>
-                            <p className="text-[9px] text-white/20 font-black uppercase tracking-widest">{altLabel}</p>
-                          </>
-                        );
-                      })()
-                    }
+                  <div className="text-right flex flex-col items-end space-y-1.5">
+                    {sub.status === 'Paused' && (
+                      <div className="flex items-center space-x-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
+                        <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Paused</span>
+                      </div>
+                    )}
+                    {sub.pricingModel !== 'free' && sub.status !== 'Paused' ? (
+                      <>
+                        <div className="flex items-center space-x-2">
+                          <div className={`h-1.5 w-1.5 rounded-full ${sub.renew === 'Manual' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]' : 'bg-[#1FE400] shadow-[0_0_6px_#1FE400]'}`}></div>
+                          <span className={`text-[9px] font-black uppercase tracking-widest ${sub.renew === 'Manual' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                            {sub.renew === 'Manual' ? 'Manual Renew' : 'Auto Renew'}
+                          </span>
+                        </div>
+                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Paid</span>
+                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">{sub.status}</span>
+                      </>
+                    ) : sub.status !== 'Paused' && (
+                      <>
+                        <div className="flex items-center space-x-2">
+                          <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
+                          <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">{sub.pricingModel === 'free' ? 'Free' : 'Paid'}</span>
+                        </div>
+                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">{sub.status}</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
