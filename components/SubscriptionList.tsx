@@ -236,108 +236,118 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 onClick={() => setEditingSubscription(sub)}
               >
                 <div className="flex justify-between items-start">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden">
-                      {sub.website ? (
-                        <img
-                          src={getFaviconUrl(sub.website) || ''}
-                          className="w-8 h-8 object-contain"
-                          alt=""
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                            const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
-                            if (fallback) fallback.style.display = 'flex';
-                          }}
-                        />
-                      ) : null}
-                      <span
-                        className="text-white font-black text-xl opacity-80 group-hover/card:text-[#EBC351] transition-colors"
-                        style={{ display: sub.website ? 'none' : 'flex' }}
-                      >
-                        {sub.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <a 
-                        href={sub.website ? (sub.website.startsWith('http') ? sub.website : `https://${sub.website}`) : '#'} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        className="flex items-center gap-2 group/name"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <h3 className="text-base font-black tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors">{sub.name}</h3>
-                        {sub.website && (
-                          <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                        )}
-                      </a>
-                      {sub.pricingModel !== 'free' && (() => {
-                        const monthlyTotal = (sub.billingCycle === 'Monthly' ? sub.cost : 0) + (sub.subServices?.reduce((sum, ss) => {
-                          if (ss.status === 'Paused') return sum;
-                          return ss.billingCycle === 'Monthly' ? sum + ss.cost : sum;
-                        }, 0) || 0);
+                  <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 items-center w-full">
+                    {/* Row 1, Col 1: Logo */}
+                    <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden shadow-sm hover:bg-white/[0.08] col-start-1 row-start-1">
+                        {sub.website ? (
+                          <img
+                            src={getFaviconUrl(sub.website) || ''}
+                            className="w-8 h-8 object-contain"
+                            alt=""
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          className="text-white font-black text-xl opacity-80 group-hover/card:text-[#EBC351] transition-colors"
+                          style={{ display: sub.website ? 'none' : 'flex' }}
+                        >
+                          {sub.name.charAt(0)}
+                        </span>
+                      </div>
 
-                        const yearlyTotal = (sub.billingCycle === 'Yearly' ? sub.cost : 0) + (sub.subServices?.reduce((sum, ss) => {
-                          if (ss.status === 'Paused') return sum;
-                          return ss.billingCycle === 'Yearly' ? sum + ss.cost : sum;
-                        }, 0) || 0);
-
-                        const primaryTotal = sub.billingCycle === 'Monthly' ? monthlyTotal : yearlyTotal;
-                        const primaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ mo.' : 'recur/ yr.';
-                        const secondaryTotal = sub.billingCycle === 'Monthly' ? yearlyTotal : monthlyTotal;
-                        const secondaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ yr.' : 'recur/ mo.';
-
-                        return (
-                          <div className="mt-[2px] flex items-start gap-3">
-                            <div className="flex flex-col">
-                              <p className="text-base font-black text-white leading-tight">
-                                ${primaryTotal.toFixed(2)}
-                              </p>
-                              <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">{primaryLabel}</p>
-                            </div>
-                            
-                            {secondaryTotal > 0 && (
+                      {/* Row 2, Col 1+2: Status Row */}
+                      <div className="flex items-center whitespace-nowrap col-span-2 row-start-2">
+                        {sub.status === 'Paused' ? (
+                          <div className="flex items-center space-x-1.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
+                            <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Paused</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2 text-[9px] font-black uppercase tracking-widest">
+                            {sub.pricingModel !== 'free' && (
                               <>
-                                <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
-                                <div className="flex flex-col">
-                                  <p className="text-base font-black text-white leading-tight">${secondaryTotal.toFixed(2)}</p>
-                                  <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">{secondaryLabel}</p>
+                                <div className="flex items-center space-x-1.5">
+                                  <div className={`h-1.5 w-1.5 rounded-full ${sub.renew === 'Manual' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]' : 'bg-[#1FE400] shadow-[0_0_6px_#1FE400]'}`}></div>
+                                  <span className={sub.renew === 'Manual' ? 'text-red-500' : 'text-[#1FE400]'}>
+                                    {sub.renew === 'Manual' ? 'Manual' : 'Auto'}
+                                  </span>
                                 </div>
+                                <span className="text-white/20 px-1 opacity-50">|</span>
+                                <span className="text-[#1FE400]">Paid</span>
+                                <span className="text-white/20 px-1 opacity-50">|</span>
                               </>
                             )}
+                            <span className={sub.pricingModel === 'free' ? 'text-white/40' : 'text-[#1FE400]'}>
+                              {sub.status}
+                            </span>
                           </div>
-                        );
-                      })()}
+                        )}
+                      </div>
+                    
+
+                    {/* Row 1, Col 2: Name + Amounts */}
+                    <div className="flex flex-col col-start-2 row-start-1">
+                        <a 
+                          href={sub.website ? (sub.website.startsWith('http') ? sub.website : `https://${sub.website}`) : '#'} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="flex items-center gap-2 group/name"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <h3 className="text-base font-black tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors leading-none">{sub.name}</h3>
+                          {sub.website && (
+                            <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                          )}
+                        </a>
+                        
+                        {sub.pricingModel !== 'free' && (() => {
+                          const monthlyTotal = (sub.billingCycle === 'Monthly' ? sub.cost : 0) + (sub.subServices?.reduce((sum, ss) => {
+                            if (ss.status === 'Paused') return sum;
+                            return ss.billingCycle === 'Monthly' ? sum + ss.cost : sum;
+                          }, 0) || 0);
+
+                          const yearlyTotal = (sub.billingCycle === 'Yearly' ? sub.cost : 0) + (sub.subServices?.reduce((sum, ss) => {
+                            if (ss.status === 'Paused') return sum;
+                            return ss.billingCycle === 'Yearly' ? sum + ss.cost : sum;
+                          }, 0) || 0);
+
+                          const primaryTotal = sub.billingCycle === 'Monthly' ? monthlyTotal : yearlyTotal;
+                          const primaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ mo.' : 'recur/ yr.';
+                          const secondaryTotal = sub.billingCycle === 'Monthly' ? yearlyTotal : monthlyTotal;
+                          const secondaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ yr.' : 'recur/ mo.';
+
+                          return (
+                            <div className="mt-[2px] flex items-start gap-3">
+                              <div className="flex flex-col">
+                                <p className="text-base font-black text-white leading-tight">
+                                  ${primaryTotal.toFixed(2)}
+                                </p>
+                                <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">{primaryLabel}</p>
+                              </div>
+                              
+                              {secondaryTotal > 0 && (
+                                <>
+                                  <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
+                                  <div className="flex flex-col">
+                                    <p className="text-base font-black text-white leading-tight">${secondaryTotal.toFixed(2)}</p>
+                                    <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">{secondaryLabel}</p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end space-y-1.5">
-                    {sub.status === 'Paused' && (
-                      <div className="flex items-center space-x-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                        <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Paused</span>
-                      </div>
-                    )}
-                    {sub.pricingModel !== 'free' && sub.status !== 'Paused' ? (
-                      <>
-                        <div className="flex items-center space-x-2">
-                          <div className={`h-1.5 w-1.5 rounded-full ${sub.renew === 'Manual' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]' : 'bg-[#1FE400] shadow-[0_0_6px_#1FE400]'}`}></div>
-                          <span className={`text-[9px] font-black uppercase tracking-widest ${sub.renew === 'Manual' ? 'text-red-500' : 'text-[#1FE400]'}`}>
-                            {sub.renew === 'Manual' ? 'Manual Renew' : 'Auto Renew'}
-                          </span>
-                        </div>
-                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">Paid</span>
-                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">{sub.status}</span>
-                      </>
-                    ) : sub.status !== 'Paused' && (
-                      <>
-                        <div className="flex items-center space-x-2">
-                          <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
-                          <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">{sub.pricingModel === 'free' ? 'Free' : 'Paid'}</span>
-                        </div>
-                        <span className="text-[#1FE400] text-[9px] font-black uppercase tracking-widest">{sub.status}</span>
-                      </>
-                    )}
+                    {/* Placeholder for top-right space */}
                   </div>
                 </div>
+
 
                 <div className="grid grid-cols-2 gap-y-6 gap-x-4 pt-2">
                   <div 
