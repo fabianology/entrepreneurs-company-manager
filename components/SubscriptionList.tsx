@@ -265,7 +265,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         className="flex items-center gap-2 group/name"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <h3 className="text-lg font-black tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors">{sub.name}</h3>
+                        <h3 className="text-base font-black tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors">{sub.name}</h3>
                         {sub.website && (
                           <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         )}
@@ -298,20 +298,28 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </div>
                   </div>
                   <div className="text-right">
-                    {sub.pricingModel !== 'free' && (
-                      <>
-                        <p className="text-xl font-black text-white">
-                          ${(sub.cost + (sub.subServices?.reduce((sum, ss) => {
-                            if (ss.status === 'Paused') return sum;
-                            if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
-                            if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
-                            if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
-                            return sum + ss.cost;
-                          }, 0) || 0)).toFixed(2)}
-                        </p>
-                        <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
-                      </>
-                    )}
+                    {sub.pricingModel !== 'free' && (() => {
+                        const totalCost = sub.cost + (sub.subServices?.reduce((sum, ss) => {
+                          if (ss.status === 'Paused') return sum;
+                          if (sub.billingCycle === ss.billingCycle) return sum + ss.cost;
+                          if (sub.billingCycle === 'Monthly' && ss.billingCycle === 'Yearly') return sum + (ss.cost / 12);
+                          if (sub.billingCycle === 'Yearly' && ss.billingCycle === 'Monthly') return sum + (ss.cost * 12);
+                          return sum + ss.cost;
+                        }, 0) || 0);
+                        const altCost = sub.billingCycle === 'Monthly' ? totalCost * 12 : totalCost / 12;
+                        const altLabel = sub.billingCycle === 'Monthly' ? 'Yearly' : 'Monthly';
+                        return (
+                          <>
+                            <p className="text-base font-black text-white">
+                              ${totalCost.toFixed(2)}
+                            </p>
+                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest">{sub.billingCycle}</p>
+                            <p className="text-base font-black text-white/25 mt-1">${altCost.toFixed(2)}</p>
+                            <p className="text-[9px] text-white/20 font-black uppercase tracking-widest">{altLabel}</p>
+                          </>
+                        );
+                      })()
+                    }
                   </div>
                 </div>
 
@@ -537,11 +545,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     + add email
                   </button>
 
-                  {(!sub.linkedEmails || sub.linkedEmails.length === 0) && (
-                    <div className="text-center py-4 text-[10px] font-black text-white/20 uppercase tracking-widest">
-                      No linked emails found
-                    </div>
-                  )}
+
                 </div>
               )}
             </div>

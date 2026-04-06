@@ -238,12 +238,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
     e.stopPropagation();
     if (Math.abs(dragY) > 5) return;
 
-    if (!isWalletExpanded) {
-      setIsWalletExpanded(true);
-    } else {
-      setShowDeleteConfirm(false);
-      setEditingCard(card);
-    }
+    setShowDeleteConfirm(false);
+    setEditingCard(card);
   };
 
   // --- LOAN HANDLERS ---
@@ -694,7 +690,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
             return (
               <div
                 key={inst.id}
-                className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors"
+                onClick={() => setEditingInstitution(inst)}
+                className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors cursor-pointer"
               >
                 <div className="p-6 border-b border-white/5">
                   <div className="flex justify-between items-start mb-6">

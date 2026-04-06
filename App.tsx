@@ -271,6 +271,8 @@ const App: React.FC = () => {
       id: card.id || Math.random().toString(36).substr(2, 9),
       companyId: selectedCompanyId,
       name: card.name || 'New Card',
+      login: card.login || '',
+      password: card.password || '',
       cardHolder: card.cardHolder || '',
       last4: card.last4 || '0000',
       expiry: card.expiry || '12/99',
@@ -535,7 +537,15 @@ const App: React.FC = () => {
       nextRenewal: subData.nextRenewal || new Date().toISOString().split('T')[0],
       renew: subData.renew || 'Auto',
       status: subData.status || 'Active',
-      subServices: []
+      pricingModel: subData.pricingModel,
+      website: subData.website || '',
+      loginId: subData.loginId || '',
+      password: subData.password || '',
+      twoFactorAuth: subData.twoFactorAuth,
+      recoveryMethod: subData.recoveryMethod || '',
+      notes: subData.notes || '',
+      linkedEmails: subData.linkedEmails || [],
+      subServices: subData.subServices || []
     };
     setState(prev => prev ? ({
       ...prev,
@@ -791,18 +801,18 @@ const App: React.FC = () => {
 
             {selectedCompanyId && activeView === 'company' && (
               <div className="w-full max-w-xl mx-auto pointer-events-auto">
-                <div className="bg-stone-900/60 backdrop-blur-xl p-1.5 rounded-2xl shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5">
+                <div className="bg-stone-900/60 backdrop-blur-xl p-0 rounded-full shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5 overflow-hidden">
                   {[
 
-                    { id: 'subscriptions', label: 'Services', activeClass: 'bg-blue-400/7 border-blue-300/20 shadow-[0_2px_16px_0_rgba(96,165,250,0.06)]' },
-                    { id: 'financial', label: 'Financial', activeClass: 'bg-green-400/7 border-green-300/20 shadow-[0_2px_16px_0_rgba(74,222,128,0.06)]' },
-                    { id: 'docs', label: 'Docs', activeClass: 'bg-white/7 border-white/20 shadow-[0_2px_16px_0_rgba(255,255,255,0.06)]' },
+                    { id: 'subscriptions', label: 'Services', activeClass: 'bg-blue-400/7 border-blue-400/30 text-blue-400 shadow-[0_2px_16px_0_rgba(96,165,250,0.06)]' },
+                    { id: 'financial', label: 'Financial', activeClass: 'bg-green-400/7 border-green-400/30 text-green-400 shadow-[0_2px_16px_0_rgba(74,222,128,0.06)]' },
+                    { id: 'docs', label: 'Docs', activeClass: 'bg-white/7 border-white/20 text-white shadow-[0_2px_16px_0_rgba(255,255,255,0.06)]' },
                   ].map(tab => (
                     <button
                       key={tab.id}
                       onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
-                      className={`relative z-10 flex-1 px-4 py-3.5 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-300 ${activeTab === tab.id
-                        ? `backdrop-blur-xl text-white scale-[1.02] border ${tab.activeClass}`
+                      className={`relative z-10 flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest rounded-full transition-all duration-300 ${activeTab === tab.id
+                        ? `backdrop-blur-xl border ${tab.activeClass}`
                         : 'text-white/40 hover:text-white hover:bg-white/5'
                         }`}
                     >
