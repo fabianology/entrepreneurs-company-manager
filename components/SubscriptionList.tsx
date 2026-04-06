@@ -320,6 +320,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           const secondaryTotal = sub.billingCycle === 'Monthly' ? yearlyTotal : monthlyTotal;
                           const secondaryLabel = sub.billingCycle === 'Monthly' ? 'recur/ yr.' : 'recur/ mo.';
 
+                          const totalAnnual = (monthlyTotal * 12) + yearlyTotal;
+
                           return (
                             <div className="mt-[2px] flex items-start gap-3">
                               <div className="flex flex-col">
@@ -338,6 +340,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                   </div>
                                 </>
                               )}
+
+                              <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
+                              <div className="flex flex-col">
+                                <p className="text-base font-black text-[#EBC351] leading-tight">${totalAnnual.toFixed(2)}</p>
+                                <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">est. yearly cost</p>
+                              </div>
                             </div>
                           );
                         })()}
