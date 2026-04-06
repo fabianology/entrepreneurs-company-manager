@@ -250,10 +250,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
           </button>
         )}
         {subscriptions.map(sub => (
-           <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-300 hover:border-white/10">
+           <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-300">
               {/* Main Info */}
               <div 
-                className="p-6 space-y-6 cursor-pointer group/card hover:bg-white/[0.02] transition-colors"
+                className="p-6 space-y-6 cursor-pointer group/card transition-colors"
                 onClick={() => setEditingSubscription(sub)}
               >
                 <div className="flex justify-between items-start">
@@ -443,8 +443,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </button>
 
                     {expandedCardDetails.has(sub.id) && (
-                      <>
-                        <div className="grid grid-cols-2 gap-y-6 gap-x-4 pt-6 animate-fadeIn">
+                      <div className="grid grid-cols-2 gap-y-6 gap-x-4 pt-6 animate-fadeIn">
                         {sub.pricingModel !== 'free' && (
                           <>
                             <div className="space-y-1">
@@ -470,174 +469,188 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           </div>
                         )}
                       </div>
-
-                      {/* Supplemental Services */}
-                      <div className="border-t border-white/5 -mx-6 px-6 pt-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleExpanded(sub.id); }}
-                          className="w-full h-[47px] flex items-center justify-between text-[#EBC351] group"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Supplemental Services</span>
-                            <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                              {sub.subServices?.length || 0}
-                            </div>
-                          </div>
-                          <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-
-                        {expandedSubs.has(sub.id) && sub.subServices && (
-                          <div className="pb-6 space-y-4 animate-fadeIn">
-                            {sub.subServices.map((child, idx) => (
-                              <div key={idx} className="flex justify-between items-center group/item">
-                                <div className="flex items-center space-x-3">
-                                  <div className={`h-1.5 w-1.5 rounded-full ${child.status === 'Paused' ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-all duration-300`}></div>
-                                  <span
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingSubscription(sub);
-                                      setTimeout(() => {
-                                        const element = document.getElementById(`sub-service-${child.id}`);
-                                        if (element) {
-                                          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                          element.style.boxShadow = '0 0 0 2px #EBC351';
-                                          setTimeout(() => { element.style.boxShadow = 'none'; }, 2000);
-                                        }
-                                      }, 100);
-                                    }}
-                                    className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
-                                  >
-                                    {child.name}
-                                  </span>
-                                  <span className={`text-[10px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
-                                    {child.status}
-                                  </span>
-                                </div>
-                                <span className={`text-[13px] font-medium ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
-                                  ${child.cost.toFixed(2)}
-                                  <span className="text-[12px] text-white/40 ml-1 font-bold uppercase tracking-widest lowercase">
-                                    /{child.billingCycle === 'Yearly' ? 'yr' : 'mo'}
-                                  </span>
-                                </span>
-                              </div>
-                            ))}
-                            <button
-                              onClick={() => addSubServiceToSubscription(sub)}
-                              className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
-                            >
-                              + add item
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Linked Emails */}
-                      <div className="border-t border-white/5 -mx-6 px-6 pt-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleEmailExpanded(sub.id); }}
-                          className="w-full h-[47px] flex items-center justify-between text-[#EBC351] group"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Emails</span>
-                            <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                              {sub.linkedEmails?.length || 0}
-                            </div>
-                          </div>
-                          <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedEmails.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                        </button>
-
-                        {expandedEmails.has(sub.id) && (
-                          <div className="pb-8 space-y-1 animate-fadeIn">
-                            {(sub.linkedEmails || []).map((email, idx) => {
-                              const emailId = email.id || String(idx);
-                              const isExpanded = expandedDetails.has(emailId);
-                              return (
-                                <div key={emailId} className="pt-2 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
-                                  <button
-                                    onClick={() => toggleDetailExpanded(emailId)}
-                                    className="w-full text-left grid grid-cols-[1fr,1fr,auto] gap-x-8 py-2 hover:bg-white/5 transition-colors rounded-xl px-4 -mx-4 group/toggle"
-                                  >
-                                    <div className="space-y-1">
-                                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Email</p>
-                                      <p className="text-xs font-black text-white truncate">{email.email}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used For</p>
-                                      <p className="text-xs font-black text-white truncate">{email.usedFor}</p>
-                                    </div>
-                                    <div className="flex items-center">
-                                      <svg
-                                        className={`w-3 h-3 text-white/20 group-hover/toggle:text-[#EBC351] transform transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'rotate-180 text-[#EBC351]' : ''}`}
-                                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                      >
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7" />
-                                      </svg>
-                                    </div>
-                                  </button>
-                                  <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'max-h-[500px] opacity-100 mt-4 pb-2' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
-                                    <div className="grid grid-cols-2 gap-x-8 gap-y-6 px-4 -mx-4">
-                                      <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Forwarding</p>
-                                        <p className="text-xs font-black text-white">{email.forwarding || 'N/A'}</p>
-                                      </div>
-                                      <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used In</p>
-                                        <p className="text-xs font-black text-white">{email.usedIn}</p>
-                                      </div>
-                                      <div className="col-span-2 space-y-1">
-                                        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Access Method</p>
-                                        <p className="text-xs font-black text-white">{email.accessMethod}</p>
-                                      </div>
-                                      <div className="col-span-2 space-y-2">
-                                        <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
-                                        <div className="space-y-1">
-                                          {email.notes.map((note, nIdx) => (
-                                            <div key={nIdx} className="flex items-start space-x-2">
-                                              <span className="text-[#EBC351] mt-1">•</span>
-                                              <p className="text-xs text-white/80 leading-relaxed font-medium">{note}</p>
-                                            </div>
-                                          ))}
-                                          <button className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest pt-1 hover:text-white transition-colors">
-                                            + add note
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <div className="col-span-2 pt-2 flex justify-end">
-                                        <button
-                                          onClick={() => setEditingSubscription(sub)}
-                                          className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest hover:text-white transition-colors py-1 flex items-center space-x-1"
-                                        >
-                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                          <span>Edit Account</span>
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <button
-                              onClick={() => addEmailToSubscription(sub)}
-                              className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
-                            >
-                              + add email
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      </>
                     )}
                   </div>
-
                 </div>
             </div>
-          </div>
 
+
+            {/* Supplemental Services Accordion */}
+            <div className="border-t border-white/5">
+              <button
+                onClick={() => toggleExpanded(sub.id)}
+                className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Supplemental Services</span>
+                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                    {sub.subServices?.length || 0}
+                  </div>
+                </div>
+                <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {expandedSubs.has(sub.id) && sub.subServices && (
+                <div className="px-6 pb-6 space-y-4 animate-fadeIn">
+                  {sub.subServices.map((child, idx) => (
+                    <div key={idx} className="flex justify-between items-center group/item">
+                      <div className="flex items-center space-x-3">
+                        <div className={`h-1.5 w-1.5 rounded-full ${child.status === 'Paused' ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-all duration-300`}></div>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSubscription(sub);
+                            setTimeout(() => {
+                              const element = document.getElementById(`sub-service-${child.id}`);
+                              if (element) {
+                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                // Add a temporary highlight effect
+                                element.style.boxShadow = '0 0 0 2px #EBC351';
+                                setTimeout(() => {
+                                  element.style.boxShadow = 'none';
+                                }, 2000);
+                              }
+                            }, 100);
+                          }}
+                          className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
+                        >
+                          {child.name}
+                        </span>
+                        <span className={`text-[10px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                          {child.status}
+                        </span>
+                      </div>
+                      <span className={`text-[13px] font-medium ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
+                        ${child.cost.toFixed(2)}
+                        <span className="text-[12px] text-white/40 ml-1 font-bold uppercase tracking-widest lowercase">
+                          /{child.billingCycle === 'Yearly' ? 'yr' : 'mo'}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => addSubServiceToSubscription(sub)}
+                    className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
+                  >
+                    + add item
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Linked Emails Accordion */}
+            <div className="border-t border-white/5">
+              <button
+                onClick={() => toggleEmailExpanded(sub.id)}
+                className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group bg-white/2"
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Emails</span>
+                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
+                    {sub.linkedEmails?.length || 0}
+                  </div>
+                </div>
+                <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedEmails.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {expandedEmails.has(sub.id) && (
+                <div className="px-6 pb-8 space-y-1 animate-fadeIn">
+                  {(sub.linkedEmails || []).map((email, idx) => {
+                    const emailId = email.id || String(idx);
+                    const isExpanded = expandedDetails.has(emailId);
+                    return (
+                      <div key={emailId} className="pt-2 first:pt-0 border-t border-white/5 first:border-0 relative group/email">
+                        {/* Header Toggle */}
+                        <button
+                          onClick={() => toggleDetailExpanded(emailId)}
+                          className="w-full text-left grid grid-cols-[1fr,1fr,auto] gap-x-8 py-2 hover:bg-white/5 transition-colors rounded-xl px-4 -mx-4 group/toggle"
+                        >
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Email</p>
+                            <p className="text-xs font-black text-white truncate">{email.email}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used For</p>
+                            <p className="text-xs font-black text-white truncate">{email.usedFor}</p>
+                          </div>
+                          <div className="flex items-center">
+                            <svg
+                              className={`w-3 h-3 text-white/20 group-hover/toggle:text-[#EBC351] transform transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'rotate-180 text-[#EBC351]' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+
+                        {/* Collapsible Drawer */}
+                        <div className={`overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'max-h-[500px] opacity-100 mt-4 pb-2' : 'max-h-0 opacity-0 mt-0 pointer-events-none'}`}>
+                          <div className="grid grid-cols-2 gap-x-8 gap-y-6 px-4 -mx-4">
+                            {/* Row 2 */}
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Forwarding</p>
+                              <p className="text-xs font-black text-white">{email.forwarding || 'N/A'}</p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Used In</p>
+                              <p className="text-xs font-black text-white">{email.usedIn}</p>
+                            </div>
+
+                            {/* Row 3 */}
+                            <div className="col-span-2 space-y-1">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Access Method</p>
+                              <p className="text-xs font-black text-white">{email.accessMethod}</p>
+                            </div>
+
+                            {/* Row 4: Notes */}
+                            <div className="col-span-2 space-y-2">
+                              <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
+                              <div className="space-y-1">
+                                {email.notes.map((note, nIdx) => (
+                                  <div key={nIdx} className="flex items-start space-x-2">
+                                    <span className="text-[#EBC351] mt-1">•</span>
+                                    <p className="text-xs text-white/80 leading-relaxed font-medium">{note}</p>
+                                  </div>
+                                ))}
+                                <button className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest pt-1 hover:text-white transition-colors">
+                                  + add note
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="col-span-2 pt-2 flex justify-end">
+                              <button
+                                onClick={() => setEditingSubscription(sub)}
+                                className="text-[10px] font-black text-[#EBC351] uppercase tracking-widest hover:text-white transition-colors py-1 flex items-center space-x-1"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                <span>Edit Account</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    onClick={() => addEmailToSubscription(sub)}
+                    className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
+                  >
+                    + add email
+                  </button>
+
+
+                </div>
+              )}
+            </div>
+          </div>
         ))}
       </div>
-
 
       {/* Editing Modal */}
       {editingSubscription && (
