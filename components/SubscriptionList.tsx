@@ -273,30 +273,37 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       </div>
 
                       {/* Row 2, Col 1+2: Status Row */}
-                      <div className="flex items-center whitespace-nowrap col-span-2 row-start-2">
+                      <div className="flex items-center whitespace-nowrap col-span-2 row-start-2 mt-[6px]">
                         {sub.status === 'Paused' ? (
                           <div className="flex items-center space-x-1.5">
                             <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                            <span className="text-red-500 text-[9px] font-black uppercase tracking-widest">Paused</span>
+                            <span className="text-red-500 text-[10px] font-medium uppercase tracking-widest">Paused</span>
                           </div>
                         ) : (
-                          <div className="flex items-center space-x-2 text-[9px] font-black uppercase tracking-widest">
-                            {sub.pricingModel !== 'free' && (
+                          <div className="flex items-center space-x-2 text-[10px] font-medium uppercase tracking-widest">
+                            {sub.pricingModel !== 'free' ? (
                               <>
                                 <div className="flex items-center space-x-1.5">
                                   <div className={`h-1.5 w-1.5 rounded-full ${sub.renew === 'Manual' ? 'bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]' : 'bg-[#1FE400] shadow-[0_0_6px_#1FE400]'}`}></div>
                                   <span className={sub.renew === 'Manual' ? 'text-red-500' : 'text-[#1FE400]'}>
-                                    {sub.renew === 'Manual' ? 'Manual' : 'Auto'}
+                                    {sub.renew === 'Manual' ? 'Manual' : 'Auto Renew'}
                                   </span>
                                 </div>
                                 <span className="text-white/20 px-1 opacity-50">|</span>
                                 <span className="text-[#1FE400]">Paid</span>
                                 <span className="text-white/20 px-1 opacity-50">|</span>
+                                <span className="text-[#1FE400]">{sub.status}</span>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center space-x-1.5">
+                                  <div className="h-1.5 w-1.5 rounded-full bg-[#1FE400] shadow-[0_0_6px_#1FE400]"></div>
+                                  <span className="text-[#1FE400]">Free</span>
+                                </div>
+                                <span className="text-white/20 px-1 opacity-50">|</span>
+                                <span className="text-[#1FE400]">{sub.status}</span>
                               </>
                             )}
-                            <span className={sub.pricingModel === 'free' ? 'text-white/40' : 'text-[#1FE400]'}>
-                              {sub.status}
-                            </span>
                           </div>
                         )}
                       </div>
@@ -311,7 +318,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           className="flex items-center gap-2 group/name"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <h3 className="text-base font-black tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors leading-none">{sub.name}</h3>
+                          <h3 className="text-base font-bold tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors leading-none">{sub.name}</h3>
                           {sub.website && (
                             <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                           )}
@@ -336,9 +343,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           const totalAnnual = (monthlyTotal * 12) + yearlyTotal;
 
                           return (
-                            <div className="mt-[2px] flex items-start gap-3">
+                            <div className="mt-[5px] flex items-start gap-3">
                               <div className="flex flex-col">
-                                <p className="text-base font-black text-white leading-tight">
+                                <p className="text-base font-bold text-white leading-tight">
                                   ${primaryTotal.toFixed(2)}
                                 </p>
                                 <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">{primaryLabel}</p>
@@ -348,7 +355,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                 <>
                                   <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
                                   <div className="flex flex-col">
-                                    <p className="text-base font-black text-white leading-tight">${secondaryTotal.toFixed(2)}</p>
+                                    <p className="text-base font-bold text-white leading-tight">${secondaryTotal.toFixed(2)}</p>
                                     <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">{secondaryLabel}</p>
                                   </div>
                                 </>
@@ -356,7 +363,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                               <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
                               <div className="flex flex-col">
-                                <p className="text-base font-black text-[#EBC351] leading-tight">${totalAnnual.toFixed(2)}</p>
+                                <p className="text-base font-bold text-[#EBC351] leading-tight">${totalAnnual.toFixed(2)}</p>
                                 <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">est. yearly cost</p>
                               </div>
                             </div>
@@ -375,10 +382,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
                     onClick={(e) => handleFieldCopy(sub.id, sub.loginId || '', 'login', e)}
                   >
-                    <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'text-orange-500' : 'text-white/40'}`}>
+                    <p className={`text-[12px] font-bold uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'text-orange-500' : 'text-white/40'}`}>
                       {lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'Copied!' : 'Login ID'}
                     </p>
-                    <p className="text-xs font-black text-white truncate max-w-[140px]">{sub.loginId || '—'}</p>
+                    <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                      <p className="text-[13px] font-medium text-white truncate max-w-[140px]">{sub.loginId || '—'}</p>
+                    </div>
                   </div>
 
                   <div 
@@ -386,7 +395,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     onClick={(e) => handleFieldCopy(sub.id, sub.password || '', 'password', e)}
                   >
                     <div className="flex items-center gap-2">
-                      <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
+                      <p className={`text-[12px] font-bold uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
                         {lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
                       </p>
                       <button 
@@ -400,27 +409,35 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         )}
                       </button>
                     </div>
-                    <p className="text-xs font-black text-white tracking-wider truncate">
-                      {visiblePasswords.has(sub.id) ? (sub.password || '—') : '••••••••'}
-                    </p>
+                    <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                      <p className="text-[13px] font-medium text-white tracking-wider truncate">
+                        {visiblePasswords.has(sub.id) ? (sub.password || '—') : '••••••••'}
+                      </p>
+                    </div>
                   </div>
 
                   {sub.pricingModel !== 'free' && (
                     <>
                       <div className="space-y-1">
-                        <p className={`text-[9px] font-black text-white/40 uppercase tracking-widest`}>Paid From</p>
-                        <p className="text-xs font-black text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
+                        <p className={`text-[12px] font-bold text-white/40 uppercase tracking-widest`}>Paid From</p>
+                        <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                          <p className="text-[13px] font-medium text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
+                        </div>
                       </div>
                       <div className="space-y-1">
-                        <p className={`text-[9px] font-black text-white/40 uppercase tracking-widest`}>Due On</p>
-                        <p className="text-xs font-black text-white">{sub.nextRenewal || '—'}</p>
+                        <p className={`text-[12px] font-bold text-white/40 uppercase tracking-widest`}>Due On</p>
+                        <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                          <p className="text-[13px] font-medium text-white">{sub.nextRenewal || '—'}</p>
+                        </div>
                       </div>
                     </>
                   )}
                   {sub.notes && (
-                    <div className="col-span-2 space-y-1 pt-2">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
-                      <p className="text-xs font-bold text-white/60 leading-tight whitespace-pre-wrap">{sub.notes}</p>
+                    <div className="col-span-2 space-y-1">
+                      <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Notes</p>
+                      <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                        <p className="text-[13px] font-medium text-white/60 leading-tight whitespace-pre-wrap">{sub.notes}</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -430,10 +447,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             <div className="border-t border-white/5">
               <button
                 onClick={() => toggleExpanded(sub.id)}
-                className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group"
+                className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group"
               >
                 <div className="flex items-center space-x-3">
-                  <span className="text-[11px] font-black uppercase tracking-[0.15em]">Supplemental Services</span>
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Supplemental Services</span>
                   <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
                     {sub.subServices?.length || 0}
                   </div>
@@ -465,17 +482,17 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               }
                             }, 100);
                           }}
-                          className="text-xs font-bold cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
+                          className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
                         >
                           {child.name}
                         </span>
-                        <span className={`text-[9px] font-black uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                        <span className={`text-[10px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
                           {child.status}
                         </span>
                       </div>
-                      <span className={`text-xs font-black ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
+                      <span className={`text-[13px] font-medium ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
                         ${child.cost.toFixed(2)}
-                        <span className="text-[9px] text-white/40 ml-1 font-black uppercase tracking-widest lowercase">
+                        <span className="text-[12px] text-white/40 ml-1 font-bold uppercase tracking-widest lowercase">
                           /{child.billingCycle === 'Yearly' ? 'yr' : 'mo'}
                         </span>
                       </span>
@@ -495,10 +512,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             <div className="border-t border-white/5">
               <button
                 onClick={() => toggleEmailExpanded(sub.id)}
-                className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group bg-white/2"
+                className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group bg-white/2"
               >
                 <div className="flex items-center space-x-3">
-                  <span className="text-[11px] font-black uppercase tracking-[0.15em]">Linked Emails</span>
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Emails</span>
                   <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
                     {sub.linkedEmails?.length || 0}
                   </div>
