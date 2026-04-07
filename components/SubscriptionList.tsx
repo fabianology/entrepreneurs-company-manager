@@ -200,15 +200,31 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       }
     }, 100);
   };
-  const monthlyBurn = subscriptions.reduce((acc, s) => {
-    const baseMonthly = s.billingCycle === 'Monthly' ? s.cost : s.cost / 12;
-    const subServicesMonthly = s.subServices?.reduce((sum, ss) => {
-      if (ss.status === 'Paused') return sum;
-      const ssMonthly = (ss.billingCycle === 'Yearly') ? (ss.cost / 12) : ss.cost;
-      return sum + ssMonthly;
-    }, 0) || 0;
-    return acc + baseMonthly + subServicesMonthly;
-  }, 0);
+  const { cycleMonthly, cycleYearly, monthlyCount, yearlyCount } = subscriptions.reduce((acc, s) => {
+    // Check main subscription
+    if (s.billingCycle === 'Monthly') {
+      acc.cycleMonthly += s.cost;
+      acc.monthlyCount += 1;
+    } else if (s.billingCycle === 'Yearly') {
+      acc.cycleYearly += s.cost;
+      acc.yearlyCount += 1;
+    }
+    
+    // Check sub-services
+    s.subServices?.forEach(ss => {
+      if (ss.status !== 'Paused') {
+        if (ss.billingCycle === 'Monthly') {
+          acc.cycleMonthly += ss.cost;
+          acc.monthlyCount += 1;
+        } else if (ss.billingCycle === 'Yearly') {
+          acc.cycleYearly += ss.cost;
+          acc.yearlyCount += 1;
+        }
+      }
+    });
+    
+    return acc;
+  }, { cycleMonthly: 0, cycleYearly: 0, monthlyCount: 0, yearlyCount: 0 });
 
   const activeStack = subscriptions.length;
 
@@ -217,18 +233,17 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       {/* Action Bar - Minimalist Floating Style */}
       <div className="w-full h-10 flex items-center overflow-hidden">
         <div className="flex-1 px-5 flex items-center gap-6 shrink-0">
-          <div className="flex items-center gap-4">
-            <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Burn</span>
+          <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${monthlyBurn.toFixed(0)}</span>
-                <span className="text-[11px] font-medium text-white/20 uppercase tracking-normal">/mo</span>
-              </div>
-              <div className="w-[1px] h-3 bg-white/5"></div>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${(monthlyBurn * 12).toLocaleString()}</span>
-                <span className="text-[11px] font-medium text-white/20 uppercase tracking-normal">/yr</span>
-              </div>
+              <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Monthly ({monthlyCount})</span>
+              <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${cycleMonthly.toFixed(0)}</span>
+            </div>
+            
+            <div className="w-[1px] h-3 bg-white/10"></div>
+
+            <div className="flex items-center gap-4">
+              <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Yearly ({yearlyCount})</span>
+              <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${cycleYearly.toLocaleString()}</span>
             </div>
           </div>
         </div>
