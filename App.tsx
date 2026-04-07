@@ -922,7 +922,7 @@ const App: React.FC = () => {
               onDeleteCompany={handleDeleteCompany}
             />
           ) : (
-            <div className="space-y-8 animate-fadeIn">
+            <div className="space-y-5 animate-fadeIn">
               {selectedCompany && (
                 <>
                   <header className="flex flex-col md:flex-row md:items-start justify-between gap-4">

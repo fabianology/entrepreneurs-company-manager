@@ -554,30 +554,34 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const amortizationData = editingLoan ? calcAmortization() : null;
 
   return (
-    <div className="bg-black min-h-screen text-white p-4 space-y-12 animate-fadeIn">
-      {/* Action Bar */}
-      <div className="grid grid-cols-3 gap-3 pr-2">
+    <div className="bg-black min-h-screen text-white p-4 space-y-5 animate-fadeIn">
+      {/* Action Bar - Full Width Pill Shape */}
+      <div className="w-full h-10 bg-stone-900/60 backdrop-blur-xl rounded-full border border-white/10 shadow-2xl flex items-center p-1 gap-1 ring-1 ring-black/5 overflow-hidden">
         <button
           onClick={handleAddNewInstitution}
-          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-[13px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95"
+          className="flex-1 h-full text-white rounded-full text-xs font-bold uppercase tracking-[0.2em] hover:bg-white/5 active:bg-white/10 transition-all flex items-center justify-center space-x-2 active:scale-95 group"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-3 h-3 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Institution</span>
         </button>
 
+        <div className="w-[1px] h-4 bg-white/5"></div>
+
         <button
           onClick={handleAddNewCard}
-          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-[13px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95"
+          className="flex-1 h-full text-white rounded-full text-xs font-bold uppercase tracking-[0.2em] hover:bg-white/5 active:bg-white/10 transition-all flex items-center justify-center space-x-2 active:scale-95 group"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-3 h-3 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Cards</span>
         </button>
 
+        <div className="w-[1px] h-4 bg-white/5"></div>
+
         <button
           onClick={handleAddNewLoan}
-          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-[13px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center justify-center space-x-2 border border-white/5 active:scale-95"
+          className="flex-1 h-full text-white rounded-full text-xs font-bold uppercase tracking-[0.2em] hover:bg-white/5 active:bg-white/10 transition-all flex items-center justify-center space-x-2 active:scale-95 group"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-3 h-3 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Loan</span>
         </button>
       </div>

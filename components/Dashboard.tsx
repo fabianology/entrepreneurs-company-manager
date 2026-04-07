@@ -135,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn bg-black min-h-screen">
+    <div className="space-y-5 animate-fadeIn bg-black min-h-screen">
       {/* Add/Edit Company Modal */}
       {isModalOpen && (
         <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>

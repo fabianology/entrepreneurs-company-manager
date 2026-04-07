@@ -213,31 +213,27 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const activeStack = subscriptions.length;
 
   return (
-    <div className="bg-black min-h-screen text-white p-4">
-      {/* Action Bar */}
-      <div className="flex items-center justify-between pr-2">
-        <div className="flex items-center gap-3">
-          <div className="bg-[#1C1C1E] px-4 py-3.5 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
-            <span className="text-[13px] font-black text-white/40 uppercase tracking-widest text-nowrap">burn /mo</span>
-            <span className="text-[13px] font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
-          </div>
-          <div className="bg-[#1C1C1E] px-4 py-3.5 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
-            <span className="text-[13px] font-black text-white/40 uppercase tracking-widest text-nowrap">stacks</span>
-            <span className="text-[13px] font-black text-white tracking-widest">{activeStack}</span>
-          </div>
+    <div className="bg-black min-h-screen text-white p-4 space-y-5">
+      {/* Action Bar - Full Width Pill Shape */}
+      <div className="w-full h-10 bg-stone-900/60 backdrop-blur-xl rounded-full border border-white/10 shadow-2xl flex items-center px-1 overflow-hidden ring-1 ring-black/5">
+        <div className="flex-1 px-5 flex items-center gap-3 shrink-0">
+          <span className="text-xs font-bold text-white/30 uppercase tracking-[0.2em] text-nowrap">burn /mo</span>
+          <span className="text-xs font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
         </div>
+
+        <div className="w-[1px] h-4 bg-white/5 mx-1"></div>
 
         <button
           onClick={handleAddNew}
-          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-[13px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
+          className="h-full text-white px-6 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white/5 active:bg-white/10 transition-all flex items-center space-x-2 active:scale-95 group"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-3 h-3 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Service</span>
         </button>
       </div>
 
       {/* Subscription cards List */}
-      <div className="mt-[30px] space-y-4">
+      <div className="space-y-4">
         {subscriptions.length === 0 && (
           <button
             onClick={handleAddNew}
