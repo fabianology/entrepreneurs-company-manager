@@ -72,7 +72,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
       <div className="w-full h-10 flex items-center justify-center p-0 overflow-hidden mb-2">
         <button
           onClick={handleAddNew}
-          className="h-[36px] px-8 bg-white/5 border border-white/[0.03] text-white rounded-lg text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 group"
+          className="h-full px-8 text-white rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Document</span>
