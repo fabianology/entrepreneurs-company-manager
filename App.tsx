@@ -745,7 +745,7 @@ const App: React.FC = () => {
                   )}
                   <button
                     onClick={() => setShowQuickMenu(!showQuickMenu)}
-                    className={`w-10 h-10 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-[#EBC351] border-[#EBC351]/50 text-black' : 'bg-stone-900/60 border-white/10 text-white/40 hover:text-white hover:bg-stone-800'}`}
+                    className={`w-10 h-10 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-[#EBC351] text-black' : 'bg-stone-900/60 border-white/10 text-white/40 hover:text-white hover:bg-stone-800'}`}
                   >
                     {showQuickMenu ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -803,66 +803,7 @@ const App: React.FC = () => {
             ) : (
               /* Company Layout: Stacked Rows */
               <div className="flex flex-col items-center gap-3 w-full">
-                {/* Top Row: Quick Menu + Tab Switcher */}
-                <div className="flex items-center justify-center gap-3 w-full max-w-2xl">
-                  <div className="relative pointer-events-auto" ref={quickMenuRef}>
-                    {showQuickMenu && (
-                      <div className="absolute bottom-full left-0 mb-4 w-64 bg-[#111111]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
-                        <button
-                          onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); setShowQuickMenu(false); }}
-                          className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-[#EBC351] text-black shadow-md' : 'hover:bg-white/5 text-white/70'}`}
-                        >
-                          <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-                          Dashboard
-                        </button>
-                        <div className="px-2 py-1 text-[10px] font-bold text-white/30 uppercase tracking-wider">Jump to Company</div>
-                        {state.companies.map(c => (
-                          <button
-                            key={c.id}
-                            onClick={() => { selectCompanyFromDashboard(c.id); setShowQuickMenu(false); }}
-                            className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-[#EBC351] text-black shadow-md' : 'hover:bg-white/5 text-white/70'}`}
-                          >
-                            <div className="w-2 h-2 rounded-full ring-2 ring-white/10" style={{ backgroundColor: c.color }}></div>
-                            {c.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <button
-                      onClick={() => setShowQuickMenu(!showQuickMenu)}
-                      className={`w-10 h-10 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-[#EBC351] border-[#EBC351]/50 text-black' : 'bg-stone-900/60 border-white/10 text-white/40 hover:text-white hover:bg-stone-800'}`}
-                    >
-                      {showQuickMenu ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="flex-1 pointer-events-auto">
-                    <div className="bg-stone-900/60 backdrop-blur-xl p-0 rounded-full shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5 overflow-hidden">
-                      {[
-                        { id: 'subscriptions', label: 'Services', activeClass: 'bg-blue-400/7 border-blue-400/30 text-blue-400 shadow-[0_2px_16px_0_rgba(96,165,250,0.06)]' },
-                        { id: 'financial', label: 'Financial', activeClass: 'bg-green-400/7 border-green-400/30 text-green-400 shadow-[0_2px_16px_0_rgba(74,222,128,0.06)]' },
-                        { id: 'docs', label: 'Docs', activeClass: 'bg-white/7 border-white/20 text-white shadow-[0_2px_16px_0_rgba(255,255,255,0.06)]' },
-                      ].map(tab => (
-                        <button
-                          key={tab.id}
-                          onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
-                          className={`relative z-10 flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest rounded-full transition-all duration-300 ${activeTab === tab.id
-                            ? `backdrop-blur-xl border ${tab.activeClass}`
-                            : 'text-white/40 hover:text-white hover:bg-white/5'
-                            }`}
-                        >
-                          {tab.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Row: Search Bar (Full Width) */}
+                {/* Top Row: Search Bar (Full Width) */}
                 <div className="w-full max-w-2xl flex items-center justify-center gap-3">
                   <div className="relative group flex-1 pointer-events-auto" ref={searchContainerRef}>
                     <div className="relative shadow-2xl rounded-full group transition-all duration-300 hover:scale-[1.01]">
@@ -906,6 +847,65 @@ const App: React.FC = () => {
                           </button>
                         )}
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Row: Quick Menu + Tab Switcher */}
+                <div className="flex items-center justify-center gap-3 w-full max-w-2xl">
+                  <div className="relative pointer-events-auto" ref={quickMenuRef}>
+                    {showQuickMenu && (
+                      <div className="absolute bottom-full left-0 mb-4 w-64 bg-[#111111]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-2xl overflow-hidden p-2 animate-fadeIn flex flex-col gap-1">
+                        <button
+                          onClick={() => { setActiveView('dashboard'); setSelectedCompanyId(null); setShowQuickMenu(false); }}
+                          className={`text-left px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${activeView === 'dashboard' ? 'bg-[#EBC351] text-black shadow-md' : 'hover:bg-white/5 text-white/70'}`}
+                        >
+                          <svg className="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                          Dashboard
+                        </button>
+                        <div className="px-2 py-1 text-[10px] font-bold text-white/30 uppercase tracking-wider">Jump to Company</div>
+                        {state.companies.map(c => (
+                          <button
+                            key={c.id}
+                            onClick={() => { selectCompanyFromDashboard(c.id); setShowQuickMenu(false); }}
+                            className={`text-left px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center gap-3 ${selectedCompanyId === c.id ? 'bg-[#EBC351] text-black shadow-md' : 'hover:bg-white/5 text-white/70'}`}
+                          >
+                            <div className="w-2 h-2 rounded-full ring-2 ring-white/10" style={{ backgroundColor: c.color }}></div>
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowQuickMenu(!showQuickMenu)}
+                      className={`w-10 h-10 rounded-full backdrop-blur-xl border shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 ${showQuickMenu ? 'bg-[#EBC351] text-black' : 'bg-stone-900/60 border-white/10 text-white/40 hover:text-white hover:bg-stone-800'}`}
+                    >
+                      {showQuickMenu ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="flex-1 pointer-events-auto">
+                    <div className="bg-stone-900/60 backdrop-blur-xl p-0 rounded-full shadow-2xl border border-white/10 flex justify-between items-center ring-1 ring-black/5 overflow-hidden">
+                      {[
+                        { id: 'subscriptions', label: 'Services', activeClass: 'bg-blue-400/7 text-blue-400 shadow-[0_2px_16px_0_rgba(96,165,250,0.06)]' },
+                        { id: 'financial', label: 'Financial', activeClass: 'bg-green-400/7 text-green-400 shadow-[0_2px_16px_0_rgba(74,222,128,0.06)]' },
+                        { id: 'docs', label: 'Docs', activeClass: 'bg-white/7 text-white shadow-[0_2px_16px_0_rgba(255,255,255,0.06)]' },
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => { setActiveTab(tab.id as any); setSearchQuery(''); }}
+                          className={`relative z-10 flex-1 px-4 py-3 text-xs font-black uppercase tracking-widest rounded-full transition-all duration-300 ${activeTab === tab.id
+                            ? `backdrop-blur-xl ${tab.activeClass}`
+                            : 'text-white/40 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>

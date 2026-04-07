@@ -218,18 +218,18 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       <div className="flex items-center justify-between pr-2">
         <div className="flex items-center gap-3">
           <div className="bg-[#1C1C1E] px-4 py-3.5 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
-            <span className="text-xs font-black text-white/40 uppercase tracking-widest text-nowrap">burn /mo</span>
-            <span className="text-xs font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
+            <span className="text-[13px] font-black text-white/40 uppercase tracking-widest text-nowrap">burn /mo</span>
+            <span className="text-[13px] font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
           </div>
           <div className="bg-[#1C1C1E] px-4 py-3.5 rounded-xl border border-white/5 flex items-center gap-3 shrink-0">
-            <span className="text-xs font-black text-white/40 uppercase tracking-widest text-nowrap">stacks</span>
-            <span className="text-xs font-black text-white tracking-widest">{activeStack}</span>
+            <span className="text-[13px] font-black text-white/40 uppercase tracking-widest text-nowrap">stacks</span>
+            <span className="text-[13px] font-black text-white tracking-widest">{activeStack}</span>
           </div>
         </div>
 
         <button
           onClick={handleAddNew}
-          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
+          className="bg-[#1C1C1E] text-white px-4 py-3.5 rounded-xl text-[13px] font-black uppercase tracking-widest hover:bg-[#2C2C2E] transition flex items-center space-x-2 border border-white/5"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Service</span>
@@ -384,14 +384,13 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   </div>
                 </div>
 
-
                 <div className="grid grid-cols-2 gap-y-6 gap-x-4 pt-2">
                   <div 
                     className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
                     onClick={(e) => handleFieldCopy(sub.id, sub.loginId || '', 'login', e)}
                   >
                     <p className={`text-[12px] font-bold uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'text-orange-500' : 'text-white/40'}`}>
-                      {lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'Copied!' : 'Login ID'}
+                      {lastCopiedField?.id === sub.id && lastCopiedField.field === 'login' ? 'Copied' : 'Login ID'}
                     </p>
                     <div className="mt-1.5 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
                       <p className="text-[13px] font-medium text-white truncate max-w-[140px]">{sub.loginId || '—'}</p>
@@ -404,7 +403,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   >
                     <div className="flex items-center gap-2">
                       <p className={`text-[12px] font-bold uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
-                        {lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                        {lastCopiedField?.id === sub.id && lastCopiedField.field === 'password' ? 'Copied' : 'Password'}
                       </p>
                       <button 
                         onClick={(e) => { e.stopPropagation(); togglePasswordVisibility(sub.id); }} 
@@ -413,7 +412,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         {visiblePasswords.has(sub.id) ? (
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
                         ) : (
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         )}
                       </button>
                     </div>
@@ -423,9 +422,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       </p>
                     </div>
                   </div>
-
                 </div>
-            </div>
+              </div>
 
             {/* Expand for Details - Full Width */}
             {sub.pricingModel !== 'free' && (
@@ -447,26 +445,36 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                 {expandedCardDetails.has(sub.id) && (
                   <div className="px-6 pt-2 pb-6 grid grid-cols-2 gap-y-6 gap-x-4 animate-fadeIn">
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Paid From</p>
-                      <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
-                        <p className="text-[13px] font-medium text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
-                      </div>
+                      <input
+                        type="text"
+                        defaultValue={sub.paymentMethod || ''}
+                        onBlur={(e) => onUpdateSubscription(sub.id, { paymentMethod: e.target.value })}
+                        placeholder="Credit Card / Bank"
+                        className="w-full bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03] focus:border-[#EBC351]/30 focus:outline-none text-[13px] font-medium text-white placeholder-white/10 transition-all"
+                      />
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Due On</p>
-                      <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
-                        <p className="text-[13px] font-medium text-white">{sub.nextRenewal || '—'}</p>
-                      </div>
+                      <input
+                        type="text"
+                        defaultValue={sub.nextRenewal || ''}
+                        onBlur={(e) => onUpdateSubscription(sub.id, { nextRenewal: e.target.value })}
+                        placeholder="15th / EOM"
+                        className="w-full bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03] focus:border-[#EBC351]/30 focus:outline-none text-[13px] font-medium text-white placeholder-white/10 transition-all"
+                      />
                     </div>
-                    {sub.notes && (
-                      <div className="col-span-2 space-y-1">
-                        <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Notes</p>
-                        <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
-                          <p className="text-[13px] font-medium text-white/60 leading-tight whitespace-pre-wrap">{sub.notes}</p>
-                        </div>
-                      </div>
-                    )}
+                    <div className="col-span-2 space-y-1.5">
+                      <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Notes</p>
+                      <textarea
+                        defaultValue={sub.notes || ''}
+                        onBlur={(e) => onUpdateSubscription(sub.id, { notes: e.target.value })}
+                        placeholder="Add critical notes here..."
+                        rows={2}
+                        className="w-full bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03] focus:border-[#EBC351]/30 focus:outline-none text-[13px] font-medium text-white/80 placeholder-white/10 transition-all resize-none leading-relaxed"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
