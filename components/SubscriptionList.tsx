@@ -234,29 +234,34 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       <div className="w-full h-10 flex items-center overflow-hidden">
         <div className="flex-1 px-5 flex items-center gap-6 shrink-0">
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4">
-              <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Monthly ({monthlyCount})</span>
-              <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${cycleMonthly.toFixed(0)}</span>
+            <div className="flex flex-col">
+              <span className="text-[12px] font-bold uppercase tracking-widest text-white/40 mb-1 ml-1 leading-none">Monthly ({monthlyCount})</span>
+              <div className="h-[36px] bg-white/5 rounded-lg border border-white/[0.03] px-3 flex items-center">
+                <span className="text-[13px] font-medium text-white uppercase tracking-normal">${cycleMonthly.toFixed(0)}</span>
+              </div>
             </div>
             
-            <div className="w-[1px] h-3 bg-white/10"></div>
+            <div className="w-[1px] h-4 bg-white/10 mt-5"></div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Yearly ({yearlyCount})</span>
-              <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${cycleYearly.toLocaleString()}</span>
+            <div className="flex flex-col">
+              <span className="text-[12px] font-bold uppercase tracking-widest text-white/40 mb-1 ml-1 leading-none">Yearly ({yearlyCount})</span>
+              <div className="h-[36px] bg-white/5 rounded-lg border border-white/[0.03] px-3 flex items-center">
+                <span className="text-[13px] font-medium text-white uppercase tracking-normal">${cycleYearly.toLocaleString()}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="w-[1px] h-4 bg-white/5 mx-2"></div>
-
-        <button
-          onClick={handleAddNew}
-          className="h-full text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 group"
-        >
-          <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-          <span>Service</span>
-        </button>
+        <div className="flex items-center mt-5">
+          <div className="w-[1px] h-4 bg-white/5 mx-2"></div>
+          <button
+            onClick={handleAddNew}
+            className="h-[36px] px-6 bg-white/5 rounded-lg border border-white/[0.03] text-white transition-all flex items-center space-x-2 active:scale-95 group"
+          >
+            <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+            <span className="text-[13px] font-medium text-white uppercase tracking-normal">Service</span>
+          </button>
+        </div>
       </div>
 
       {/* Subscription cards List */}
