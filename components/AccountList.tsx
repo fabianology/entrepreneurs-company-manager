@@ -160,7 +160,7 @@ const AccountList: React.FC<AccountListProps> = ({
       <div className="w-full h-10 bg-stone-900/60 backdrop-blur-xl rounded-full border border-white/10 shadow-2xl flex items-center justify-center p-1 overflow-hidden ring-1 ring-black/5">
         <button
           onClick={handleAddNew}
-          className="h-full px-8 text-white rounded-full text-[13px] font-medium tracking-normal hover:bg-white/5 active:bg-white/10 transition-all flex items-center space-x-2 active:scale-95 group"
+          className="h-full px-8 text-white rounded-full text-[13px] font-medium uppercase tracking-normal hover:bg-white/5 active:bg-white/10 transition-all flex items-center space-x-2 active:scale-95 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Account</span>
