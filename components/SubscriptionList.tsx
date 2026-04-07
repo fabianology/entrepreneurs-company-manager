@@ -253,7 +253,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
            <div key={sub.id} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-300">
               {/* Main Info */}
               <div 
-                className="px-6 pt-6 pb-[2px] space-y-6 cursor-pointer group/card transition-colors"
+                className={`px-6 pt-6 ${sub.pricingModel === 'free' ? 'pb-[18px]' : 'pb-[2px]'} space-y-6 cursor-pointer group/card transition-colors`}
                 onClick={() => setEditingSubscription(sub)}
               >
                 <div className="flex justify-between items-start">
@@ -285,10 +285,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         {sub.status === 'Paused' ? (
                           <div className="flex items-center space-x-1.5">
                             <div className="h-1.5 w-1.5 rounded-full bg-red-500 shadow-[0_0_6px_rgba(239,68,68,0.6)]"></div>
-                            <span className="text-red-500 text-[10px] font-medium uppercase tracking-widest">Paused</span>
+                            <span className="text-red-500 text-[11px] font-medium uppercase tracking-widest">Paused</span>
                           </div>
                         ) : (
-                          <div className="flex items-center space-x-2 text-[10px] font-medium uppercase tracking-widest">
+                          <div className="flex items-center space-x-2 text-[11px] font-medium uppercase tracking-widest">
                             {sub.pricingModel !== 'free' ? (
                               <>
                                 <div className="flex items-center space-x-1.5">
@@ -428,51 +428,49 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             </div>
 
             {/* Expand for Details - Full Width */}
-            <div>
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleCardDetails(sub.id); }}
-                className="w-full h-[47px] px-6 flex items-center justify-between transition-colors"
-              >
-                <span className="text-[13px] font-medium text-white/40 uppercase tracking-[0.15em]">
-                  {expandedCardDetails.has(sub.id) ? 'Collapse' : 'Expand for Details'}
-                </span>
-                <svg
-                  className={`w-3 h-3 text-white/20 transform transition-transform duration-300 ${expandedCardDetails.has(sub.id) ? 'rotate-180' : ''}`}
-                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            {sub.pricingModel !== 'free' && (
+              <div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleCardDetails(sub.id); }}
+                  className="w-full h-[47px] px-6 flex items-center justify-between transition-colors"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                  <span className="text-[13px] font-medium text-white/40 uppercase tracking-[0.15em]">
+                    {expandedCardDetails.has(sub.id) ? 'Collapse' : 'Expand for Details'}
+                  </span>
+                  <svg
+                    className={`w-3 h-3 text-white/20 transform transition-transform duration-300 ${expandedCardDetails.has(sub.id) ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
 
-              {expandedCardDetails.has(sub.id) && (
-                <div className="px-6 pt-2 pb-6 grid grid-cols-2 gap-y-6 gap-x-4 animate-fadeIn">
-                  {sub.pricingModel !== 'free' && (
-                    <>
-                      <div className="space-y-1">
-                        <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Paid From</p>
-                        <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
-                          <p className="text-[13px] font-medium text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Due On</p>
-                        <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
-                          <p className="text-[13px] font-medium text-white">{sub.nextRenewal || '—'}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                  {sub.notes && (
-                    <div className="col-span-2 space-y-1">
-                      <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Notes</p>
+                {expandedCardDetails.has(sub.id) && (
+                  <div className="px-6 pt-2 pb-6 grid grid-cols-2 gap-y-6 gap-x-4 animate-fadeIn">
+                    <div className="space-y-1">
+                      <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Paid From</p>
                       <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
-                        <p className="text-[13px] font-medium text-white/60 leading-tight whitespace-pre-wrap">{sub.notes}</p>
+                        <p className="text-[13px] font-medium text-white truncate max-w-[100px]">{sub.paymentMethod || '—'}</p>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </div>
+                    <div className="space-y-1">
+                      <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Due On</p>
+                      <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
+                        <p className="text-[13px] font-medium text-white">{sub.nextRenewal || '—'}</p>
+                      </div>
+                    </div>
+                    {sub.notes && (
+                      <div className="col-span-2 space-y-1">
+                        <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Notes</p>
+                        <div className="mt-1.5 bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03]">
+                          <p className="text-[13px] font-medium text-white/60 leading-tight whitespace-pre-wrap">{sub.notes}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Supplemental Services Accordion */}
             <div className="border-t border-white/5">
@@ -517,7 +515,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         >
                           {child.name}
                         </span>
-                        <span className={`text-[10px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                        <span className={`text-[11px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
                           {child.status}
                         </span>
                       </div>
