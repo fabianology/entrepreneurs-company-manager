@@ -213,7 +213,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const activeStack = subscriptions.length;
 
   return (
-    <div className="bg-black min-h-screen text-white p-4 space-y-8">
+    <div className="bg-black min-h-screen text-white p-4">
       {/* Action Bar */}
       <div className="flex items-center justify-between pr-2">
         <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       </div>
 
       {/* Subscription cards List */}
-      <div className="space-y-4">
+      <div className="mt-[30px] space-y-4">
         {subscriptions.length === 0 && (
           <button
             onClick={handleAddNew}
