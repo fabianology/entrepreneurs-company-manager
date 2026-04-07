@@ -215,9 +215,21 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5">
       <div className="w-full h-10 bg-stone-900/60 backdrop-blur-xl rounded-full border border-white/10 shadow-2xl flex items-center px-1 overflow-hidden ring-1 ring-black/5">
-        <div className="flex-1 px-5 flex items-center gap-3 shrink-0">
-          <span className="text-[11px] font-bold text-white/30 uppercase tracking-[0.2em] text-nowrap">burn /mo</span>
-          <span className="text-[13px] font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
+        <div className="flex-1 px-5 flex items-center gap-6 shrink-0">
+          <div className="flex items-center gap-4">
+            <span className="text-[11px] font-bold text-white/30 uppercase tracking-[0.2em] text-nowrap">burn</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-black text-white tracking-widest">${monthlyBurn.toFixed(0)}</span>
+                <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">/mo</span>
+              </div>
+              <div className="w-[1px] h-3 bg-white/5"></div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[13px] font-black text-white tracking-widest">${(monthlyBurn * 12).toLocaleString()}</span>
+                <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest">/yr</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="w-[1px] h-4 bg-white/5 mx-1"></div>
