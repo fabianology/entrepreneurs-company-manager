@@ -296,7 +296,7 @@ const AccountList: React.FC<AccountListProps> = ({
 
               {expandedNotes.has(acc.id) && (
                 <div className="px-6 pb-4 space-y-2 animate-fadeIn">
-                  <ul className="space-y-2">
+                  <ul className="space-y-1">
                     {acc.notes.map((note, idx) => (
                       <li key={idx} className="flex items-start space-x-2 text-xs font-bold text-white/90">
                         <span className="mt-1 h-1 w-1 rounded-full bg-white/40 shrink-0"></span>
@@ -435,7 +435,7 @@ const AccountList: React.FC<AccountListProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-4 pt-2">
+              <div className="space-y-1 pt-2">
                 <p className="text-[12px] font-bold text-white/20 uppercase tracking-[0.2em] ml-1">Security & Recovery</p>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">

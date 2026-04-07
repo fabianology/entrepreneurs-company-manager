@@ -147,7 +147,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
               </button>
             </div>
             <div className="p-8 space-y-6 overflow-y-auto max-h-[70vh]">
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">Entity Name</label>
                 <input
                   autoFocus
@@ -157,7 +157,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                   onChange={(e) => setFormState({ ...formState, name: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">Entity Structure</label>
                 <select
                   className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-[#1FE400]/50 transition font-bold"
@@ -170,7 +170,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                 </select>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-1">
                 <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1">Identity Color</label>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {BRAND_COLORS.map(color => (
@@ -223,8 +223,8 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
                     </div>
                   </div>
 
-                  <div className="flex-1 space-y-4">
-                    <div className="space-y-1.5">
+                  <div className="flex-1 space-y-1">
+                    <div className="space-y-1">
                       <label className="text-[9px] font-black text-white/20 uppercase tracking-widest ml-1">Logo from URL</label>
                       <input
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-[#1FE400]/40 transition font-bold placeholder:text-white/10"

@@ -972,12 +972,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </button>
 
                   {/* Cards List */}
-                  <div className="space-y-4 mt-6">
+                  <div className="space-y-1 mt-6">
                     {(editingInstitution.accounts || []).map((acc, idx) => {
                       if (!['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                       return (
                         <div key={idx} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03]">
-                          <div className="flex-1 w-full space-y-4">
+                          <div className="flex-1 w-full space-y-1">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                               <div className="md:col-span-1 space-y-1">
                                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
@@ -1199,12 +1199,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-1">
                   {(editingInstitution.accounts || []).map((acc, idx) => {
                     if (['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                     return (
                       <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
-                        <div className="flex-1 w-full space-y-4">
+                        <div className="flex-1 w-full space-y-1">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                             <div className="md:col-span-1 space-y-1">
                               <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Account Name</label>

@@ -635,7 +635,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             </div>
 
                             {/* Row 4: Notes */}
-                            <div className="col-span-2 space-y-2">
+                            <div className="col-span-2 space-y-1">
                               <p className="text-[9px] font-black text-white/40 uppercase tracking-widest">Notes</p>
                               <div className="space-y-1">
                                 {email.notes.map((note, nIdx) => (
@@ -711,7 +711,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Subscription</label>
@@ -859,7 +859,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   </div>
                 )}
 
-                <div className="space-y-2 pt-2">
+                <div className="space-y-1 pt-2">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Notes</label>
                   <div className="bg-black/20 border border-white/[0.03] rounded-lg px-4 py-1">
                     <textarea
@@ -944,12 +944,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-1">
                     {(editingSubscription.subServices || []).map((child, idx) => (
                       <div key={child.id} id={`sub-service-${child.id}`} className="bg-black/20 p-5 rounded-lg flex flex-col gap-4 group/sub relative transition-all duration-300 border border-white/[0.03]">
-                        <div className="flex-1 space-y-4">
+                        <div className="flex-1 space-y-1">
                           <div className="flex gap-4 items-start">
-                            <div className="flex-1 space-y-2">
+                            <div className="flex-1 space-y-1">
                               <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Service Name</label>
                               <input
                                 className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1007,7 +1007,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                 <option value="Yearly">Yearly</option>
                               </select>
                             </div>
-                            <div className="col-span-3 md:col-span-3 lg:col-span-3 space-y-2 order-last md:order-none min-h-[60px]">
+                            <div className="col-span-3 md:col-span-3 lg:col-span-3 space-y-1 order-last md:order-none min-h-[60px]">
                               <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Purpose</label>
                               <textarea
                                 rows={2}
@@ -1106,7 +1106,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                   <div className="space-y-6">
                     {(editingSubscription.linkedEmails || []).map((email, idx) => (
-                      <div key={email.id} id={`linked-email-${email.id}`} className="bg-black/20 p-6 rounded-lg border border-white/[0.03] space-y-4 relative group/email-edit transition-all duration-300">
+                      <div key={email.id} id={`linked-email-${email.id}`} className="bg-black/20 p-6 rounded-lg border border-white/[0.03] space-y-1 relative group/email-edit transition-all duration-300">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-1">
                             <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Email Address</label>
@@ -1160,7 +1160,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               }}
                             />
                           </div>
-                          <div className="col-span-full space-y-2">
+                          <div className="col-span-full space-y-1">
                             <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Access Method</label>
                             <input
                               className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1173,7 +1173,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               }}
                             />
                           </div>
-                          <div className="col-span-full space-y-2">
+                          <div className="col-span-full space-y-1">
                             <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Notes</label>
                             <textarea
                               className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition h-24 resize-none"
