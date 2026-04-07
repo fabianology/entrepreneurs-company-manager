@@ -93,7 +93,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
             </div>
 
             <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Document Name</label>
                 <input
                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -104,7 +104,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
                   <select
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
@@ -118,7 +118,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                     <option value="Other" className="bg-[#1C1C1E]">Other</option>
                   </select>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Date</label>
                   <input
                     type="date"
@@ -129,7 +129,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">File / Link</label>
                   <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[30px] items-center">
@@ -174,7 +174,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
                 )}
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Notes</label>
                 <textarea
                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition resize-none custom-scrollbar"

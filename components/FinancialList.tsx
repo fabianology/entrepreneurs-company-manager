@@ -930,7 +930,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             </div>
             <div className="p-6 space-y-8 max-h-[60dvh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2 space-y-1.5">
+                <div className="md:col-span-2 space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Bank / Institution Name</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -939,7 +939,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Email/User</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -948,7 +948,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -958,7 +958,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })}
                   />
                 </div>
-                <div className="md:col-span-2 space-y-1.5">
+                <div className="md:col-span-2 space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Portal URL</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -979,7 +979,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         <div key={idx} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03]">
                           <div className="flex-1 w-full space-y-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                              <div className="md:col-span-1 space-y-1.5">
+                              <div className="md:col-span-1 space-y-1">
                                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
                                 <input
                                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -988,7 +988,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })}
                                 />
                               </div>
-                              <div className="md:col-span-1 space-y-1.5">
+                              <div className="md:col-span-1 space-y-1">
                                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
                                 <select
                                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1001,7 +1001,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   <option value="HSA">HSA</option>
                                 </select>
                               </div>
-                              <div className="md:col-span-1 space-y-1.5">
+                              <div className="md:col-span-1 space-y-1">
                                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Last 4</label>
                                 <input
                                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
@@ -1011,7 +1011,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })}
                                 />
                               </div>
-                              <div className="md:col-span-1 space-y-1.5">
+                              <div className="md:col-span-1 space-y-1">
                                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Autopay</label>
                                 <select
                                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1035,7 +1035,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                             {expandedAccounts.has(idx) && (
                               <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
-                                <div className="md:col-span-1 space-y-1.5">
+                                <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Holder</label>
                                   <input
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1044,7 +1044,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })}
                                   />
                                 </div>
-                                <div className="md:col-span-1 space-y-1.5">
+                                <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Network</label>
                                   <select
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1058,7 +1058,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     <option value="Other">Other</option>
                                   </select>
                                 </div>
-                                <div className="md:col-span-1 space-y-1.5">
+                                <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Expiry</label>
                                   <input
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
@@ -1068,7 +1068,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })}
                                   />
                                 </div>
-                                <div className="md:col-span-1 space-y-1.5">
+                                <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Status</label>
                                   <select
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1080,7 +1080,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     <option value="Expired">Expired</option>
                                   </select>
                                 </div>
-                                <div className="md:col-span-2 space-y-1.5">
+                                <div className="md:col-span-2 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid From</label>
                                   <input
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1089,7 +1089,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })}
                                   />
                                 </div>
-                                <div className="md:col-span-2 space-y-1.5">
+                                <div className="md:col-span-2 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid On</label>
                                   <input
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1100,7 +1100,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 </div>
                                 {acc.type === 'Credit Card' ? (
                                   <>
-                                    <div className="md:col-span-2 space-y-1.5">
+                                    <div className="md:col-span-2 space-y-1">
                                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Balance</label>
                                       <div className="relative flex items-center">
                                         <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
@@ -1118,7 +1118,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                         />
                                       </div>
                                     </div>
-                                    <div className="md:col-span-2 space-y-1.5">
+                                    <div className="md:col-span-2 space-y-1">
                                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Credit Limit</label>
                                       <div className="relative flex items-center">
                                         <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
@@ -1138,7 +1138,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="md:col-span-2 space-y-1.5">
+                                  <div className="md:col-span-2 space-y-1">
                                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Balance</label>
                                     <div className="relative flex items-center">
                                       <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
@@ -1206,7 +1206,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
                         <div className="flex-1 w-full space-y-4">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                            <div className="md:col-span-1 space-y-1.5">
+                            <div className="md:col-span-1 space-y-1">
                               <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Account Name</label>
                               <input
                                 className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1215,7 +1215,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })}
                               />
                             </div>
-                            <div className="md:col-span-1 space-y-1.5">
+                            <div className="md:col-span-1 space-y-1">
                               <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
                               <select
                                 className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1236,7 +1236,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 <option value="Other">Other</option>
                               </select>
                             </div>
-                            <div className="md:col-span-1 space-y-1.5">
+                            <div className="md:col-span-1 space-y-1">
                               <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Account Number</label>
                               <input
                                 className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
@@ -1245,7 +1245,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })}
                               />
                             </div>
-                            <div className="md:col-span-1 space-y-1.5">
+                            <div className="md:col-span-1 space-y-1">
                               <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Balance</label>
                               <div className="relative flex items-center">
                                 <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
@@ -1345,7 +1345,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                           {/* Progress bar */}
                           {amort && (
-                            <div className="space-y-1.5">
+                            <div className="space-y-1">
                               <div className="flex justify-between text-[8px] font-bold uppercase tracking-widest">
                                 <span className="text-[#EBC351]">Principal {amort.principalPct.toFixed(0)}%</span>
                                 <span className="text-orange-500">{loan.interestType === 'Fixed' ? 'Fee' : 'Interest'} {amort.interestPct.toFixed(0)}%</span>
@@ -1404,7 +1404,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             </div>
 
             <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
                 <input
                   className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1415,7 +1415,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Institution Name</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1424,7 +1424,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onChange={e => setEditingCard({ ...editingCard, institutionName: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
                   <select
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1438,7 +1438,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1447,7 +1447,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onChange={e => setEditingCard({ ...editingCard, login: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1460,7 +1460,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2 space-y-1.5">
+                <div className="col-span-2 space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Number (Last 4)</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-white/20 font-mono text-[13px] font-medium tracking-widest pointer-events-none">•••• •••• ••••</span>
@@ -1473,7 +1473,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Expiry</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white text-center font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
@@ -1486,7 +1486,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Credit Limit / Balance</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>
@@ -1498,7 +1498,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Status</label>
                   <select
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1579,7 +1579,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               {editingLoan.role === 'Lender' ? (
                 <>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Lent To</label>
                       <input
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1588,7 +1588,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Name</label>
                       <input
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1598,7 +1598,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Summary</label>
                     <textarea
                       rows={2}
@@ -1612,7 +1612,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Lender / Institution</label>
                       <input
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1621,7 +1621,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan ID</label>
                       <input
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -1631,7 +1631,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Summary</label>
                     <textarea
                       rows={2}
@@ -1645,7 +1645,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Date</label>
                   <input
                     type="date"
@@ -1664,7 +1664,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     }}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Maturity Date</label>
                   <input
                     type="date"
@@ -1697,7 +1697,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Amount</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>
@@ -1710,7 +1710,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
                 {editingLoan.role !== 'Lender' ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid Off</label>
                     <input
                       type="date"
@@ -1720,7 +1720,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     />
                   </div>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Interest Type</label>
                     <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[36px] items-center">
                       <button
@@ -1741,7 +1741,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Term</label>
                   <div className="flex gap-2">
                     <select
@@ -1788,7 +1788,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </select>
                   </div>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">
                     {editingLoan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Rate'}
                   </label>
@@ -1835,7 +1835,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
                       <span className="text-[#EBC351]">Principal ({amortizationData.principalPct.toFixed(1)}%)</span>
                       <span className="text-orange-500">Interest ({amortizationData.interestPct.toFixed(1)}%)</span>

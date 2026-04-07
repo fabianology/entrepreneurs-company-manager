@@ -299,7 +299,7 @@ const AccountList: React.FC<AccountListProps> = ({
                   <ul className="space-y-2">
                     {acc.notes.map((note, idx) => (
                       <li key={idx} className="flex items-start space-x-2 text-xs font-bold text-white/90">
-                        <span className="mt-1.5 h-1 w-1 rounded-full bg-white/40 shrink-0"></span>
+                        <span className="mt-1 h-1 w-1 rounded-full bg-white/40 shrink-0"></span>
                         <div className="flex-1 group/note flex items-center justify-between">
                           <input
                             className="bg-transparent border-none outline-none w-full py-0.5 focus:text-white transition-colors"
@@ -359,7 +359,7 @@ const AccountList: React.FC<AccountListProps> = ({
 
             <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Platform</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -368,7 +368,7 @@ const AccountList: React.FC<AccountListProps> = ({
                     onChange={e => setEditingAccount({ ...editingAccount, platform: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Website</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -380,7 +380,7 @@ const AccountList: React.FC<AccountListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Email</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -389,7 +389,7 @@ const AccountList: React.FC<AccountListProps> = ({
                     onChange={e => setEditingAccount({ ...editingAccount, email: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
                   <div className="relative">
                     <input
@@ -410,7 +410,7 @@ const AccountList: React.FC<AccountListProps> = ({
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Pricing</label>
                   <select
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
@@ -421,7 +421,7 @@ const AccountList: React.FC<AccountListProps> = ({
                     <option value="paid" className="bg-[#1C1C1E]">paid</option>
                   </select>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Status</label>
                   <select
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
@@ -438,7 +438,7 @@ const AccountList: React.FC<AccountListProps> = ({
               <div className="space-y-4 pt-2">
                 <p className="text-[12px] font-bold text-white/20 uppercase tracking-[0.2em] ml-1">Security & Recovery</p>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest ml-1">2FA Method</label>
                     <select
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
@@ -450,7 +450,7 @@ const AccountList: React.FC<AccountListProps> = ({
                       <option value="None" className="bg-[#1C1C1E]">None</option>
                     </select>
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest ml-1">Recovery</label>
                     <input
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
