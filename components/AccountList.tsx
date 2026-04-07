@@ -345,58 +345,60 @@ const AccountList: React.FC<AccountListProps> = ({
         )}
       </div>
 
-      {/* Editing Modal */}
       {editingAccount && (
-        <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/90 backdrop-blur-xl animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
-          <div className="bg-[#1C1C1E] rounded-[32px] shadow-2xl w-full max-w-xl border border-white/10 overflow-hidden">
-            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-base font-black tracking-tight text-white uppercase">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest">
                 {editingAccount.id ? 'Edit Account' : 'New Account'}
               </h3>
-              <button onClick={() => setEditingAccount(null)} className="text-white/40 hover:text-white transition">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+              <button onClick={() => setEditingAccount(null)} className="text-white/40 hover:text-white transition p-2 hover:bg-white/5 rounded-lg">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="p-8 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Platform</label>
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Platform</label>
                   <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingAccount.platform || ''}
                     placeholder="AWS"
                     onChange={e => setEditingAccount({ ...editingAccount, platform: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Website</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Website</label>
                   <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingAccount.website || ''}
                     placeholder="app.aws.com"
                     onChange={e => setEditingAccount({ ...editingAccount, website: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Login Email</label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Email</label>
                   <input
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingAccount.email || ''}
                     placeholder="admin@cifr.io"
                     onChange={e => setEditingAccount({ ...editingAccount, email: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Password</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
                   <div className="relative">
                     <input
                       type={showModalPassword ? "text" : "password"}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold pr-10"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition pr-10"
                       value={editingAccount.password || ''}
                       onChange={e => setEditingAccount({ ...editingAccount, password: e.target.value })}
                     />
-                    <button onClick={() => setShowModalPassword(!showModalPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20">
+                    <button onClick={() => setShowModalPassword(!showModalPassword)} className="absolute right-3 top-2 text-white/20">
                       {showModalPassword ? (
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
                       ) : (
@@ -405,59 +407,53 @@ const AccountList: React.FC<AccountListProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Pricing</label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Pricing</label>
                   <select
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                     value={editingAccount.pricingModel || 'free'}
                     onChange={e => setEditingAccount({ ...editingAccount, pricingModel: e.target.value as any })}
                   >
-                    <option value="free">free</option>
-                    <option value="paid">paid</option>
+                    <option value="free" className="bg-[#1C1C1E]">free</option>
+                    <option value="paid" className="bg-[#1C1C1E]">paid</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Status</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Status</label>
                   <select
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                     value={editingAccount.status || 'Active'}
                     onChange={e => setEditingAccount({ ...editingAccount, status: e.target.value as any })}
                   >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Trial">Trial</option>
+                    <option value="Active" className="bg-[#1C1C1E]">Active</option>
+                    <option value="Inactive" className="bg-[#1C1C1E]">Inactive</option>
+                    <option value="Trial" className="bg-[#1C1C1E]">Trial</option>
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4">
-                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest ml-1">Security & Recovery</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">2FA Method</label>
+              <div className="space-y-4 pt-2">
+                <p className="text-[12px] font-bold text-white/20 uppercase tracking-[0.2em] ml-1">Security & Recovery</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest ml-1">2FA Method</label>
                     <select
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                       value={editingAccount.twoFactorAuth || 'None'}
                       onChange={e => setEditingAccount({ ...editingAccount, twoFactorAuth: e.target.value })}
                     >
-                      <option value="Authenticator">Authenticator</option>
-                      <option value="SMS">SMS</option>
-                      <option value="None">None</option>
+                      <option value="Authenticator" className="bg-[#1C1C1E]">Authenticator</option>
+                      <option value="SMS" className="bg-[#1C1C1E]">SMS</option>
+                      <option value="None" className="bg-[#1C1C1E]">None</option>
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Last Updated</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-white/20 uppercase tracking-widest ml-1">Recovery</label>
                     <input
-                      type="date"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
-                      value={editingAccount.lastUpdated ? new Date(editingAccount.lastUpdated).toISOString().split('T')[0] : ''}
-                      onChange={e => setEditingAccount({ ...editingAccount, lastUpdated: new Date(e.target.value).getTime() })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-white/20 uppercase tracking-widest ml-1">Recovery</label>
-                    <input
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-3.5 text-white outline-none focus:border-orange-500/50 transition font-bold"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                       value={editingAccount.recoveryMethod || ''}
                       placeholder="email, phone number"
                       onChange={e => setEditingAccount({ ...editingAccount, recoveryMethod: e.target.value })}
@@ -467,29 +463,32 @@ const AccountList: React.FC<AccountListProps> = ({
               </div>
             </div>
 
-            <div className="px-6 py-3 bg-black/20 border-t border-white/5 flex justify-between items-center">
-              <div className="flex-1">
+            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between font-bold">
+              <div>
                 {editingAccount.id && (
                   showDeleteConfirm ? (
-                    <div className="flex items-center space-x-3">
-                      <span className="text-[10px] font-black text-orange-500 uppercase">Confirm?</span>
-                      <button onClick={() => { onDeleteAccount(editingAccount.id!); setEditingAccount(null); }} className="text-[10px] font-black text-white hover:text-orange-500">YES</button>
-                      <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-black text-white/20 hover:text-white">NO</button>
+                    <div className="flex items-center bg-orange-500/10 rounded-lg p-1 border border-orange-500/30 gap-3">
+                      <span className="text-[10px] font-bold text-orange-500 uppercase px-2">Confirm?</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => { onDeleteAccount(editingAccount.id!); setEditingAccount(null); }} className="text-[10px] font-bold text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">YES</button>
+                        <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-bold text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">NO</button>
+                      </div>
                     </div>
                   ) : (
-                    <button onClick={() => setShowDeleteConfirm(true)} className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest">Delete</button>
+                    <button onClick={() => setShowDeleteConfirm(true)} className="text-white/20 hover:text-orange-500 p-3 transition rounded-lg hover:bg-white/5 border border-transparent flex items-center justify-center">
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
                   )
                 )}
               </div>
               <div className="flex space-x-4">
-                <button onClick={() => setEditingAccount(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
-                <button onClick={handleSaveModal} className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
+                <button onClick={() => setEditingAccount(null)} className="px-6 py-3 text-[11px] font-bold text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+                <button onClick={handleSaveModal} className="h-[36px] px-8 bg-orange-500 rounded-lg text-[11px] font-bold text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Account</button>
               </div>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

@@ -921,38 +921,54 @@ const FinancialList: React.FC<FinancialListProps> = ({
       {/* --- EDIT INSTITUTION MODAL --- */}
       {editingInstitution && (
         <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
-          <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden my-auto border border-white/10">
+          <div className="bg-[#1C1C1E] rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden my-auto border border-white/10">
             <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
               <h3 className="text-base font-black text-white tracking-wide">{editingInstitution.id ? 'Edit Bank' : 'Add Bank'}</h3>
-              <button onClick={() => setEditingInstitution(null)} className="text-white/40 hover:text-white transition">
+              <button type="button" onClick={() => setEditingInstitution(null)} className="text-white/40 hover:text-white transition">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             <div className="p-6 space-y-8 max-h-[60dvh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Bank / Institution Name</label>
-                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.name || ''} placeholder="Mercury" onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })} />
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Bank / Institution Name</label>
+                  <input
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                    value={editingInstitution.name || ''}
+                    placeholder="Mercury"
+                    onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })}
+                  />
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login Email/User</label>
-                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.username || ''} placeholder="user@example.com" onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })} />
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Email/User</label>
+                  <input
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                    value={editingInstitution.username || ''}
+                    placeholder="user@example.com"
+                    onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })}
+                  />
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Password</label>
-                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" type="text" value={editingInstitution.password || ''} placeholder="••••••" onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })} />
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
+                  <input
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                    type="text"
+                    value={editingInstitution.password || ''}
+                    placeholder="••••••"
+                    onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })}
+                  />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login Portal URL</label>
-                  <input className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors" value={editingInstitution.loginUrl || ''} placeholder="https://bank.com/login" onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })} />
-                </div>
-              </div>
-
-              <div className="border-t border-white/5 pt-8">
-                <div className="mb-8">
-                  <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Portal URL</label>
+                  <input
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                    value={editingInstitution.loginUrl || ''}
+                    placeholder="https://bank.com/login"
+                    onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })}
+                  />
+                            <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
                     <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
-                    <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Card</span>
+                    <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Card</span>
                   </button>
 
                   {/* Cards List */}
@@ -960,29 +976,48 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     {(editingInstitution.accounts || []).map((acc, idx) => {
                       if (!['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                       return (
-                        <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
+                        <div key={idx} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03]">
                           <div className="flex-1 w-full space-y-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Nickname</label>
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Chase Sapphire" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                              <div className="md:col-span-1 space-y-1.5">
+                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
+                                <input
+                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                  placeholder="Chase Sapphire"
+                                  value={acc.name}
+                                  onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })}
+                                />
                               </div>
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Type</label>
-                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
+                              <div className="md:col-span-1 space-y-1.5">
+                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
+                                <select
+                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                  value={acc.type}
+                                  onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}
+                                >
                                   <option value="Credit Card">Credit Card</option>
                                   <option value="Debit (Linked)">Debit (Linked)</option>
                                   <option value="FSA">FSA</option>
                                   <option value="HSA">HSA</option>
                                 </select>
                               </div>
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Last 4</label>
-                                <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="1234" value={acc.last4} maxLength={4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                              <div className="md:col-span-1 space-y-1.5">
+                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Last 4</label>
+                                <input
+                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
+                                  placeholder="1234"
+                                  value={acc.last4}
+                                  maxLength={4}
+                                  onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })}
+                                />
                               </div>
-                              <div className="md:col-span-1">
-                                <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Autopay</label>
-                                <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.autopay || 'N/A'} onChange={e => handleUpdateInstAccount(idx, { autopay: e.target.value as any })}>
+                              <div className="md:col-span-1 space-y-1.5">
+                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Autopay</label>
+                                <select
+                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                  value={acc.autopay || 'N/A'}
+                                  onChange={e => handleUpdateInstAccount(idx, { autopay: e.target.value as any })}
+                                >
                                   <option value="Yes">Yes</option>
                                   <option value="No">No</option>
                                   <option value="N/A">N/A</option>
@@ -992,7 +1027,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                             {/* Toggle Button for Details */}
                             <div className="pt-3 border-t border-white/5 flex justify-center mt-2">
-                              <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[9px] font-black uppercase flex items-center gap-1 hover:text-white transition-colors">
+                              <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[10px] font-bold uppercase flex items-center gap-1 hover:text-white transition-colors">
                                 {expandedAccounts.has(idx) ? 'Minimize' : 'Expand Details'}
                                 <svg className={`w-3 h-3 transform transition-transform ${expandedAccounts.has(idx) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                               </button>
@@ -1000,13 +1035,22 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                             {expandedAccounts.has(idx) && (
                               <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
-                                <div className="md:col-span-1">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Card Holder</label>
-                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="NAME" value={acc.cardHolder || ''} onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })} />
+                                <div className="md:col-span-1 space-y-1.5">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Holder</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="NAME"
+                                    value={acc.cardHolder || ''}
+                                    onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })}
+                                  />
                                 </div>
-                                <div className="md:col-span-1">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Network</label>
-                                  <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.network || 'Visa'} onChange={e => handleUpdateInstAccount(idx, { network: e.target.value as any })}>
+                                <div className="md:col-span-1 space-y-1.5">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Network</label>
+                                  <select
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    value={acc.network || 'Visa'}
+                                    onChange={e => handleUpdateInstAccount(idx, { network: e.target.value as any })}
+                                  >
                                     <option value="Visa">Visa</option>
                                     <option value="Mastercard">Mastercard</option>
                                     <option value="Amex">Amex</option>
@@ -1014,64 +1058,102 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     <option value="Other">Other</option>
                                   </select>
                                 </div>
-                                <div className="md:col-span-1">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Expiry</label>
-                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="MM/YY" maxLength={5} value={acc.expiry || ''} onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })} />
+                                <div className="md:col-span-1 space-y-1.5">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Expiry</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="MM/YY"
+                                    maxLength={5}
+                                    value={acc.expiry || ''}
+                                    onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })}
+                                  />
                                 </div>
-                                <div className="md:col-span-1">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Status</label>
-                                  <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.status || 'Active'} onChange={e => handleUpdateInstAccount(idx, { status: e.target.value as any })}>
+                                <div className="md:col-span-1 space-y-1.5">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Status</label>
+                                  <select
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    value={acc.status || 'Active'}
+                                    onChange={e => handleUpdateInstAccount(idx, { status: e.target.value as any })}
+                                  >
                                     <option value="Active">Active</option>
                                     <option value="Frozen">Frozen</option>
                                     <option value="Expired">Expired</option>
                                   </select>
                                 </div>
-                                <div className="md:col-span-2">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid From</label>
-                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Chase Checking" value={acc.paidFrom || ''} onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })} />
+                                <div className="md:col-span-2 space-y-1.5">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid From</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="Chase Checking"
+                                    value={acc.paidFrom || ''}
+                                    onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })}
+                                  />
                                 </div>
-                                <div className="md:col-span-2">
-                                  <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Paid On</label>
-                                  <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="15th of Month" value={acc.paidOn || ''} onChange={e => handleUpdateInstAccount(idx, { paidOn: e.target.value })} />
+                                <div className="md:col-span-2 space-y-1.5">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid On</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="15th of Month"
+                                    value={acc.paidOn || ''}
+                                    onChange={e => handleUpdateInstAccount(idx, { paidOn: e.target.value })}
+                                  />
                                 </div>
                                 {acc.type === 'Credit Card' ? (
                                   <>
-                                    <div className="md:col-span-2">
-                                      <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Balance</label>
+                                    <div className="md:col-span-2 space-y-1.5">
+                                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Balance</label>
                                       <div className="relative flex items-center">
-                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
                                           <option value="USD" className="bg-[#1C1C1E]">$</option>
                                           <option value="EUR" className="bg-[#1C1C1E]">€</option>
                                           <option value="GBP" className="bg-[#1C1C1E]">£</option>
                                           <option value="CAD" className="bg-[#1C1C1E]">C$</option>
                                         </select>
-                                        <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="0.00" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                                        <input
+                                          className="w-full pl-8 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
+                                          type="number"
+                                          placeholder="0.00"
+                                          value={acc.balance}
+                                          onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })}
+                                        />
                                       </div>
                                     </div>
-                                    <div className="md:col-span-2">
-                                      <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Credit Limit</label>
+                                    <div className="md:col-span-2 space-y-1.5">
+                                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Credit Limit</label>
                                       <div className="relative flex items-center">
-                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
                                           <option value="USD" className="bg-[#1C1C1E]">$</option>
                                           <option value="EUR" className="bg-[#1C1C1E]">€</option>
                                           <option value="GBP" className="bg-[#1C1C1E]">£</option>
                                           <option value="CAD" className="bg-[#1C1C1E]">C$</option>
                                         </select>
-                                        <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Limit" value={acc.limit || ''} onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })} />
+                                        <input
+                                          className="w-full pl-8 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
+                                          type="number"
+                                          placeholder="Limit"
+                                          value={acc.limit || ''}
+                                          onChange={e => handleUpdateInstAccount(idx, { limit: parseFloat(e.target.value) })}
+                                        />
                                       </div>
                                     </div>
                                   </>
                                 ) : (
-                                  <div className="md:col-span-2">
-                                    <label className="block text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Balance</label>
+                                  <div className="md:col-span-2 space-y-1.5">
+                                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Balance</label>
                                     <div className="relative flex items-center">
-                                      <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                      <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
                                         <option value="USD" className="bg-[#1C1C1E]">$</option>
                                         <option value="EUR" className="bg-[#1C1C1E]">€</option>
                                         <option value="GBP" className="bg-[#1C1C1E]">£</option>
                                         <option value="CAD" className="bg-[#1C1C1E]">C$</option>
                                       </select>
-                                      <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="0.00" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                                      <input
+                                        className="w-full pl-8 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
+                                        type="number"
+                                        placeholder="0.00"
+                                        value={acc.balance}
+                                        onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })}
+                                      />
                                     </div>
                                   </div>
                                 )}
@@ -1081,17 +1163,17 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                           <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
                             {confirmDeleteAccount === idx ? (
-                              <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-xl p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
-                                <span className="text-[10px] md:text-[8px] font-black text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
+                              <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-lg p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
+                                <span className="text-[10px] md:text-[8px] font-bold text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
                                 <div className="flex gap-2 md:gap-1">
-                                  <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-black text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">YES</button>
-                                  <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-black text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">NO</button>
+                                  <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-bold text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">YES</button>
+                                  <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-bold text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">NO</button>
                                 </div>
                               </div>
                             ) : (
-                              <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-xl w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
+                              <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-lg w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
                                 <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                <span className="md:hidden text-[10px] font-black uppercase tracking-widest">Remove Card</span>
+                                <span className="md:hidden text-[10px] font-bold uppercase tracking-widest">Remove Card</span>
                               </button>
                             )}
                           </div>
@@ -1103,20 +1185,19 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                 <div className="mb-8 pt-4 border-t border-white/5">
                   <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
+                    <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
                       <span className="text-2xl group-hover:scale-110 transition-transform">🏦</span>
-                      <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
+                      <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
                     </button>
                     <button
                       onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name, _fromBank: true } as any)}
-                      className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-2xl flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group"
+                      className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group"
                     >
                       <span className="text-2xl group-hover:scale-110 transition-transform">💸</span>
-                      <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Loan</span>
+                      <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Loan</span>
                     </button>
                   </div>
                 </div>
-
 
                 <div className="space-y-4">
                   {(editingInstitution.accounts || []).map((acc, idx) => {
@@ -1125,11 +1206,22 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
                         <div className="flex-1 w-full space-y-4">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                            <div className="md:col-span-1">
-                              <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" placeholder="Account Name" value={acc.name} onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })} />
+                            <div className="md:col-span-1 space-y-1.5">
+                              <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Account Name</label>
+                              <input
+                                className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                placeholder="Account Name"
+                                value={acc.name}
+                                onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })}
+                              />
                             </div>
-                            <div className="md:col-span-1">
-                              <select className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold" value={acc.type} onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}>
+                            <div className="md:col-span-1 space-y-1.5">
+                              <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
+                              <select
+                                className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                value={acc.type}
+                                onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}
+                              >
                                 <option value="Checking">Checking</option>
                                 <option value="Savings">Savings</option>
                                 <option value="Investing">Investing</option>
@@ -1144,34 +1236,49 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 <option value="Other">Other</option>
                               </select>
                             </div>
-                            <div className="md:col-span-1">
-                              <input className="w-full px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-widest" placeholder="Account Number" value={acc.last4} onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })} />
+                            <div className="md:col-span-1 space-y-1.5">
+                              <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Account Number</label>
+                              <input
+                                className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
+                                placeholder="Account Number"
+                                value={acc.last4}
+                                onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })}
+                              />
                             </div>
-                            <div className="md:col-span-1 relative flex items-center">
-                              <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-black outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
-                                <option value="USD" className="bg-[#1C1C1E]">$</option>
-                                <option value="EUR" className="bg-[#1C1C1E]">€</option>
-                                <option value="GBP" className="bg-[#1C1C1E]">£</option>
-                                <option value="CAD" className="bg-[#1C1C1E]">C$</option>
-                              </select>
-                              <input className="w-full pl-8 px-3 py-2 bg-black/50 border border-white/10 rounded-lg outline-none focus:border-[#EBC351] text-white text-xs font-bold font-mono tracking-wider" type="number" placeholder="Balance" value={acc.balance} onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })} />
+                            <div className="md:col-span-1 space-y-1.5">
+                              <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Balance</label>
+                              <div className="relative flex items-center">
+                                <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                  <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                  <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                  <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                  <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                </select>
+                                <input
+                                  className="w-full pl-8 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
+                                  type="number"
+                                  placeholder="Balance"
+                                  value={acc.balance}
+                                  onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })}
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
                           {confirmDeleteAccount === idx ? (
-                            <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-xl p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
-                              <span className="text-[10px] md:text-[8px] font-black text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
+                            <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-lg p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
+                              <span className="text-[10px] md:text-[8px] font-bold text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
                               <div className="flex gap-2 md:gap-1">
-                                <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-black text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">YES</button>
-                                <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-black text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded-lg md:rounded transition-colors active:scale-95">NO</button>
+                                <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-bold text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">YES</button>
+                                <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-bold text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">NO</button>
                               </div>
                             </div>
                           ) : (
-                            <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-xl w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
+                            <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-lg w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
                               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              <span className="md:hidden text-[10px] font-black uppercase tracking-widest">Remove Account</span>
+                              <span className="md:hidden text-[10px] font-bold uppercase tracking-widest">Remove Account</span>
                             </button>
                           )}
                         </div>
@@ -1184,45 +1291,44 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 {/* --- LOAN CARDS inside bank modal --- */}
                 {loans.filter(l => l.lender === editingInstitution.name).length > 0 && (
                   <div className="space-y-3 pt-2">
-                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest px-1">💸 Loans
-                    </p>
+                    <p className="text-[12px] font-bold text-white/30 uppercase tracking-widest px-1">💸 Loans</p>
                     {loans.filter(l => l.lender === editingInstitution.name).map(loan => {
                       const amort = calcAmortization(loan);
                       return (
                         <div
                           key={loan.id}
                           onClick={() => setEditingLoan(loan)}
-                          className="bg-white/5 p-4 rounded-xl flex flex-col gap-3 border border-white/5 cursor-pointer hover:border-[#EBC351]/30 hover:bg-white/[0.07] transition-all group"
+                          className="bg-black/20 p-4 rounded-lg flex flex-col gap-3 border border-white/[0.03] cursor-pointer hover:border-[#EBC351]/30 hover:bg-white/[0.05] transition-all group"
                         >
                           {/* Header row */}
                           <div className="flex justify-between items-start">
-                            <div>
+                            <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <p className="text-sm font-black text-white">{loan.name}</p>
-                                <span className="text-[8px] font-black text-white/30 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded-full">
+                                <p className="text-[13px] font-bold text-white">{loan.name}</p>
+                                <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest border border-white/10 px-1.5 py-0.5 rounded-full">
                                   {loan.role || 'Lendee'}
                                 </span>
                               </div>
-                              <p className={`text-[9px] font-black uppercase tracking-widest mt-0.5 ${
+                              <p className={`text-[10px] font-bold uppercase tracking-widest ${
                                 loan.paidOffDate || loan.status === 'Paid Off' ? 'text-emerald-500' : 'text-[#EBC351]'
                               }`}>
                                 {loan.paidOffDate ? 'Paid Off' : loan.status}
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-sm font-black text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
-                              <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Loan Amount</p>
+                              <p className="text-[13px] font-bold text-white">${(loan.principalAmount || 0).toLocaleString()}</ p>
+                              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Loan Amount</p>
                             </div>
                           </div>
 
                           {/* Stats row */}
                           <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-3">
                             <div>
-                              <p className="text-[8px] font-black text-white/40 mb-0.5 uppercase tracking-widest">Loan Date</p>
+                              <p className="text-[10px] font-bold text-white/40 mb-0.5 uppercase tracking-widest">Loan Date</p>
                               <p className="text-xs font-bold text-white">{loan.startDate || '—'}</p>
                             </div>
                             <div>
-                              <p className="text-[8px] font-black text-white/40 mb-0.5 uppercase tracking-widest">
+                              <p className="text-[10px] font-bold text-white/40 mb-0.5 uppercase tracking-widest">
                                 {loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest'}
                               </p>
                               <p className="text-xs font-bold text-white">
@@ -1230,7 +1336,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               </p>
                             </div>
                             <div>
-                              <p className="text-[8px] font-black text-white/40 mb-0.5 uppercase tracking-widest">Total</p>
+                              <p className="text-[10px] font-bold text-white/40 mb-0.5 uppercase tracking-widest">Total</p>
                               <p className="text-xs font-bold text-white">
                                 ${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                               </p>
@@ -1240,18 +1346,18 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           {/* Progress bar */}
                           {amort && (
                             <div className="space-y-1.5">
-                              <div className="flex justify-between text-[7px] font-black uppercase tracking-widest">
+                              <div className="flex justify-between text-[8px] font-bold uppercase tracking-widest">
                                 <span className="text-[#EBC351]">Principal {amort.principalPct.toFixed(0)}%</span>
                                 <span className="text-orange-500">{loan.interestType === 'Fixed' ? 'Fee' : 'Interest'} {amort.interestPct.toFixed(0)}%</span>
                               </div>
-                              <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden flex">
+                              <div className="h-1.5 w-full bg-black/40 rounded-full overflow-hidden flex">
                                 <div className="h-full bg-[#EBC351]" style={{ width: `${amort.principalPct}%` }} />
                                 <div className="h-full bg-orange-500" style={{ width: `${amort.interestPct}%` }} />
                               </div>
                             </div>
                           )}
 
-                          <p className="text-[8px] font-black text-[#EBC351]/60 uppercase tracking-widest group-hover:text-[#EBC351] transition text-center">Tap to edit →</p>
+                          <p className="text-[10px] font-bold text-[#EBC351]/60 uppercase tracking-widest group-hover:text-[#EBC351] transition text-center">Tap to edit →</p>
                         </div>
                       );
                     })}
@@ -1277,74 +1383,74 @@ const FinancialList: React.FC<FinancialListProps> = ({
               )}
               <div className="flex space-x-4 ml-auto">
                 <button onClick={() => setEditingInstitution(null)} className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
-                <button onClick={handleSaveInstitution} className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Bank</button>
+                <button onClick={handleSaveInstitution} className="h-[36px] px-8 bg-orange-500 rounded-lg text-[11px] font-bold text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Bank</button>
               </div>
             </div>
           </div>
         </div>
       )}
-
+      
       {/* --- EDIT CARD MODAL --- */}
       {editingCard && (
-        <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
-          <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto border border-white/10">
-            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-base font-black text-white tracking-wide">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest">
                 {editingCard.id ? 'Edit Card Details' : 'Add New Card'}
               </h3>
-              <button onClick={() => setEditingCard(null)} className="text-white/40 hover:text-white transition">
+              <button onClick={() => setEditingCard(null)} className="text-white/40 hover:text-white transition p-2 hover:bg-white/5 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-              <div>
-                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Nickname</label>
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
                 <input
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                   placeholder="Amex Gold - Advertising"
                   value={editingCard.name || ''}
                   onChange={e => setEditingCard({ ...editingCard, name: e.target.value })}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Institution Name</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Institution Name</label>
                   <input
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     placeholder="Chase, Amex"
                     value={editingCard.institutionName || ''}
                     onChange={e => setEditingCard({ ...editingCard, institutionName: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Type</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
                   <select
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingCard.type || 'Credit'}
                     onChange={e => setEditingCard({ ...editingCard, type: e.target.value as any })}
                   >
-                    <option value="Credit">Credit</option>
-                    <option value="Debit">Debit</option>
+                    <option value="Credit" className="bg-[#1C1C1E]">Credit</option>
+                    <option value="Debit" className="bg-[#1C1C1E]">Debit</option>
                   </select>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Login</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login</label>
                   <input
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     placeholder="username or email"
                     value={editingCard.login || ''}
                     onChange={e => setEditingCard({ ...editingCard, login: e.target.value })}
                   />
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Password</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
                   <input
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     type="password"
                     placeholder="••••••••"
                     value={editingCard.password || ''}
@@ -1353,24 +1459,24 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-6">
-                <div className="col-span-2">
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Card Number (Last 4)</label>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2 space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Number (Last 4)</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-white/40 font-mono text-sm font-black tracking-widest">•••• •••• ••••</span>
+                    <span className="absolute left-3 top-2.5 text-white/20 font-mono text-[13px] font-medium tracking-widest pointer-events-none">•••• •••• ••••</span>
                     <input
                       maxLength={4}
-                      className="w-full pl-40 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold font-mono tracking-widest transition-colors"
+                      className="w-full pl-32 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
                       placeholder="1234"
                       value={editingCard.last4 || ''}
                       onChange={e => setEditingCard({ ...editingCard, last4: e.target.value.replace(/\D/g, '') })}
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Expiry</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Expiry</label>
                   <input
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold text-center font-mono tracking-widest transition-colors"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white text-center font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
                     placeholder="MM/YY"
                     maxLength={5}
                     value={editingCard.expiry || ''}
@@ -1379,29 +1485,29 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Credit Limit / Balance</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Credit Limit / Balance</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
+                    <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>
                     <input
                       type="number"
-                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg pl-7 px-3 py-2 text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
                       value={editingCard.limit || ''}
                       onChange={e => setEditingCard({ ...editingCard, limit: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Status</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Status</label>
                   <select
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingCard.status || 'Active'}
                     onChange={e => setEditingCard({ ...editingCard, status: e.target.value as any })}
                   >
-                    <option value="Active">Active</option>
-                    <option value="Frozen">Frozen</option>
-                    <option value="Expired">Expired</option>
+                    <option value="Active" className="bg-[#1C1C1E]">Active</option>
+                    <option value="Frozen" className="bg-[#1C1C1E]">Frozen</option>
+                    <option value="Expired" className="bg-[#1C1C1E]">Expired</option>
                   </select>
                 </div>
               </div>
@@ -1411,71 +1517,49 @@ const FinancialList: React.FC<FinancialListProps> = ({
               <div>
                 {editingCard.id && (
                   showDeleteConfirm ? (
-                    <div className="flex items-center space-x-3">
-                      <button
-                        onClick={() => { onDeleteCard(editingCard.id!); setEditingCard(null); }}
-                        className="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition"
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="text-[10px] font-black text-white/40 hover:text-white uppercase tracking-widest transition"
-                      >
-                        Cancel
-                      </button>
+                    <div className="flex items-center bg-orange-500/10 rounded-lg p-1 border border-orange-500/30 gap-3">
+                      <span className="text-[10px] font-bold text-orange-500 uppercase px-2">Confirm?</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => { onDeleteCard(editingCard.id!); setEditingCard(null); setShowDeleteConfirm(false); }} className="text-[10px] font-bold text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">YES</button>
+                        <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-bold text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">NO</button>
+                      </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="text-[10px] font-black text-white/20 hover:text-orange-500 uppercase tracking-widest transition"
-                    >
-                      Remove Card
+                    <button onClick={() => setShowDeleteConfirm(true)} className="text-white/20 hover:text-orange-500 p-3 transition rounded-lg hover:bg-white/5 border border-transparent flex items-center justify-center">
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   )
                 )}
               </div>
               <div className="flex space-x-4">
-                <button
-                  onClick={() => setEditingCard(null)}
-                  className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveCardModal}
-                  className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition"
-                >
-                  Save Card
-                </button>
+                <button onClick={() => setEditingCard(null)} className="px-6 py-3 text-[11px] font-bold text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+                <button onClick={handleSaveCardModal} className="h-[36px] px-8 bg-orange-500 rounded-lg text-[11px] font-bold text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Card</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- EDIT LOAN MODAL --- */}
       {editingLoan && (
-        <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
-          <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden my-auto border border-white/10">
-            <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
-              <h3 className="text-base font-black text-white tracking-wide">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest">
                 {editingLoan.id ? 'Edit Loan Details' : 'Add New Financing'}
               </h3>
-              <button onClick={() => setEditingLoan(null)} className="text-white/40 hover:text-white transition">
+              <button onClick={() => setEditingLoan(null)} className="text-white/40 hover:text-white transition p-2 hover:bg-white/5 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
-            <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
               <div className="flex justify-center pb-2">
-                {/* When opened from bank, lock to Lendee-only — no toggle shown */}
                 {!(editingLoan as any)._fromBank && (
                   <div className={`flex bg-black/40 p-1 rounded-full border border-white/5 min-w-[200px] ${editingLoan.id ? 'pointer-events-none' : ''}`}>
                     {(!editingLoan.id || editingLoan.role === 'Lender') && (
                       <button
                         onClick={() => setEditingLoan({ ...editingLoan, role: 'Lender' })}
-                        className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
+                        className={`py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex-1 text-center ${editingLoan.role === 'Lender' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
                       >
                         Lender
                       </button>
@@ -1483,7 +1567,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     {(!editingLoan.id || editingLoan.role === 'Lendee' || !editingLoan.role) && (
                       <button
                         onClick={() => setEditingLoan({ ...editingLoan, role: 'Lendee' })}
-                        className={`py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex-1 text-center ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
+                        className={`py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all flex-1 text-center ${editingLoan.role === 'Lendee' || !editingLoan.role ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'} ${!editingLoan.id ? 'px-6' : ''}`}
                       >
                         Lendee
                       </button>
@@ -1494,36 +1578,31 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
               {editingLoan.role === 'Lender' ? (
                 <>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lent To</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Lent To</label>
                       <input
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                         placeholder="Acme Corp"
                         value={editingLoan.lender || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                       />
                     </div>
-                    <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Name</label>
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Name</label>
                       <input
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                         placeholder="Bridge Loan"
                         value={editingLoan.name || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Summary</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Summary</label>
                     <textarea
                       rows={2}
-                      style={{
-                        backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
-                        backgroundAttachment: 'local',
-                        lineHeight: '20px'
-                      }}
-                      className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition resize-none custom-scrollbar"
                       placeholder="36 Months summary..."
                       value={editingLoan.term || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
@@ -1532,36 +1611,31 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Lender / Institution</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Lender / Institution</label>
                       <input
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                         placeholder="Silicon Valley Bank"
                         value={editingLoan.lender || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, lender: e.target.value })}
                       />
                     </div>
-                    <div>
-                      <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan ID</label>
+                    <div className="space-y-1.5">
+                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan ID</label>
                       <input
-                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors"
+                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                         placeholder="Series A Venture Debt"
                         value={editingLoan.name || ''}
                         onChange={e => setEditingLoan({ ...editingLoan, name: e.target.value })}
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Summary</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Summary</label>
                     <textarea
                       rows={2}
-                      style={{
-                        backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
-                        backgroundAttachment: 'local',
-                        lineHeight: '20px'
-                      }}
-                      className="w-full py-3 bg-transparent border-none outline-none focus:ring-0 text-white text-sm font-bold transition-colors resize-none custom-scrollbar"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition resize-none custom-scrollbar"
                       placeholder="36 Months summary..."
                       value={editingLoan.term || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, term: e.target.value })}
@@ -1570,12 +1644,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </>
               )}
 
-              <div className="grid grid-cols-2 gap-6 pb-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Date</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Date</label>
                   <input
                     type="date"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition [color-scheme:dark]"
                     value={editingLoan.startDate || ''}
                     onChange={e => {
                       const newStart = e.target.value;
@@ -1590,11 +1664,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     }}
                   />
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Maturity Date</label>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Maturity Date</label>
                   <input
                     type="date"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition [color-scheme:dark]"
                     value={(() => {
                       const totalMonths = (editingLoan.termYears || 0) * 12 + (editingLoan.termMonths || 0);
                       if (editingLoan.startDate && totalMonths > 0) {
@@ -1622,42 +1696,42 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Amount</label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Amount</label>
                   <div className="relative">
-                    <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>
+                    <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>
                     <input
                       type="number"
-                      className="w-full pl-8 px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold tracking-widest transition-colors"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg pl-7 px-3 py-2 text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
                       value={editingLoan.principalAmount || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, principalAmount: parseFloat(e.target.value) })}
                     />
                   </div>
                 </div>
                 {editingLoan.role !== 'Lender' ? (
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Paid Off</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid Off</label>
                     <input
                       type="date"
-                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors [color-scheme:dark]"
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition [color-scheme:dark]"
                       value={editingLoan.paidOffDate || ''}
                       onChange={e => setEditingLoan({ ...editingLoan, paidOffDate: e.target.value })}
                     />
                   </div>
                 ) : (
-                  <div>
-                    <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Interest Type</label>
-                    <div className="flex bg-black/40 p-1 rounded-full border border-white/5 h-[42px] items-center">
+                  <div className="space-y-1.5">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Interest Type</label>
+                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[36px] items-center">
                       <button
                         onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Percentage' })}
-                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                        className={`flex-1 h-full rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${(!editingLoan.interestType || editingLoan.interestType === 'Percentage') ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
                       >
                         Interest
                       </button>
                       <button
                         onClick={() => setEditingLoan({ ...editingLoan, interestType: 'Fixed' })}
-                        className={`flex-1 h-full rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
+                        className={`flex-1 h-full rounded-md text-[10px] font-bold uppercase tracking-widest transition-all ${editingLoan.interestType === 'Fixed' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/40 hover:text-white'}`}
                       >
                         Fixed
                       </button>
@@ -1666,12 +1740,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">Loan Term</label>
-                  <div className="flex space-x-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Term</label>
+                  <div className="flex gap-2">
                     <select
-                      className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
+                      className="flex-1 bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                       value={editingLoan.termYears || 0}
                       onChange={e => {
                         const yrs = parseInt(e.target.value);
@@ -1686,13 +1760,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         setEditingLoan({ ...editingLoan, termYears: yrs, maturityDate: newMaturity });
                       }}
                     >
-                      <option value={0} className="bg-[#1C1C1E]">0 Years</option>
+                      <option value={0} className="bg-[#1C1C1E]">0 Yrs</option>
                       {[...Array(30)].map((_, i) => (
-                        <option key={i + 1} value={i + 1} className="bg-[#1C1C1E]">{i + 1} Years</option>
+                        <option key={i + 1} value={i + 1} className="bg-[#1C1C1E]">{i + 1} Yrs</option>
                       ))}
                     </select>
                     <select
-                      className="flex-1 w-full px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
+                      className="flex-1 bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                       value={editingLoan.termMonths || 0}
                       onChange={e => {
                         const mos = parseInt(e.target.value);
@@ -1707,108 +1781,103 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         setEditingLoan({ ...editingLoan, termMonths: mos, maturityDate: newMaturity });
                       }}
                     >
-                      <option value={0} className="bg-[#1C1C1E]">0 Months</option>
+                      <option value={0} className="bg-[#1C1C1E]">0 Mos</option>
                       {[...Array(11)].map((_, i) => (
-                        <option key={i + 1} value={i + 1} className="bg-[#1C1C1E]">{i + 1} Months</option>
+                        <option key={i + 1} value={i + 1} className="bg-[#1C1C1E]">{i + 1} Mos</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-2">
-                    {editingLoan.interestType === 'Fixed' ? 'Fixed' : 'APR'}
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">
+                    {editingLoan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Rate'}
                   </label>
-                  <div className="flex space-x-2">
+                  <div className="flex gap-2">
                     <div className="relative flex-1">
-                      {editingLoan.interestType === 'Fixed' && <span className="absolute left-4 top-3.5 text-white/40 font-black">$</span>}
+                      {editingLoan.interestType === 'Fixed' && <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>}
                       <input
                         type="number"
                         step={editingLoan.interestType === 'Fixed' ? "1" : "0.1"}
-                        className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-8' : ''} px-4 py-3 bg-white/5 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors`}
+                        className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-7' : ''} bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition`}
                         value={editingLoan.interestRate || ''}
                         placeholder={editingLoan.interestType === 'Fixed' ? "500" : "5.5"}
                         onChange={e => setEditingLoan({ ...editingLoan, interestRate: e.target.value ? parseFloat(e.target.value) : 0 })}
                       />
+                      {editingLoan.interestType !== 'Fixed' && <span className="absolute right-3 top-2 text-[13px] font-bold text-white/40">%</span>}
                     </div>
                     {editingLoan.interestType !== 'Fixed' && (
                       <select
-                        className="flex-1 px-4 py-3 bg-black/50 border border-white/10 rounded-xl outline-none focus:border-[#EBC351] text-white text-sm font-bold transition-colors appearance-none"
+                        className="flex-1 bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                         value={editingLoan.scheduleFrequency || 'Monthly'}
                         onChange={e => setEditingLoan({ ...editingLoan, scheduleFrequency: e.target.value as any })}
                       >
-                        <option value="Weekly">Weekly</option>
-                        <option value="Monthly">Monthly</option>
-                        <option value="Yearly">Yearly</option>
+                        <option value="Weekly" className="bg-[#1C1C1E]">Wk</option>
+                        <option value="Monthly" className="bg-[#1C1C1E]">Mo</option>
+                        <option value="Yearly" className="bg-[#1C1C1E]">Yr</option>
                       </select>
                     )}
                   </div>
                 </div>
               </div>
 
-
-
               {amortizationData && (
-                <div className="pt-6 mt-6 border-t border-white/5 space-y-6 animate-fadeIn">
-                  <div className="flex items-center justify-between">
+                <div className="pt-5 mt-5 border-t border-white/5 space-y-5 animate-fadeIn">
+                  <div className="flex items-center justify-between px-1">
                     <div>
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">
-                        {amortizationData.scheduleFrequency === 'Weekly' ? 'Weekly' : amortizationData.scheduleFrequency === 'Yearly' ? 'Yearly' : 'Monthly'} Payment
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">
+                        {amortizationData.scheduleFrequency === 'Weekly' ? 'Weekly' : amortizationData.scheduleFrequency === 'Yearly' ? 'Yearly' : 'Monthly'} Pmt
                       </p>
-                      <p className="text-xl font-black text-white">${amortizationData.monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="text-xl font-bold text-white">${amortizationData.monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">Total Cost of Loan</p>
-                      <p className="text-base font-black text-white">${amortizationData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Total Cost</p>
+                      <p className="text-sm font-bold text-white">${amortizationData.totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[9px] font-black uppercase tracking-widest">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
                       <span className="text-[#EBC351]">Principal ({amortizationData.principalPct.toFixed(1)}%)</span>
                       <span className="text-orange-500">Interest ({amortizationData.interestPct.toFixed(1)}%)</span>
                     </div>
-                    <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden flex shadow-inner">
+                    <div className="h-2 w-full bg-black/40 rounded-full overflow-hidden flex">
                       <div className="h-full bg-[#EBC351] transition-all duration-1000 ease-out" style={{ width: `${amortizationData.principalPct}%` }}></div>
                       <div className="h-full bg-orange-500 transition-all duration-1000 ease-out" style={{ width: `${amortizationData.interestPct}%` }}></div>
                     </div>
-                    <div className="flex justify-between text-xs font-black">
-                      <span className="text-white">${amortizationData.totalPrincipal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      <span className="text-white">${amortizationData.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <button
                       onClick={() => setShowAmortizationTable(!showAmortizationTable)}
-                      className="w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl text-[10px] font-black text-white uppercase tracking-widest transition flex items-center justify-center space-x-2 active:scale-95"
+                      className="w-full h-[36px] bg-black/20 hover:bg-white/5 border border-white/[0.03] rounded-lg text-[10px] font-bold text-white/60 uppercase tracking-widest transition flex items-center justify-center gap-2 active:scale-95"
                     >
                       <span>{showAmortizationTable ? 'Hide Schedule' : 'Amortization Schedule'}</span>
                       <svg className={`w-4 h-4 transform transition-transform ${showAmortizationTable ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                     </button>
 
                     {showAmortizationTable && (
-                      <div className="mt-4 border border-white/10 rounded-xl overflow-hidden animate-fadeIn">
-                        <div className="max-h-[300px] overflow-y-auto custom-scrollbar bg-black/20">
-                          <table className="w-full text-left text-xs text-white">
-                            <thead className="bg-[#1C1C1E] sticky top-0 z-10 shadow-md">
+                      <div className="mt-3 border border-white/[0.03] rounded-lg overflow-hidden animate-fadeIn">
+                        <div className="max-h-[250px] overflow-y-auto custom-scrollbar bg-black/40">
+                          <table className="w-full text-left text-[11px] text-white">
+                            <thead className="bg-[#1C1C1E] sticky top-0 z-10 shadow-sm">
                               <tr>
-                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5">
+                                <th className="px-3 py-2 font-bold text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5">
                                   {amortizationData.scheduleFrequency === 'Weekly' ? 'Wk.' : amortizationData.scheduleFrequency === 'Yearly' ? 'Yr.' : 'Mo.'}
                                 </th>
-                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5 text-right">Payment</th>
-                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-[#EBC351] border-b border-white/5 text-right">Principal</th>
-                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-orange-500 border-b border-white/5 text-right">Interest</th>
-                                <th className="px-4 py-3 font-black text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5 text-right">Balance</th>
+                                <th className="px-3 py-2 font-bold text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5 text-right">Pmt</th>
+                                <th className="px-3 py-2 font-bold text-[9px] uppercase tracking-widest text-[#EBC351] border-b border-white/5 text-right">Prin</th>
+                                <th className="px-3 py-2 font-bold text-[9px] uppercase tracking-widest text-orange-500 border-b border-white/5 text-right">Int</th>
+                                <th className="px-3 py-2 font-bold text-[9px] uppercase tracking-widest text-white/40 border-b border-white/5 text-right">Bal</th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-white/5 font-mono">
+                            <tbody className="divide-y divide-white/[0.03] font-mono">
                               {amortizationData.schedule.map((row) => (
                                 <tr key={row.month} className="hover:bg-white/5 transition-colors">
-                                  <td className="px-4 py-2 opacity-50">{row.month}</td>
-                                  <td className="px-4 py-2 text-right opacity-90">${row.payment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                  <td className="px-4 py-2 text-right text-[#EBC351]">${row.principal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                  <td className="px-4 py-2 text-right text-orange-500">${row.interest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                  <td className="px-4 py-2 text-right font-bold">${row.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                  <td className="px-3 py-1.5 opacity-50">{row.month}</td>
+                                  <td className="px-3 py-1.5 text-right opacity-90">${row.payment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                  <td className="px-3 py-1.5 text-right text-[#EBC351]/80">${row.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                  <td className="px-3 py-1.5 text-right text-orange-500/80">${row.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                                  <td className="px-3 py-1.5 text-right font-bold opacity-100">${row.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1821,28 +1890,19 @@ const FinancialList: React.FC<FinancialListProps> = ({
               )}
             </div>
 
-            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
+            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between font-bold">
               <div>
                 {editingLoan.id && (
                   showDeleteConfirm ? (
-                    <div className="flex items-center bg-orange-500/10 rounded-xl p-1.5 border border-orange-500/30 gap-3">
-                      <span className="text-[10px] font-black text-orange-500 uppercase px-2 whitespace-nowrap">Confirm?</span>
+                    <div className="flex items-center bg-orange-500/10 rounded-lg p-1 border border-orange-500/30 gap-3">
+                      <span className="text-[10px] font-bold text-orange-500 uppercase px-2">Confirm?</span>
                       <div className="flex gap-1">
-                        <button
-                          onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); setShowDeleteConfirm(false); }}
-                          className="text-[10px] font-black text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
-                        >YES</button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(false)}
-                          className="text-[10px] font-black text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded-lg transition-colors active:scale-95"
-                        >NO</button>
+                        <button onClick={() => { onDeleteLoan(editingLoan.id!); setEditingLoan(null); setShowDeleteConfirm(false); }} className="text-[10px] font-bold text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">YES</button>
+                        <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-bold text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">NO</button>
                       </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="text-white/20 hover:text-orange-500 p-3 transition rounded-xl hover:bg-white/5 border border-transparent flex items-center justify-center active:scale-95"
-                    >
+                    <button onClick={() => setShowDeleteConfirm(true)} className="text-white/20 hover:text-orange-500 p-3 transition rounded-lg hover:bg-white/5 border border-transparent flex items-center justify-center">
                       <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
                   )
@@ -1850,26 +1910,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </div>
               <div className="flex space-x-4">
                 {editingLoan.role === 'Lender' && (
-                  <button
-                    onClick={() => generatePromissoryNote(editingLoan)}
-                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[11px] font-black text-white/70 uppercase tracking-widest hover:bg-white/10 hover:text-white active:scale-95 transition flex items-center gap-2"
-                  >
+                  <button onClick={() => generatePromissoryNote(editingLoan)} className="h-[36px] px-6 bg-white/5 border border-white/10 rounded-lg text-[11px] font-bold text-white/70 uppercase tracking-widest hover:bg-white/10 hover:text-white transition flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Promissory Note
+                    Note
                   </button>
                 )}
-                <button
-                  onClick={() => setEditingLoan(null)}
-                  className="px-6 py-3 text-[11px] font-black text-white/40 uppercase tracking-widest hover:text-white transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveLoanModal}
-                  className="px-8 py-3 bg-orange-500 rounded-2xl text-[11px] font-black text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition"
-                >
-                  Save Loan
-                </button>
+                <button onClick={() => setEditingLoan(null)} className="px-6 py-3 text-[11px] font-bold text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+                <button onClick={handleSaveLoanModal} className="h-[36px] px-8 bg-orange-500 rounded-lg text-[11px] font-bold text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save Loan</button>
               </div>
             </div>
           </div>

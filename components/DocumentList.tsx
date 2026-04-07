@@ -81,153 +81,133 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
       {/* Edit/Add Modal */}
       {editingDoc && (
-        <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg text-slate-900 my-auto">
-            <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-base font-bold text-slate-900">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
+              <h3 className="text-sm font-bold text-white uppercase tracking-widest">
                 {editingDoc.id ? 'Edit Document' : 'Add Document'}
               </h3>
-              <button onClick={() => setEditingDoc(null)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setEditingDoc(null)} className="text-white/40 hover:text-white transition p-2 hover:bg-white/5 rounded-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            
-            <div className="p-6 space-y-4">
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Document Name</label>
-                  <input 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="Operating Agreement"
-                    value={editingDoc.name || ''}
-                    onChange={e => setEditingDoc({...editingDoc, name: e.target.value})}
+
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Document Name</label>
+                <input
+                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                  placeholder="Operating Agreement"
+                  value={editingDoc.name || ''}
+                  onChange={e => setEditingDoc({ ...editingDoc, name: e.target.value })}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
+                  <select
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
+                    value={editingDoc.type || 'Other'}
+                    onChange={e => setEditingDoc({ ...editingDoc, type: e.target.value as any })}
+                  >
+                    <option value="Formation" className="bg-[#1C1C1E]">Formation</option>
+                    <option value="Legal" className="bg-[#1C1C1E]">Legal</option>
+                    <option value="Contract" className="bg-[#1C1C1E]">Contract</option>
+                    <option value="Finance" className="bg-[#1C1C1E]">Finance</option>
+                    <option value="Other" className="bg-[#1C1C1E]">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Date</label>
+                  <input
+                    type="date"
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition [color-scheme:dark]"
+                    value={editingDoc.uploadDate || ''}
+                    onChange={e => setEditingDoc({ ...editingDoc, uploadDate: e.target.value })}
                   />
-               </div>
-               
-               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
-                    <select
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                      value={editingDoc.type || 'Other'}
-                      onChange={e => setEditingDoc({...editingDoc, type: e.target.value as any})}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">File / Link</label>
+                  <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[30px] items-center">
+                    <button
+                      onClick={() => setUploadMode('link')}
+                      className={`px-3 h-full rounded text-[10px] font-bold uppercase tracking-widest transition-all ${uploadMode === 'link' ? 'bg-[#EBC351] text-black shadow-sm' : 'text-white/40 hover:text-white'}`}
                     >
-                      <option value="Formation">Formation</option>
-                      <option value="Legal">Legal</option>
-                      <option value="Contract">Contract</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Other">Other</option>
-                    </select>
-                 </div>
-                 <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label>
-                    <input 
-                       type="date"
-                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                       value={editingDoc.uploadDate || ''}
-                       onChange={e => setEditingDoc({...editingDoc, uploadDate: e.target.value})}
-                    />
-                 </div>
-               </div>
+                      Link
+                    </button>
+                    <button
+                      onClick={() => setUploadMode('file')}
+                      className={`px-3 h-full rounded text-[10px] font-bold uppercase tracking-widest transition-all ${uploadMode === 'file' ? 'bg-[#EBC351] text-black shadow-sm' : 'text-white/40 hover:text-white'}`}
+                    >
+                      File
+                    </button>
+                  </div>
+                </div>
 
-               <div>
-                   <div className="flex justify-between items-center mb-1">
-                      <label className="block text-xs font-bold text-slate-500 uppercase">File / Link</label>
-                      <div className="flex bg-slate-100 rounded p-0.5">
-                         <button 
-                            onClick={() => setUploadMode('link')}
-                            className={`px-2 py-0.5 text-[10px] font-bold rounded ${uploadMode === 'link' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                         >
-                            Link
-                         </button>
-                         <button 
-                            onClick={() => setUploadMode('file')}
-                            className={`px-2 py-0.5 text-[10px] font-bold rounded ${uploadMode === 'file' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-                         >
-                            Upload
-                         </button>
-                      </div>
-                   </div>
-                   
-                   {uploadMode === 'link' ? (
-                      <input 
-                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                        placeholder="https://drive.google.com/..."
-                        value={editingDoc.url || ''}
-                        onChange={e => setEditingDoc({...editingDoc, url: e.target.value})}
-                      />
-                   ) : (
-                      <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center hover:bg-slate-50 transition cursor-pointer relative">
-                         <input 
-                            type="file" 
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            onChange={(e) => e.target.files && processFile(e.target.files[0])}
-                         />
-                         <div className="text-sm text-slate-500">
-                            {editingDoc.url && editingDoc.url.startsWith('data:') ? (
-                                <span className="text-emerald-600 font-bold flex items-center justify-center gap-1">
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
-                                    File Attached
-                                </span>
-                            ) : 'Click to select file (max 2MB)'}
-                         </div>
-                      </div>
-                   )}
-               </div>
-
-               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notes</label>
-                  <textarea 
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-black bg-white"
-                    placeholder="Details about this document..."
-                    rows={3}
-                    value={editingDoc.notes || ''}
-                    onChange={e => setEditingDoc({...editingDoc, notes: e.target.value})}
+                {uploadMode === 'link' ? (
+                  <input
+                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                    placeholder="https://drive.google.com/..."
+                    value={editingDoc.url || ''}
+                    onChange={e => setEditingDoc({ ...editingDoc, url: e.target.value })}
                   />
-               </div>
+                ) : (
+                  <div className="border border-dashed border-white/10 rounded-lg p-5 text-center hover:bg-white/5 transition cursor-pointer relative bg-black/20">
+                    <input
+                      type="file"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => e.target.files && processFile(e.target.files[0])}
+                    />
+                    <div className="text-xs text-white/40 font-medium">
+                      {editingDoc.url && editingDoc.url.startsWith('data:') ? (
+                        <span className="text-[#EBC351] font-bold flex items-center justify-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                          File Attached
+                        </span>
+                      ) : 'Drop file here or click to browse (max 2MB)'}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Notes</label>
+                <textarea
+                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition resize-none custom-scrollbar"
+                  placeholder="Details about this document..."
+                  rows={3}
+                  value={editingDoc.notes || ''}
+                  onChange={e => setEditingDoc({ ...editingDoc, notes: e.target.value })}
+                />
+              </div>
             </div>
 
-            <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl flex justify-between items-center">
+            <div className="px-6 py-3 border-t border-white/5 bg-black/20 flex items-center justify-between font-bold">
               <div>
-                  {editingDoc.id && (
-                     showDeleteConfirm ? (
-                        <div className="flex items-center space-x-2">
-                           <button 
-                              onClick={() => { onDeleteDocument(editingDoc.id!); setEditingDoc(null); }}
-                              className="bg-rose-600 text-white px-3 py-1.5 rounded text-xs font-bold"
-                           >
-                              Confirm
-                           </button>
-                           <button 
-                              onClick={() => setShowDeleteConfirm(false)}
-                              className="text-slate-500 text-xs font-bold underline"
-                           >
-                              Cancel
-                           </button>
-                        </div>
-                     ) : (
-                        <button 
-                           onClick={() => setShowDeleteConfirm(true)}
-                           className="text-rose-500 text-sm font-bold hover:text-rose-700"
-                        >
-                           Delete
-                        </button>
-                     )
-                  )}
-               </div>
-               <div className="flex space-x-3">
-                  <button 
-                     onClick={() => setEditingDoc(null)}
-                     className="px-4 py-2 text-slate-600 font-bold hover:text-slate-800"
-                  >
-                     Cancel
-                  </button>
-                  <button 
-                     onClick={handleSaveModal}
-                     className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm hover:bg-indigo-700 transition"
-                  >
-                     Save
-                  </button>
-               </div>
+                {editingDoc.id && (
+                  showDeleteConfirm ? (
+                    <div className="flex items-center bg-orange-500/10 rounded-lg p-1 border border-orange-500/30 gap-3">
+                      <span className="text-[10px] font-bold text-orange-500 uppercase px-2">Confirm?</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => { onDeleteDocument(editingDoc.id!); setEditingDoc(null); }} className="text-[10px] font-bold text-white hover:text-orange-500 px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">YES</button>
+                        <button onClick={() => setShowDeleteConfirm(false)} className="text-[10px] font-bold text-white/40 hover:text-white px-4 py-2 bg-black/40 hover:bg-black/80 rounded transition-colors">NO</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => setShowDeleteConfirm(true)} className="text-white/20 hover:text-orange-500 p-3 transition rounded-lg hover:bg-white/5 border border-transparent flex items-center justify-center">
+                      <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="flex space-x-4">
+                <button onClick={() => setEditingDoc(null)} className="px-6 py-3 text-[11px] font-bold text-white/40 uppercase tracking-widest hover:text-white transition">Cancel</button>
+                <button onClick={handleSaveModal} className="h-[36px] px-8 bg-orange-500 rounded-lg text-[11px] font-bold text-white uppercase tracking-widest shadow-lg shadow-orange-500/20 hover:scale-[1.02] active:scale-95 transition">Save</button>
+              </div>
             </div>
           </div>
         </div>
