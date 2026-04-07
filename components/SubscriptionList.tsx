@@ -323,7 +323,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           href={sub.website ? (sub.website.startsWith('http') ? sub.website : `https://${sub.website}`) : '#'} 
                           target="_blank" 
                           rel="noreferrer"
-                          className="flex items-center gap-2 group/name"
+                          className="flex items-center gap-2 group/name w-fit"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <h3 className="text-base font-bold tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors leading-none">{sub.name}</h3>
