@@ -252,7 +252,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
         <button
           onClick={handleAddNew}
-          className="h-full text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 group"
+          className="h-full bg-[#1C1C1E] border border-white/5 text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Service</span>
