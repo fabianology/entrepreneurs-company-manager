@@ -925,16 +925,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
               </button>
             </div>
             <div className="p-6 space-y-8 max-h-[60dvh] overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2 space-y-1">
-                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Institution</label>
-                  <input
-                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                    value={editingInstitution.name || ''}
-                    placeholder="Mercury"
-                    onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })}
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-[10px]">
+                <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Institution</label>
+                    <input
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                      value={editingInstitution.name || ''}
+                      placeholder="Mercury"
+                      onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Website</label>
+                    <input
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                      value={editingInstitution.loginUrl || ''}
+                      placeholder="bank.com"
+                      onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })}
+                    />
+                  </div>
                 </div>
+
                 <div className="md:col-span-2 grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login ID</label>
@@ -956,15 +968,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     />
                   </div>
                 </div>
-                 <div className="md:col-span-2 space-y-1">
-                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Website</label>
-                  <input
-                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                    value={editingInstitution.loginUrl || ''}
-                    placeholder="bank.com"
-                    onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })}
-                  />
-                            <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
+              </div>
+
+              <div className="w-full h-px bg-white/5 mt-8 mb-0"></div>
+
+                            <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full !mt-4 bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
                     <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
                     <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Card</span>
                   </button>
@@ -1025,14 +1033,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                             {/* Toggle Button for Details */}
                             <div className="pt-3 border-t border-white/5 flex justify-center mt-2">
-                              <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[10px] font-bold uppercase flex items-center gap-1 hover:text-white transition-colors">
+                              <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[13px] font-semibold uppercase tracking-widest flex items-center gap-2 hover:text-white transition-colors">
                                 {expandedAccounts.has(idx) ? 'Minimize' : 'Expand Details'}
                                 <svg className={`w-3 h-3 transform transition-transform ${expandedAccounts.has(idx) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
                               </button>
                             </div>
 
                             {expandedAccounts.has(idx) && (
-                              <div className="pt-4 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
+                              <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
                                 <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Holder</label>
                                   <input
@@ -1179,7 +1187,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       );
                     })}
                   </div>
-                </div>
 
                 <div className="mb-8 pt-4 border-t border-white/5">
                   <div className="grid grid-cols-2 gap-3">
@@ -1361,7 +1368,6 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     })}
                   </div>
                 )}
-              </div>
             </div>
             <div className="px-6 py-3 border-t border-white/5 flex justify-between items-center bg-black/20">
               {editingInstitution.id && (
