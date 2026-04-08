@@ -138,7 +138,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onSelectCompany, onAddComp
     <div className="space-y-5 animate-fadeIn bg-black min-h-screen">
       {/* Add/Edit Company Modal */}
       {isModalOpen && (
-        <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pb-[160px] bg-black/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
           <div className="bg-[#1C1C1E] rounded-3xl shadow-2xl w-full max-w-lg text-white border border-white/10 overflow-hidden my-auto">
             <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
               <h3 className="text-base font-black text-white uppercase tracking-widest">{editingCompany ? 'Edit Entity Profile' : 'Register New Entity'}</h3>

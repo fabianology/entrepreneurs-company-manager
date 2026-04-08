@@ -81,7 +81,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
       {/* Edit/Add Modal */}
       {editingDoc && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-[160px] bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
             <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
               <h3 className="text-sm font-bold text-white uppercase tracking-widest">

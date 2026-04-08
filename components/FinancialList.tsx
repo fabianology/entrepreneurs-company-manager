@@ -687,22 +687,20 @@ const FinancialList: React.FC<FinancialListProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {institutions.map(inst => {
             const totalBalance = inst.accounts.reduce((sum, acc) => sum + acc.balance, 0);
+            const instCards = cards.filter(c => c.institutionName?.toLowerCase() === inst.name.toLowerCase()).length;
+            const instLoans = loans.filter(l => l.lender?.toLowerCase() === inst.name.toLowerCase()).length;
+            const instAccounts = inst.accounts?.length || 0;
             return (
               <div
                 key={inst.id}
                 onClick={() => setEditingInstitution(inst)}
                 className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors cursor-pointer"
               >
-                <div className="p-6 border-b border-white/5">
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-14 h-14 bg-white/5 flex items-center justify-center text-white overflow-hidden cursor-pointer p-1 -ml-1 rounded-2xl border border-white/10 hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingInstitution(inst);
-                        }}
-                      >
+                <div className="px-6 pt-6 pb-[18px] space-y-6 group/card transition-colors">
+                  <div className="flex justify-between items-start">
+                    <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 items-center w-full">
+                      {/* Row 1, Col 1: Logo */}
+                      <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden shadow-sm hover:bg-white/[0.08] col-start-1 row-start-1">
                         {inst.loginUrl ? (
                           <img
                             src={getFaviconUrl(inst.loginUrl) || ''}
@@ -716,7 +714,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           />
                         ) : null}
                         <svg
-                          className="w-8 h-8 opacity-40 shrink-0"
+                          className="w-8 h-8 opacity-40 shrink-0 text-white group-hover/card:text-[#EBC351] transition-colors"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -725,109 +723,157 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
                       </div>
-                      <div>
-                        <h4 className="font-black text-white text-base">{inst.name}</h4>
-                        {inst.loginUrl && (
-                          <a href={inst.loginUrl} target="_blank" rel="noreferrer" className="text-[10px] text-white/40 hover:text-white/80 hover:underline flex items-center gap-1 font-black uppercase tracking-widest mt-1">
-                            Launch Portal
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                          </a>
-                        )}
+
+                      {/* Row 2, Col 1+2: Status row */}
+                      <div className="flex items-center whitespace-nowrap col-span-2 row-start-2 mt-[6px]">
+                        <div className="flex items-center space-x-2 text-[11px] font-bold uppercase tracking-widest text-white/50">
+                          <span className="text-[#EBC351]">{instAccounts}</span><span> {instAccounts === 1 ? 'Account' : 'Accounts'}</span>
+                          <span className="text-white/20 px-0.5 opacity-50">|</span>
+                          <span className="text-[#EBC351]">{instCards}</span><span> {instCards === 1 ? 'Card' : 'Cards'}</span>
+                          <span className="text-white/20 px-0.5 opacity-50">|</span>
+                          <span className="text-[#EBC351]">{instLoans}</span><span> {instLoans === 1 ? 'Loan' : 'Loans'}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xl font-black text-white">${totalBalance.toLocaleString()}</p>
-                      <p className="text-[9px] font-black text-white/40 uppercase tracking-widest mt-1">Total Liquidity</p>
+
+                      {/* Row 1, Col 2: Name + Amounts */}
+                      <div className="flex flex-col col-start-2 row-start-1">
+                        <a 
+                          href={inst.loginUrl ? (inst.loginUrl.startsWith('http') ? inst.loginUrl : `https://${inst.loginUrl}`) : '#'} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="flex items-center gap-2 group/name w-fit"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <h3 className="text-base font-bold tracking-tight text-white uppercase group-hover/name:text-[#EBC351] transition-colors leading-none">{inst.name}</h3>
+                          {inst.loginUrl && (
+                            <svg className="w-3.5 h-3.5 text-white/20 group-hover/name:text-[#EBC351]/50 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                          )}
+                        </a>
+                        
+                        <div className="mt-[5px] flex items-start gap-3">
+                          <div className="flex flex-col">
+                            <p className="text-base font-bold text-white leading-tight">
+                              ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Total Liquidity</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-y-6 gap-x-8 pt-4 px-1">
-                    <div
+                  <div className="grid grid-cols-2 gap-y-6 gap-x-4 pt-2">
+                    <div 
                       className="space-y-1 group/field cursor-pointer active:opacity-60 transition-opacity"
-                      onClick={() => handleFieldCopy(inst.id, inst.username || inst.email || '', 'username')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFieldCopy(inst.id, inst.username || inst.email || '', 'username');
+                      }}
                     >
-                      <div className="flex justify-between items-center">
-                        <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'text-orange-500' : 'text-white/40'}`}>
-                          {lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'Copied!' : 'Username / Email'}
-                        </p>
+                      <p className={`text-[12px] font-bold uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'text-orange-500' : 'text-white/40'}`}>
+                        {lastCopiedField?.id === inst.id && lastCopiedField.field === 'username' ? 'Copied' : 'Login ID'}
+                      </p>
+                      <div className="mt-1 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                        <p className="text-[13px] font-medium text-white truncate max-w-[140px]">{inst.username || inst.email || '—'}</p>
                       </div>
-                      <p className="text-xs font-black text-white truncate">{inst.username || inst.email || '-'}</p>
                     </div>
 
-                    <div
+                    <div 
                       className="space-y-1 group/pass cursor-pointer active:opacity-60 transition-opacity"
-                      onClick={() => handleFieldCopy(inst.id, inst.password || '', 'password')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFieldCopy(inst.id, inst.password || '', 'password');
+                      }}
                     >
-                      <div className="flex justify-between items-center">
-                        <p className={`text-[9px] font-black uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
-                          {lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'Copied!' : 'Password'}
+                      <div className="flex items-center gap-2">
+                        <p className={`text-[12px] font-bold uppercase tracking-widest transition-colors duration-300 ${lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'text-orange-500' : 'text-white/40'}`}>
+                          {lastCopiedField?.id === inst.id && lastCopiedField.field === 'password' ? 'Copied' : 'Password'}
                         </p>
-                        <div className="flex space-x-2 opacity-0 group-hover/pass:opacity-100 transition-opacity">
-                          <button onClick={(e) => { e.stopPropagation(); togglePassword(inst.id); }} className="text-[9px] font-black text-[#EBC351] uppercase">
-                            {showPasswords.has(inst.id) ? 'Hide' : 'Show'}
-                          </button>
-                        </div>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); togglePassword(inst.id); }} 
+                          className="text-white/20 hover:text-[#EBC351] transition-colors"
+                        >
+                          {showPasswords.has(inst.id) ? (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          )}
+                        </button>
                       </div>
-                      <p className="text-xs font-black text-white font-mono tracking-wider truncate">
-                        {showPasswords.has(inst.id) ? (inst.password || '-') : '••••••••'}
-                      </p>
+                      <div className="mt-1 bg-black/20 rounded-lg px-3 py-2 border border-white/[0.03]">
+                        <p className="text-[13px] font-medium text-white tracking-wider truncate">
+                          {showPasswords.has(inst.id) ? (inst.password || '—') : '••••••••'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Linked Accounts Accordion */}
                 <div className="border-t border-white/5">
                   <button
-                    onClick={() => toggleInstitutionExpanded(inst.id)}
-                    className="w-full h-14 px-6 flex items-center justify-between text-[#EBC351] group hover:bg-white/[0.02] transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleInstitutionExpanded(inst.id);
+                    }}
+                    className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group"
                   >
                     <div className="flex items-center space-x-3">
-                      <span className="text-[11px] font-black uppercase tracking-[0.15em]">Linked Accounts</span>
+                      <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Accounts</span>
                       <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
                         {inst.accounts.length}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingInstitution(inst);
-                        }}
-                        className="text-[9px] font-black text-[#EBC351] uppercase hover:text-white transition"
-                      >
-                        Manage
-                      </button>
-                      <svg
-                        className={`w-4 h-4 transform transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
+                    <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                    </svg>
                   </button>
 
                   <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${expandedInstitutions.has(inst.id) ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                     <div className="overflow-hidden">
-                      <div className="p-6 pt-0 space-y-2">
+                      <div className="px-6 pb-6 pt-2 space-y-4 animate-fadeIn">
                         {inst.accounts.map((acc, aIdx) => (
-                          <div key={acc.id || aIdx} className="flex justify-between items-center py-3 px-1 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition cursor-default">
+                          <div key={acc.id || aIdx} className="flex justify-between items-center group/item">
                             <div className="flex items-center space-x-3">
-                              <span className={`w-2 h-2 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351]' : acc.type === 'Credit Card' ? 'bg-orange-500' : 'bg-blue-400'}`}></span>
-                              <div>
-                                <p className="text-xs font-black text-white truncate max-w-[120px]">{acc.name}</p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-[9px] font-black text-white/40 font-mono tracking-widest">••{acc.last4}</span>
-                                  <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">• {acc.type}</span>
-                                </div>
-                              </div>
+                              <div className={`h-1.5 w-1.5 rounded-full ${acc.type === 'Checking' ? 'bg-[#EBC351] shadow-[0_0_4px_rgba(235,195,81,0.8)]' : acc.type === 'Credit Card' ? 'bg-orange-500 shadow-[0_0_4px_rgba(249,115,22,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-all duration-300`}></div>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingInstitution(inst);
+                                  setTimeout(() => {
+                                    const element = document.getElementById(`inst-account-${acc.id || aIdx}`);
+                                    if (element) {
+                                      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      element.style.boxShadow = '0 0 0 2px #EBC351';
+                                      setTimeout(() => {
+                                        element.style.boxShadow = 'none';
+                                      }, 2000);
+                                    }
+                                  }, 100);
+                                }}
+                                className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
+                              >
+                                {acc.name}
+                              </span>
+                              <span className="text-[11px] font-medium uppercase tracking-tighter opacity-80 text-[#EBC351]">
+                                ••{acc.last4}
+                              </span>
                             </div>
-                            <div className="text-right">
-                              <p className="text-xs font-black text-white tracking-widest">${acc.balance.toLocaleString()}</p>
-                            </div>
+                            <span className="text-[13px] font-medium text-white">
+                              ${acc.balance.toLocaleString()}
+                              <span className="text-[12px] text-white/40 ml-1 font-bold uppercase tracking-widest lowercase">
+                                /{acc.type === 'Credit Card' ? 'cc' : acc.type === 'Checking' ? 'chk' : 'acc'}
+                              </span>
+                            </span>
                           </div>
                         ))}
-                        {inst.accounts.length === 0 && <p className="text-[9px] font-black text-white/40 uppercase tracking-widest text-center py-4">No linked accounts</p>}
+                        {inst.accounts.length === 0 && <p className="text-[10px] font-black text-white/40 uppercase tracking-widest py-1">No linked accounts</p>}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingInstitution(inst); }}
+                          className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
+                        >
+                          + add account
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -916,7 +962,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
       {/* --- EDIT INSTITUTION MODAL --- */}
       {editingInstitution && (
-        <div className="fixed inset-x-0 z-[100] flex items-start justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-4 pb-[160px] bg-black/60 backdrop-blur-md animate-fadeIn overflow-y-auto">
           <div className="bg-[#1C1C1E] rounded-lg shadow-2xl w-full max-w-2xl overflow-hidden my-auto border border-white/10">
             <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
               <h3 className="text-base font-black text-white tracking-wide">{editingInstitution.id ? 'Edit Bank' : 'Add Bank'}</h3>
@@ -982,7 +1028,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     {(editingInstitution.accounts || []).map((acc, idx) => {
                       if (!['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                       return (
-                        <div key={idx} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03]">
+                        <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03] transition-all duration-500">
                           <div className="flex-1 w-full space-y-1">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                               <div className="md:col-span-1 space-y-1">
@@ -1208,7 +1254,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   {(editingInstitution.accounts || []).map((acc, idx) => {
                     if (['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                     return (
-                      <div key={idx} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5">
+                      <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5 transition-all duration-500">
                         <div className="flex-1 w-full space-y-1">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                             <div className="md:col-span-1 space-y-1">
@@ -1396,7 +1442,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
       
       {/* --- EDIT CARD MODAL --- */}
       {editingCard && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-[160px] bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
             <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
               <h3 className="text-sm font-bold text-white uppercase tracking-widest">
@@ -1545,7 +1591,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
       )}
 
       {editingLoan && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fadeIn">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pb-[160px] bg-black/60 backdrop-blur-md animate-fadeIn">
           <div className="bg-[#1C1C1E] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-white/10">
             <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-black/20">
               <h3 className="text-sm font-bold text-white uppercase tracking-widest">

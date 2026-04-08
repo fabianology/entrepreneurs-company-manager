@@ -680,7 +680,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
       {/* Editing Modal */}
       {editingSubscription && (
-        <div className="fixed inset-x-0 z-50 flex items-start justify-center p-4 bg-black/90 backdrop-blur-xl animate-fadeIn overflow-y-auto" style={{ top: '20px', bottom: '160px' }}>
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pb-[160px] bg-black/90 backdrop-blur-xl animate-fadeIn overflow-y-auto">
           <div className="bg-[#1C1C1E] rounded-[32px] shadow-2xl w-full max-w-xl border border-white/10 overflow-hidden">
             <div className="px-6 py-3 border-b border-white/5 flex justify-between items-center">
               <h3 className="text-base font-black tracking-tight text-white uppercase">
