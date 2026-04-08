@@ -232,7 +232,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     <div className="bg-black min-h-screen text-white p-4 space-y-5">
       {/* Action Bar - Minimalist Floating Style */}
       <div className="w-full h-10 flex items-center overflow-x-auto no-scrollbar flex-nowrap pb-1">
-        <div className="flex-1 px-5 flex items-center gap-6 shrink-0">
+        <div className="flex-1 pl-6 flex items-center gap-6 shrink-0">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
               <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Monthly ({monthlyCount})</span>

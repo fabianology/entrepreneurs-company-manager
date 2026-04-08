@@ -69,10 +69,10 @@ const DocumentList: React.FC<DocumentListProps> = ({
   return (
     <div className="space-y-5 animate-fadeIn">
       {/* Action Bar - Minimalist Floating Style */}
-      <div className="w-full h-10 flex items-center justify-center p-0 overflow-x-auto no-scrollbar flex-nowrap mb-2 pb-1">
+      <div className="w-full h-10 flex items-center justify-start pl-6 p-0 overflow-x-auto no-scrollbar flex-nowrap mb-2 pb-1">
         <button
           onClick={handleAddNew}
-          className="h-full px-8 text-white rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 shrink-0 group"
+          className="h-full px-8 bg-[#1C1C1E] border border-white/5 text-white rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 shrink-0 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Document</span>
