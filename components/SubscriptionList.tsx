@@ -709,9 +709,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-2.5">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Subscription</label>
                     <input
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -720,7 +720,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       onChange={e => setEditingSubscription({ ...editingSubscription, name: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Website</label>
                     <input
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -733,7 +733,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 
                 {editingSubscription.pricingModel !== 'free' && (
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Cost</label>
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[13px] font-medium">$</span>
@@ -746,7 +746,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         />
                       </div>
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Due On</label>
                       <input
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -763,7 +763,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         }}
                       />
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Cycle</label>
                       <select
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none cursor-pointer"
@@ -778,7 +778,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 )}
                 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login ID</label>
                     <input
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -787,7 +787,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       onChange={e => setEditingSubscription({ ...editingSubscription, loginId: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-0.5">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
                     <input
                       type="password"
@@ -826,7 +826,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                 </div>
                 {editingSubscription.pricingModel !== 'free' && (
                   <div className="grid grid-cols-2 gap-4 items-end pb-2">
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid From</label>
                       <input
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
@@ -835,7 +835,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Auto Renew</label>
                       <div className="flex items-center h-[36px]">
                         <div

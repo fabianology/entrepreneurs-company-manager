@@ -631,9 +631,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     key={card.id}
                     onClick={(e) => handleCardClick(card, e)}
                     className={`
-                      w-full max-w-[400px] mx-auto h-56 rounded-[24px] p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
+                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
                       ${getCardGradient(card.network)}
-                      transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]
+                      transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
                     `}
                     style={{
@@ -691,13 +691,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
               <div
                 key={inst.id}
                 onClick={() => setEditingInstitution(inst)}
-                className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-300 flex flex-col cursor-pointer"
+                className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors cursor-pointer"
               >
                 <div className="p-6 border-b border-white/5">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
                       <div
-                        className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center transition-all duration-300 overflow-hidden shadow-sm hover:bg-white/[0.08]"
+                        className="w-14 h-14 bg-white/5 flex items-center justify-center text-white overflow-hidden cursor-pointer p-1 -ml-1 rounded-2xl border border-white/10 hover:bg-white/10 hover:border-[#1FE400]/30 transition-all duration-300"
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingInstitution(inst);
@@ -849,7 +849,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
           {loans.map(loan => {
             const amort = calcAmortization(loan);
             return (
-              <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] overflow-hidden border border-white/5 shadow-2xl transition-all duration-300 flex flex-col cursor-pointer">
+              <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
                 <div className="p-6 border-b border-white/5 flex-1">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
@@ -927,7 +927,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             <div className="p-6 space-y-8 max-h-[60dvh] overflow-y-auto custom-scrollbar">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2 space-y-1">
-                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Bank / Institution Name</label>
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Institution</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingInstitution.name || ''}
@@ -935,31 +935,33 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onChange={e => setEditingInstitution({ ...editingInstitution, name: e.target.value })}
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Email/User</label>
-                  <input
-                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                    value={editingInstitution.username || ''}
-                    placeholder="user@example.com"
-                    onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })}
-                  />
+                <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login ID</label>
+                    <input
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                      value={editingInstitution.username || ''}
+                      placeholder="user_admin"
+                      onChange={e => setEditingInstitution({ ...editingInstitution, username: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
+                    <input
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                      type="text"
+                      value={editingInstitution.password || ''}
+                      placeholder="••••••"
+                      onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Password</label>
-                  <input
-                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                    type="text"
-                    value={editingInstitution.password || ''}
-                    placeholder="••••••"
-                    onChange={e => setEditingInstitution({ ...editingInstitution, password: e.target.value })}
-                  />
-                </div>
-                <div className="md:col-span-2 space-y-1">
-                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login Portal URL</label>
+                 <div className="md:col-span-2 space-y-1">
+                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Website</label>
                   <input
                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                     value={editingInstitution.loginUrl || ''}
-                    placeholder="https://bank.com/login"
+                    placeholder="bank.com"
                     onChange={e => setEditingInstitution({ ...editingInstitution, loginUrl: e.target.value })}
                   />
                             <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
@@ -1312,7 +1314,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               </p>
                             </div>
                             <div className="text-right">
-                              <p className="text-[13px] font-bold text-white">${(loan.principalAmount || 0).toLocaleString()}</ p>
+                              <p className="text-[13px] font-bold text-white">${(loan.principalAmount || 0).toLocaleString()}</p>
                               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Loan Amount</p>
                             </div>
                           </div>
