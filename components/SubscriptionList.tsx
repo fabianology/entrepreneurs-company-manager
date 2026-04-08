@@ -231,8 +231,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5">
       {/* Action Bar - Minimalist Floating Style */}
-      <div className="w-full h-10 flex items-center overflow-x-auto no-scrollbar flex-nowrap pb-1">
-        <div className="flex-1 pl-6 flex items-center gap-6 shrink-0">
+      <div className="w-full h-10 flex items-center justify-between overflow-x-auto no-scrollbar flex-nowrap pb-1">
+        <div className="flex items-center gap-6 shrink-0">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
               <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Monthly ({monthlyCount})</span>
@@ -248,11 +248,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
           </div>
         </div>
 
-        <div className="w-[1px] h-4 bg-white/5 mx-2"></div>
-
         <button
           onClick={handleAddNew}
-          className="h-full bg-[#1C1C1E] border border-white/5 text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 shrink-0 group"
+          className="h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center space-x-2 active:scale-95 shrink-0 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Service</span>
