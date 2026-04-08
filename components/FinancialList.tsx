@@ -686,9 +686,21 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {institutions.map(inst => {
-            const totalBalance = inst.accounts.reduce((sum, acc) => sum + acc.balance, 0);
+            const instLoansList = loans.filter(l => l.lender?.toLowerCase() === inst.name.toLowerCase());
+            const totalLoanPayments = instLoansList.reduce((sum, l) => {
+              const amort = calcAmortization(l);
+              const pmt = Number(l.monthlyPayment) || (amort ? amort.monthlyPayment : 0);
+              let normalized = pmt;
+              if (!Number(l.monthlyPayment) && amort) {
+                if (l.scheduleFrequency === 'Weekly') normalized = pmt * (52 / 12);
+                else if (l.scheduleFrequency === 'Yearly') normalized = pmt / 12;
+              }
+              return sum + normalized;
+            }, 0);
+            const totalAccountPayments = inst.accounts.reduce((sum, acc) => sum + (Number((acc as any).monthlyPayment) || 0), 0);
+            const totalMonthlyPayment = totalLoanPayments + totalAccountPayments;
             const instCards = cards.filter(c => c.institutionName?.toLowerCase() === inst.name.toLowerCase()).length;
-            const instLoans = loans.filter(l => l.lender?.toLowerCase() === inst.name.toLowerCase()).length;
+            const instLoans = instLoansList.length;
             const instAccounts = inst.accounts?.length || 0;
             return (
               <div
@@ -753,9 +765,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         <div className="mt-[5px] flex items-start gap-3">
                           <div className="flex flex-col">
                             <p className="text-base font-bold text-white leading-tight">
-                              ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              ${totalMonthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
-                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Total Liquidity</p>
+                            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-0.5">Mo. Payment</p>
                           </div>
                         </div>
                       </div>
@@ -1018,9 +1030,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
               <div className="w-full h-px bg-white/5 mt-8 mb-0"></div>
 
-                            <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full !mt-4 bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
-                    <span className="text-2xl group-hover:scale-110 transition-transform">💳</span>
-                    <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Card</span>
+                            <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full !mt-4 h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
+                    <span className="text-xl group-hover:scale-110 transition-transform">💳</span>
+                    <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Card</span>
                   </button>
 
                   {/* Cards List */}
@@ -1088,27 +1100,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
                             {expandedAccounts.has(idx) && (
                               <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
                                 <div className="md:col-span-1 space-y-1">
-                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Holder</label>
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Name on Card</label>
                                   <input
                                     className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                    placeholder="NAME"
+                                    placeholder="Jane Doe"
                                     value={acc.cardHolder || ''}
                                     onChange={e => handleUpdateInstAccount(idx, { cardHolder: e.target.value })}
                                   />
                                 </div>
                                 <div className="md:col-span-1 space-y-1">
-                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Network</label>
-                                  <select
-                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                    value={acc.network || 'Visa'}
-                                    onChange={e => handleUpdateInstAccount(idx, { network: e.target.value as any })}
-                                  >
-                                    <option value="Visa">Visa</option>
-                                    <option value="Mastercard">Mastercard</option>
-                                    <option value="Amex">Amex</option>
-                                    <option value="Discover">Discover</option>
-                                    <option value="Other">Other</option>
-                                  </select>
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Holder</label>
+                                  <div className="flex bg-black/20 p-1 rounded-lg border border-white/[0.03] h-[38px] w-full">
+                                    <button
+                                      type="button"
+                                      className={`flex-1 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest rounded-md transition-all duration-300 ${(!acc.network || acc.network === 'Mine') ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}
+                                      onClick={(e) => { e.stopPropagation(); handleUpdateInstAccount(idx, { network: 'Mine' as any }); }}
+                                    >Mine</button>
+                                    <button
+                                      type="button"
+                                      className={`flex-1 flex items-center justify-center text-[10px] font-bold uppercase tracking-widest rounded-md transition-all duration-300 ${acc.network === 'Assigned' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white/80'}`}
+                                      onClick={(e) => { e.stopPropagation(); handleUpdateInstAccount(idx, { network: 'Assigned' as any }); }}
+                                    >Assigned</button>
+                                  </div>
                                 </div>
                                 <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Expiry</label>
@@ -1188,6 +1201,24 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                         />
                                       </div>
                                     </div>
+                                    <div className="md:col-span-2 space-y-1">
+                                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Mo. Payment</label>
+                                      <div className="relative flex items-center">
+                                        <select className="absolute left-2 bg-transparent text-white/50 hover:text-white text-xs font-bold outline-none cursor-pointer appearance-none z-10" value={acc.currency || 'USD'} onChange={e => handleUpdateInstAccount(idx, { currency: e.target.value })}>
+                                          <option value="USD" className="bg-[#1C1C1E]">$</option>
+                                          <option value="EUR" className="bg-[#1C1C1E]">€</option>
+                                          <option value="GBP" className="bg-[#1C1C1E]">£</option>
+                                          <option value="CAD" className="bg-[#1C1C1E]">C$</option>
+                                        </select>
+                                        <input
+                                          className="w-full pl-8 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
+                                          type="number"
+                                          placeholder="0.00"
+                                          value={(acc as any).monthlyPayment || ''}
+                                          onChange={e => handleUpdateInstAccount(idx, { monthlyPayment: parseFloat(e.target.value) } as any)}
+                                        />
+                                      </div>
+                                    </div>
                                   </>
                                 ) : (
                                   <div className="md:col-span-2 space-y-1">
@@ -1234,18 +1265,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     })}
                   </div>
 
-                <div className="mb-8 pt-4 border-t border-white/5">
-                  <div className="grid grid-cols-2 gap-3">
-                    <button onClick={() => handleAddInstAccount('Checking')} className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group">
-                      <span className="text-2xl group-hover:scale-110 transition-transform">🏦</span>
-                      <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Account</span>
-                    </button>
-                    <button
-                      onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name, _fromBank: true } as any)}
-                      className="w-full bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 p-4 rounded-lg flex flex-col items-center justify-center gap-2 transition-all active:scale-95 group"
-                    >
-                      <span className="text-2xl group-hover:scale-110 transition-transform">💸</span>
-                      <span className="text-[10px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center">Add Loan</span>
+                <div className="mb-4 pt-4 border-t border-white/5">
+                  <div className="space-y-3">
+                    <button onClick={() => handleAddInstAccount('Checking')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
+                      <span className="text-xl group-hover:scale-110 transition-transform">🏦</span>
+                      <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Account</span>
                     </button>
                   </div>
                 </div>
@@ -1254,7 +1278,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   {(editingInstitution.accounts || []).map((acc, idx) => {
                     if (['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                     return (
-                      <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-white/5 p-4 rounded-xl flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/5 transition-all duration-500">
+                      <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03] transition-all duration-500">
                         <div className="flex-1 w-full space-y-1">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                             <div className="md:col-span-1 space-y-1">
@@ -1337,6 +1361,16 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     );
                   })}
 
+                </div>
+
+                <div className="mb-4 pt-4 border-t border-white/5">
+                  <button
+                    onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name, _fromBank: true } as any)}
+                    className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group"
+                  >
+                    <span className="text-xl group-hover:scale-110 transition-transform">💸</span>
+                    <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Loan</span>
+                  </button>
                 </div>
 
                 {/* --- LOAN CARDS inside bank modal --- */}
