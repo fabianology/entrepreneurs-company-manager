@@ -556,10 +556,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5 animate-fadeIn">
       {/* Action Bar - Minimalist Floating Style */}
-      <div className="w-full h-10 flex items-center gap-1 overflow-hidden">
+      <div className="w-full h-10 flex items-center gap-1 overflow-x-auto no-scrollbar flex-nowrap pb-1">
         <button
           onClick={handleAddNewInstitution}
-          className="flex-1 h-full text-white rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
+          className="shrink-0 h-full text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Institution</span>
@@ -569,7 +569,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
         <button
           onClick={handleAddNewCard}
-          className="flex-1 h-full text-white rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
+          className="shrink-0 h-full text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Cards</span>
