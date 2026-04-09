@@ -266,63 +266,13 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       }
     }, 100);
   };
-  const { cycleMonthly, cycleYearly, monthlyCount, yearlyCount } = subscriptions.reduce((acc, s) => {
-    // Check main subscription
-    if (s.billingCycle === 'Monthly') {
-      acc.cycleMonthly += s.cost;
-      acc.monthlyCount += 1;
-    } else if (s.billingCycle === 'Yearly') {
-      acc.cycleYearly += s.cost;
-      acc.yearlyCount += 1;
-    }
-    
-    // Check sub-services
-    s.subServices?.forEach(ss => {
-      if (ss.status !== 'Paused') {
-        if (ss.billingCycle === 'Monthly') {
-          acc.cycleMonthly += ss.cost;
-          acc.monthlyCount += 1;
-        } else if (ss.billingCycle === 'Yearly') {
-          acc.cycleYearly += ss.cost;
-          acc.yearlyCount += 1;
-        }
-      }
-    });
-    
-    return acc;
-  }, { cycleMonthly: 0, cycleYearly: 0, monthlyCount: 0, yearlyCount: 0 });
 
   const activeStack = subscriptions.length;
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5">
       {/* Action Bar - Minimalist Floating Style */}
-      <div className="w-full h-10 flex items-center justify-between overflow-x-auto no-scrollbar flex-nowrap pb-1">
-        <div className="flex items-center gap-4 shrink-0">
-          <div className="flex items-center">
-            <div className="flex items-center gap-1 mr-1.5">
-              <span className="text-[22px] leading-none">💵</span>
-              <span className="text-[16px] leading-none">🔥</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[14px] font-medium text-white/40 lowercase tracking-normal">mo.</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[16px] font-semibold text-white uppercase tracking-normal">${cycleMonthly.toFixed(0)}</span>
-                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({monthlyCount})</span>
-              </div>
-            </div>
-            
-            <div className="w-[1px] h-4 bg-white/10 mx-4"></div>
-
-            <div className="flex items-center gap-1">
-              <span className="text-[14px] font-medium text-white/40 lowercase tracking-normal">yr.</span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[16px] font-semibold text-white uppercase tracking-normal">${cycleYearly.toLocaleString()}</span>
-                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({yearlyCount})</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="w-full h-10 flex items-center justify-end overflow-x-auto no-scrollbar flex-nowrap pb-1">
 
         <button
           onClick={handleAddNew}
@@ -1076,18 +1026,18 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                 {/* Sub-services Management Section */}
                 <div className="pt-8 border-t border-white/5" id="modal-supplemental-section">
-                  <div className="flex justify-between items-center mb-6">
-                    <h4 className="text-[12px] font-bold text-[#EBC351] uppercase tracking-widest ml-1">Supplemental Services</h4>
+
+                  
+                  <div className="space-y-1">
                     <button
                       type="button"
                       onClick={handleAddSubService}
-                      className="text-[10px] font-bold text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition"
+                      className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group"
                     >
-                      + ADD SERVICE
+                      <span className="text-xl transition-transform">💾</span>
+                      <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest text-center mt-0.5">Add Supplemental Service</span>
                     </button>
-                  </div>
 
-                  <div className="space-y-1">
                     {(editingSubscription.subServices || []).map((child, idx) => {
                       const expandedId = child.id || String(idx);
                       const isExpanded = expandedModalSubServices.has(expandedId);
@@ -1266,8 +1216,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                 {/* Linked Emails Management Section */}
                 <div className="pt-8 border-t border-white/5" id="modal-emails-section">
-                  <div className="flex justify-between items-center mb-6">
-                    <h4 className="text-[12px] font-bold text-[#EBC351] uppercase tracking-widest ml-1">Linked Emails</h4>
+
+                  
+                  <div className="space-y-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1299,13 +1250,12 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           }
                         }, 100);
                       }}
-                      className="text-[10px] font-bold text-[#EBC351] bg-[#EBC351]/10 px-3 py-1.5 rounded-lg hover:bg-[#EBC351]/20 transition"
+                      className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group"
                     >
-                      + ADD EMAIL
+                      <span className="text-xl transition-transform">📨</span>
+                      <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest text-center mt-0.5">Add Linked Email</span>
                     </button>
-                  </div>
 
-                  <div className="space-y-1">
                     {(editingSubscription.linkedEmails || []).map((email, idx) => {
                       const expandedId = email.id || String(idx);
                       const isExpanded = expandedModalEmails.has(expandedId);

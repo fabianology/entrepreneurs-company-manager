@@ -183,6 +183,34 @@ const App: React.FC = () => {
     );
   }, [state?.subscriptions, selectedCompanyId, searchQuery]);
 
+  const subMetrics = useMemo(() => {
+    return companySubscriptions.reduce((acc, s) => {
+      // Check main subscription
+      if (s.billingCycle === 'Monthly') {
+        acc.cycleMonthly += s.cost;
+        acc.monthlyCount += 1;
+      } else if (s.billingCycle === 'Yearly') {
+        acc.cycleYearly += s.cost;
+        acc.yearlyCount += 1;
+      }
+      
+      // Check sub-services
+      s.subServices?.forEach(ss => {
+        if (ss.status !== 'Paused') {
+          if (ss.billingCycle === 'Monthly') {
+            acc.cycleMonthly += ss.cost;
+            acc.monthlyCount += 1;
+          } else if (ss.billingCycle === 'Yearly') {
+            acc.cycleYearly += ss.cost;
+            acc.yearlyCount += 1;
+          }
+        }
+      });
+      
+      return acc;
+    }, { cycleMonthly: 0, cycleYearly: 0, monthlyCount: 0, yearlyCount: 0 });
+  }, [companySubscriptions]);
+
   const companyCards = useMemo(() => {
     const base = state?.financialCards.filter(c => c.companyId === selectedCompanyId) || [];
     if (!searchQuery) return base;
@@ -1035,8 +1063,55 @@ const App: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-3 w-full overflow-hidden">
-                          <h2 className={`text-2xl md:text-3xl font-bold truncate ${selectedCompanyId ? 'text-white' : 'text-slate-900'}`}>{selectedCompany.name}</h2>
+                        <div className="flex flex-col w-full overflow-hidden gap-1.5">
+                          <div className="flex items-center space-x-3 w-full overflow-hidden">
+                            <h2 className={`text-2xl md:text-3xl font-bold truncate ${selectedCompanyId ? 'text-white' : 'text-slate-900'}`}>{selectedCompany.name}</h2>
+                          </div>
+                          
+                          {/* DYNAMIC METRICS SUB-HEADER */}
+                          {activeTab === 'subscriptions' && (
+                            <div className="flex items-center gap-4 shrink-0 pl-1">
+                              <div className="flex items-center">
+                                <div className="flex items-center gap-1 mr-1.5">
+                                  <span className="text-[18px] leading-none" style={{ filter: 'brightness(0.9) contrast(1.1)' }}>💵</span>
+                                  <span className="text-[14px] leading-none" style={{ filter: 'brightness(0.9)' }}>🔥</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[12px] font-medium text-white/40 lowercase tracking-normal">mo.</span>
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[14px] font-semibold text-white uppercase tracking-normal">${subMetrics.cycleMonthly.toFixed(0)}</span>
+                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-normal">({subMetrics.monthlyCount})</span>
+                                  </div>
+                                </div>
+                                
+                                <div className="w-[1px] h-3 bg-white/10 mx-3"></div>
+
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[12px] font-medium text-white/40 lowercase tracking-normal">yr.</span>
+                                  <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[14px] font-semibold text-white uppercase tracking-normal">${subMetrics.cycleYearly.toLocaleString()}</span>
+                                    <span className="text-[10px] font-medium text-white/40 uppercase tracking-normal">({subMetrics.yearlyCount})</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {activeTab === 'financial' && (
+                            <div className="flex items-center gap-4 shrink-0 pl-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[16px] leading-none">🏦</span>
+                                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({companyInstitutions.length})</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[16px] leading-none">💳</span>
+                                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({companyCards.length})</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[16px] leading-none">📑</span>
+                                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({companyLoans.length})</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

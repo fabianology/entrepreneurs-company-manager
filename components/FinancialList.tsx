@@ -596,21 +596,23 @@ const FinancialList: React.FC<FinancialListProps> = ({
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5 animate-fadeIn">
       {/* Action Bar - Minimalist Floating Style */}
-      <div className="w-full h-10 flex justify-between items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1">
-        <div className="flex items-center gap-4 shrink-0 px-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[16px] leading-none">🏦</span>
-            <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({institutions.length})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[16px] leading-none">💳</span>
-            <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({cards.length})</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[16px] leading-none">📑</span>
-            <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({loans.length})</span>
-          </div>
-        </div>
+      <div className="w-full h-10 flex justify-end items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1">
+
+        <button
+          onClick={handleAddNewCard}
+          className="h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 shrink-0 group"
+        >
+          <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Card</span>
+        </button>
+
+        <button
+          onClick={handleAddNewLoan}
+          className="h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 shrink-0 group mr-auto"
+        >
+          <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <span>Loan</span>
+        </button>
 
         <button
           onClick={handleAddNewInstitution}
@@ -872,13 +874,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       e.stopPropagation();
                       toggleInstitutionExpanded(inst.id);
                     }}
-                    className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group"
+                    className="w-full h-[47px] px-6 flex items-center justify-between text-white/40 group"
                   >
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-1.5">
                       <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Accounts</span>
-                      <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                        {inst.accounts.length}
-                      </div>
+                      <span className="text-[13px] font-black text-white/20 tracking-normal">
+                        ({inst.accounts.length})
+                      </span>
                     </div>
                     <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
@@ -1082,9 +1084,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
               <div className="w-full h-px bg-white/5 mt-8 mb-0"></div>
 
               <div className="space-y-1">
-                  <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
-                    <span className="text-xl group-hover:scale-110 transition-transform">💳</span>
-                    <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Card</span>
+                  <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
+                    <span className="text-xl transition-transform">💳</span>
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest text-center mt-0.5">Add Card</span>
                   </button>
 
                   {/* Cards List */}
@@ -1308,8 +1310,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                           className="w-full pl-8 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg text-[13px] font-medium text-white font-mono tracking-wider outline-none focus:border-[#EBC351]/50 transition"
                                           type="number"
                                           placeholder="0.00"
-                                          value={acc.balance}
-                                          onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) })}
+                                          value={acc.balance || ''}
+                                          onChange={e => handleUpdateInstAccount(idx, { balance: parseFloat(e.target.value) || 0 })}
                                         />
                                       </div>
                                     </div>
@@ -1379,9 +1381,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
 
               <div className="pt-4 border-t border-white/5 space-y-1">
-                  <button onClick={() => handleAddInstAccount('Checking')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
-                    <span className="text-xl group-hover:scale-110 transition-transform">🏦</span>
-                    <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Account</span>
+                  <button onClick={() => handleAddInstAccount('Checking')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
+                    <span className="text-xl transition-transform">🏦</span>
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest text-center mt-0.5">Add Account</span>
                   </button>
 
                   {(editingInstitution.accounts || []).map((acc, idx) => {
@@ -1477,10 +1479,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 <div className="mb-4 pt-4 border-t border-white/5">
                   <button
                     onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name, _fromBank: true } as any)}
-                    className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group"
+                    className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group"
                   >
-                    <span className="text-xl group-hover:scale-110 transition-transform">💸</span>
-                    <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Loan</span>
+                    <span className="text-xl transition-transform">💸</span>
+                    <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest text-center mt-0.5">Add Loan</span>
                   </button>
                 </div>
 
