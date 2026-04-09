@@ -41,12 +41,28 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const getUsedInServices = (emailStr: string) => {
     if (!emailStr) return [];
     const normalized = emailStr.toLowerCase().trim();
-    const matches = subscriptions.filter(s => {
-      if (s.loginId?.toLowerCase().trim() === normalized) return true;
-      if (s.linkedEmails?.some(e => e.email?.toLowerCase().trim() === normalized)) return true;
-      return false;
-    }).map(s => s.name || 'Unnamed Service');
-    return Array.from(new Set(matches)); // Remove duplicates if same service matched multiple times
+    
+    const results: { name: string, role: 'primary' | 'linked' }[] = [];
+    const seen = new Set<string>();
+
+    subscriptions.forEach(s => {
+      const isPrimary = s.loginId?.toLowerCase().trim() === normalized;
+      const isLinked = s.linkedEmails?.some(e => e.email?.toLowerCase().trim() === normalized);
+      
+      const sName = s.name || 'Unnamed Service';
+      
+      if (isPrimary || isLinked) {
+        if (!seen.has(sName)) {
+           results.push({
+             name: sName,
+             role: isPrimary ? 'primary' : 'linked'
+           });
+           seen.add(sName);
+        }
+      }
+    });
+
+    return results;
   };
 
   const [modalCustomPaymentMode, setModalCustomPaymentMode] = useState(false);
@@ -1374,16 +1390,16 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                   <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Used In</label>
                                   {(() => {
                                     const computedServices = getUsedInServices(email.email);
-                                    const legacyTags = email.usedIn ? email.usedIn.split(',').map(s => s.trim()).filter(s => s && !computedServices.find(cs => cs.toLowerCase() === s.toLowerCase())) : [];
+                                    const legacyTags = email.usedIn ? email.usedIn.split(',').map(s => s.trim()).filter(s => s && !computedServices.find(cs => cs.name.toLowerCase() === s.toLowerCase())) : [];
                                     
                                     return (
                                       <div className="flex flex-wrap gap-2 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg min-h-[38px] items-center">
                                         {computedServices.length === 0 && legacyTags.length === 0 && (
                                           <span className="text-white/20 text-[11px] italic">Auto-generates when linked to services...</span>
                                         )}
-                                        {computedServices.map((serviceName, i) => (
-                                          <span key={`svc-${i}`} className="px-2 py-1 bg-[#EBC351]/10 text-[#EBC351] text-[10px] uppercase tracking-widest font-bold rounded-md border border-[#EBC351]/20">
-                                            🏷️ {serviceName}
+                                        {computedServices.map((svc, i) => (
+                                          <span key={`svc-${i}`} className={`px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border ${svc.role === 'primary' ? 'bg-[#EBC351]/10 text-[#EBC351] border-[#EBC351]/20 shadow-[0_0_8px_rgba(235,195,81,0.1)]' : 'bg-white/5 text-white/50 border-white/10'}`}>
+                                            {svc.role === 'primary' ? '🔑 ' : '🔗 '} {svc.name} {svc.role === 'primary' ? '(Login)' : ''}
                                           </span>
                                         ))}
                                         {legacyTags.map((tag, i) => (
