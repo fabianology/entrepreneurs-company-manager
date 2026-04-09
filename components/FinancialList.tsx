@@ -997,15 +997,18 @@ const FinancialList: React.FC<FinancialListProps> = ({
       )}
 
       {/* --- LOANS SECTION --- */}
-      {loans.length > 0 && (
-      <section className="space-y-6">
-        <div className="flex justify-between items-center border-t border-white/10 pt-8 px-1">
-          <div className="flex flex-col">
-            <h3 className="text-lg font-black text-white/40">Loans & Debt</h3>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {loans.map(loan => {
+      {(() => {
+        const standaloneLoans = loans.filter(l => !institutions.some(inst => inst.name.toLowerCase() === l.lender?.toLowerCase()));
+        if (standaloneLoans.length === 0) return null;
+        return (
+          <section className="space-y-6">
+            <div className="flex justify-between items-center border-t border-white/10 pt-8 px-1">
+              <div className="flex flex-col">
+                <h3 className="text-lg font-black text-white/40">Loans & Debt</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {standaloneLoans.map(loan => {
             const amort = calcAmortization(loan);
             return (
               <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
@@ -1072,7 +1075,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
           })}
         </div>
       </section>
-      )}
+        )
+      })()}
       <datalist id="email-sweeps">
         {globalEmails.map((email, i) => <option key={i} value={email} />)}
       </datalist>
@@ -1529,7 +1533,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
                 </div>
 
-                <div className="mb-4 pt-4 border-t border-white/5">
+                <div className="pt-4 border-t border-white/5 space-y-1">
                   <button
                     onClick={() => setEditingLoan({ role: 'Lendee', lender: editingInstitution.name, _fromBank: true } as any)}
                     className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group"
@@ -1537,12 +1541,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <span className="text-xl transition-transform">💸</span>
                     <span className="text-[11px] font-bold text-white/60 uppercase tracking-widest text-center mt-0.5">Add Loan</span>
                   </button>
-                </div>
 
-                {/* --- LOAN CARDS inside bank modal --- */}
-                {loans.filter(l => l.lender === editingInstitution.name).length > 0 && (
-                  <div className="space-y-3 pt-2">
-                    <p className="text-[12px] font-bold text-white/30 uppercase tracking-widest px-1">💸 Loans</p>
+                  {/* --- LOAN CARDS inside bank modal --- */}
+                  {loans.filter(l => l.lender === editingInstitution.name).length > 0 && (
+                    <div className="space-y-2">
                     {loans.filter(l => l.lender === editingInstitution.name).map(loan => {
                       const amort = calcAmortization(loan);
                       return (
@@ -1608,13 +1610,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               </div>
                             </div>
                           )}
-
-                          <p className="text-[10px] font-bold text-[#EBC351]/60 uppercase tracking-widest group-hover:text-[#EBC351] transition text-center">Tap to edit →</p>
                         </div>
                       );
                     })}
                   </div>
                 )}
+              </div>
             </div>
             <div className="px-6 py-3 border-t border-white/5 flex justify-between items-center bg-black/20">
               {editingInstitution.id && (
