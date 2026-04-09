@@ -37,6 +37,18 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   })));
   
   const uniqueLoginIds = Array.from(new Set(subscriptions.map(s => s.loginId).filter((id): id is string => Boolean(id) && id.trim() !== '')));
+  
+  const getUsedInServices = (emailStr: string) => {
+    if (!emailStr) return [];
+    const normalized = emailStr.toLowerCase().trim();
+    const matches = subscriptions.filter(s => {
+      if (s.loginId?.toLowerCase().trim() === normalized) return true;
+      if (s.linkedEmails?.some(e => e.email?.toLowerCase().trim() === normalized)) return true;
+      return false;
+    }).map(s => s.name || 'Unnamed Service');
+    return Array.from(new Set(matches)); // Remove duplicates if same service matched multiple times
+  };
+
   const [modalCustomPaymentMode, setModalCustomPaymentMode] = useState(false);
   const [inlineCustomPaymentIds, setInlineCustomPaymentIds] = useState<Set<string>>(new Set());
   const [expandedSecurity, setExpandedSecurity] = useState(false);
@@ -613,7 +625,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
-                            setExpandedModalSubServices(new Set());
+                            setExpandedModalSubServices(new Set([child.id || String(idx)]));
+                            setExpandedModalEmails(new Set());
                             setEditingSubscription(sub);
                             setTimeout(() => {
                               const element = document.getElementById(`sub-service-${child.id}`);
@@ -681,7 +694,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setExpandedModalSubServices(new Set());
-                            setExpandedModalEmails(new Set());
+                            setExpandedModalEmails(new Set([emailId]));
                             setEditingSubscription(sub);
                             setTimeout(() => {
                               const element = document.getElementById(`linked-email-${emailId}`);
@@ -848,6 +861,29 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       value={editingSubscription.loginId || ''}
                       placeholder="admin"
                       onChange={e => setEditingSubscription({ ...editingSubscription, loginId: e.target.value })}
+                      onBlur={e => {
+                        const val = e.target.value.trim();
+                        if (val.includes('@')) {
+                          const currentEmails = editingSubscription.linkedEmails || [];
+                          if (!currentEmails.some(em => em.email?.toLowerCase().trim() === val.toLowerCase())) {
+                            const newId = Date.now().toString();
+                            const newEmail = {
+                              id: newId,
+                              email: val,
+                              usedFor: '',
+                              usedIn: '',
+                              accessMethod: '',
+                              forwarding: '',
+                              notes: ['This is the primary Login ID.']
+                            };
+                            setEditingSubscription({
+                              ...editingSubscription,
+                              linkedEmails: [...currentEmails, newEmail]
+                            });
+                            setExpandedModalEmails(prev => new Set(prev).add(newId));
+                          }
+                        }
+                      }}
                     />
                   </div>
                   <div className="space-y-0.5">
@@ -1334,18 +1370,30 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                     }}
                                   />
                                 </div>
-                                <div className="space-y-1">
+                                <div className="space-y-2">
                                   <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Used In</label>
-                                  <input
-                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                    placeholder="Shopify"
-                                    value={email.usedIn}
-                                    onChange={e => {
-                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                      newEmails[idx] = { ...newEmails[idx], usedIn: e.target.value };
-                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                                    }}
-                                  />
+                                  {(() => {
+                                    const computedServices = getUsedInServices(email.email);
+                                    const legacyTags = email.usedIn ? email.usedIn.split(',').map(s => s.trim()).filter(s => s && !computedServices.find(cs => cs.toLowerCase() === s.toLowerCase())) : [];
+                                    
+                                    return (
+                                      <div className="flex flex-wrap gap-2 px-3 py-2 bg-black/20 border border-white/[0.03] rounded-lg min-h-[38px] items-center">
+                                        {computedServices.length === 0 && legacyTags.length === 0 && (
+                                          <span className="text-white/20 text-[11px] italic">Auto-generates when linked to services...</span>
+                                        )}
+                                        {computedServices.map((serviceName, i) => (
+                                          <span key={`svc-${i}`} className="px-2 py-1 bg-[#EBC351]/10 text-[#EBC351] text-[10px] uppercase tracking-widest font-bold rounded-md border border-[#EBC351]/20">
+                                            🏷️ {serviceName}
+                                          </span>
+                                        ))}
+                                        {legacyTags.map((tag, i) => (
+                                          <div key={`legacy-${i}`} className="flex items-center bg-black/40 text-white/50 text-[10px] uppercase tracking-widest font-bold rounded-md border border-white/5 px-2 py-1">
+                                             {tag}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="col-span-full space-y-1">
                                   <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Access Method</label>
