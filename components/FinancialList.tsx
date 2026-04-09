@@ -465,7 +465,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
     // Row 1: Principal | Interest | Total
     drawRow('Principal Amount', fmt(loan.principalAmount || 0), 0, y);
-    drawRow(loan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Rate', loan.interestType === 'Fixed' ? fmt(loan.interestRate || 0) : `${loan.interestRate || 0}% APR`, contentW / 3, y);
+    drawRow(loan.interestType === 'Fixed' ? 'Fixed Fee' : 'YR APR', loan.interestType === 'Fixed' ? fmt(loan.interestRate || 0) : `${loan.interestRate || 0}% APR`, contentW / 3, y);
     drawRow('Total Cost of Loan', fmt((loan.principalAmount || 0) + (amort?.totalInterest || 0)), (contentW / 3) * 2, y);
     y += 16;
 
@@ -616,9 +616,9 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
         <button
           onClick={handleAddNewInstitution}
-          className="h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 shrink-0 group"
+          className="h-full bg-white text-black px-6 rounded-full text-[13px] font-bold uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 shrink-0 group"
         >
-          <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-3.5 h-3.5 text-black/40 group-hover:text-black transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Institution</span>
         </button>
       </div>
@@ -1942,12 +1942,12 @@ const FinancialList: React.FC<FinancialListProps> = ({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
+              <div className="flex items-start gap-4 w-full">
+                <div className="space-y-1 shrink-0">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Loan Term</label>
                   <div className="flex gap-2">
                     <select
-                      className="flex-1 bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
+                      className="w-[75px] bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                       value={editingLoan.termYears || 0}
                       onChange={e => {
                         const yrs = parseInt(e.target.value);
@@ -1968,7 +1968,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       ))}
                     </select>
                     <select
-                      className="flex-1 bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
+                      className="w-[75px] bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
                       value={editingLoan.termMonths || 0}
                       onChange={e => {
                         const mos = parseInt(e.target.value);
@@ -1990,36 +1990,41 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     </select>
                   </div>
                 </div>
-                <div className="space-y-1">
+                
+                <div className="w-[85px] shrink-0 space-y-1">
                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">
-                    {editingLoan.interestType === 'Fixed' ? 'Fixed Fee' : 'Interest Rate'}
+                    {editingLoan.interestType === 'Fixed' ? 'Fee' : 'YR APR'}
                   </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      {editingLoan.interestType === 'Fixed' && <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>}
-                      <input
-                        type="number"
-                        step={editingLoan.interestType === 'Fixed' ? "1" : "0.1"}
-                        className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-7' : ''} bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition`}
-                        value={editingLoan.interestRate || ''}
-                        placeholder={editingLoan.interestType === 'Fixed' ? "500" : "5.5"}
-                        onChange={e => setEditingLoan({ ...editingLoan, interestRate: e.target.value ? parseFloat(e.target.value) : 0 })}
-                      />
-                      {editingLoan.interestType !== 'Fixed' && <span className="absolute right-3 top-2 text-[13px] font-bold text-white/40">%</span>}
-                    </div>
-                    {editingLoan.interestType !== 'Fixed' && (
-                      <select
-                        className="flex-1 bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
-                        value={editingLoan.scheduleFrequency || 'Monthly'}
-                        onChange={e => setEditingLoan({ ...editingLoan, scheduleFrequency: e.target.value as any })}
-                      >
-                        <option value="Weekly" className="bg-[#1C1C1E]">Wk</option>
-                        <option value="Monthly" className="bg-[#1C1C1E]">Mo</option>
-                        <option value="Yearly" className="bg-[#1C1C1E]">Yr</option>
-                      </select>
-                    )}
+                  <div className="relative">
+                    {editingLoan.interestType === 'Fixed' && <span className="absolute left-3 top-2 text-[13px] font-bold text-white/40">$</span>}
+                    <input
+                      type="number"
+                      step={editingLoan.interestType === 'Fixed' ? "1" : "0.1"}
+                      className={`w-full ${editingLoan.interestType === 'Fixed' ? 'pl-7' : ''} bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition`}
+                      value={editingLoan.interestRate || ''}
+                      placeholder={editingLoan.interestType === 'Fixed' ? "500" : "5.5"}
+                      onChange={e => setEditingLoan({ ...editingLoan, interestRate: e.target.value ? parseFloat(e.target.value) : 0 })}
+                    />
+                    {editingLoan.interestType !== 'Fixed' && <span className="absolute right-3 top-2 text-[13px] font-bold text-white/40">%</span>}
                   </div>
                 </div>
+
+                {editingLoan.interestType !== 'Fixed' && (
+                  <div className="flex-1 min-w-[90px] space-y-1">
+                    <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1 whitespace-nowrap truncate">
+                      PAYMENT FREQ.
+                    </label>
+                    <select
+                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-2 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none"
+                      value={editingLoan.scheduleFrequency || 'Monthly'}
+                      onChange={e => setEditingLoan({ ...editingLoan, scheduleFrequency: e.target.value as any })}
+                    >
+                      <option value="Weekly" className="bg-[#1C1C1E]">Weekly</option>
+                      <option value="Monthly" className="bg-[#1C1C1E]">Monthly</option>
+                      <option value="Yearly" className="bg-[#1C1C1E]">Yearly</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {amortizationData && (
