@@ -879,7 +879,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <div className="flex items-center space-x-1.5">
                       <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Accounts</span>
                       <span className="text-[13px] font-black text-white/20 tracking-normal">
-                        ({inst.accounts.length})
+                        ({instAccounts + instLoans})
                       </span>
                     </div>
                     <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedInstitutions.has(inst.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -913,19 +913,72 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               >
                                 {acc.name}
                               </span>
-                              <span className="text-[11px] font-medium uppercase tracking-tighter opacity-80 text-[#EBC351]">
-                                ••{acc.last4}
-                              </span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                                  {acc.type}
+                                </span>
+                                {acc.last4 && (
+                                  <span className="text-[11px] font-medium uppercase tracking-tighter opacity-80 text-[#EBC351]">
+                                    ••{acc.last4}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <span className="text-[13px] font-medium text-white">
-                              ${acc.balance.toLocaleString()}
+                              ${((acc as any).monthlyPayment || 0) > 0 ? (acc as any).monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : acc.balance.toLocaleString()}
                               <span className="text-[12px] text-white/40 ml-1 font-bold uppercase tracking-widest lowercase">
-                                /{acc.type === 'Credit Card' ? 'cc' : acc.type === 'Checking' ? 'chk' : 'acc'}
+                                {((acc as any).monthlyPayment || 0) > 0 ? '/mo' : `/${acc.type === 'Credit Card' ? 'cc' : acc.type === 'Checking' ? 'chk' : 'acc'}`}
                               </span>
                             </span>
                           </div>
                         ))}
-                        {inst.accounts.length === 0 && <p className="text-[10px] font-black text-white/40 uppercase tracking-widest py-1">No linked accounts</p>}
+                        {instLoansList.map((loan, lIdx) => (
+                          <div key={loan.id || `loan-${lIdx}`} className="flex justify-between items-center group/item">
+                            <div className="flex items-center space-x-3">
+                              <div className="h-1.5 w-1.5 rounded-full bg-[#EBC351] shadow-[0_0_4px_rgba(235,195,81,0.8)] transition-all duration-300"></div>
+                              <span
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingInstitution(inst);
+                                  setTimeout(() => {
+                                    const element = document.getElementById(`inst-loan-${loan.id}`);
+                                    if (element) {
+                                      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                      element.style.boxShadow = '0 0 0 2px #EBC351';
+                                      setTimeout(() => {
+                                        element.style.boxShadow = 'none';
+                                      }, 2000);
+                                    }
+                                  }, 100);
+                                }}
+                                className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
+                              >
+                                {loan.name}
+                              </span>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                                  Loan
+                                  {!!loan.interestRate && (
+                                    <span className="ml-1.5">
+                                      • {loan.interestRate}{loan.interestType === 'Fixed' ? '' : '%'} {loan.interestType === 'Fixed' ? 'FEE' : 'APR'}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[13px] font-medium text-white">
+                              ${(() => {
+                                const amort = calcAmortization(loan);
+                                const pmt = Number(loan.monthlyPayment) || (amort ? amort.monthlyPayment : 0);
+                                return pmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                              })()}
+                              <span className="text-[12px] text-white/40 ml-1 font-bold uppercase tracking-widest lowercase">
+                                /{loan.scheduleFrequency === 'Weekly' ? 'wk' : loan.scheduleFrequency === 'Yearly' ? 'yr' : 'mo'}
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                        {(instAccounts + instLoans) === 0 && <p className="text-[10px] font-black text-white/40 uppercase tracking-widest py-1">No linked accounts</p>}
                         <button
                           onClick={(e) => { e.stopPropagation(); setEditingInstitution(inst); }}
                           className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
@@ -2035,6 +2088,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         {amortizationData.scheduleFrequency === 'Weekly' ? 'Weekly' : amortizationData.scheduleFrequency === 'Yearly' ? 'Yearly' : 'Monthly'} Pmt
                       </p>
                       <p className="text-xl font-bold text-white">${amortizationData.monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Total Int.</p>
+                      <p className="text-sm font-bold text-white">${amortizationData.totalInterest.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Total Cost</p>
