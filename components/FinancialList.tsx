@@ -210,7 +210,13 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
     setTimeout(() => {
       const el = document.getElementById(`inst-account-${newId}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.boxShadow = '0 0 0 2px #EBC351';
+        setTimeout(() => {
+          el.style.boxShadow = 'none';
+        }, 2000);
+      }
     }, 150);
   };
 
@@ -284,7 +290,21 @@ const FinancialList: React.FC<FinancialListProps> = ({
       if (editingLoan.id) {
         onUpdateLoan(editingLoan.id, editingLoan);
       } else {
-        onAddLoan(editingLoan);
+        const newId = Math.random().toString(36).substr(2, 9);
+        onAddLoan({ ...editingLoan, id: newId });
+        
+        if ((editingLoan as any)._fromBank) {
+          setTimeout(() => {
+            const el = document.getElementById(`inst-loan-${newId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.style.boxShadow = '0 0 0 2px #EBC351';
+              setTimeout(() => {
+                el.style.boxShadow = 'none';
+              }, 2000);
+            }
+          }, 300);
+        }
       }
       setEditingLoan(null);
     }
@@ -1473,6 +1493,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                       return (
                         <div
                           key={loan.id}
+                          id={loan.id ? `inst-loan-${loan.id}` : undefined}
                           onClick={() => setEditingLoan(loan)}
                           className="bg-black/20 p-4 rounded-lg flex flex-col gap-3 border border-white/[0.03] cursor-pointer hover:border-[#EBC351]/30 hover:bg-white/[0.05] transition-all group"
                         >

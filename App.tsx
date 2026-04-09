@@ -401,7 +401,7 @@ const App: React.FC = () => {
   const handleAddLoan = (loan: Partial<Loan>) => {
     if (!selectedCompanyId || !state) return;
     const newLoan: Loan = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: loan.id || Math.random().toString(36).substr(2, 9),
       companyId: selectedCompanyId,
       role: loan.role || 'Lendee',
       lender: loan.lender || 'Bank',
