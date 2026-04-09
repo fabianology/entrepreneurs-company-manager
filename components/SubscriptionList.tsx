@@ -603,9 +603,15 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         >
                           {child.name}
                         </span>
-                        <span className={`text-[11px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
-                          {child.status}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`text-[11px] font-medium uppercase tracking-tighter opacity-80 ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                            {child.status}
+                          </span>
+                          <span className="text-white/20 text-[10px]">|</span>
+                          <span className={`text-[11px] font-medium uppercase tracking-tighter opacity-80 ${(child.autoPay === 'Manual') ? 'text-red-500' : 'text-[#1FE400]'}`}>
+                            {(child.autoPay === 'Manual') ? 'Manual' : 'Auto Pay'}
+                          </span>
+                        </div>
                       </div>
                       <span className={`text-[13px] font-medium ${child.status === 'Paused' ? 'text-white/20' : 'text-white'}`}>
                         ${child.cost.toFixed(2)}
@@ -786,7 +792,15 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       <select
                         className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none cursor-pointer"
                         value={editingSubscription.billingCycle || 'Monthly'}
-                        onChange={e => setEditingSubscription({ ...editingSubscription, billingCycle: e.target.value as any })}
+                        onChange={e => {
+                          const newCycle = e.target.value as any;
+                          if (newCycle !== editingSubscription.billingCycle) {
+                            // Clear out the Due On date when changing cycles, since the format completely changes
+                            setEditingSubscription({ ...editingSubscription, billingCycle: newCycle, nextRenewal: '' });
+                          } else {
+                            setEditingSubscription({ ...editingSubscription, billingCycle: newCycle });
+                          }
+                        }}
                       >
                         <option value="Monthly">Monthly</option>
                         <option value="Yearly">Yearly</option>
@@ -885,7 +899,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                       )}
                     </div>
                     <div className="space-y-0.5">
-                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Auto Renew</label>
+                      <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Auto Pay</label>
                       <div className="flex items-center h-[36px]">
                         <div
                           className="relative flex items-center w-full bg-black/20 border border-white/[0.03] rounded-lg p-1 cursor-pointer select-none h-full"
@@ -898,8 +912,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               background: editingSubscription.renew === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
                             }}
                           />
-                          <span className={`relative z-10 flex-1 text-center text-[10px] font-bold uppercase tracking-widest transition-colors duration-200 py-1 ${editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'}`}>Auto</span>
-                          <span className={`relative z-10 flex-1 text-center text-[10px] font-bold uppercase tracking-widest transition-colors duration-200 py-1 ${editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'}`}>Manual</span>
+                          <span className={`relative z-10 flex-1 text-center text-[10px] font-bold uppercase tracking-widest transition-colors duration-200 py-1 ${editingSubscription.renew !== 'Manual' ? 'text-black' : 'text-white/30'}`}>On</span>
+                          <span className={`relative z-10 flex-1 text-center text-[10px] font-bold uppercase tracking-widest transition-colors duration-200 py-1 ${editingSubscription.renew === 'Manual' ? 'text-white' : 'text-white/30'}`}>Off</span>
                         </div>
                       </div>
                     </div>
@@ -994,8 +1008,19 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   <div className="space-y-1">
                     {(editingSubscription.subServices || []).map((child, idx) => (
                       <div key={child.id} id={`sub-service-${child.id}`} className="bg-black/20 p-5 rounded-lg flex flex-col gap-4 group/sub relative transition-all duration-300 border border-white/[0.03]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
+                            setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                          }}
+                          className="absolute top-3 right-3 text-white/10 hover:text-orange-500 transition-colors p-1 z-10"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        
                         <div className="flex-1 space-y-1">
-                          <div className="flex gap-4 items-start">
+                          <div className="flex gap-4 items-start pr-6">
                             <div className="flex-1 space-y-1">
                               <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Service Name</label>
                               <input
@@ -1009,19 +1034,37 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                 }}
                               />
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
-                                setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                              }}
-                              className="text-white/10 hover:text-orange-500 transition-colors p-1 mt-8"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </button>
+                            
+                            <div className="w-[124px] shrink-0 space-y-1">
+                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Status</label>
+                              <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[37px] items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newSubs = [...(editingSubscription.subServices || [])];
+                                    newSubs[idx] = { ...newSubs[idx], status: 'Active' };
+                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  }}
+                                  className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Active' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
+                                >
+                                  Active
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newSubs = [...(editingSubscription.subServices || [])];
+                                    newSubs[idx] = { ...newSubs[idx], status: 'Paused' };
+                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                  }}
+                                  className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Paused' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
+                                >
+                                  Paused
+                                </button>
+                              </div>
+                            </div>
                           </div>
 
-                          <div className="grid grid-cols-3 md:grid-cols-6 gap-4 items-end">
+                          <div className="grid grid-cols-[1fr_1fr_124px] lg:grid-cols-[110px_120px_1fr_124px] gap-4 items-end">
                             <div className="space-y-1">
                               <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Cost</label>
                               <div className="relative">
@@ -1054,7 +1097,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                 <option value="Yearly">Yearly</option>
                               </select>
                             </div>
-                            <div className="col-span-3 md:col-span-3 lg:col-span-3 space-y-1 order-last md:order-none min-h-[60px]">
+                            <div className="col-span-3 lg:col-span-1 space-y-1 order-last lg:order-none min-h-[60px]">
                               <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Purpose</label>
                               <textarea
                                 rows={2}
@@ -1078,30 +1121,24 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Status</label>
-                              <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[36px] items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newSubs = [...(editingSubscription.subServices || [])];
-                                    newSubs[idx] = { ...newSubs[idx], status: 'Active' };
-                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Auto Pay</label>
+                              <div 
+                                className="bg-black/20 border border-white/[0.03] rounded-lg p-1 flex relative cursor-pointer group h-[36px] items-center"
+                                onClick={() => {
+                                  const newSubs = [...(editingSubscription.subServices || [])];
+                                  newSubs[idx] = { ...newSubs[idx], autoPay: child.autoPay === 'Manual' ? 'Auto' : 'Manual' };
+                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                }}
+                              >
+                                <div 
+                                  className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-md transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                                  style={{ 
+                                    left: child.autoPay === 'Manual' ? 'calc(50% + 2px)' : '4px',
+                                    background: child.autoPay === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
                                   }}
-                                  className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Active' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
-                                >
-                                  Active
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newSubs = [...(editingSubscription.subServices || [])];
-                                    newSubs[idx] = { ...newSubs[idx], status: 'Paused' };
-                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                  }}
-                                  className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Paused' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
-                                >
-                                  Paused
-                                </button>
+                                />
+                                <span className={`relative z-10 flex-1 text-center text-[9px] font-bold uppercase tracking-widest transition-colors duration-200 ${child.autoPay !== 'Manual' ? 'text-black' : 'text-white/30'}`}>On</span>
+                                <span className={`relative z-10 flex-1 text-center text-[9px] font-bold uppercase tracking-widest transition-colors duration-200 ${child.autoPay === 'Manual' ? 'text-white' : 'text-white/30'}`}>Off</span>
                               </div>
                             </div>
                           </div>
@@ -1183,10 +1220,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Forwarding</label>
+                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Provider</label>
                             <input
                               className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                              placeholder="N/A or Destination"
+                              placeholder="e.g. Google Workspace"
                               value={email.forwarding}
                               onChange={e => {
                                 const newEmails = [...(editingSubscription.linkedEmails || [])];

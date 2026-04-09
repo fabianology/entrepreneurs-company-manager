@@ -37,6 +37,7 @@ export interface SubService {
   cost: number;
   billingCycle: 'Monthly' | 'Yearly';
   purpose?: string;
+  autoPay?: 'Auto' | 'Manual';
   status: 'Active' | 'Cancelled' | 'Pending' | 'Paused';
 }
 
