@@ -27,6 +27,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const [expandedCardDetails, setExpandedCardDetails] = useState<Set<string>>(new Set());
+  const [expandedModalSubServices, setExpandedModalSubServices] = useState<Set<string>>(new Set());
+  const [expandedModalEmails, setExpandedModalEmails] = useState<Set<string>>(new Set());
   
   const paymentOptions = institutions.flatMap(inst => inst.accounts.map(acc => ({
     id: acc.id,
@@ -61,6 +63,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const handleAddNew = () => {
     setShowDeleteConfirm(false);
     setModalCustomPaymentMode(false);
+    setExpandedModalSubServices(new Set());
+    setExpandedModalEmails(new Set());
     setEditingSubscription({
       name: '',
       cost: 0,
@@ -81,6 +85,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
   const handleEditSubscription = (sub: Subscription) => {
     setShowDeleteConfirm(false);
+    setExpandedModalSubServices(new Set());
+    setExpandedModalEmails(new Set());
     setEditingSubscription(sub);
   };
 
@@ -103,6 +109,22 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     if (newSet.has(emailId)) newSet.delete(emailId);
     else newSet.add(emailId);
     setExpandedDetails(newSet);
+  };
+
+  const toggleModalSubService = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const newSet = new Set(expandedModalSubServices);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedModalSubServices(newSet);
+  };
+
+  const toggleModalEmail = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const newSet = new Set(expandedModalEmails);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedModalEmails(newSet);
   };
 
   const toggleCardDetails = (id: string) => {
@@ -139,6 +161,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       ...editingSubscription,
       subServices: [...(editingSubscription.subServices || []), newSub]
     });
+    setExpandedModalSubServices(prev => new Set(prev).add(newId));
 
     // Auto-scroll to the new service section
     setTimeout(() => {
@@ -300,7 +323,11 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               {/* Main Info */}
               <div 
                 className={`px-6 pt-6 ${sub.pricingModel === 'free' ? 'pb-[18px]' : 'pb-[2px]'} space-y-6 cursor-pointer group/card transition-colors`}
-                onClick={() => setEditingSubscription(sub)}
+                onClick={() => {
+                  setExpandedModalSubServices(new Set());
+                  setExpandedModalEmails(new Set());
+                  setEditingSubscription(sub);
+                }}
               >
                 <div className="flex justify-between items-start">
                   <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 items-center w-full">
@@ -586,6 +613,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         <span
                           onClick={(e) => {
                             e.stopPropagation();
+                            setExpandedModalSubServices(new Set());
                             setEditingSubscription(sub);
                             setTimeout(() => {
                               const element = document.getElementById(`sub-service-${child.id}`);
@@ -652,6 +680,8 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            setExpandedModalSubServices(new Set());
+                            setExpandedModalEmails(new Set());
                             setEditingSubscription(sub);
                             setTimeout(() => {
                               const element = document.getElementById(`linked-email-${emailId}`);
@@ -1006,145 +1036,179 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    {(editingSubscription.subServices || []).map((child, idx) => (
-                      <div key={child.id} id={`sub-service-${child.id}`} className="bg-black/20 p-5 rounded-lg flex flex-col gap-4 group/sub relative transition-all duration-300 border border-white/[0.03]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
-                            setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                          }}
-                          className="absolute top-3 right-3 text-white/10 hover:text-orange-500 transition-colors p-1 z-10"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                        
-                        <div className="flex-1 space-y-1">
-                          <div className="flex gap-4 items-start pr-6">
-                            <div className="flex-1 space-y-1">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Service Name</label>
-                              <input
-                                className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                placeholder="Service Name (Storage)"
-                                value={child.name}
-                                onChange={e => {
-                                  const newSubs = [...(editingSubscription.subServices || [])];
-                                  newSubs[idx] = { ...newSubs[idx], name: e.target.value };
+                    {(editingSubscription.subServices || []).map((child, idx) => {
+                      const expandedId = child.id || String(idx);
+                      const isExpanded = expandedModalSubServices.has(expandedId);
+                      return (
+                        <div key={expandedId} id={`sub-service-${expandedId}`} className="bg-black/20 rounded-lg flex flex-col group/sub relative transition-all duration-300 border border-white/[0.03]">
+                          <div 
+                            className="flex items-center justify-between px-4 h-[47px] cursor-pointer hover:bg-white/5 transition-colors"
+                            onClick={(e) => toggleModalSubService(expandedId, e)}
+                          >
+                            <div className="flex items-center gap-4">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newSubs = editingSubscription.subServices?.filter((_, i) => i !== idx);
                                   setEditingSubscription({ ...editingSubscription, subServices: newSubs });
                                 }}
-                              />
-                            </div>
-                            
-                            <div className="w-[124px] shrink-0 space-y-1">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Status</label>
-                              <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[37px] items-center">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newSubs = [...(editingSubscription.subServices || [])];
-                                    newSubs[idx] = { ...newSubs[idx], status: 'Active' };
-                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                  }}
-                                  className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Active' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
-                                >
-                                  Active
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newSubs = [...(editingSubscription.subServices || [])];
-                                    newSubs[idx] = { ...newSubs[idx], status: 'Paused' };
-                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                  }}
-                                  className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Paused' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
-                                >
-                                  Paused
-                                </button>
+                                className="text-white/20 hover:text-orange-500 transition-colors p-1"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                              
+                              <div className="flex items-center space-x-2.5">
+                                <span className="text-[13px] font-medium text-white">{child.name || 'New Service'}</span>
+                                <span className="text-white/20 text-[10px]">|</span>
+                                <div className="flex items-center space-x-1.5">
+                                  <div className={`h-1.5 w-1.5 rounded-full ${child.status === 'Paused' ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-colors`}></div>
+                                  <span className={`text-[10px] font-bold uppercase tracking-widest ${child.status === 'Paused' ? 'text-red-500' : 'text-[#1FE400]'}`}>{child.status || 'Active'}</span>
+                                </div>
                               </div>
                             </div>
+
+                            <button
+                              type="button"
+                              className="text-white/30 p-1"
+                            >
+                              <svg className={`w-4 h-4 transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
                           </div>
 
-                          <div className="grid grid-cols-[1fr_1fr_124px] lg:grid-cols-[110px_120px_1fr_124px] gap-4 items-end">
-                            <div className="space-y-1">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Cost</label>
-                              <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[13px] font-medium">$</span>
-                                <input
-                                  type="text"
-                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg pl-7 pr-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                  placeholder="0.00"
-                                  value={child.cost || ''}
-                                  onChange={e => {
-                                    const newSubs = [...(editingSubscription.subServices || [])];
-                                    newSubs[idx] = { ...newSubs[idx], cost: parseFloat(e.target.value) || 0 };
-                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                  }}
-                                />
+                          {isExpanded && (
+                            <div className="p-4 pt-0 animate-fadeIn border-t border-white/5 mt-1">
+                              <div className="flex-1 space-y-4">
+                                <div className="flex gap-4 items-start pt-4">
+                                  <div className="flex-1 space-y-1">
+                                    <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Service Name</label>
+                                    <input
+                                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                      placeholder="Service Name (Storage)"
+                                      value={child.name}
+                                      onChange={e => {
+                                        const newSubs = [...(editingSubscription.subServices || [])];
+                                        newSubs[idx] = { ...newSubs[idx], name: e.target.value };
+                                        setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                      }}
+                                    />
+                                  </div>
+                                  
+                                  <div className="w-[124px] shrink-0 space-y-1">
+                                    <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Status</label>
+                                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 h-[37px] items-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newSubs = [...(editingSubscription.subServices || [])];
+                                          newSubs[idx] = { ...newSubs[idx], status: 'Active' };
+                                          setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                        }}
+                                        className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Active' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
+                                      >
+                                        Active
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newSubs = [...(editingSubscription.subServices || [])];
+                                          newSubs[idx] = { ...newSubs[idx], status: 'Paused' };
+                                          setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                        }}
+                                        className={`flex-1 h-full rounded-md text-[9px] font-bold uppercase tracking-widest transition-all ${child.status === 'Paused' ? 'bg-[#EBC351] text-black shadow-lg shadow-[#EBC351]/20' : 'text-white/30 hover:text-white'}`}
+                                      >
+                                        Paused
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-[1fr_1fr_124px] lg:grid-cols-[110px_120px_1fr_124px] gap-4 items-end pb-1">
+                                  <div className="space-y-1">
+                                    <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Cost</label>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 text-[13px] font-medium">$</span>
+                                      <input
+                                        type="text"
+                                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg pl-7 pr-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                        placeholder="0.00"
+                                        value={child.cost || ''}
+                                        onChange={e => {
+                                          const newSubs = [...(editingSubscription.subServices || [])];
+                                          newSubs[idx] = { ...newSubs[idx], cost: parseFloat(e.target.value) || 0 };
+                                          setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Cycle</label>
+                                    <select
+                                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none cursor-pointer"
+                                      value={child.billingCycle || 'Monthly'}
+                                      onChange={e => {
+                                        const newSubs = [...(editingSubscription.subServices || [])];
+                                        newSubs[idx] = { ...newSubs[idx], billingCycle: e.target.value as any };
+                                        setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                      }}
+                                    >
+                                      <option value="Monthly">Monthly</option>
+                                      <option value="Yearly">Yearly</option>
+                                    </select>
+                                  </div>
+                                  <div className="col-span-3 lg:col-span-1 space-y-1 order-last lg:order-none min-h-[60px]">
+                                    <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Purpose</label>
+                                    <textarea
+                                      rows={2}
+                                      style={{
+                                        backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
+                                        backgroundAttachment: 'local',
+                                        lineHeight: '20px'
+                                      }}
+                                      className="w-full py-2.5 bg-transparent border-none outline-none focus:ring-0 text-white text-[13px] font-medium transition-colors resize-none overflow-hidden custom-scrollbar"
+                                      placeholder="Backup storage, processing..."
+                                      value={child.purpose || ''}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        const lines = val.split('\n');
+                                        if (lines.length <= 2) {
+                                          const newSubs = [...(editingSubscription.subServices || [])];
+                                          newSubs[idx] = { ...newSubs[idx], purpose: val };
+                                          setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Auto Pay</label>
+                                    <div 
+                                      className="bg-black/20 border border-white/[0.03] rounded-lg p-1 flex relative cursor-pointer group h-[36px] items-center"
+                                      onClick={() => {
+                                        const newSubs = [...(editingSubscription.subServices || [])];
+                                        newSubs[idx] = { ...newSubs[idx], autoPay: child.autoPay === 'Manual' ? 'Auto' : 'Manual' };
+                                        setEditingSubscription({ ...editingSubscription, subServices: newSubs });
+                                      }}
+                                    >
+                                      <div 
+                                        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-md transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                                        style={{ 
+                                          left: child.autoPay === 'Manual' ? 'calc(50% + 2px)' : '4px',
+                                          background: child.autoPay === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
+                                        }}
+                                      />
+                                      <span className={`relative z-10 flex-1 text-center text-[9px] font-bold uppercase tracking-widest transition-colors duration-200 ${child.autoPay !== 'Manual' ? 'text-black' : 'text-white/30'}`}>On</span>
+                                      <span className={`relative z-10 flex-1 text-center text-[9px] font-bold uppercase tracking-widest transition-colors duration-200 ${child.autoPay === 'Manual' ? 'text-white' : 'text-white/30'}`}>Off</span>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div className="space-y-1">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Cycle</label>
-                              <select
-                                className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none cursor-pointer"
-                                value={child.billingCycle || 'Monthly'}
-                                onChange={e => {
-                                  const newSubs = [...(editingSubscription.subServices || [])];
-                                  newSubs[idx] = { ...newSubs[idx], billingCycle: e.target.value as any };
-                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                }}
-                              >
-                                <option value="Monthly">Monthly</option>
-                                <option value="Yearly">Yearly</option>
-                              </select>
-                            </div>
-                            <div className="col-span-3 lg:col-span-1 space-y-1 order-last lg:order-none min-h-[60px]">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Purpose</label>
-                              <textarea
-                                rows={2}
-                                style={{
-                                  backgroundImage: 'linear-gradient(to bottom, transparent 31px, rgba(255,255,255,0.1) 31px, rgba(255,255,255,0.1) 32px, transparent 32px, transparent 51px, rgba(255,255,255,0.1) 51px, rgba(255,255,255,0.1) 52px, transparent 52px)',
-                                  backgroundAttachment: 'local',
-                                  lineHeight: '20px'
-                                }}
-                                className="w-full py-2.5 bg-transparent border-none outline-none focus:ring-0 text-white text-[13px] font-medium transition-colors resize-none overflow-hidden custom-scrollbar"
-                                placeholder="Backup storage, processing..."
-                                value={child.purpose || ''}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  const lines = val.split('\n');
-                                  if (lines.length <= 2) {
-                                    const newSubs = [...(editingSubscription.subServices || [])];
-                                    newSubs[idx] = { ...newSubs[idx], purpose: val };
-                                    setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Auto Pay</label>
-                              <div 
-                                className="bg-black/20 border border-white/[0.03] rounded-lg p-1 flex relative cursor-pointer group h-[36px] items-center"
-                                onClick={() => {
-                                  const newSubs = [...(editingSubscription.subServices || [])];
-                                  newSubs[idx] = { ...newSubs[idx], autoPay: child.autoPay === 'Manual' ? 'Auto' : 'Manual' };
-                                  setEditingSubscription({ ...editingSubscription, subServices: newSubs });
-                                }}
-                              >
-                                <div 
-                                  className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-md transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                                  style={{ 
-                                    left: child.autoPay === 'Manual' ? 'calc(50% + 2px)' : '4px',
-                                    background: child.autoPay === 'Manual' ? 'rgba(255,255,255,0.08)' : '#EBC351'
-                                  }}
-                                />
-                                <span className={`relative z-10 flex-1 text-center text-[9px] font-bold uppercase tracking-widest transition-colors duration-200 ${child.autoPay !== 'Manual' ? 'text-black' : 'text-white/30'}`}>On</span>
-                                <span className={`relative z-10 flex-1 text-center text-[9px] font-bold uppercase tracking-widest transition-colors duration-200 ${child.autoPay === 'Manual' ? 'text-white' : 'text-white/30'}`}>Off</span>
-                              </div>
-                            </div>
-                          </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -1169,6 +1233,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           ...editingSubscription,
                           linkedEmails: [...(editingSubscription.linkedEmails || []), newEmail]
                         });
+                        setExpandedModalEmails(prev => new Set(prev).add(newId));
 
                         // Auto-scroll to the new email section
                         setTimeout(() => {
@@ -1188,102 +1253,132 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                     </button>
                   </div>
 
-                  <div className="space-y-6">
-                    {(editingSubscription.linkedEmails || []).map((email, idx) => (
-                      <div key={email.id} id={`linked-email-${email.id}`} className="bg-black/20 p-6 rounded-lg border border-white/[0.03] space-y-1 relative group/email-edit transition-all duration-300">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Email Address</label>
-                            <input
-                              list="email-sweeps"
-                              className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                              placeholder="email@example.com"
-                              value={email.email}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], email: e.target.value };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
+                  <div className="space-y-1">
+                    {(editingSubscription.linkedEmails || []).map((email, idx) => {
+                      const expandedId = email.id || String(idx);
+                      const isExpanded = expandedModalEmails.has(expandedId);
+                      return (
+                        <div key={expandedId} id={`linked-email-${expandedId}`} className="bg-black/20 rounded-lg flex flex-col group/sub relative transition-all duration-300 border border-white/[0.03]">
+                          <div 
+                            className="flex items-center justify-between px-4 h-[47px] cursor-pointer hover:bg-white/5 transition-colors"
+                            onClick={(e) => toggleModalEmail(expandedId, e)}
+                          >
+                            <div className="flex items-center gap-4">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const newEmails = editingSubscription.linkedEmails?.filter((_, i) => i !== idx);
+                                  setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                }}
+                                className="text-white/20 hover:text-orange-500 transition-colors p-1"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                              
+                              <div className="flex items-center space-x-2.5">
+                                <span className="text-[13px] font-medium text-white">{email.email || 'New Email Address'}</span>
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="text-white/30 p-1"
+                            >
+                              <svg className={`w-4 h-4 transform transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Used For</label>
-                            <input
-                              className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                              placeholder="Personal use"
-                              value={email.usedFor}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], usedFor: e.target.value };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Provider</label>
-                            <input
-                              className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                              placeholder="e.g. Google Workspace"
-                              value={email.forwarding}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], forwarding: e.target.value };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Used In</label>
-                            <input
-                              className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                              placeholder="Shopify"
-                              value={email.usedIn}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], usedIn: e.target.value };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
-                          </div>
-                          <div className="col-span-full space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Access Method</label>
-                            <input
-                              className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                              placeholder="Gmail, Apple Mail"
-                              value={email.accessMethod}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], accessMethod: e.target.value };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
-                          </div>
-                          <div className="col-span-full space-y-1">
-                            <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Notes</label>
-                            <textarea
-                              className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition h-24 resize-none"
-                              placeholder="Main email used for...&#10;Secondary contact..."
-                              value={email.notes.join('\n')}
-                              onChange={e => {
-                                const newEmails = [...(editingSubscription.linkedEmails || [])];
-                                newEmails[idx] = { ...newEmails[idx], notes: e.target.value.split('\n') };
-                                setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                              }}
-                            />
-                          </div>
+
+                          {isExpanded && (
+                            <div className="p-4 pt-0 animate-fadeIn border-t border-white/5 mt-1">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                                <div className="space-y-1">
+                                  <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Email Address</label>
+                                  <input
+                                    list="email-sweeps"
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="email@example.com"
+                                    value={email.email}
+                                    onChange={e => {
+                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                      newEmails[idx] = { ...newEmails[idx], email: e.target.value };
+                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Used For</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="Personal use"
+                                    value={email.usedFor}
+                                    onChange={e => {
+                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                      newEmails[idx] = { ...newEmails[idx], usedFor: e.target.value };
+                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Provider</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="e.g. Google Workspace"
+                                    value={email.forwarding}
+                                    onChange={e => {
+                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                      newEmails[idx] = { ...newEmails[idx], forwarding: e.target.value };
+                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                    }}
+                                  />
+                                </div>
+                                <div className="space-y-1">
+                                  <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Used In</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="Shopify"
+                                    value={email.usedIn}
+                                    onChange={e => {
+                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                      newEmails[idx] = { ...newEmails[idx], usedIn: e.target.value };
+                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-full space-y-1">
+                                  <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Access Method</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="Gmail, Apple Mail"
+                                    value={email.accessMethod}
+                                    onChange={e => {
+                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                      newEmails[idx] = { ...newEmails[idx], accessMethod: e.target.value };
+                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                    }}
+                                  />
+                                </div>
+                                <div className="col-span-full space-y-1">
+                                  <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Notes</label>
+                                  <textarea
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition h-24 resize-none"
+                                    placeholder="Main email used for...&#10;Secondary contact..."
+                                    value={email.notes.join('\n')}
+                                    onChange={e => {
+                                      const newEmails = [...(editingSubscription.linkedEmails || [])];
+                                      newEmails[idx] = { ...newEmails[idx], notes: e.target.value.split('\n') };
+                                      setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newEmails = editingSubscription.linkedEmails?.filter((_, i) => i !== idx);
-                            setEditingSubscription({ ...editingSubscription, linkedEmails: newEmails });
-                          }}
-                          className="absolute top-4 right-4 text-white/20 hover:text-orange-500 transition-colors p-1"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
