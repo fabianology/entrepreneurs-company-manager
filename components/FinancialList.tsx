@@ -45,7 +45,14 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [lastCopiedField, setLastCopiedField] = useState<{ id: string, field: 'username' | 'password' } | null>(null);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<number | null>(null);
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
+  const [customPaidFromIndices, setCustomPaidFromIndices] = useState<Set<number>>(new Set());
   const [showAmortizationTable, setShowAmortizationTable] = useState(false);
+
+  const paymentOptions = institutions.flatMap(inst => (inst.accounts || []).map(acc => ({
+    id: acc.id,
+    label: `${inst.name || 'Unnamed Institution'} ${acc.last4 ? `(x${acc.last4})` : ''}`.trim(),
+    type: acc.type
+  })));
   const [expandedSchedules, setExpandedSchedules] = useState<Set<string>>(new Set());
 
   const toggleSchedule = (loanId: string, e: React.MouseEvent) => {
@@ -183,17 +190,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   const handleAddInstAccount = (defaultType: string = 'Checking') => {
     if (!editingInstitution) return;
+    const newId = Math.random().toString(36).substr(2, 9);
     const newAcc: InstitutionAccount = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: newId,
       name: '',
       type: defaultType as any,
       last4: '',
       balance: 0
     };
+    
+    const currentIndex = (editingInstitution.accounts || []).length;
+    
     setEditingInstitution({
       ...editingInstitution,
       accounts: [...(editingInstitution.accounts || []), newAcc]
     });
+    
+    setExpandedAccounts(prev => new Set(prev).add(currentIndex));
+
+    setTimeout(() => {
+      const el = document.getElementById(`inst-account-${newId}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
   };
 
   const handleUpdateInstAccount = (index: number, updates: Partial<InstitutionAccount>) => {
@@ -557,38 +575,46 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5 animate-fadeIn">
-      <datalist id="email-sweeps">
-        {globalEmails.map((email, i) => <option key={i} value={email} />)}
-      </datalist>
-      
       {/* Action Bar - Minimalist Floating Style */}
-      <div className="w-full h-10 flex items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1">
+      <div className="w-full h-10 flex justify-between items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1">
+        <div className="flex items-center gap-4 shrink-0 px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[16px] leading-none">🏦</span>
+            <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({institutions.length})</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[16px] leading-none">💳</span>
+            <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({cards.length})</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[16px] leading-none">📑</span>
+            <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({loans.length})</span>
+          </div>
+        </div>
+
         <button
           onClick={handleAddNewInstitution}
-          className="flex-1 h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
+          className="h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 shrink-0 group"
         >
           <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
           <span>Institution</span>
         </button>
-
-        <button
-          onClick={handleAddNewCard}
-          className="flex-1 h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
-        >
-          <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-          <span>Cards</span>
-        </button>
-
-        <button
-          onClick={handleAddNewLoan}
-          className="flex-1 h-full bg-[#1C1C1E] text-white px-6 rounded-full text-[13px] font-medium uppercase tracking-normal transition-all flex items-center justify-center space-x-2 active:scale-95 group"
-        >
-          <svg className="w-3.5 h-3.5 text-white/40 group-hover:text-[#EBC351] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4" /></svg>
-          <span>Loan</span>
-        </button>
       </div>
 
+      {cards.length === 0 && institutions.length === 0 && loans.length === 0 && (
+        <button
+          onClick={handleAddNewInstitution}
+          className="w-full max-w-[400px] mx-auto h-[216px] rounded-[32px] border border-dashed border-white/20 flex flex-col items-center justify-center bg-[#1C1C1E]/50 hover:bg-[#1C1C1E] hover:border-[#EBC351]/50 transition-all duration-300 group shadow-2xl mt-4"
+        >
+          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+            <span className="text-2xl">🏦</span>
+          </div>
+          <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-[0.2em] transition-colors">+ Add Your First Institution</span>
+        </button>
+      )}
+
       {/* --- PAYMENT METHODS --- */}
+      {cards.length > 0 && (
       <section className="space-y-6">
         <div className="flex justify-between items-center px-1">
           <div className="flex flex-col">
@@ -616,17 +642,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             transition: isDragging ? 'none' : 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
           }}
         >
-          {cards.length === 0 ? (
-            <button
-              onClick={handleAddNewCard}
-              className="w-full max-w-[400px] mx-auto h-[216px] rounded-[32px] border border-dashed border-white/20 flex flex-col items-center justify-center bg-[#1C1C1E]/50 hover:bg-[#1C1C1E] hover:border-[#EBC351]/50 transition-all duration-300 group shadow-2xl"
-            >
-              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
-                <span className="text-2xl">💳</span>
-              </div>
-              <span className="text-[10px] font-black text-white/60 group-hover:text-white uppercase tracking-[0.2em] transition-colors">+ Add Your First Card</span>
-            </button>
-          ) : (
+          {cards.length > 0 && (
             <div className={`relative ${isWalletExpanded ? 'flex flex-col gap-4' : ''}`}>
               {cards.map((card, index) => {
                 const stackOffset = index * 45;
@@ -681,8 +697,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
           )}
         </div>
       </section>
+      )}
 
       {/* --- BANKING INSTITUTIONS --- */}
+      {institutions.length > 0 && (
       <section className="space-y-6">
         <div className="flex justify-between items-center px-1 border-t border-white/10 pt-8">
           <div className="flex flex-col">
@@ -901,8 +919,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
           })}
         </div>
       </section>
+      )}
 
       {/* --- LOANS SECTION --- */}
+      {loans.length > 0 && (
       <section className="space-y-6">
         <div className="flex justify-between items-center border-t border-white/10 pt-8 px-1">
           <div className="flex flex-col">
@@ -977,6 +997,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
           })}
         </div>
       </section>
+      )}
+      <datalist id="email-sweeps">
+        {globalEmails.map((email, i) => <option key={i} value={email} />)}
+      </datalist>
 
       {/* --- EDIT INSTITUTION MODAL --- */}
       {editingInstitution && (
@@ -1037,75 +1061,112 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
               <div className="w-full h-px bg-white/5 mt-8 mb-0"></div>
 
-                            <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full !mt-4 h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
+              <div className="space-y-1">
+                  <button onClick={() => handleAddInstAccount('Credit Card')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
                     <span className="text-xl group-hover:scale-110 transition-transform">💳</span>
                     <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Card</span>
                   </button>
 
                   {/* Cards List */}
-                  <div className="space-y-1 mt-6">
-                    {(editingInstitution.accounts || []).map((acc, idx) => {
+                  {(editingInstitution.accounts || []).map((acc, idx) => {
                       if (!['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                       return (
-                        <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03] transition-all duration-500">
-                          <div className="flex-1 w-full space-y-1">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
-                              <div className="md:col-span-1 space-y-1">
-                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
-                                <input
-                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                  placeholder="Chase Sapphire"
-                                  value={acc.name}
-                                  onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })}
-                                />
-                              </div>
-                              <div className="md:col-span-1 space-y-1">
-                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
-                                <select
-                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                  value={acc.type}
-                                  onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}
+                        <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-black/20 rounded-lg flex flex-col group/sub relative transition-all duration-300 border border-white/[0.03]">
+                          <div 
+                            className="flex items-center justify-between px-4 h-[47px] cursor-pointer hover:bg-white/5 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); toggleAccountExpanded(idx); }}
+                          >
+                            <div className="flex items-center gap-4">
+                              {confirmDeleteAccount === idx ? (
+                                <div className="absolute top-1 left-2 flex items-center justify-between bg-[#1C1C1E] rounded-lg p-1.5 border border-orange-500/50 shadow-2xl gap-2 z-10" onClick={e => e.stopPropagation()}>
+                                  <span className="text-[10px] font-bold text-orange-500 uppercase whitespace-nowrap ml-1">Confirm?</span>
+                                  <div className="flex gap-1">
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-[9px] font-bold text-white hover:text-orange-500 px-2 py-1 bg-black/60 hover:bg-black rounded transition-colors active:scale-95">Y</button>
+                                    <button type="button" onClick={(e) => { e.stopPropagation(); setConfirmDeleteAccount(null); }} className="text-[9px] font-bold text-white/40 hover:text-white px-2 py-1 bg-black/60 hover:bg-black rounded transition-colors active:scale-95">N</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteAccount(idx);
+                                  }}
+                                  className="text-white/20 hover:text-orange-500 transition-colors p-1"
                                 >
-                                  <option value="Credit Card">Credit Card</option>
-                                  <option value="Debit (Linked)">Debit (Linked)</option>
-                                  <option value="FSA">FSA</option>
-                                  <option value="HSA">HSA</option>
-                                </select>
-                              </div>
-                              <div className="md:col-span-1 space-y-1">
-                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Last 4</label>
-                                <input
-                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
-                                  placeholder="1234"
-                                  value={acc.last4}
-                                  maxLength={4}
-                                  onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })}
-                                />
-                              </div>
-                              <div className="md:col-span-1 space-y-1">
-                                <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Autopay</label>
-                                <select
-                                  className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                  value={acc.autopay || 'N/A'}
-                                  onChange={e => handleUpdateInstAccount(idx, { autopay: e.target.value as any })}
-                                >
-                                  <option value="Yes">Yes</option>
-                                  <option value="No">No</option>
-                                  <option value="N/A">N/A</option>
-                                </select>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                              )}
+                              
+                              <div className="flex items-center space-x-2.5">
+                                <span className="text-[13px] font-medium text-white">{acc.name || 'New Card'}</span>
+                                <span className="text-white/20 text-[10px]">|</span>
+                                <span className="text-[10px] font-mono text-white/60 tracking-widest leading-none mt-0.5">{acc.last4 ? `•••• ${acc.last4}` : '••••'}</span>
+                                <span className="text-white/20 text-[10px]">|</span>
+                                <div className="flex items-center space-x-1.5">
+                                  <div className={`h-1.5 w-1.5 rounded-full ${acc.status === 'Frozen' ? 'bg-[#EBC351] shadow-[0_0_4px_rgba(235,195,81,0.8)]' : acc.status === 'Expired' ? 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]' : 'bg-[#1FE400] shadow-[0_0_4px_#1FE400]'} transition-colors`}></div>
+                                  <span className={`text-[10px] font-bold uppercase tracking-widest ${acc.status === 'Frozen' ? 'text-[#EBC351]' : acc.status === 'Expired' ? 'text-red-500' : 'text-[#1FE400]'}`}>{acc.status || 'Active'}</span>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Toggle Button for Details */}
-                            <div className="pt-3 border-t border-white/5 flex justify-center mt-2">
-                              <button onClick={() => toggleAccountExpanded(idx)} className="text-[#EBC351] text-[13px] font-semibold uppercase tracking-widest flex items-center gap-2 hover:text-white transition-colors">
-                                {expandedAccounts.has(idx) ? 'Minimize' : 'Expand Details'}
-                                <svg className={`w-3 h-3 transform transition-transform ${expandedAccounts.has(idx) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              className="text-white/30 p-1"
+                            >
+                              <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedAccounts.has(idx) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          </div>
 
-                            {expandedAccounts.has(idx) && (
-                              <div className="pt-4 grid grid-cols-2 md:grid-cols-4 gap-4 w-full animate-fadeIn">
+                          {expandedAccounts.has(idx) && (
+                            <div className="p-4 animate-fadeIn border-t border-white/5 space-y-4">
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
+                                <div className="md:col-span-1 space-y-1">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Nickname</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="Chase Sapphire"
+                                    value={acc.name}
+                                    onChange={e => handleUpdateInstAccount(idx, { name: e.target.value })}
+                                  />
+                                </div>
+                                <div className="md:col-span-1 space-y-1">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Type</label>
+                                  <select
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    value={acc.type}
+                                    onChange={e => handleUpdateInstAccount(idx, { type: e.target.value as any })}
+                                  >
+                                    <option value="Credit Card">Credit Card</option>
+                                    <option value="Debit (Linked)">Debit (Linked)</option>
+                                    <option value="FSA">FSA</option>
+                                    <option value="HSA">HSA</option>
+                                  </select>
+                                </div>
+                                <div className="md:col-span-1 space-y-1">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Last 4</label>
+                                  <input
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white font-mono tracking-widest outline-none focus:border-[#EBC351]/50 transition"
+                                    placeholder="1234"
+                                    value={acc.last4}
+                                    maxLength={4}
+                                    onChange={e => handleUpdateInstAccount(idx, { last4: e.target.value })}
+                                  />
+                                </div>
+                                <div className="md:col-span-1 space-y-1">
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Autopay</label>
+                                  <select
+                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
+                                    value={acc.autopay || 'N/A'}
+                                    onChange={e => handleUpdateInstAccount(idx, { autopay: e.target.value as any })}
+                                  >
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                    <option value="N/A">N/A</option>
+                                  </select>
+                                </div>
                                 <div className="md:col-span-1 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Name on Card</label>
                                   <input
@@ -1137,7 +1198,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                     placeholder="MM/YY"
                                     maxLength={5}
                                     value={acc.expiry || ''}
-                                    onChange={e => handleUpdateInstAccount(idx, { expiry: e.target.value })}
+                                    onChange={e => {
+                                      let val = e.target.value.replace(/\D/g, '');
+                                      if (val.length > 2) val = val.substring(0, 2) + '/' + val.substring(2, 4);
+                                      handleUpdateInstAccount(idx, { expiry: val });
+                                    }}
                                   />
                                 </div>
                                 <div className="md:col-span-1 space-y-1">
@@ -1154,12 +1219,50 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid From</label>
-                                  <input
-                                    className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                                    placeholder="Chase Checking"
-                                    value={acc.paidFrom || ''}
-                                    onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })}
-                                  />
+                                  {customPaidFromIndices.has(idx) || (acc.paidFrom && !paymentOptions.find(o => o.id === acc.paidFrom)) ? (
+                                    <div className="relative">
+                                      <input
+                                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition pr-8"
+                                        placeholder="Partner's checking..."
+                                        value={acc.paidFrom || ''}
+                                        onChange={e => handleUpdateInstAccount(idx, { paidFrom: e.target.value })}
+                                      />
+                                      <button 
+                                        className="absolute right-2 top-2 w-5 h-5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                                        onClick={() => {
+                                           const newSet = new Set(customPaidFromIndices);
+                                           newSet.delete(idx);
+                                           setCustomPaidFromIndices(newSet);
+                                           handleUpdateInstAccount(idx, { paidFrom: '' });
+                                        }}
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <select
+                                      value={acc.paidFrom || ''}
+                                      onChange={(e) => {
+                                         if (e.target.value === '_custom_new') {
+                                           const newSet = new Set(customPaidFromIndices);
+                                           newSet.add(idx);
+                                           setCustomPaidFromIndices(newSet);
+                                           handleUpdateInstAccount(idx, { paidFrom: '' });
+                                         } else {
+                                           handleUpdateInstAccount(idx, { paidFrom: e.target.value });
+                                         }
+                                      }}
+                                      className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none cursor-pointer"
+                                    >
+                                      <option value="">Select account...</option>
+                                      {paymentOptions.map(o => (
+                                        <option key={o.id} value={o.id}>
+                                          {o.label} {o.type ? `(${o.type})` : ''}
+                                        </option>
+                                      ))}
+                                      <option value="_custom_new">+ Enter Custom Card...</option>
+                                    </select>
+                                  )}
                                 </div>
                                 <div className="md:col-span-2 space-y-1">
                                   <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid On</label>
@@ -1248,44 +1351,40 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   </div>
                                 )}
                               </div>
-                            )}
-                          </div>
-
-                          <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
-                            {confirmDeleteAccount === idx ? (
-                              <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-lg p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
-                                <span className="text-[10px] md:text-[8px] font-bold text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
-                                <div className="flex gap-2 md:gap-1">
-                                  <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-bold text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">YES</button>
-                                  <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-bold text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">NO</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-lg w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
-                                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                <span className="md:hidden text-[10px] font-bold uppercase tracking-widest">Remove Card</span>
-                              </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
 
-                <div className="mb-4 pt-4 border-t border-white/5">
-                  <div className="space-y-3">
-                    <button onClick={() => handleAddInstAccount('Checking')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
-                      <span className="text-xl group-hover:scale-110 transition-transform">🏦</span>
-                      <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Account</span>
-                    </button>
-                  </div>
-                </div>
+              <div className="pt-4 border-t border-white/5 space-y-1">
+                  <button onClick={() => handleAddInstAccount('Checking')} className="w-full h-[60px] bg-[#1C1C1E] border border-white/5 hover:border-[#EBC351]/50 rounded-lg flex flex-row items-center justify-center gap-3 transition-all active:scale-95 group">
+                    <span className="text-xl group-hover:scale-110 transition-transform">🏦</span>
+                    <span className="text-[11px] font-bold text-white/60 group-hover:text-white uppercase tracking-widest text-center mt-0.5">Add Account</span>
+                  </button>
 
-                <div className="space-y-1">
                   {(editingInstitution.accounts || []).map((acc, idx) => {
                     if (['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(acc.type)) return null;
                     return (
-                      <div key={idx} id={`inst-account-${acc.id || idx}`} className="bg-black/20 p-4 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03] transition-all duration-500">
+                      <div key={idx} id={`inst-account-${acc.id || idx}`} className="relative bg-black/20 p-4 pt-6 md:pt-4 md:pr-12 rounded-lg flex flex-col md:flex-row gap-4 items-start md:items-start border border-white/[0.03] transition-all duration-500">
+                        {confirmDeleteAccount === idx ? (
+                          <div className="absolute top-2 right-2 flex items-center justify-between bg-[#1C1C1E] rounded-lg p-1.5 border border-orange-500/50 shadow-2xl gap-3 z-10">
+                            <span className="text-[10px] font-bold text-orange-500 uppercase whitespace-nowrap ml-1">Confirm?</span>
+                            <div className="flex gap-1">
+                              <button type="button" onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-[9px] font-bold text-white hover:text-orange-500 px-2 py-1 bg-black/60 hover:bg-black w-8 rounded transition-colors active:scale-95">Y</button>
+                              <button type="button" onClick={() => setConfirmDeleteAccount(null)} className="text-[9px] font-bold text-white/40 hover:text-white px-2 py-1 bg-black/60 hover:bg-black w-8 rounded transition-colors active:scale-95">N</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button 
+                            type="button"
+                            onClick={() => setConfirmDeleteAccount(idx)} 
+                            className="absolute top-2 right-2 p-1.5 text-white/20 hover:text-orange-500 hover:bg-white/5 rounded-full transition-colors z-10"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        )}
                         <div className="flex-1 w-full space-y-1">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
                             <div className="md:col-span-1 space-y-1">
@@ -1348,22 +1447,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex w-full md:w-auto md:flex-col items-center justify-end md:self-start mt-2 md:mt-1 shrink-0 rounded-b-xl">
-                          {confirmDeleteAccount === idx ? (
-                            <div className="flex items-center justify-between w-full md:w-auto md:flex-col bg-orange-500/10 rounded-lg p-3 md:p-1.5 border border-orange-500/30 gap-3 md:gap-0">
-                              <span className="text-[10px] md:text-[8px] font-bold text-orange-500 uppercase md:mb-1 whitespace-nowrap">Confirm?</span>
-                              <div className="flex gap-2 md:gap-1">
-                                <button onClick={() => { handleDeleteInstAccount(idx); setConfirmDeleteAccount(null); }} className="text-xs md:text-[9px] font-bold text-white hover:text-orange-500 px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">YES</button>
-                                <button onClick={() => setConfirmDeleteAccount(null)} className="text-xs md:text-[9px] font-bold text-white/40 hover:text-white px-6 py-2 md:px-2 md:py-1 bg-black/40 hover:bg-black/80 rounded transition-colors active:scale-95">NO</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button onClick={() => setConfirmDeleteAccount(idx)} className="text-white/40 border border-white/10 hover:border-orange-500/50 hover:text-orange-500 bg-black/20 md:bg-transparent md:border-transparent p-3 md:p-2 transition rounded-lg w-full md:w-auto flex items-center justify-center gap-2 active:scale-95">
-                              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              <span className="md:hidden text-[10px] font-bold uppercase tracking-widest">Remove Account</span>
-                            </button>
-                          )}
-                        </div>
+
                       </div>
                     );
                   })}
@@ -1571,7 +1655,11 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     placeholder="MM/YY"
                     maxLength={5}
                     value={editingCard.expiry || ''}
-                    onChange={e => setEditingCard({ ...editingCard, expiry: e.target.value })}
+                    onChange={e => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      if (val.length > 2) val = val.substring(0, 2) + '/' + val.substring(2, 4);
+                      setEditingCard({ ...editingCard, expiry: val });
+                    }}
                   />
                 </div>
               </div>

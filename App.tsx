@@ -161,9 +161,9 @@ const App: React.FC = () => {
     if (!searchQuery) return state.companies;
     const q = searchQuery.toLowerCase();
     return state.companies.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.structure.toLowerCase().includes(q) ||
-      c.description.toLowerCase().includes(q)
+      c.name?.toLowerCase().includes(q) ||
+      c.structure?.toLowerCase().includes(q) ||
+      c.description?.toLowerCase().includes(q)
     );
   }, [state, searchQuery]);
 
@@ -178,14 +178,31 @@ const App: React.FC = () => {
     if (!searchQuery) return base;
     const q = searchQuery.toLowerCase();
     return base.filter(s =>
-      s.name.toLowerCase().includes(q) ||
+      s.name?.toLowerCase().includes(q) ||
       s.paymentMethod?.toLowerCase().includes(q)
     );
   }, [state?.subscriptions, selectedCompanyId, searchQuery]);
 
-  const companyCards = state?.financialCards.filter(c => c.companyId === selectedCompanyId) || [];
-  const companyLoans = state?.loans.filter(l => l.companyId === selectedCompanyId) || [];
-  const companyInstitutions = state?.institutions?.filter(i => i.companyId === selectedCompanyId) || [];
+  const companyCards = useMemo(() => {
+    const base = state?.financialCards.filter(c => c.companyId === selectedCompanyId) || [];
+    if (!searchQuery) return base;
+    const q = searchQuery.toLowerCase();
+    return base.filter(c => c.name?.toLowerCase().includes(q) || c.institutionName?.toLowerCase().includes(q) || c.network?.toLowerCase().includes(q));
+  }, [state?.financialCards, selectedCompanyId, searchQuery]);
+
+  const companyLoans = useMemo(() => {
+    const base = state?.loans.filter(l => l.companyId === selectedCompanyId) || [];
+    if (!searchQuery) return base;
+    const q = searchQuery.toLowerCase();
+    return base.filter(l => l.name?.toLowerCase().includes(q) || l.lender?.toLowerCase().includes(q));
+  }, [state?.loans, selectedCompanyId, searchQuery]);
+
+  const companyInstitutions = useMemo(() => {
+    const base = state?.institutions?.filter(i => i.companyId === selectedCompanyId) || [];
+    if (!searchQuery) return base;
+    const q = searchQuery.toLowerCase();
+    return base.filter(i => i.name?.toLowerCase().includes(q) || i.username?.toLowerCase().includes(q) || i.email?.toLowerCase().includes(q));
+  }, [state?.institutions, selectedCompanyId, searchQuery]);
   const companyDocuments = state?.documents?.filter(d => d.companyId === selectedCompanyId) || [];
 
   const globalEmails = useMemo(() => {
@@ -208,14 +225,24 @@ const App: React.FC = () => {
     if (!searchQuery || !state) return null;
     const q = searchQuery.toLowerCase();
 
-    const companies = state.companies.filter(c => c.name.toLowerCase().includes(q));
+    const companies = state.companies.filter(c => c.name?.toLowerCase().includes(q));
 
     const subscriptions = state.subscriptions.filter(s =>
-      s.name.toLowerCase().includes(q)
+      s.name?.toLowerCase().includes(q)
     ).map(s => ({ ...s, companyName: state.companies.find(c => c.id === s.companyId)?.name, companyColor: state.companies.find(c => c.id === s.companyId)?.color }));
 
-    const hasResults = companies.length > 0 || subscriptions.length > 0;
-    return { companies, subscriptions, hasResults };
+    const financials = [
+      ...(state.institutions || []).filter(i => i.name?.toLowerCase().includes(q)).map(i => ({ id: i.id, companyId: i.companyId, name: i.name, subtext: 'Institution', icon: '🏦' })),
+      ...state.financialCards.filter(c => c.name?.toLowerCase().includes(q) || c.institutionName?.toLowerCase().includes(q) || c.network?.toLowerCase().includes(q)).map(c => ({ id: c.id, companyId: c.companyId, name: c.name, subtext: `Card •••• ${c.last4}`, icon: '💳' })),
+      ...state.loans.filter(l => l.name?.toLowerCase().includes(q) || l.lender?.toLowerCase().includes(q)).map(l => ({ id: l.id, companyId: l.companyId, name: l.name, subtext: `Loan • ${l.lender}`, icon: '📑' })),
+    ].map(f => ({
+      ...f,
+      companyName: state.companies.find(c => c.id === f.companyId)?.name,
+      companyColor: state.companies.find(c => c.id === f.companyId)?.color
+    }));
+
+    const hasResults = companies.length > 0 || subscriptions.length > 0 || financials.length > 0;
+    return { companies, subscriptions, financials, hasResults };
   }, [searchQuery, state]);
 
   const toggleSearchPassword = (id: string, e: React.MouseEvent) => {
@@ -235,7 +262,7 @@ const App: React.FC = () => {
     setTimeout(() => setCopiedSearchId(null), 2000);
   };
 
-  const handleGlobalResultClick = (type: 'company' | 'sub', id: string, companyId: string) => {
+  const handleGlobalResultClick = (type: 'company' | 'sub' | 'financial', id: string, companyId: string) => {
     setSelectedCompanyId(companyId);
     setActiveView('company');
     setSearchQuery('');
@@ -243,6 +270,7 @@ const App: React.FC = () => {
 
     if (type === 'sub') setActiveTab('subscriptions');
     if (type === 'company') setActiveTab('subscriptions');
+    if (type === 'financial') setActiveTab('financial');
 
     handleUpdateCompany(companyId, { lastViewed: Date.now() });
   };
@@ -721,6 +749,37 @@ const App: React.FC = () => {
                                   {s.companyName}
                                 </span>
                                 <svg className="w-4 h-4 text-white/20 group-hover:text-[#1FE400]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {globalSearchResults.financials && globalSearchResults.financials.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-bold text-white/40 uppercase tracking-widest pl-2">Financials</h4>
+                        <div className="bg-white/5 rounded-2xl border border-white/10 divide-y divide-white/5 overflow-hidden">
+                          {globalSearchResults.financials.map(f => (
+                            <div
+                              key={f.id}
+                              onClick={() => handleGlobalResultClick('financial', f.id, f.companyId)}
+                              className="p-4 hover:bg-white/10 cursor-pointer flex items-center justify-between transition-colors group"
+                            >
+                              <div className="flex items-center space-x-4">
+                                <div className="bg-white/10 p-2 rounded-xl text-white">
+                                  <span className="text-lg">{f.icon}</span>
+                                </div>
+                                <div>
+                                  <p className="font-bold text-white text-sm">{f.name}</p>
+                                  <p className="text-xs text-white/40 font-mono font-bold">{f.subtext}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-white/10 text-white/40 mr-2 max-w-[100px] truncate">
+                                  {f.companyName}
+                                </span>
+                                <svg className="w-4 h-4 text-white/20 group-hover:text-[#EBC351]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                               </div>
                             </div>
                           ))}

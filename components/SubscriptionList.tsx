@@ -534,7 +534,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   className="w-full h-[47px] px-6 flex items-center justify-between text-white/40 group"
                 >
                   <span className="text-[13px] font-medium uppercase tracking-[0.15em]">
-                    {expandedCardDetails.has(sub.id) ? 'Collapse' : 'Expand for Details'}
+                    {expandedCardDetails.has(sub.id) ? 'Less Details' : 'More Details'}
                   </span>
                   <svg
                     className={`w-4 h-4 transform transition-transform duration-300 ${expandedCardDetails.has(sub.id) ? 'rotate-180' : ''}`}
@@ -1398,7 +1398,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                                           <span className="text-white/20 text-[11px] italic">Auto-generates when linked to services...</span>
                                         )}
                                         {computedServices.map((svc, i) => (
-                                          <span key={`svc-${i}`} className={`px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border ${svc.role === 'primary' ? 'bg-[#EBC351]/10 text-[#EBC351] border-[#EBC351]/20 shadow-[0_0_8px_rgba(235,195,81,0.1)]' : 'bg-white/5 text-white/50 border-white/10'}`}>
+                                          <span key={`svc-${i}`} className={`px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border ${svc.role === 'primary' ? 'bg-[#1FE400]/10 text-[#1FE400] border-[#1FE400]/20 shadow-[0_0_8px_rgba(31,228,0,0.1)]' : 'bg-[#3AB0FF]/10 text-[#3AB0FF] border-[#3AB0FF]/20 shadow-[0_0_8px_rgba(58,176,255,0.1)]'}`}>
                                             {svc.role === 'primary' ? '🔑 ' : '🔗 '} {svc.name} {svc.role === 'primary' ? '(Login)' : ''}
                                           </span>
                                         ))}
