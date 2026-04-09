@@ -183,6 +183,21 @@ const App: React.FC = () => {
   const companyInstitutions = state?.institutions?.filter(i => i.companyId === selectedCompanyId) || [];
   const companyDocuments = state?.documents?.filter(d => d.companyId === selectedCompanyId) || [];
 
+  const globalEmails = useMemo(() => {
+    if (!state) return [];
+    const emails = new Set<string>();
+    
+    state.accounts.forEach(a => { if (a.email?.trim()) emails.add(a.email.trim().toLowerCase()); });
+    state.subscriptions.forEach(s => {
+      s.linkedEmails?.forEach(e => { if (e.email?.trim()) emails.add(e.email.trim().toLowerCase()); });
+    });
+    if (state.institutions) {
+      state.institutions.forEach(i => { if (i.email?.trim()) emails.add(i.email.trim().toLowerCase()); });
+    }
+
+    return Array.from(emails);
+  }, [state]);
+
   // --- GLOBAL SEARCH LOGIC ---
   const globalSearchResults = useMemo(() => {
     if (!searchQuery || !state) return null;
@@ -970,6 +985,7 @@ const App: React.FC = () => {
                         <SubscriptionList
                           subscriptions={companySubscriptions}
                           institutions={companyInstitutions}
+                          globalEmails={globalEmails}
                           onUpdateSubscription={handleUpdateSubscription}
                           onAddSubscription={handleAddSubscription}
                           onDeleteSubscription={handleDeleteSubscription}
@@ -982,6 +998,7 @@ const App: React.FC = () => {
                         cards={companyCards}
                         loans={companyLoans}
                         institutions={companyInstitutions}
+                        globalEmails={globalEmails}
                         onAddCard={handleAddFinancialCard}
                         onUpdateCard={handleUpdateFinancialCard}
                         onDeleteCard={handleDeleteFinancialCard}

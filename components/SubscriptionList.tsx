@@ -7,6 +7,7 @@ import { generateSubscriptionEmailPurpose } from '../services/geminiService';
 interface SubscriptionListProps {
   subscriptions: Subscription[];
   institutions?: Institution[];
+  globalEmails?: string[];
   onUpdateSubscription: (id: string, updates: Partial<Subscription>) => void;
   onAddSubscription?: (sub: Partial<Subscription>) => void;
   onDeleteSubscription?: (id: string) => void;
@@ -15,6 +16,7 @@ interface SubscriptionListProps {
 const SubscriptionList: React.FC<SubscriptionListProps> = ({
   subscriptions,
   institutions = [],
+  globalEmails = [],
   onUpdateSubscription,
   onAddSubscription,
   onDeleteSubscription
@@ -732,6 +734,9 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       <datalist id="login-sweeps">
         {uniqueLoginIds.map((id, i) => <option key={i} value={id} />)}
       </datalist>
+      <datalist id="email-sweeps">
+        {globalEmails.map((email, i) => <option key={i} value={email} />)}
+      </datalist>
       
       {editingSubscription && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pb-[160px] bg-black/90 backdrop-blur-xl animate-fadeIn overflow-y-auto">
@@ -1194,6 +1199,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                           <div className="space-y-1">
                             <label className="text-[12px] font-bold text-white/40 uppercase tracking-widest ml-1">Email Address</label>
                             <input
+                              list="email-sweeps"
                               className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                               placeholder="email@example.com"
                               value={email.email}

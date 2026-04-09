@@ -8,6 +8,7 @@ interface FinancialListProps {
   cards: FinancialCard[];
   loans: Loan[];
   institutions: Institution[];
+  globalEmails?: string[];
   onAddCard: (card: Partial<FinancialCard>) => void;
   onUpdateCard: (id: string, updates: Partial<FinancialCard>) => void;
   onDeleteCard: (id: string) => void;
@@ -23,6 +24,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   cards,
   loans,
   institutions,
+  globalEmails = [],
   onAddCard,
   onUpdateCard,
   onDeleteCard,
@@ -555,6 +557,10 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   return (
     <div className="bg-black min-h-screen text-white p-4 space-y-5 animate-fadeIn">
+      <datalist id="email-sweeps">
+        {globalEmails.map((email, i) => <option key={i} value={email} />)}
+      </datalist>
+      
       {/* Action Bar - Minimalist Floating Style */}
       <div className="w-full h-10 flex items-center gap-2 overflow-x-auto no-scrollbar flex-nowrap pb-1">
         <button
@@ -1009,6 +1015,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   <div className="space-y-1">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login ID</label>
                     <input
+                      list="email-sweeps"
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                       value={editingInstitution.username || ''}
                       placeholder="user_admin"
