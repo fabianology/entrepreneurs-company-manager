@@ -969,6 +969,7 @@ const App: React.FC = () => {
                       <div className="space-y-8 animate-fadeIn">
                         <SubscriptionList
                           subscriptions={companySubscriptions}
+                          institutions={companyInstitutions}
                           onUpdateSubscription={handleUpdateSubscription}
                           onAddSubscription={handleAddSubscription}
                           onDeleteSubscription={handleDeleteSubscription}

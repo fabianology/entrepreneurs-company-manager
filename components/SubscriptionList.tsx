@@ -1,11 +1,12 @@
 
 import React, { useState, useRef } from 'react';
-import { Subscription, SubService } from '../types';
+import { Subscription, SubService, Institution } from '../types';
 import { getFaviconUrl } from '../services/logoService';
 import { generateSubscriptionEmailPurpose } from '../services/geminiService';
 
 interface SubscriptionListProps {
   subscriptions: Subscription[];
+  institutions?: Institution[];
   onUpdateSubscription: (id: string, updates: Partial<Subscription>) => void;
   onAddSubscription?: (sub: Partial<Subscription>) => void;
   onDeleteSubscription?: (id: string) => void;
@@ -13,6 +14,7 @@ interface SubscriptionListProps {
 
 const SubscriptionList: React.FC<SubscriptionListProps> = ({
   subscriptions,
+  institutions = [],
   onUpdateSubscription,
   onAddSubscription,
   onDeleteSubscription
@@ -23,6 +25,16 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
   const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const [expandedCardDetails, setExpandedCardDetails] = useState<Set<string>>(new Set());
+  
+  const paymentOptions = institutions.flatMap(inst => inst.accounts.map(acc => ({
+    id: acc.id,
+    label: `${acc.name} ${acc.last4 ? `(x${acc.last4})` : ''}`,
+    type: acc.type
+  })));
+  
+  const uniqueLoginIds = Array.from(new Set(subscriptions.map(s => s.loginId).filter((id): id is string => Boolean(id) && id.trim() !== '')));
+  const [modalCustomPaymentMode, setModalCustomPaymentMode] = useState(false);
+  const [inlineCustomPaymentIds, setInlineCustomPaymentIds] = useState<Set<string>>(new Set());
   const [expandedSecurity, setExpandedSecurity] = useState(false);
   const [lastCopiedField, setLastCopiedField] = useState<{ id: string, field: string } | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -46,6 +58,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
   const handleAddNew = () => {
     setShowDeleteConfirm(false);
+    setModalCustomPaymentMode(false);
     setEditingSubscription({
       name: '',
       cost: 0,
@@ -468,13 +481,50 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   <div className="px-6 pt-2 pb-6 grid grid-cols-2 gap-y-6 gap-x-4 animate-fadeIn">
                     <div className="space-y-1">
                       <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Paid From</p>
-                      <input
-                        type="text"
-                        defaultValue={sub.paymentMethod || ''}
-                        onBlur={(e) => onUpdateSubscription(sub.id, { paymentMethod: e.target.value })}
-                        placeholder="Credit Card / Bank"
-                        className="w-full bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03] focus:border-[#EBC351]/30 focus:outline-none text-[13px] font-medium text-white placeholder-white/10 transition-all"
-                      />
+                      {inlineCustomPaymentIds.has(sub.id) || (sub.paymentMethod && !paymentOptions.find(o => o.id === sub.paymentMethod)) ? (
+                        <div className="relative">
+                          <input
+                            type="text"
+                            defaultValue={sub.paymentMethod || ''}
+                            onBlur={(e) => onUpdateSubscription(sub.id, { paymentMethod: e.target.value })}
+                            placeholder="Partner's card..."
+                            className="w-full bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03] focus:border-[#EBC351]/30 focus:outline-none text-[13px] font-medium text-white placeholder-white/30 transition-all pr-8"
+                          />
+                          <button 
+                            className="absolute right-2 top-2 w-5 h-5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                            onClick={() => {
+                               const newSet = new Set(inlineCustomPaymentIds);
+                               newSet.delete(sub.id);
+                               setInlineCustomPaymentIds(newSet);
+                               onUpdateSubscription(sub.id, { paymentMethod: '' });
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          value={sub.paymentMethod || ''}
+                          onChange={(e) => {
+                             if (e.target.value === '_custom_new') {
+                               const newSet = new Set(inlineCustomPaymentIds);
+                               newSet.add(sub.id);
+                               setInlineCustomPaymentIds(newSet);
+                             } else {
+                               onUpdateSubscription(sub.id, { paymentMethod: e.target.value });
+                             }
+                          }}
+                          className="w-full bg-black/30 rounded-lg px-3 py-2 border border-white/[0.03] focus:border-[#EBC351]/30 focus:outline-none text-[13px] font-medium text-white placeholder-white/10 transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="">Linked cards</option>
+                          {paymentOptions.map(o => (
+                            <option key={o.id} value={o.id} className="bg-[#1C1C1E]">
+                              {o.type === 'Credit' || o.type === 'Debit Card' ? '💳' : '🏦'} {o.label}
+                            </option>
+                          ))}
+                          <option value="_custom_new" className="bg-[#1C1C1E] text-[#EBC351] font-bold">+ Enter Custom Card &hellip;</option>
+                        </select>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <p className="text-[12px] font-bold text-white/40 uppercase tracking-widest">Due On</p>
@@ -679,6 +729,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
       </div>
 
       {/* Editing Modal */}
+      <datalist id="login-sweeps">
+        {uniqueLoginIds.map((id, i) => <option key={i} value={id} />)}
+      </datalist>
+      
       {editingSubscription && (
         <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pb-[160px] bg-black/90 backdrop-blur-xl animate-fadeIn overflow-y-auto">
           <div className="bg-[#1C1C1E] rounded-[32px] shadow-2xl w-full max-w-xl border border-white/10 overflow-hidden">
@@ -781,6 +835,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   <div className="space-y-0.5">
                     <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Login ID</label>
                     <input
+                      list="login-sweeps"
                       className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
                       value={editingSubscription.loginId || ''}
                       placeholder="admin"
@@ -828,12 +883,42 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
                   <div className="grid grid-cols-2 gap-4 items-end pb-2">
                     <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Paid From</label>
-                      <input
-                        className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition"
-                        value={editingSubscription.paymentMethod || ''}
-                        placeholder="Amex Gold"
-                        onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
-                      />
+                      {modalCustomPaymentMode || (editingSubscription.paymentMethod && !paymentOptions.find(o => o.id === editingSubscription.paymentMethod)) ? (
+                        <div className="relative">
+                          <input
+                            className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition pr-8"
+                            value={editingSubscription.paymentMethod || ''}
+                            placeholder="e.g. Partner's external card"
+                            onChange={e => setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value })}
+                          />
+                          <button 
+                            className="absolute right-2 top-2 w-5 h-5 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                            onClick={() => {
+                               setModalCustomPaymentMode(false);
+                               setEditingSubscription({ ...editingSubscription, paymentMethod: '' });
+                            }}
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <select
+                          className="w-full bg-black/20 border border-white/[0.03] rounded-lg px-3 py-2 text-[13px] font-medium text-white outline-none focus:border-[#EBC351]/50 transition appearance-none cursor-pointer"
+                          value={editingSubscription.paymentMethod || ''}
+                          onChange={e => {
+                             if (e.target.value === '_custom_new') setModalCustomPaymentMode(true);
+                             else setEditingSubscription({ ...editingSubscription, paymentMethod: e.target.value });
+                          }}
+                        >
+                          <option value="">Linked cards</option>
+                          {paymentOptions.map(o => (
+                            <option key={o.id} value={o.id} className="bg-[#1C1C1E]">
+                              {o.type === 'Credit' || o.type === 'Debit Card' ? '💳' : '🏦'} {o.label}
+                            </option>
+                          ))}
+                          <option value="_custom_new" className="bg-[#1C1C1E] text-[#EBC351] font-bold">+ Enter Custom Card &hellip;</option>
+                        </select>
+                      )}
                     </div>
                     <div className="space-y-0.5">
                       <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Auto Renew</label>
