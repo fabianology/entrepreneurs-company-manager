@@ -247,18 +247,28 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
     <div className="bg-black min-h-screen text-white p-4 space-y-5">
       {/* Action Bar - Minimalist Floating Style */}
       <div className="w-full h-10 flex items-center justify-between overflow-x-auto no-scrollbar flex-nowrap pb-1">
-        <div className="flex items-center gap-6 shrink-0">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-4">
-              <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Monthly ({monthlyCount})</span>
-              <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${cycleMonthly.toFixed(0)}</span>
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="flex items-center">
+            <div className="flex items-center gap-1 mr-1.5">
+              <span className="text-[22px] leading-none">💵</span>
+              <span className="text-[16px] leading-none">🔥</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">Mo.</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[16px] font-semibold text-white uppercase tracking-normal">${cycleMonthly.toFixed(0)}</span>
+                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({monthlyCount})</span>
+              </div>
             </div>
             
-            <div className="w-[1px] h-3 bg-white/10"></div>
+            <div className="w-[1px] h-4 bg-white/10 mx-4"></div>
 
-            <div className="flex items-center gap-4">
-              <span className="text-[13px] font-medium text-white/40 uppercase tracking-normal">Yearly ({yearlyCount})</span>
-              <span className="text-[13px] font-semibold text-white uppercase tracking-normal">${cycleYearly.toLocaleString()}</span>
+            <div className="flex items-center gap-1">
+              <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">Yr.</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-[16px] font-semibold text-white uppercase tracking-normal">${cycleYearly.toLocaleString()}</span>
+                <span className="text-[12px] font-medium text-white/40 uppercase tracking-normal">({yearlyCount})</span>
+              </div>
             </div>
           </div>
         </div>
@@ -407,7 +417,7 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
 
                               <div className="h-8 w-[1px] bg-white/5 mt-1"></div>
                               <div className="flex flex-col">
-                                <p className="text-base font-bold text-[#EBC351] leading-tight">${totalAnnual.toFixed(2)}</p>
+                                <p className="text-base font-bold text-white leading-tight">${totalAnnual.toFixed(2)}</p>
                                 <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mt-0.5">est. yearly cost</p>
                               </div>
                             </div>
@@ -466,16 +476,16 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
               <div>
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleCardDetails(sub.id); }}
-                  className="w-full h-[47px] px-6 flex items-center justify-between transition-colors"
+                  className="w-full h-[47px] px-6 flex items-center justify-between text-white/40 group"
                 >
-                  <span className="text-[13px] font-medium text-white/40 uppercase tracking-[0.15em]">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">
                     {expandedCardDetails.has(sub.id) ? 'Collapse' : 'Expand for Details'}
                   </span>
                   <svg
-                    className={`w-3 h-3 text-white/20 transform transition-transform duration-300 ${expandedCardDetails.has(sub.id) ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 transform transition-transform duration-300 ${expandedCardDetails.has(sub.id) ? 'rotate-180' : ''}`}
                     fill="none" stroke="currentColor" viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
 
@@ -557,13 +567,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             <div className="border-t border-white/5">
               <button
                 onClick={() => toggleExpanded(sub.id)}
-                className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group"
+                className="w-full h-[47px] px-6 flex items-center justify-between text-white/40 group"
               >
-                <div className="flex items-center space-x-3">
-                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Supplemental Services</span>
-                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                    {sub.subServices?.length || 0}
-                  </div>
+                <div className="flex items-center">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Supplemental Services <span className="text-white/20">({sub.subServices?.length || 0})</span></span>
                 </div>
                 <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedSubs.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" />
@@ -622,13 +629,10 @@ const SubscriptionList: React.FC<SubscriptionListProps> = ({
             <div className="border-t border-white/5">
               <button
                 onClick={() => toggleEmailExpanded(sub.id)}
-                className="w-full h-[47px] px-6 flex items-center justify-between text-[#EBC351] group bg-white/2"
+                className="w-full h-[47px] px-6 flex items-center justify-between text-white/40 group bg-white/2"
               >
-                <div className="flex items-center space-x-3">
-                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Emails</span>
-                  <div className="px-1.5 py-0.5 rounded bg-[#EBC351]/10 text-[9px] font-black">
-                    {sub.linkedEmails?.length || 0}
-                  </div>
+                <div className="flex items-center">
+                  <span className="text-[13px] font-medium uppercase tracking-[0.15em]">Linked Emails <span className="text-white/20">({sub.linkedEmails?.length || 0})</span></span>
                 </div>
                 <svg className={`w-4 h-4 transform transition-transform duration-300 ${expandedEmails.has(sub.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M19 9l-7 7-7-7" /></svg>
               </button>

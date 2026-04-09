@@ -140,6 +140,11 @@ const App: React.FC = () => {
     localStorage.setItem('fs_tab', activeTab);
   }, [activeView, selectedCompanyId, activeTab]);
 
+  // Scroll to top on navigation changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeView, selectedCompanyId, activeTab]);
+
   // --- CALCULATIONS ---
   const totalMonthlyBurn = useMemo(() => {
     if (!state) return 0;
