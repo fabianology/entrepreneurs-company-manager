@@ -1135,6 +1135,7 @@ const App: React.FC = () => {
 
                     {activeTab === 'financial' && (
                       <FinancialList
+                        subscriptions={companySubscriptions}
                         cards={companyCards}
                         loans={companyLoans}
                         institutions={companyInstitutions}

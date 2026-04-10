@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FinancialCard, Loan, Institution, InstitutionAccount } from '../types';
+import { FinancialCard, Loan, Institution, InstitutionAccount, Subscription } from '../types';
 import { getFaviconUrl } from '../services/logoService';
 import jsPDF from 'jspdf';
 
 interface FinancialListProps {
+  subscriptions?: Subscription[];
   cards: FinancialCard[];
   loans: Loan[];
   institutions: Institution[];
@@ -21,6 +22,7 @@ interface FinancialListProps {
 }
 
 const FinancialList: React.FC<FinancialListProps> = ({
+  subscriptions = [],
   cards,
   loans,
   institutions,
@@ -741,7 +743,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
             const associatedCards = cards.filter(c => c.institutionName?.toLowerCase() === inst.name.toLowerCase());
             const instCards = associatedCards.length;
             const instLoans = instLoansList.length;
-            const instAccounts = inst.accounts?.length || 0;
+            const instAccounts = inst.accounts?.filter(a => !['Credit Card', 'Debit Card', 'Debit (Linked)', 'FSA', 'HSA'].includes(a.type)).length || 0;
             return (
               <div key={inst.id} className={`relative ${instCards > 0 ? 'mt-[100px]' : ''}`}>
                 {associatedCards.map((card, i) => {
@@ -774,6 +776,28 @@ const FinancialList: React.FC<FinancialListProps> = ({
                           <span className="truncate max-w-[150px]">{card.cardHolder}</span>
                           <span>{card.expiry}</span>
                         </div>
+                        {/* Services Cross-Reference */}
+                        {(() => {
+                           const linkedServices = subscriptions.filter(s => s.paymentMethod === card.id);
+                           if (linkedServices.length === 0) return null;
+                           return (
+                             <div className="mt-5 pt-4 border-t border-white/20">
+                               <p className="text-[9px] font-bold uppercase tracking-widest opacity-60 mb-3">Pays For</p>
+                               <div className="flex flex-wrap gap-2">
+                                 {linkedServices.map(sub => (
+                                   <div key={sub.id} className="flex items-center space-x-2 bg-black/20 rounded-full pl-1.5 pr-3 py-1.5 border border-white/10 shadow-inner">
+                                      {sub.loginUrl ? (
+                                        <img src={getFaviconUrl(sub.loginUrl) || ''} className="w-[14px] h-[14px] rounded-full bg-white/5 object-contain p-0.5" alt="" onError={(e) => { (e.target as HTMLImageElement).style.display='none'; }} />
+                                      ) : (
+                                        <div className="w-[14px] h-[14px] rounded-full bg-white/20 flex items-center justify-center shadow-inner"><span className="text-[6px] font-black opacity-50">#</span></div>
+                                      )}
+                                      <span className="text-[9px] font-bold tracking-wider text-white/90">{sub.name}</span>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                           )
+                        })()}
                       </div>
                     </div>
                   );
