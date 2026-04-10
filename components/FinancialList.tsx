@@ -47,6 +47,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [expandedAccounts, setExpandedAccounts] = useState<Set<number>>(new Set());
   const [customPaidFromIndices, setCustomPaidFromIndices] = useState<Set<number>>(new Set());
   const [showAmortizationTable, setShowAmortizationTable] = useState(false);
+  const [poppedCardId, setPoppedCardId] = useState<string | null>(null);
 
   const paymentOptions = institutions.flatMap(inst => (inst.accounts || []).map(acc => ({
     id: acc.id,
@@ -745,16 +746,51 @@ const FinancialList: React.FC<FinancialListProps> = ({
             }, 0);
             const totalAccountPayments = inst.accounts.reduce((sum, acc) => sum + (Number((acc as any).monthlyPayment) || 0), 0);
             const totalMonthlyPayment = totalLoanPayments + totalAccountPayments;
-            const instCards = cards.filter(c => c.institutionName?.toLowerCase() === inst.name.toLowerCase()).length;
+            const associatedCards = cards.filter(c => c.institutionName?.toLowerCase() === inst.name.toLowerCase());
+            const instCards = associatedCards.length;
             const instLoans = instLoansList.length;
             const instAccounts = inst.accounts?.length || 0;
             return (
-              <div
-                key={inst.id}
-                onClick={() => setEditingInstitution(inst)}
-                className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors cursor-pointer"
-              >
-                <div className="px-6 pt-6 pb-[18px] space-y-6 group/card transition-colors">
+              <div key={inst.id} className={`relative ${instCards > 0 ? 'mt-[100px]' : ''}`}>
+                {associatedCards.map((card, i) => {
+                  const isPopped = poppedCardId === card.id;
+                  const zIndex = isPopped ? 30 : 10 - i;
+                  const topOffset = isPopped ? -120 : -(30 + (i * 30));
+                  const scale = isPopped ? 1 : 1 - ((i + 1) * 0.04);
+                  return (
+                    <div 
+                      key={card.id}
+                      onClick={(e) => { e.stopPropagation(); setPoppedCardId(isPopped ? null : card.id); }}
+                      className={`absolute left-0 right-0 h-full rounded-[24px] shadow-2xl transition-all duration-500 bg-gradient-to-br ${getCardGradient(card.network)} cursor-pointer`} 
+                      style={{ 
+                        zIndex, 
+                        top: `${topOffset}px`,
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top center',
+                        border: isPopped ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)'
+                      }}
+                    >
+                      <div className="flex justify-between items-center px-6 pt-3 opacity-80">
+                         <span className="text-[10px] font-bold uppercase tracking-widest text-white/90 truncate max-w-[150px]">{card.name}</span>
+                         <span className="font-black text-xs italic tracking-tighter text-white/70">{card.network}</span>
+                      </div>
+                      <div className={`px-6 mt-8 transition-opacity duration-500 ${isPopped ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className="text-xl font-mono tracking-[0.2em] opacity-90 mb-4 drop-shadow-md">
+                          •••• •••• •••• {card.last4}
+                        </div>
+                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest opacity-70">
+                          <span className="truncate max-w-[150px]">{card.cardHolder}</span>
+                          <span>{card.expiry}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div
+                  onClick={() => setEditingInstitution(inst)}
+                  className="relative z-20 bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors cursor-pointer h-full"
+                >
+                  <div className="px-6 pt-6 pb-[18px] space-y-6 group/card transition-colors">
                   <div className="flex justify-between items-start">
                     <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 items-center w-full">
                       {/* Row 1, Col 1: Logo */}
@@ -990,6 +1026,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   </div>
                 </div>
               </div>
+            </div>
             )
           })}
         </div>

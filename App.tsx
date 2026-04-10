@@ -347,6 +347,7 @@ const App: React.FC = () => {
       id: card.id || Math.random().toString(36).substr(2, 9),
       companyId: selectedCompanyId,
       name: card.name || 'New Card',
+      institutionName: card.institutionName,
       login: card.login || '',
       password: card.password || '',
       cardHolder: card.cardHolder || '',
