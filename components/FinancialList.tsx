@@ -311,13 +311,72 @@ const FinancialList: React.FC<FinancialListProps> = ({
     }
   };
 
-  const getCardGradient = (network: string | undefined) => {
-    switch (network) {
-      case 'Amex': return 'from-blue-600 to-cyan-500';
-      case 'Mastercard': return 'from-slate-800 to-orange-900';
-      case 'Visa': return 'from-indigo-700 to-purple-800';
-      case 'Discover': return 'from-orange-500 to-amber-600';
-      default: return 'from-slate-700 to-slate-900';
+  const brandGradients: Record<string, string> = {
+    'chase': 'from-blue-700 to-blue-900',
+    'bank of america': 'from-red-600 to-red-800',
+    'bofa': 'from-red-600 to-red-800',
+    'wells fargo': 'from-red-700 to-red-900',
+    'citi': 'from-sky-500 to-blue-700',
+    'capital one': 'from-red-700 to-blue-900',
+    'american express': 'from-cyan-600 to-blue-800',
+    'amex': 'from-cyan-600 to-blue-800',
+    'discover': 'from-orange-500 to-amber-700',
+    'barclays': 'from-sky-400 to-cyan-600',
+    'us bank': 'from-blue-800 to-blue-950',
+    'pnc': 'from-orange-500 to-orange-700',
+    'td bank': 'from-green-600 to-green-800',
+    'truist': 'from-purple-700 to-purple-900',
+    'navy federal': 'from-blue-800 to-blue-950',
+    'schwab': 'from-sky-600 to-blue-800',
+    'fidelity': 'from-green-600 to-emerald-800',
+    'vanguard': 'from-red-800 to-red-950',
+    'robinhood': 'from-green-400 to-lime-600',
+    'sofi': 'from-cyan-400 to-blue-600',
+    'chime': 'from-green-400 to-emerald-600',
+    'ally': 'from-purple-600 to-fuchsia-800',
+    'apple': 'from-stone-300 to-stone-500',
+    'goldman sachs': 'from-blue-600 to-blue-800',
+    'stripe': 'from-indigo-500 to-purple-600',
+    'paypal': 'from-blue-500 to-sky-700',
+    'square': 'from-gray-700 to-gray-900',
+    'brex': 'from-orange-500 to-red-600',
+    'mercury': 'from-blue-700 to-indigo-900',
+    'ramp': 'from-lime-400 to-green-600',
+  };
+
+  const institutionGradients = [
+    'from-emerald-600 to-teal-800',
+    'from-fuchsia-600 to-purple-800',
+    'from-sky-500 to-indigo-800',
+    'from-rose-500 to-pink-800',
+    'from-lime-500 to-emerald-800',
+    'from-amber-500 to-orange-700',
+    'from-cyan-500 to-blue-800',
+    'from-violet-600 to-fuchsia-900',
+    'from-teal-500 to-cyan-800',
+    'from-red-600 to-rose-900'
+  ];
+
+  const getCardGradient = (card: FinancialCard) => {
+    if (card.institutionName) {
+      const name = card.institutionName.trim().toLowerCase();
+      
+      const matchedBrand = Object.keys(brandGradients).find(brand => name.includes(brand));
+      if (matchedBrand) return brandGradients[matchedBrand];
+
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const index = Math.abs(hash) % institutionGradients.length;
+      return institutionGradients[index];
+    }
+    switch (card.network) {
+      case 'Amex': return 'from-slate-500 to-slate-700';
+      case 'Mastercard': return 'from-stone-800 to-black';
+      case 'Visa': return 'from-zinc-700 to-zinc-900';
+      case 'Discover': return 'from-neutral-700 to-neutral-900';
+      default: return 'from-slate-800 to-black';
     }
   };
 
@@ -677,7 +736,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     onClick={(e) => handleCardClick(card, e)}
                     className={`
                       w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
-                      ${getCardGradient(card.network)}
+                      ${getCardGradient(card)}
                       transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
                       ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
                     `}
@@ -761,7 +820,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <div 
                       key={card.id}
                       onClick={(e) => { e.stopPropagation(); setPoppedCardId(isPopped ? null : card.id); }}
-                      className={`absolute left-0 right-0 h-full rounded-[24px] shadow-2xl transition-all duration-500 bg-gradient-to-br ${getCardGradient(card.network)} cursor-pointer`} 
+                      className={`absolute left-0 right-0 h-full rounded-[24px] shadow-2xl transition-all duration-500 bg-gradient-to-br ${getCardGradient(card)} cursor-pointer`} 
                       style={{ 
                         zIndex, 
                         top: `${topOffset}px`,
