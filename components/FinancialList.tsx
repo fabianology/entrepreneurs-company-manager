@@ -49,12 +49,24 @@ const FinancialList: React.FC<FinancialListProps> = ({
   const [showAmortizationTable, setShowAmortizationTable] = useState(false);
   const [poppedCardId, setPoppedCardId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handleOutsideClick = () => {
+      if (poppedCardId) setPoppedCardId(null);
+    };
+    if (poppedCardId) {
+      document.addEventListener('click', handleOutsideClick);
+    }
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [poppedCardId]);
+
   const paymentOptions = institutions.flatMap(inst => (inst.accounts || []).map(acc => ({
     id: acc.id,
     label: `${inst.name || 'Unnamed Institution'} ${acc.last4 ? `(x${acc.last4})` : ''}`.trim(),
     type: acc.type
   })));
   const [expandedSchedules, setExpandedSchedules] = useState<Set<string>>(new Set());
+
+
 
   const toggleSchedule = (loanId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -132,6 +144,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
 
   const handleAddNewInstitution = () => {
     setShowDeleteConfirm(false);
+    setExpandedAccounts(new Set());
+    setCustomPaidFromIndices(new Set());
     setEditingInstitution({
       name: '',
       loginUrl: '',
@@ -170,7 +184,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
           limit: acc.limit || 0,
           paidFrom: acc.paidFrom || '',
           paidOn: acc.paidOn || '',
-          autopay: acc.autopay || 'N/A'
+          autopay: acc.autopay || 'N/A',
+          cardHolder: acc.cardHolder || ''
         };
         const exists = cards.find(c => c.id === acc.id);
         if (exists) {
@@ -272,6 +287,8 @@ const FinancialList: React.FC<FinancialListProps> = ({
   // --- LOAN HANDLERS ---
   const handleAddNewLoan = () => {
     setShowDeleteConfirm(false);
+    setShowAmortizationTable(false);
+    setExpandedSchedules(new Set());
     setEditingLoan({
       role: 'Lendee',
       lender: '',
@@ -312,49 +329,49 @@ const FinancialList: React.FC<FinancialListProps> = ({
   };
 
   const brandGradients: Record<string, string> = {
-    'chase': 'from-blue-700 to-blue-900',
-    'bank of america': 'from-red-600 to-red-800',
-    'bofa': 'from-red-600 to-red-800',
-    'wells fargo': 'from-red-700 to-red-900',
-    'citi': 'from-sky-500 to-blue-700',
-    'capital one': 'from-red-700 to-blue-900',
-    'american express': 'from-cyan-600 to-blue-800',
-    'amex': 'from-cyan-600 to-blue-800',
-    'discover': 'from-orange-500 to-amber-700',
-    'barclays': 'from-sky-400 to-cyan-600',
-    'us bank': 'from-blue-800 to-blue-950',
-    'pnc': 'from-orange-500 to-orange-700',
-    'td bank': 'from-green-600 to-green-800',
-    'truist': 'from-purple-700 to-purple-900',
-    'navy federal': 'from-blue-800 to-blue-950',
-    'schwab': 'from-sky-600 to-blue-800',
-    'fidelity': 'from-green-600 to-emerald-800',
-    'vanguard': 'from-red-800 to-red-950',
-    'robinhood': 'from-green-400 to-lime-600',
-    'sofi': 'from-cyan-400 to-blue-600',
-    'chime': 'from-green-400 to-emerald-600',
-    'ally': 'from-purple-600 to-fuchsia-800',
-    'apple': 'from-stone-300 to-stone-500',
-    'goldman sachs': 'from-blue-600 to-blue-800',
-    'stripe': 'from-indigo-500 to-purple-600',
-    'paypal': 'from-blue-500 to-sky-700',
-    'square': 'from-gray-700 to-gray-900',
-    'brex': 'from-orange-500 to-red-600',
-    'mercury': 'from-blue-700 to-indigo-900',
-    'ramp': 'from-lime-400 to-green-600',
+    'chase': 'from-blue-800 to-blue-950',
+    'bank of america': 'from-red-800 to-red-950',
+    'bofa': 'from-red-800 to-red-950',
+    'wells fargo': 'from-red-800 to-red-950',
+    'citi': 'from-sky-800 to-blue-950',
+    'capital one': 'from-red-800 to-blue-950',
+    'american express': 'from-cyan-800 to-blue-950',
+    'amex': 'from-cyan-800 to-blue-950',
+    'discover': 'from-orange-700 to-amber-900',
+    'barclays': 'from-sky-800 to-cyan-950',
+    'us bank': 'from-blue-900 to-slate-950',
+    'pnc': 'from-orange-700 to-orange-950',
+    'td bank': 'from-green-800 to-green-950',
+    'truist': 'from-purple-800 to-purple-950',
+    'navy federal': 'from-blue-800 to-slate-950',
+    'schwab': 'from-sky-700 to-blue-950',
+    'fidelity': 'from-green-700 to-emerald-950',
+    'vanguard': 'from-red-900 to-black',
+    'robinhood': 'from-green-700 to-lime-950',
+    'sofi': 'from-cyan-700 to-blue-900',
+    'chime': 'from-green-700 to-emerald-950',
+    'ally': 'from-purple-800 to-fuchsia-950',
+    'apple': 'from-stone-700 to-stone-900',
+    'goldman sachs': 'from-blue-800 to-slate-900',
+    'stripe': 'from-indigo-800 to-purple-950',
+    'paypal': 'from-blue-800 to-sky-950',
+    'square': 'from-gray-800 to-black',
+    'brex': 'from-orange-800 to-red-950',
+    'mercury': 'from-blue-800 to-indigo-950',
+    'ramp': 'from-lime-700 to-green-950',
   };
 
   const institutionGradients = [
-    'from-emerald-600 to-teal-800',
-    'from-fuchsia-600 to-purple-800',
-    'from-sky-500 to-indigo-800',
-    'from-rose-500 to-pink-800',
-    'from-lime-500 to-emerald-800',
-    'from-amber-500 to-orange-700',
-    'from-cyan-500 to-blue-800',
-    'from-violet-600 to-fuchsia-900',
-    'from-teal-500 to-cyan-800',
-    'from-red-600 to-rose-900'
+    'from-emerald-800 to-teal-950',
+    'from-fuchsia-800 to-purple-950',
+    'from-sky-800 to-indigo-950',
+    'from-rose-800 to-pink-950',
+    'from-lime-800 to-emerald-950',
+    'from-amber-700 to-orange-950',
+    'from-cyan-800 to-blue-950',
+    'from-violet-800 to-fuchsia-950',
+    'from-teal-800 to-cyan-950',
+    'from-red-800 to-rose-950'
   ];
 
   const getCardGradient = (card: FinancialCard) => {
@@ -695,91 +712,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
         </button>
       )}
 
-      {/* --- PAYMENT METHODS --- */}
-      {cards.length > 0 && (
-      <section className="space-y-6">
-        <div className="flex justify-between items-center px-1">
-          <div className="flex flex-col">
-            <h3 className="text-lg font-black text-white/40">Payment Methods</h3>
-          </div>
-          {isWalletExpanded && (
-            <button
-              onClick={() => setIsWalletExpanded(false)}
-              className="text-orange-500 text-[10px] font-black uppercase tracking-widest hover:text-orange-400 transition"
-            >
-              Collapse
-            </button>
-          )}
-        </div>
-        <div
-          ref={walletContainerRef}
-          className={`relative transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${isWalletExpanded ? 'space-y-4' : 'h-[300px] overflow-hidden'} ${isDragging ? 'cursor-grabbing touch-none' : ''}`}
-          onClick={() => !isWalletExpanded && setIsWalletExpanded(true)}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          style={{
-            transform: isWalletExpanded ? `translateY(${dragY}px)` : 'none',
-            transition: isDragging ? 'none' : 'all 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
-          }}
-        >
-          {cards.length > 0 && (
-            <div className={`relative ${isWalletExpanded ? 'flex flex-col gap-4' : ''}`}>
-              {cards.map((card, index) => {
-                const stackOffset = index * 45;
-                const stackScale = 1 - (cards.length - 1 - index) * 0.02;
-                const stackZ = index;
-                return (
-                  <div
-                    key={card.id}
-                    onClick={(e) => handleCardClick(card, e)}
-                    className={`
-                      w-full max-w-[400px] mx-auto h-56 rounded-2xl p-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br 
-                      ${getCardGradient(card)}
-                      transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]
-                      ${!isWalletExpanded ? 'absolute left-0 right-0 hover:-translate-y-4' : 'relative hover:scale-[1.01]'}
-                    `}
-                    style={{
-                      top: !isWalletExpanded ? `${stackOffset}px` : '0',
-                      zIndex: stackZ,
-                      transform: !isWalletExpanded ? `scale(${stackScale})` : 'scale(1)',
-                      boxShadow: !isWalletExpanded ? '0 -10px 20px -5px rgba(0,0,0,0.3)' : '0 10px 30px -10px rgba(0,0,0,0.2)'
-                    }}
-                  >
-                    <div className="flex justify-between items-start mb-8">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold opacity-70 uppercase tracking-widest">{card.type}</span>
-                        <span className="font-bold text-lg tracking-tight truncate max-w-[200px]">{card.name}</span>
-                      </div>
-                      <span className="font-black text-xl italic tracking-tighter opacity-90">{card.network}</span>
-                    </div>
-                    <div className="flex items-center space-x-3 mb-8">
-                      <div className="w-11 h-8 bg-yellow-200/20 rounded-md border border-yellow-100/30 flex items-center justify-center">
-                        <div className="w-6 h-4 border border-yellow-100/40 rounded-sm"></div>
-                      </div>
-                      <div className="text-xl font-mono tracking-[0.2em] opacity-90">
-                        •••• •••• •••• {card.last4}
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Card Holder</p>
-                        <p className="font-bold tracking-wide uppercase text-xs truncate max-w-[150px]">{card.cardHolder}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Expires</p>
-                        <p className="font-mono font-bold text-sm">{card.expiry}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-      )}
+
 
       {/* --- BANKING INSTITUTIONS --- */}
       {institutions.length > 0 && (
@@ -820,7 +753,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                     <div 
                       key={card.id}
                       onClick={(e) => { e.stopPropagation(); setPoppedCardId(isPopped ? null : card.id); }}
-                      className={`absolute left-0 right-0 h-full rounded-[24px] shadow-2xl transition-all duration-500 bg-gradient-to-br ${getCardGradient(card)} cursor-pointer`} 
+                      className={`absolute left-0 right-0 h-full rounded-[24px] shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] bg-gradient-to-br ${getCardGradient(card)} cursor-pointer`} 
                       style={{ 
                         zIndex, 
                         top: `${topOffset}px`,
@@ -846,7 +779,16 @@ const FinancialList: React.FC<FinancialListProps> = ({
                   );
                 })}
                 <div
-                  onClick={() => setEditingInstitution(inst)}
+                  onClick={(e) => { 
+                    if (poppedCardId) {
+                      e.stopPropagation();
+                      setPoppedCardId(null);
+                      return;
+                    }
+                    setExpandedAccounts(new Set()); 
+                    setCustomPaidFromIndices(new Set()); 
+                    setEditingInstitution(inst); 
+                  }}
                   className="relative z-20 bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl overflow-hidden flex flex-col hover:border-white/10 transition-colors cursor-pointer h-full"
                 >
                   <div className="px-6 pt-6 pb-[18px] space-y-6 group/card transition-colors">
@@ -992,6 +934,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                               <span
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  setExpandedAccounts(new Set([aIdx]));
                                   setEditingInstitution(inst);
                                   setTimeout(() => {
                                     const element = document.getElementById(`inst-account-${acc.id || aIdx}`);
@@ -1002,7 +945,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                         element.style.boxShadow = 'none';
                                       }, 2000);
                                     }
-                                  }, 100);
+                                  }, 450);
                                 }}
                                 className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
                               >
@@ -1044,7 +987,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                         element.style.boxShadow = 'none';
                                       }, 2000);
                                     }
-                                  }, 100);
+                                  }, 450);
                                 }}
                                 className="text-[13px] font-medium uppercase cursor-pointer hover:text-[#EBC351] transition-colors text-white/90"
                               >
@@ -1075,7 +1018,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         ))}
                         {(instAccounts + instLoans) === 0 && <p className="text-[10px] font-black text-white/40 uppercase tracking-widest py-1">No linked accounts</p>}
                         <button
-                          onClick={(e) => { e.stopPropagation(); setEditingInstitution(inst); }}
+                          onClick={(e) => { e.stopPropagation(); setExpandedAccounts(new Set()); setCustomPaidFromIndices(new Set()); setEditingInstitution(inst); }}
                           className="text-[10px] font-black text-white/30 uppercase tracking-widest pt-2 hover:text-[#EBC351] transition"
                         >
                           + add account
@@ -1107,7 +1050,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
               {standaloneLoans.map(loan => {
             const amort = calcAmortization(loan);
             return (
-              <div key={loan.id} onClick={() => setEditingLoan(loan)} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
+              <div key={loan.id} onClick={() => { setShowAmortizationTable(false); setExpandedSchedules(new Set()); setEditingLoan(loan); }} className="bg-[#1C1C1E] rounded-[24px] border border-white/5 shadow-2xl flex flex-col overflow-hidden cursor-pointer hover:border-white/10 transition-colors">
                 <div className="p-6 border-b border-white/5 flex-1">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-3">
@@ -1176,6 +1119,70 @@ const FinancialList: React.FC<FinancialListProps> = ({
       <datalist id="email-sweeps">
         {globalEmails.map((email, i) => <option key={i} value={email} />)}
       </datalist>
+
+      {/* --- PAYMENT METHODS --- */}
+      {cards.length > 0 && (
+      <section className="space-y-6">
+        <div className="flex justify-between items-center px-1">
+          <div className="flex flex-col">
+            <h3 className="text-lg font-black text-white/40">Payment Methods</h3>
+          </div>
+        </div>
+        <div className="relative h-[300px] overflow-hidden">
+          {cards.length > 0 && (
+            <div className="relative">
+              {cards.map((card, index) => {
+                const stackOffset = index * 45;
+                const stackScale = 1 - (cards.length - 1 - index) * 0.02;
+                const stackZ = index;
+                return (
+                  <div
+                    key={card.id}
+                    onClick={(e) => handleCardClick(card, e)}
+                    className={`absolute left-0 right-0 w-full max-w-[400px] mx-auto h-56 rounded-2xl px-5 pt-[14px] pb-6 text-white shadow-2xl cursor-pointer bg-gradient-to-br ${getCardGradient(card)}`}
+                    style={{
+                      top: `${stackOffset}px`,
+                      zIndex: stackZ,
+                      transform: `scale(${stackScale})`,
+                      boxShadow: '0 -10px 20px -5px rgba(0,0,0,0.3)'
+                    }}
+                  >
+                    <div className="flex justify-between items-start mb-8">
+                      <div className="flex flex-col min-w-0 pr-4">
+                        <span className="font-bold text-[15px] tracking-tight truncate leading-none mb-1.5">{card.name}</span>
+                        <span className="text-[9px] font-bold opacity-70 uppercase tracking-widest truncate leading-none">{card.cardHolder || 'NAME ON CARD'}</span>
+                      </div>
+                      <div className="flex flex-col items-end shrink-0 text-right">
+                        <span className="text-[9px] font-bold opacity-70 uppercase tracking-widest truncate max-w-[120px] leading-none mb-1.5">{card.institutionName || card.type}</span>
+                        <span className="font-black text-[17px] italic tracking-tighter opacity-90 leading-none">{card.network}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-3 mb-8">
+                      <div className="w-11 h-8 bg-yellow-200/20 rounded-md border border-yellow-100/30 flex items-center justify-center">
+                        <div className="w-6 h-4 border border-yellow-100/40 rounded-sm"></div>
+                      </div>
+                      <div className="text-xl font-mono tracking-[0.2em] opacity-90">
+                        •••• •••• •••• {card.last4}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Name on Card</p>
+                        <p className="font-bold tracking-wide uppercase text-xs truncate max-w-[150px]">{card.cardHolder}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] uppercase font-bold tracking-widest opacity-60 mb-1">Expires</p>
+                        <p className="font-mono font-bold text-sm">{card.expiry}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+      )}
 
       {/* --- EDIT INSTITUTION MODAL --- */}
       {editingInstitution && (
@@ -1352,7 +1359,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                                   />
                                 </div>
                                 <div className="md:col-span-1 space-y-1">
-                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Card Holder</label>
+                                  <label className="text-[12px] font-bold uppercase tracking-widest text-white/40 ml-1">Name on Card</label>
                                   <div className="flex bg-black/20 p-1 rounded-lg border border-white/[0.03] h-[38px] w-full">
                                     <button
                                       type="button"
@@ -1647,7 +1654,7 @@ const FinancialList: React.FC<FinancialListProps> = ({
                         <div
                           key={loan.id}
                           id={loan.id ? `inst-loan-${loan.id}` : undefined}
-                          onClick={() => setEditingLoan(loan)}
+                          onClick={() => { setShowAmortizationTable(false); setExpandedSchedules(new Set()); setEditingLoan(loan); }}
                           className="bg-black/20 p-4 rounded-lg flex flex-col gap-3 border border-white/[0.03] cursor-pointer hover:border-[#EBC351]/30 hover:bg-white/[0.05] transition-all group"
                         >
                           {/* Header row */}
