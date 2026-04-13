@@ -90,121 +90,118 @@ export default function CompanyDetailScreen() {
         }} 
       />
       
-      <ScrollView className="flex-1 p-6" contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView className="flex-1 p-6" contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         
-        {/* Dismiss Button */}
-        <TouchableOpacity onPress={() => router.back()} className="self-end bg-white/10 p-2 rounded-full mb-2">
-          <Ionicons name="close" size={24} color="rgba(255,255,255,0.6)" />
-        </TouchableOpacity>
-
-        {/* Header Hero Section */}
-        <View className="mb-4 items-center mt-2">
-          <View 
-            style={{ backgroundColor: formState.color || '#3b82f6' }}
-            className="w-24 h-24 rounded-3xl items-center justify-center shadow-lg mb-4 overflow-hidden border border-white/10"
-          >
-            {formState.logoUrl ? (
-              <Image source={{ uri: formState.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-            ) : (
-              <Text className="text-white font-black text-5xl">{formState.name?.charAt(0) || '?'}</Text>
-            )}
+        {/* Header Row: Logo, Name, Dismiss */}
+        <View className="flex-row items-center justify-between mb-5 z-10">
+          <View className="flex-row items-center flex-1 mr-4">
+            <View 
+              style={{ backgroundColor: formState.color || '#3b82f6' }}
+              className="w-16 h-16 rounded-2xl items-center justify-center overflow-hidden border border-white/10 mr-4"
+            >
+              {formState.logoUrl ? (
+                <Image source={{ uri: formState.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <Text className="text-white font-black text-3xl">{formState.name?.charAt(0) || '?'}</Text>
+              )}
+            </View>
+            <View className="flex-1">
+              <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
+              <TextInput
+                value={formState.name}
+                onChangeText={v => setFormState({ ...formState, name: v })}
+                className="w-full bg-[#111111] border border-white/10 rounded-xl px-4 py-2.5 text-white font-bold text-sm"
+                placeholderTextColor="rgba(255,255,255,0.2)"
+                placeholder="Acme Holdings Inc."
+              />
+            </View>
           </View>
+          <TouchableOpacity onPress={() => router.back()} className="bg-white/10 p-2 rounded-full self-start mt-1">
+            <Ionicons name="close" size={20} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
         </View>
 
-        {/* Profile Form */}
-        <View className="mb-8">
-          
-          {/* Name */}
-          <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
-            <TextInput
-              value={formState.name}
-              onChangeText={v => setFormState({ ...formState, name: v })}
-              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
-              placeholderTextColor="rgba(255,255,255,0.2)"
-              placeholder="Acme Holdings Inc."
-            />
-          </View>
-
+        {/* Form Row 1: Structure & Color */}
+        <View style={{ zIndex: 50 }} className="flex-row gap-4 mb-4">
           {/* Structure */}
-          <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
-            <TouchableOpacity 
-              onPress={() => setShowStructureMenu(!showStructureMenu)}
-              className={`w-full flex-row items-center justify-between bg-[#111111] border border-white/10 px-5 py-3.5 transition-all ${showStructureMenu ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
-            >
-              <Text className="text-white font-bold">{formState.structure}</Text>
-              <Ionicons name={showStructureMenu ? "chevron-up" : "chevron-down"} size={18} color="rgba(255,255,255,0.4)" />
-            </TouchableOpacity>
+          <View className="flex-1">
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Structure</Text>
+            <View className="relative z-50">
+              <TouchableOpacity 
+                onPress={() => setShowStructureMenu(!showStructureMenu)}
+                className={`w-full flex-row items-center justify-between bg-[#111111] border border-white/10 px-4 py-3 transition-all z-50 ${showStructureMenu ? 'rounded-t-xl border-b-0' : 'rounded-xl'}`}
+              >
+                <Text className="text-white font-bold text-xs" numberOfLines={1}>{formState.structure}</Text>
+                <Ionicons name={showStructureMenu ? "chevron-up" : "chevron-down"} size={14} color="rgba(255,255,255,0.4)" />
+              </TouchableOpacity>
 
-            {showStructureMenu && (
-              <View className="bg-[#111111] border border-white/10 border-t-0 rounded-b-2xl max-h-[220px]">
-                <ScrollView nestedScrollEnabled className="w-full">
-                  {COMPANY_STRUCTURES.map(type => (
-                    <TouchableOpacity 
-                      key={type} 
-                      onPress={() => { setFormState({ ...formState, structure: type }); setShowStructureMenu(false); }}
-                      className="flex-row items-center justify-between px-5 py-3.5 border-t border-white/5"
-                    >
-                      <Text className={`font-bold text-sm ${formState.structure === type ? 'text-[#1FE400]' : 'text-white/70'}`}>{type}</Text>
-                      {formState.structure === type && <Ionicons name="checkmark" size={16} color="#1FE400" />}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
+              {showStructureMenu && (
+                <View className="absolute top-full left-0 right-0 bg-[#111111] border border-white/10 border-t-0 rounded-b-xl max-h-[160px] z-50">
+                  <ScrollView nestedScrollEnabled className="w-full">
+                    {COMPANY_STRUCTURES.map(type => (
+                      <TouchableOpacity 
+                        key={type} 
+                        onPress={() => { setFormState({ ...formState, structure: type }); setShowStructureMenu(false); }}
+                        className="flex-row items-center justify-between px-4 py-2.5 border-t border-white/5"
+                      >
+                        <Text className={`font-bold text-[11px] ${formState.structure === type ? 'text-[#1FE400]' : 'text-white/70'}`}>{type}</Text>
+                        {formState.structure === type && <Ionicons name="checkmark" size={14} color="#1FE400" />}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
           </View>
 
           {/* Color */}
-          <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Identity Color</Text>
-            <View className="flex-row flex-wrap gap-[6px]">
-              {BRAND_COLORS.map(color => (
+          <View className="flex-1">
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Identity Hue</Text>
+            <View className="flex-row flex-wrap gap-1.5 mt-1">
+              {BRAND_COLORS.slice(0, 8).map(color => (
                 <TouchableOpacity
                   key={color}
                   onPress={() => setFormState({ ...formState, color, logoUrl: '' })}
                   style={{ backgroundColor: color }}
-                  className={`w-8 h-8 rounded-full border border-white/10 items-center justify-center`}
+                  className={`w-6 h-6 rounded-full border border-white/10 items-center justify-center`}
                 >
                   {formState.color === color && !formState.logoUrl && (
-                    <View className="w-3 h-3 rounded-full border-2 border-white" />
+                    <View className="w-2 h-2 rounded-full border-2 border-white" />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
           </View>
+        </View>
 
-          {/* Logo URL */}
-          <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Logo URL</Text>
-            <TextInput
-              value={formState.logoUrl}
-              onChangeText={v => setFormState({ ...formState, logoUrl: v })}
-              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
-              placeholderTextColor="rgba(255,255,255,0.2)"
-              placeholder="https://example.com/logo.png"
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-          </View>
-
-          {/* Website URL */}
-          <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Website URL</Text>
+        {/* Form Row 2: Website & Logo */}
+        <View className="flex-row gap-4 mb-6 z-10">
+          <View className="flex-1">
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Website</Text>
             <TextInput
               value={formState.website}
               onChangeText={v => setFormState({ ...formState, website: v })}
               onBlur={() => {
                 if (formState.website && !formState.logoUrl) {
                   const domain = formState.website.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
-                  if (domain) {
-                    setFormState(prev => ({ ...prev, logoUrl: `https://logo.clearbit.com/${domain}` }));
-                  }
+                  if (domain) setFormState(prev => ({ ...prev, logoUrl: `https://logo.clearbit.com/${domain}` }));
                 }
               }}
-              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
+              className="w-full bg-[#111111] border border-white/10 rounded-xl px-4 py-2.5 text-white font-bold text-xs"
               placeholderTextColor="rgba(255,255,255,0.2)"
               placeholder="service.com"
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+          </View>
+          <View className="flex-1">
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Logo URL</Text>
+            <TextInput
+              value={formState.logoUrl}
+              onChangeText={v => setFormState({ ...formState, logoUrl: v })}
+              className="w-full bg-[#111111] border border-white/10 rounded-xl px-4 py-2.5 text-white font-bold text-xs"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              placeholder="url.png"
               autoCapitalize="none"
               keyboardType="url"
             />
@@ -212,51 +209,38 @@ export default function CompanyDetailScreen() {
         </View>
 
         {/* Quick Jumps */}
-        <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">App Navigators</Text>
-        <View className="flex-col gap-[5px] mb-10">
-          
-          <TouchableOpacity 
-            onPress={() => jumpToTab('subscriptions')} 
-            style={{ height: 40 }}
-            className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
-          >
-            <View className="flex-row items-center gap-2.5">
-               <Ionicons name="layers" size={16} color="#60A5FA" />
-               <Text className="text-white/90 font-bold text-[12px]">Tech Stack</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
-          </TouchableOpacity>
+        <View className="z-10 mb-6">
+          <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">App Navigators</Text>
+          <View className="flex-col gap-[5px]">
+            <TouchableOpacity onPress={() => jumpToTab('subscriptions')} style={{ height: 40 }} className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2.5">
+                 <Ionicons name="layers" size={16} color="#60A5FA" />
+                 <Text className="text-white/90 font-bold text-[12px]">Tech Stack</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => jumpToTab('financials')} 
-            style={{ height: 40 }}
-            className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
-          >
-            <View className="flex-row items-center gap-2.5">
-               <Ionicons name="card" size={16} color="#22c55e" />
-               <Text className="text-white/90 font-bold text-[12px]">Financials</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={() => jumpToTab('financials')} style={{ height: 40 }} className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2.5">
+                 <Ionicons name="card" size={16} color="#22c55e" />
+                 <Text className="text-white/90 font-bold text-[12px]">Financials</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
+            </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => jumpToTab('documents')} 
-            style={{ height: 40 }}
-            className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
-          >
-            <View className="flex-row items-center gap-2.5">
-               <Ionicons name="document-text" size={16} color="#FBBF24" />
-               <Text className="text-white/90 font-bold text-[12px]">Doc Vault</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
-          </TouchableOpacity>
-          
+            <TouchableOpacity onPress={() => jumpToTab('documents')} style={{ height: 40 }} className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between">
+              <View className="flex-row items-center gap-2.5">
+                 <Ionicons name="document-text" size={16} color="#FBBF24" />
+                 <Text className="text-white/90 font-bold text-[12px]">Doc Vault</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-
         {/* Danger Zone */}
-        <TouchableOpacity onPress={requestDelete} className="p-4 rounded-3xl items-center border border-red-500/30 mb-8 bg-red-500/5">
-          <Text className="text-red-500 font-bold tracking-widest uppercase text-xs">Delete {company.name}</Text>
+        <TouchableOpacity onPress={requestDelete} className="p-3 rounded-2xl items-center border border-red-500/30 bg-red-500/5 z-10">
+          <Text className="text-red-500 font-bold tracking-widest uppercase text-[10px]">Delete {company.name}</Text>
         </TouchableOpacity>
 
       </ScrollView>
