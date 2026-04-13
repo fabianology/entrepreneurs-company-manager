@@ -185,6 +185,14 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
 }
 
 // ──────────── Custom Tab Bar ────────────
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+
+const TAB_WIDTH = 180;
+const TAB_COUNT = 3;
+const SLOT_WIDTH = TAB_WIDTH / TAB_COUNT; // 60px each
+const PILL_WIDTH = 52;
+const PILL_OFFSET = (SLOT_WIDTH - PILL_WIDTH) / 2; // centers pill within slot
+
 const TAB_CONFIGS = [
   { name: 'subscriptions', icon: 'layers' as const, color: '#60A5FA' },
   { name: 'financials', icon: 'card' as const, color: '#22c55e' },
@@ -196,6 +204,27 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const insets = useSafeAreaInsets();
   const BOTTOM = insets.bottom + 12;
 
+  // Find the index among our visible tabs (0=subscriptions, 1=financials, 2=documents)
+  const activeTabIndex = TAB_CONFIGS.findIndex(
+    (t) => t.name === state.routes[state.index]?.name
+  );
+  const safeIndex = activeTabIndex < 0 ? 0 : activeTabIndex;
+
+  const pillX = useSharedValue(safeIndex * SLOT_WIDTH + PILL_OFFSET);
+
+  // Animate pill whenever active tab changes
+  React.useEffect(() => {
+    pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
+      damping: 18,
+      stiffness: 180,
+      mass: 0.6,
+    });
+  }, [safeIndex]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: pillX.value }],
+  }));
+
   if (pathname === '/') return null;
 
   return (
@@ -204,7 +233,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
         position: 'absolute',
         bottom: BOTTOM,
         right: 20,
-        width: 180,
+        width: TAB_WIDTH,
         height: 32,
         backgroundColor: '#1C1C1E',
         borderRadius: 40,
@@ -212,27 +241,43 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
         borderColor: 'rgba(255,255,255,0.1)',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-around',
         shadowColor: '#000',
         shadowOpacity: 0.5,
         shadowRadius: 20,
         elevation: 10,
         zIndex: 50,
-        paddingHorizontal: 8,
+        overflow: 'hidden',
       }}
     >
-      {TAB_CONFIGS.map((tab) => {
-        const route = state.routes.find((r: any) => r.name === tab.name);
-        const isActive = route && state.routes[state.index]?.name === tab.name;
+      {/* Liquid glass sliding pill */}
+      <Reanimated.View
+        style={[
+          pillStyle,
+          {
+            position: 'absolute',
+            width: PILL_WIDTH,
+            height: 24,
+            top: 4,
+            borderRadius: 12,
+            backgroundColor: 'rgba(255,255,255,0.13)',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.28)',
+          },
+        ]}
+      />
+
+      {/* Tab icon buttons */}
+      {TAB_CONFIGS.map((tab, i) => {
+        const isActive = i === safeIndex;
         return (
           <TouchableOpacity
             key={tab.name}
             onPress={() => navigation.navigate(tab.name)}
-            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' }}
+            style={{ width: SLOT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%' }}
           >
             <Ionicons
               name={tab.icon}
-              size={20}
+              size={18}
               color={isActive ? tab.color : 'rgba(255,255,255,0.4)'}
             />
           </TouchableOpacity>
