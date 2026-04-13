@@ -63,25 +63,31 @@ export default function DashboardScreen() {
           <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2 mb-4">Your Companies</Text>
           
           {filteredCompanies.map((company) => (
-            <TouchableOpacity 
+            <View 
               key={company.id}
-              onPress={() => handleCompanyPress(company)}
-              className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden"
+              className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden relative"
             >
               <View className="flex-row items-center justify-between mb-5">
                 <View className="flex-row items-center max-w-[85%]">
-                  <View 
+                  <TouchableOpacity
+                    onPress={() => handleCompanyPress(company)}
                     style={{ backgroundColor: company.color || '#3b82f6' }}
-                    className="w-12 h-12 rounded-xl items-center justify-center mr-4"
+                    className="w-12 h-12 rounded-xl items-center justify-center mr-4 overflow-hidden"
                   >
-                    <Text className="text-white font-black text-xl">{company.name.charAt(0)}</Text>
-                  </View>
+                    {company.logoUrl ? (
+                      <Image source={{ uri: company.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <Text className="text-white font-black text-xl">{company.name.charAt(0)}</Text>
+                    )}
+                  </TouchableOpacity>
                   <View className="flex-1">
                     <Text className="text-lg font-black text-white tracking-tight" numberOfLines={1}>{company.name}</Text>
                     <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{company.structure}</Text>
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.2)" />
+                <TouchableOpacity onPress={() => handleCompanyPress(company)} className="p-2 border border-white/10 bg-white/5 rounded-full">
+                  <Ionicons name="create-outline" size={14} color="rgba(255,255,255,0.7)" />
+                </TouchableOpacity>
               </View>
 
               <View className="flex-row items-center justify-between border-t border-white/5 pt-4">
