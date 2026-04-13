@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '../../context/AppContext';
@@ -25,8 +26,35 @@ const getTimeAgo = (timestamp?: number) => {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany, handleUpdateCompany } = useAppContext();
+  const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany, handleUpdateCompany, handleDeleteCompany } = useAppContext();
   const [quote, setQuote] = useState<string>('');
+
+  const renderLeftActions = (company: Company) => (
+    <TouchableOpacity 
+      onPress={() => router.push(`/company/${company.id}`)}
+      className="bg-blue-600 justify-center items-start rounded-3xl mb-4 p-5 w-24 pl-6 h-[85%]"
+    >
+      <Ionicons name="create-outline" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
+
+  const renderRightActions = (company: Company) => (
+    <TouchableOpacity 
+      onPress={() => {
+        Alert.alert(
+          "Delete Entity?",
+          `Are you sure you want to permanently delete ${company.name} and all associated financial records?`,
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Delete", style: "destructive", onPress: () => handleDeleteCompany(company.id) }
+          ]
+        );
+      }}
+      className="bg-red-600 justify-center items-end rounded-3xl mb-4 p-5 w-24 pr-6 h-[85%]"
+    >
+      <Ionicons name="trash-outline" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
 
   useEffect(() => {
     getEntrepreneurialQuote().then(setQuote);
@@ -64,8 +92,13 @@ export default function DashboardScreen() {
           <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2 mb-4">Your Companies</Text>
           
           {filteredCompanies.map((company) => (
-            <TouchableOpacity 
-              activeOpacity={0.8}
+            <Swipeable 
+              key={company.id} 
+              renderLeftActions={() => renderLeftActions(company)}
+              renderRightActions={() => renderRightActions(company)}
+            >
+              <TouchableOpacity 
+                activeOpacity={0.8}
               onPress={() => {
                 handleUpdateCompany(company.id, { lastViewed: Date.now() });
                 setSelectedCompanyId(company.id);
@@ -127,6 +160,7 @@ export default function DashboardScreen() {
                 </View>
               </View>
             </TouchableOpacity>
+            </Swipeable>
           ))}
 
           {/* Add Company Button */}
