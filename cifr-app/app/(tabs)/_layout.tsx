@@ -249,7 +249,7 @@ export default function TabLayout() {
             display: pathname === '/' ? 'none' : 'flex',
             position: 'absolute',
             bottom: BOTTOM,
-            left: 20,
+            right: 20,
             width: 180,
             backgroundColor: '#1C1C1E',
             borderRadius: 40,
@@ -309,7 +309,7 @@ export default function TabLayout() {
         <View style={{
           position: 'absolute',
           bottom: BOTTOM + 32 + 10,
-          right: 20,
+          left: 20,
           zIndex: 100,
         }}>
           <QuickMenuPopover
@@ -326,7 +326,7 @@ export default function TabLayout() {
           style={{
             position: 'absolute',
             bottom: BOTTOM,
-            right: 20,
+            left: 20,
             width: 32,
             height: 32,
             backgroundColor: showMenu ? '#EBC351' : '#1C1C1E',
