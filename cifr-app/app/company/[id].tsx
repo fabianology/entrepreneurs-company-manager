@@ -105,7 +105,7 @@ export default function CompanyDetailScreen() {
         }} 
       />
       
-      <ScrollView className="flex-1 p-6" contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView className="flex-1 p-6" contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}>
         
         {/* Dismiss Button */}
         <TouchableOpacity onPress={() => router.back()} className="self-end bg-white/10 p-2 rounded-full mb-2">
@@ -267,7 +267,7 @@ export default function CompanyDetailScreen() {
 
 
         {/* Danger Zone */}
-        <TouchableOpacity onPress={requestDelete} className="p-4 rounded-3xl items-center border border-red-500/30 mb-8 bg-red-500/5">
+        <TouchableOpacity onPress={requestDelete} className="mt-auto p-4 rounded-3xl items-center border border-red-500/30 mb-8 bg-red-500/5">
           <Text className="text-red-500 font-bold tracking-widest uppercase text-xs">Delete {company.name}</Text>
         </TouchableOpacity>
 
