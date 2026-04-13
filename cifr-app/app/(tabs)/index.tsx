@@ -44,14 +44,14 @@ export default function DashboardScreen() {
         </View>
 
         {/* Companies Grid */}
-        <View className="space-y-4 mb-16">
-          <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2">Your Companies</Text>
+        <View className="mb-16">
+          <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2 mb-4">Your Companies</Text>
           
           {filteredCompanies.map((company) => (
             <TouchableOpacity 
               key={company.id}
               onPress={() => handleCompanyPress(company)}
-              className="bg-white/5 border border-white/10 p-5 rounded-3xl"
+              className="bg-white/5 border border-white/10 p-5 rounded-3xl mb-4"
             >
               <View className="flex-row items-center justify-between mb-3">
                 <View className="flex-row items-center">
