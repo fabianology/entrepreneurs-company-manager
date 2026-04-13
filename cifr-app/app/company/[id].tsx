@@ -1,8 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
+import { Company } from '../../types';
+
+const BRAND_COLORS = [
+  '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6',
+  '#8b5cf6', '#ec4899', '#64748b', '#000000'
+];
+
+const COMPANY_STRUCTURES = [
+  'LLC', 'S-Corp', 'C-Corp', 'Small Business', 'Sole Proprietorship',
+  'Partnership', 'Holding Company', 'Non-Profit', 'Personal', 'Other'
+];
 
 export default function CompanyDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -11,11 +22,13 @@ export default function CompanyDetailScreen() {
 
   const company = state?.companies.find(c => c.id === id);
 
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [internalName, setInternalName] = useState(company?.name || '');
-
-  const [isEditingDesc, setIsEditingDesc] = useState(false);
-  const [internalDesc, setInternalDesc] = useState(company?.description || '');
+  const [formState, setFormState] = useState<Partial<Company>>({
+    name: company?.name || '',
+    structure: company?.structure || 'LLC',
+    color: company?.color || BRAND_COLORS[0],
+    logoUrl: company?.logoUrl || '',
+    website: company?.website || ''
+  });
 
   if (!company) {
     return (
@@ -28,18 +41,13 @@ export default function CompanyDetailScreen() {
     );
   }
 
-  const saveName = () => {
-    setIsEditingName(false);
-    if (internalName.trim()) {
-      handleUpdateCompany(id as string, { name: internalName });
+  const handleSaveCompany = () => {
+    if (formState.name?.trim()) {
+      handleUpdateCompany(id as string, formState);
+      Alert.alert("Success", "Entity Profile updated.", [{ text: "OK", onPress: () => router.back() }]);
     } else {
-      setInternalName(company.name); // Revert
+      Alert.alert("Error", "Entity name cannot be empty.");
     }
-  };
-
-  const saveDesc = () => {
-    setIsEditingDesc(false);
-    handleUpdateCompany(id as string, { description: internalDesc });
   };
 
   const requestDelete = () => {
@@ -61,7 +69,6 @@ export default function CompanyDetailScreen() {
   };
 
   const jumpToTab = (tabName: 'subscriptions' | 'financials' | 'documents') => {
-    // Keep this company selected and navigate to the related tab
     setSelectedCompanyId(id as string);
     router.navigate(`/(tabs)/${tabName}`);
   };
@@ -77,7 +84,7 @@ export default function CompanyDetailScreen() {
         }} 
       />
       
-      <ScrollView className="flex-1 p-6">
+      <ScrollView className="flex-1 p-6" contentContainerStyle={{ paddingBottom: 100 }}>
         
         {/* Dismiss Button */}
         <TouchableOpacity onPress={() => router.back()} className="self-end bg-white/10 p-2 rounded-full mb-2">
@@ -85,74 +92,120 @@ export default function CompanyDetailScreen() {
         </TouchableOpacity>
 
         {/* Header Hero Section */}
-        <View className="mb-8 items-center mt-4">
+        <View className="mb-4 items-center mt-2">
           <View 
-            style={{ backgroundColor: company.color || '#3b82f6' }}
-            className="w-24 h-24 rounded-3xl items-center justify-center shadow-lg mb-6"
+            style={{ backgroundColor: formState.color || '#3b82f6' }}
+            className="w-24 h-24 rounded-3xl items-center justify-center shadow-lg mb-4 overflow-hidden border border-white/10"
           >
-            <Text className="text-white font-black text-5xl">{company.name.charAt(0)}</Text>
-          </View>
-          
-          {/* Editable Name */}
-          <View className="flex-row items-center justify-center w-full">
-            {isEditingName ? (
-              <TextInput
-                value={internalName}
-                onChangeText={setInternalName}
-                onBlur={saveName}
-                autoFocus
-                className="text-4xl font-black text-white bg-white/10 rounded-xl px-4 py-2 w-full text-center"
-                returnKeyType="done"
-                onSubmitEditing={saveName}
-              />
+            {formState.logoUrl ? (
+              <Image source={{ uri: formState.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
             ) : (
-              <TouchableOpacity onPress={() => setIsEditingName(true)} className="flex-row items-center border border-transparent hover:border-white/10 rounded-xl px-4 py-2">
-                <Text className="text-4xl font-black text-white text-center">{company.name}</Text>
-                <Ionicons name="pencil" size={16} color="rgba(255,255,255,0.3)" className="ml-2" />
-              </TouchableOpacity>
+              <Text className="text-white font-black text-5xl">{formState.name?.charAt(0) || '?'}</Text>
             )}
           </View>
-          <Text className="text-stone-400 font-bold uppercase tracking-widest mt-2">{company.structure}</Text>
         </View>
 
-        {/* Description Section */}
-        <View className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-white/40 font-bold uppercase tracking-widest">About</Text>
-            {!isEditingDesc && (
-              <TouchableOpacity onPress={() => setIsEditingDesc(true)}>
-                <Ionicons name="pencil" size={18} color="rgba(255,255,255,0.4)" />
-              </TouchableOpacity>
-            )}
-          </View>
+        {/* Profile Form */}
+        <View className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 mb-8 overflow-hidden">
+          <Text className="text-white/40 font-bold uppercase tracking-widest mb-6">Entity Profile</Text>
           
-          {isEditingDesc ? (
-            <View>
-              <TextInput
-                value={internalDesc}
-                onChangeText={setInternalDesc}
-                multiline
-                className="text-white text-lg bg-white/10 rounded-xl p-4 min-h-[100px]"
-                autoFocus
-              />
-              <TouchableOpacity onPress={saveDesc} className="mt-4 bg-[#primary] self-end px-6 py-2 rounded-full border border-white/20">
-                <Text className="text-white font-bold">Save</Text>
-              </TouchableOpacity>
+          {/* Name */}
+          <View className="mb-5">
+            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
+            <TextInput
+              value={formState.name}
+              onChangeText={v => setFormState({ ...formState, name: v })}
+              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              placeholder="Acme Holdings Inc."
+            />
+          </View>
+
+          {/* Structure */}
+          <View className="mb-5">
+            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {COMPANY_STRUCTURES.map(type => (
+                <TouchableOpacity 
+                  key={type} 
+                  onPress={() => setFormState({ ...formState, structure: type })}
+                  className={`px-4 py-3 rounded-xl border ${formState.structure === type ? 'bg-white/20 border-white/40' : 'bg-[#111111] border-white/10'}`}
+                >
+                  <Text className={`font-bold ${formState.structure === type ? 'text-white' : 'text-white/50'}`}>{type}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Color */}
+          <View className="mb-5">
+            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-2">Identity Color</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {BRAND_COLORS.map(color => (
+                <TouchableOpacity
+                  key={color}
+                  onPress={() => setFormState({ ...formState, color, logoUrl: '' })}
+                  style={{ backgroundColor: color }}
+                  className={`w-10 h-10 rounded-full border border-white/10 items-center justify-center`}
+                >
+                  {formState.color === color && !formState.logoUrl && (
+                    <View className="w-3 h-3 rounded-full border-2 border-white" />
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
-          ) : (
-            <TouchableOpacity onPress={() => setIsEditingDesc(true)}>
-              <Text className="text-white text-lg leading-relaxed">
-                {company.description || "No description provided. Tap to edit."}
-              </Text>
-            </TouchableOpacity>
-          )}
+          </View>
+
+          {/* Logo URL */}
+          <View className="mb-5">
+            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-1">Logo URL</Text>
+            <TextInput
+              value={formState.logoUrl}
+              onChangeText={v => setFormState({ ...formState, logoUrl: v })}
+              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              placeholder="https://example.com/logo.png"
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+          </View>
+
+          {/* Website URL */}
+          <View className="mb-5">
+            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-1">Website URL</Text>
+            <TextInput
+              value={formState.website}
+              onChangeText={v => setFormState({ ...formState, website: v })}
+              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
+              placeholderTextColor="rgba(255,255,255,0.2)"
+              placeholder="service.com"
+              autoCapitalize="none"
+              keyboardType="url"
+            />
+          </View>
+
+          {/* Action Row */}
+          <View className="mt-4 flex-row items-center justify-between border-t border-white/5 pt-6">
+             <TouchableOpacity onPress={() => router.back()}>
+                <Text className="text-xs font-black text-white/40 uppercase tracking-widest">Discard</Text>
+             </TouchableOpacity>
+             <TouchableOpacity 
+               onPress={handleSaveCompany} 
+               disabled={!formState.name}
+               className={`px-6 py-4 rounded-2xl shadow-2xl items-center justify-center ${formState.name ? 'bg-white' : 'bg-white/20'}`}
+             >
+                <Text className={`font-black text-xs uppercase tracking-[0.2em] ${formState.name ? 'text-black' : 'text-white/40'}`}>
+                  Commit Changes
+                </Text>
+             </TouchableOpacity>
+          </View>
         </View>
 
         {/* Quick Jumps */}
         <Text className="text-white/40 font-bold uppercase tracking-widest mb-4 ml-2">App Navigators</Text>
         <View className="space-y-3 mb-10">
           
-          <TouchableOpacity onPress={() => jumpToTab('subscriptions')} className="bg-white/5 border border-white/10 p-5 rounded-3xl flex-row items-center justify-between">
+          <TouchableOpacity onPress={() => jumpToTab('subscriptions')} className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl flex-row items-center justify-between">
             <View className="flex-row items-center">
               <View className="bg-emerald-500/20 p-3 rounded-xl mr-4">
                  <Ionicons name="layers" size={24} color="#10b981" />
@@ -162,7 +215,7 @@ export default function CompanyDetailScreen() {
             <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => jumpToTab('financials')} className="bg-white/5 border border-white/10 p-5 rounded-3xl flex-row items-center justify-between">
+          <TouchableOpacity onPress={() => jumpToTab('financials')} className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl flex-row items-center justify-between">
             <View className="flex-row items-center">
               <View className="bg-blue-500/20 p-3 rounded-xl mr-4">
                  <Ionicons name="card" size={24} color="#3b82f6" />
@@ -172,7 +225,7 @@ export default function CompanyDetailScreen() {
             <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => jumpToTab('documents')} className="bg-white/5 border border-white/10 p-5 rounded-3xl flex-row items-center justify-between">
+          <TouchableOpacity onPress={() => jumpToTab('documents')} className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl flex-row items-center justify-between">
             <View className="flex-row items-center">
               <View className="bg-pink-500/20 p-3 rounded-xl mr-4">
                  <Ionicons name="document-text" size={24} color="#ec4899" />
@@ -185,8 +238,8 @@ export default function CompanyDetailScreen() {
         </View>
 
         {/* Danger Zone */}
-        <TouchableOpacity onPress={requestDelete} className="p-4 rounded-3xl items-center border border-red-500/30 mb-12">
-          <Text className="text-red-500 font-bold">Delete {company.name}</Text>
+        <TouchableOpacity onPress={requestDelete} className="p-4 rounded-3xl items-center border border-red-500/30 mb-8 bg-red-500/5">
+          <Text className="text-red-500 font-bold tracking-widest uppercase text-xs">Delete {company.name}</Text>
         </TouchableOpacity>
 
       </ScrollView>
