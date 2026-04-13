@@ -85,17 +85,17 @@ export default function DashboardScreen() {
               </View>
 
               <View className="border-t border-white/5 pt-4 pb-2">
-                <View className="space-y-1.5">
-                  <View className="flex-row items-center">
-                    <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" />
-                    <Text className="text-[9px] font-black tracking-widest text-white/30 uppercase ml-1">
-                      Modified: <Text className="text-white/70 ml-1">{getTimeAgo(company.lastModified)}</Text>
+                <View className="flex-col gap-1.5">
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.4)" />
+                    <Text className="text-[11px] font-medium text-white/40">
+                      Modified: <Text className="text-white/80 font-bold">{getTimeAgo(company.lastModified)}</Text>
                     </Text>
                   </View>
-                  <View className="flex-row items-center">
-                    <Ionicons name="eye-outline" size={12} color="rgba(255,255,255,0.3)" />
-                    <Text className="text-[9px] font-black tracking-widest text-white/30 uppercase ml-1">
-                      Viewed: <Text className="text-white/70 ml-1">{getTimeAgo(company.lastViewed)}</Text>
+                  <View className="flex-row items-center gap-1.5">
+                    <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.4)" />
+                    <Text className="text-[11px] font-medium text-white/40">
+                      Viewed: <Text className="text-white/80 font-bold">{getTimeAgo(company.lastViewed)}</Text>
                     </Text>
                   </View>
                 </View>
