@@ -28,7 +28,7 @@ interface AppContextType {
   setSearchQuery: (q: string) => void;
 
   // Company
-  handleAddCompany: (newCompany: Omit<Company, 'id'>) => void;
+  handleAddCompany: (newCompany: Omit<Company, 'id'>) => string | void;
   handleUpdateCompany: (id: string, updates: Partial<Company>) => void;
   handleDeleteCompany: (id?: string) => void;
 
@@ -172,6 +172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       companies: [...prev.companies, { ...newCompany, id, lastModified: Date.now(), lastViewed: Date.now() }]
     }) : null);
+    return id;
   };
 
   const handleUpdateCompany = (id: string, updates: Partial<Company>) => {

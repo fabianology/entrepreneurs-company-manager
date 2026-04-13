@@ -10,7 +10,7 @@ import { getEntrepreneurialQuote } from '../../services/geminiService';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { state, setSelectedCompanyId, filteredCompanies } = useAppContext();
+  const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany } = useAppContext();
   const [quote, setQuote] = useState<string>('');
 
   useEffect(() => {
@@ -76,9 +76,18 @@ export default function DashboardScreen() {
           ))}
 
           {/* Add Company Button */}
-          <TouchableOpacity className="border-2 border-dashed border-white/20 p-5 rounded-3xl items-center justify-center mt-4 border-opacity-50 hover:bg-white/5 bg-transparent">
+          <TouchableOpacity 
+            onPress={() => {
+              const newId = handleAddCompany({ name: 'New Entity', structure: 'LLC', color: '#4f46e5', logoUrl: '', website: '' });
+              if (newId) {
+                setSelectedCompanyId(newId);
+                router.push(`/company/${newId}`);
+              }
+            }}
+            className="border-2 border-dashed border-white/20 p-5 rounded-3xl items-center justify-center mt-4 border-opacity-50 hover:bg-white/5 bg-transparent"
+          >
             <Ionicons name="add" size={28} color="rgba(255,255,255,0.4)" />
-            <Text className="text-white/40 font-bold mt-2">Register New Company</Text>
+            <Text className="text-white/40 font-bold mt-2">Create New Entity</Text>
           </TouchableOpacity>
         </View>
 
