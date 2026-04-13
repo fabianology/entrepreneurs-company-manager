@@ -64,7 +64,13 @@ export default function DashboardScreen() {
           <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2 mb-4">Your Companies</Text>
           
           {filteredCompanies.map((company) => (
-            <View 
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={() => {
+                handleUpdateCompany(company.id, { lastViewed: Date.now() });
+                setSelectedCompanyId(company.id);
+                router.push('/financials');
+              }}
               key={company.id}
               className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden relative"
             >
@@ -120,7 +126,7 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
 
           {/* Add Company Button */}
