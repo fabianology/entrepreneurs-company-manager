@@ -24,7 +24,7 @@ const getTimeAgo = (timestamp?: number) => {
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany } = useAppContext();
+  const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany, handleUpdateCompany } = useAppContext();
   const [quote, setQuote] = useState<string>('');
 
   useEffect(() => {
@@ -40,6 +40,7 @@ export default function DashboardScreen() {
   }
 
   const handleCompanyPress = (company: Company) => {
+    handleUpdateCompany(company.id, { lastViewed: Date.now() });
     setSelectedCompanyId(company.id);
     router.push(`/company/${company.id}`);
   };
@@ -105,7 +106,7 @@ export default function DashboardScreen() {
                   <Ionicons name="document-text" size={14} color="rgba(255,255,255,0.5)" />
                 </View>
               </View>
-            </TouchableOpacity>>
+            </TouchableOpacity>
           ))}
 
           {/* Add Company Button */}
