@@ -126,35 +126,29 @@ export default function CompanyDetailScreen() {
           <View className="mb-5">
             <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
             <TouchableOpacity 
-              onPress={() => setShowStructureMenu(true)}
-              className="w-full flex-row items-center justify-between bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5"
+              onPress={() => setShowStructureMenu(!showStructureMenu)}
+              className={`w-full flex-row items-center justify-between bg-[#111111] border border-white/10 px-5 py-3.5 transition-all ${showStructureMenu ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
             >
               <Text className="text-white font-bold">{formState.structure}</Text>
-              <Ionicons name="chevron-down" size={18} color="rgba(255,255,255,0.4)" />
+              <Ionicons name={showStructureMenu ? "chevron-up" : "chevron-down"} size={18} color="rgba(255,255,255,0.4)" />
             </TouchableOpacity>
 
-            <Modal visible={showStructureMenu} transparent animationType="fade">
-              <TouchableWithoutFeedback onPress={() => setShowStructureMenu(false)}>
-                <View className="flex-1 bg-black/80 justify-end">
-                   <View className="bg-[#1C1C1E] rounded-t-3xl border-t border-white/10 pt-4 pb-12 max-h-[60%]">
-                     <View className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6" />
-                     <Text className="text-center text-white/50 font-bold uppercase tracking-widest text-xs mb-4">Select Structure</Text>
-                     <ScrollView>
-                       {COMPANY_STRUCTURES.map(type => (
-                         <TouchableOpacity 
-                           key={type} 
-                           onPress={() => { setFormState({ ...formState, structure: type }); setShowStructureMenu(false); }}
-                           className="flex-row items-center justify-between px-8 py-4 border-b border-white/5"
-                         >
-                           <Text className={`font-bold text-lg ${formState.structure === type ? 'text-[#1FE400]' : 'text-white'}`}>{type}</Text>
-                           {formState.structure === type && <Ionicons name="checkmark" size={24} color="#1FE400" />}
-                         </TouchableOpacity>
-                       ))}
-                     </ScrollView>
-                   </View>
-                </View>
-              </TouchableWithoutFeedback>
-            </Modal>
+            {showStructureMenu && (
+              <View className="bg-[#111111] border border-white/10 border-t-0 rounded-b-2xl max-h-[220px]">
+                <ScrollView nestedScrollEnabled className="w-full">
+                  {COMPANY_STRUCTURES.map(type => (
+                    <TouchableOpacity 
+                      key={type} 
+                      onPress={() => { setFormState({ ...formState, structure: type }); setShowStructureMenu(false); }}
+                      className="flex-row items-center justify-between px-5 py-3.5 border-t border-white/5"
+                    >
+                      <Text className={`font-bold text-sm ${formState.structure === type ? 'text-[#1FE400]' : 'text-white/70'}`}>{type}</Text>
+                      {formState.structure === type && <Ionicons name="checkmark" size={16} color="#1FE400" />}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
           </View>
 
           {/* Color */}
