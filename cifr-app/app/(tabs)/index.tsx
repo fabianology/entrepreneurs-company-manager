@@ -45,6 +45,12 @@ export default function DashboardScreen() {
     router.push(`/company/${company.id}`);
   };
 
+  const handleTabJump = (company: Company, tab: '/subscriptions' | '/financials' | '/documents') => {
+    handleUpdateCompany(company.id, { lastViewed: Date.now() });
+    setSelectedCompanyId(company.id);
+    router.push(tab);
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-black">
       <ScrollView className="flex-1 p-4">
@@ -66,6 +72,7 @@ export default function DashboardScreen() {
             <TouchableOpacity 
               key={company.id}
               onPress={() => handleCompanyPress(company)}
+              activeOpacity={0.7}
               className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden"
             >
               <View className="flex-row items-center justify-between mb-5">
@@ -100,10 +107,16 @@ export default function DashboardScreen() {
                   </View>
                 </View>
 
-                <View className="flex-row items-center justify-around bg-black/30 w-32 px-4 py-2 rounded-xl border border-white/5">
-                  <Ionicons name="layers" size={14} color="rgba(255,255,255,0.5)" />
-                  <Ionicons name="card" size={14} color="rgba(255,255,255,0.5)" />
-                  <Ionicons name="document-text" size={14} color="rgba(255,255,255,0.5)" />
+                <View className="flex-row items-center justify-around bg-black/30 w-36 py-1 rounded-xl border border-white/5">
+                  <TouchableOpacity onPress={() => handleTabJump(company, '/subscriptions')} className="p-2">
+                    <Ionicons name="layers" size={20} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleTabJump(company, '/financials')} className="p-2">
+                    <Ionicons name="card" size={20} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleTabJump(company, '/documents')} className="p-2">
+                    <Ionicons name="document-text" size={20} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
                 </View>
               </View>
             </TouchableOpacity>
