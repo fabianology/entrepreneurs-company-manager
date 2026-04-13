@@ -267,7 +267,7 @@ export default function TabLayout() {
         }}>
         <Tabs.Screen name="index" options={{ href: null, tabBarIcon: ({ color }) => <Ionicons size={20} name="home" color={color} /> }} />
         <Tabs.Screen name="subscriptions" options={{ tabBarActiveTintColor: '#60A5FA', tabBarIcon: ({ color }) => <Ionicons size={20} name="layers" color={color} /> }} />
-        <Tabs.Screen name="financials" options={{ tabBarActiveTintColor: '#4ADE80', tabBarIcon: ({ color }) => <Ionicons size={20} name="card" color={color} /> }} />
+        <Tabs.Screen name="financials" options={{ tabBarActiveTintColor: '#22c55e', tabBarIcon: ({ color }) => <Ionicons size={20} name="card" color={color} /> }} />
         <Tabs.Screen name="documents" options={{ tabBarActiveTintColor: '#FBBF24', tabBarIcon: ({ color }) => <Ionicons size={20} name="document-text" color={color} /> }} />
       </Tabs>
 

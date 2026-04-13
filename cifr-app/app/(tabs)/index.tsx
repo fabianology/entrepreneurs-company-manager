@@ -105,7 +105,7 @@ export default function DashboardScreen() {
                     <Ionicons name="layers" size={14} color="#60A5FA" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
-                    <Ionicons name="card" size={14} color="#4ADE80" />
+                    <Ionicons name="card" size={14} color="#22c55e" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
                     <Ionicons name="document-text" size={14} color="#FBBF24" />
