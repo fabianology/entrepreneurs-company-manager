@@ -963,7 +963,7 @@ export default function FinancialsScreen() {
                     <TouchableOpacity onPress={() => { toggleInst(inst.id); }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 12, textTransform: 'uppercase', letterSpacing: 2 }}>Linked Accounts</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 12, textTransform: 'uppercase', letterSpacing: 2 }}>{expanded ? 'Less Details' : 'More Details'}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.2)', fontWeight: '900', fontSize: 12 }}>({instAccounts + instLoans.length})</Text>
                       </View>
                       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.3)" />
