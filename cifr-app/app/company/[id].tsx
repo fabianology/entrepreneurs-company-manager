@@ -191,16 +191,16 @@ export default function CompanyDetailScreen() {
             </View>
           </View>
 
-          {/* Logo URL */}
+          {/* Website URL */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Logo Configuration</Text>
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Website URL</Text>
             <View className="flex-row items-center gap-2">
               <TextInput
-                value={formState.logoUrl}
-                onChangeText={v => setFormState({ ...formState, logoUrl: v })}
+                value={formState.website}
+                onChangeText={v => setFormState({ ...formState, website: v })}
                 className="flex-1 bg-[#111111] border border-white/10 rounded-2xl px-5 py-[12px] text-white font-bold"
                 placeholderTextColor="rgba(255,255,255,0.2)"
-                placeholder="https://example.com/logo.png"
+                placeholder="service.com"
                 autoCapitalize="none"
                 keyboardType="url"
               />
@@ -211,20 +211,6 @@ export default function CompanyDetailScreen() {
                 <Ionicons name="cloud-upload" size={20} color="#fff" />
               </TouchableOpacity>
             </View>
-          </View>
-
-          {/* Website URL */}
-          <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Website URL</Text>
-            <TextInput
-              value={formState.website}
-              onChangeText={v => setFormState({ ...formState, website: v })}
-              className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
-              placeholderTextColor="rgba(255,255,255,0.2)"
-              placeholder="service.com"
-              autoCapitalize="none"
-              keyboardType="url"
-            />
           </View>
         </View>
 
