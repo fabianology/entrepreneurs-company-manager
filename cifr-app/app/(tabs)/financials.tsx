@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../../types';
 import CompanyHeader from '../../components/CompanyHeader';
@@ -1127,6 +1127,6 @@ export default function FinancialsScreen() {
           onClose={() => setEditingLoan(null)}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
