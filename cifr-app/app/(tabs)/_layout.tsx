@@ -141,19 +141,30 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
       shadowRadius: 24,
       elevation: 20,
     }}>
-      {/* Dashboard row */}
-      <TouchableOpacity
-        onPress={onSelectDashboard}
-        style={{
-          flexDirection: 'row', alignItems: 'center', gap: 12,
-          paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12,
-          backgroundColor: 'rgba(255,255,255,0.04)',
-          marginBottom: 2,
-        }}
-      >
-        <Ionicons name="grid" size={18} color="rgba(255,255,255,0.65)" />
-        <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: 14 }}>Dashboard</Text>
-      </TouchableOpacity>
+      {/* Dashboard row + gear */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+        <TouchableOpacity
+          onPress={onSelectDashboard}
+          style={{
+            flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12,
+            paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12,
+            backgroundColor: 'rgba(255,255,255,0.04)',
+          }}
+        >
+          <Ionicons name="grid" size={18} color="rgba(255,255,255,0.65)" />
+          <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600', fontSize: 14 }}>Dashboard</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => {/* admin backend — coming soon */}}
+          style={{
+            width: 42, height: 42, borderRadius: 12,
+            backgroundColor: 'rgba(255,255,255,0.04)',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="settings-outline" size={18} color="rgba(255,255,255,0.5)" />
+        </TouchableOpacity>
+      </View>
 
       {/* Companies */}
       {state.companies.length > 0 && (
