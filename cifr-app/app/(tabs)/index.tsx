@@ -68,10 +68,11 @@ export default function DashboardScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.2)" />
               </View>
-              
-              <Text className="text-sm text-stone-400 mt-2" numberOfLines={2}>
-                {company.description}
-              </Text>
+              <View className="flex-row items-center gap-4 mt-2 bg-black/20 self-start px-3 py-1.5 rounded-full border border-white/5">
+                <Ionicons name="layers" size={16} color="rgba(255,255,255,0.5)" />
+                <Ionicons name="card" size={16} color="rgba(255,255,255,0.5)" />
+                <Ionicons name="document-text" size={16} color="rgba(255,255,255,0.5)" />
+              </View>
             </TouchableOpacity>
           ))}
 
