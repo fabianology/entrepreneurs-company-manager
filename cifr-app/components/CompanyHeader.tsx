@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Image } from 'react-native';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAppContext } from '../context/AppContext';
 
 interface CompanyHeaderProps {
@@ -13,6 +14,7 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
     subMetrics, 
     state 
   } = useAppContext();
+  const router = useRouter();
 
   // If no company is specifically selected, return a highly minimized global header
   if (!selectedCompanyId || !selectedCompany || !state) {
@@ -52,16 +54,20 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         
         {/* Logo Tile */}
-        <View style={{
-          width: 48,
-          height: 48,
-          borderRadius: 12,
-          backgroundColor: logoBg,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12,
-          overflow: 'hidden'
-        }}>
+        <TouchableOpacity 
+          onPress={() => router.push(`/company/${selectedCompanyId}`)}
+          activeOpacity={0.8}
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            backgroundColor: logoBg,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12,
+            overflow: 'hidden'
+          }}
+        >
           {selectedCompany.logoUrl ? (
             <Image source={{ uri: selectedCompany.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
           ) : (
@@ -69,7 +75,7 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
               {selectedCompany.name.charAt(0)}
             </Text>
           )}
-        </View>
+        </TouchableOpacity>
 
         {/* Company Title */}
         <View style={{ flex: 1, overflow: 'hidden' }}>
