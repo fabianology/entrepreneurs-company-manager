@@ -8,6 +8,20 @@ import { Company } from '../../types';
 import { getEntrepreneurialQuote } from '../../services/geminiService';
 
 
+const getTimeAgo = (timestamp?: number) => {
+  if (!timestamp) return 'Never';
+  const now = Date.now();
+  const diffInMs = now - timestamp;
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInDays === 0) {
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    if (diffInHours === 0) return 'Just now';
+    return `${diffInHours}h ago`;
+  }
+  return `${diffInDays}d ago`;
+};
+
 export default function DashboardScreen() {
   const router = useRouter();
   const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany } = useAppContext();
@@ -51,29 +65,47 @@ export default function DashboardScreen() {
             <TouchableOpacity 
               key={company.id}
               onPress={() => handleCompanyPress(company)}
-              className="bg-white/5 border border-white/10 p-5 rounded-3xl mb-4"
+              className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden"
             >
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-row items-center">
+              <View className="flex-row items-center justify-between mb-5">
+                <View className="flex-row items-center max-w-[85%]">
                   <View 
                     style={{ backgroundColor: company.color || '#3b82f6' }}
                     className="w-12 h-12 rounded-xl items-center justify-center mr-4"
                   >
                     <Text className="text-white font-black text-xl">{company.name.charAt(0)}</Text>
                   </View>
-                  <View>
-                    <Text className="text-xl font-bold text-white">{company.name}</Text>
-                    <Text className="text-sm font-bold text-white/40">{company.structure}</Text>
+                  <View className="flex-1">
+                    <Text className="text-lg font-black text-white tracking-tight" numberOfLines={1}>{company.name}</Text>
+                    <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{company.structure}</Text>
                   </View>
                 </View>
-                <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.2)" />
+                <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.2)" />
               </View>
-              <View className="flex-row items-center justify-around mt-2 bg-black/20 self-end w-1/2 px-4 py-2 rounded-full border border-white/5">
-                <Ionicons name="layers" size={16} color="rgba(255,255,255,0.5)" />
-                <Ionicons name="card" size={16} color="rgba(255,255,255,0.5)" />
-                <Ionicons name="document-text" size={16} color="rgba(255,255,255,0.5)" />
+
+              <View className="flex-row items-end justify-between border-t border-white/5 pt-4">
+                <View className="space-y-1.5">
+                  <View className="flex-row items-center">
+                    <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" />
+                    <Text className="text-[9px] font-black tracking-widest text-white/30 uppercase ml-1">
+                      Modified: <Text className="text-white/70 ml-1">{getTimeAgo(company.lastModified)}</Text>
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center">
+                    <Ionicons name="eye-outline" size={12} color="rgba(255,255,255,0.3)" />
+                    <Text className="text-[9px] font-black tracking-widest text-white/30 uppercase ml-1">
+                      Viewed: <Text className="text-white/70 ml-1">{getTimeAgo(company.lastViewed)}</Text>
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-around bg-black/30 w-32 px-4 py-2 rounded-xl border border-white/5">
+                  <Ionicons name="layers" size={14} color="rgba(255,255,255,0.5)" />
+                  <Ionicons name="card" size={14} color="rgba(255,255,255,0.5)" />
+                  <Ionicons name="document-text" size={14} color="rgba(255,255,255,0.5)" />
+                </View>
               </View>
-            </TouchableOpacity>
+            </TouchableOpacity>>
           ))}
 
           {/* Add Company Button */}
