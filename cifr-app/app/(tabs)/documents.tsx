@@ -43,7 +43,7 @@ export default function DocumentsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-black">
-      <ScrollView className="flex-1 px-4">
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }}>
         
         <CompanyHeader activeTab="docs" />
 

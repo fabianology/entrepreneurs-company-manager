@@ -798,7 +798,7 @@ export default function FinancialsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: BOTTOM_PAD }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: BOTTOM_PAD }}>
 
         <CompanyHeader activeTab="financial" />
 
