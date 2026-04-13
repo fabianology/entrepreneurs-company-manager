@@ -184,6 +184,64 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
   );
 }
 
+// ──────────── Custom Tab Bar ────────────
+const TAB_CONFIGS = [
+  { name: 'subscriptions', icon: 'layers' as const, color: '#60A5FA' },
+  { name: 'financials', icon: 'card' as const, color: '#22c55e' },
+  { name: 'documents', icon: 'document-text' as const, color: '#FBBF24' },
+];
+
+function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
+  const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+  const BOTTOM = insets.bottom + 12;
+
+  if (pathname === '/') return null;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        bottom: BOTTOM,
+        right: 20,
+        width: 180,
+        height: 32,
+        backgroundColor: '#1C1C1E',
+        borderRadius: 40,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        shadowColor: '#000',
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 10,
+        zIndex: 50,
+        paddingHorizontal: 8,
+      }}
+    >
+      {TAB_CONFIGS.map((tab) => {
+        const route = state.routes.find((r: any) => r.name === tab.name);
+        const isActive = route && state.routes[state.index]?.name === tab.name;
+        return (
+          <TouchableOpacity
+            key={tab.name}
+            onPress={() => navigation.navigate(tab.name)}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' }}
+          >
+            <Ionicons
+              name={tab.icon}
+              size={20}
+              color={isActive ? tab.color : 'rgba(255,255,255,0.4)'}
+            />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 // ──────────── Root Tab Layout ────────────
 export default function TabLayout() {
   const router = useRouter();
@@ -239,36 +297,14 @@ export default function TabLayout() {
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Tabs
         sceneContainerStyle={{ backgroundColor: 'transparent' }}
+        tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
-          tabBarActiveTintColor: '#EBC351',
-          tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
           headerShown: false,
-          tabBarButton: HapticTab,
-          tabBarShowLabel: false,
-          tabBarStyle: {
-            display: pathname === '/' ? 'none' : 'flex',
-            position: 'absolute',
-            bottom: BOTTOM,
-            left: SCREEN_WIDTH - 200,
-            width: 180,
-            backgroundColor: '#1C1C1E',
-            borderRadius: 40,
-            height: 32,
-            borderTopWidth: 0,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.1)',
-            shadowColor: '#000',
-            shadowOpacity: 0.5,
-            shadowRadius: 20,
-            elevation: 10,
-            paddingBottom: 0,
-          },
-          tabBarItemStyle: { justifyContent: 'center', alignItems: 'center' }
         }}>
-        <Tabs.Screen name="index" options={{ href: null, tabBarIcon: ({ color }) => <Ionicons size={20} name="home" color={color} /> }} />
-        <Tabs.Screen name="subscriptions" options={{ tabBarActiveTintColor: '#60A5FA', tabBarIcon: ({ color }) => <Ionicons size={20} name="layers" color={color} /> }} />
-        <Tabs.Screen name="financials" options={{ tabBarActiveTintColor: '#22c55e', tabBarIcon: ({ color }) => <Ionicons size={20} name="card" color={color} /> }} />
-        <Tabs.Screen name="documents" options={{ tabBarActiveTintColor: '#FBBF24', tabBarIcon: ({ color }) => <Ionicons size={20} name="document-text" color={color} /> }} />
+        <Tabs.Screen name="index" options={{ href: null }} />
+        <Tabs.Screen name="subscriptions" options={{}} />
+        <Tabs.Screen name="financials" options={{}} />
+        <Tabs.Screen name="documents" options={{}} />
       </Tabs>
 
       {/* ── Search Bar (full width, above nav row) ── */}
