@@ -102,13 +102,13 @@ export default function DashboardScreen() {
 
                 <View className="flex-row items-center justify-around bg-black/30 w-40 px-1 py-1 rounded-xl border border-white/5">
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/subscriptions'); }} className="p-2">
-                    <Ionicons name="layers" size={14} color="rgba(255,255,255,0.5)" />
+                    <Ionicons name="layers" size={14} color="#60A5FA" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
-                    <Ionicons name="card" size={14} color="rgba(255,255,255,0.5)" />
+                    <Ionicons name="card" size={14} color="#4ADE80" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
-                    <Ionicons name="document-text" size={14} color="rgba(255,255,255,0.5)" />
+                    <Ionicons name="document-text" size={14} color="#FBBF24" />
                   </TouchableOpacity>
                 </View>
               </View>
