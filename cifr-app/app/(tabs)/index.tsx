@@ -8,7 +8,7 @@ import { Company } from '../../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { state, totalMonthlyBurn, setSelectedCompanyId } = useAppContext();
+  const { state, totalMonthlyBurn, setSelectedCompanyId, filteredCompanies, searchQuery } = useAppContext();
 
   if (!state) {
     return (
@@ -41,7 +41,7 @@ export default function DashboardScreen() {
         <View className="space-y-4 mb-16">
           <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2">Your Companies</Text>
           
-          {state.companies.map((company) => (
+          {filteredCompanies.map((company) => (
             <TouchableOpacity 
               key={company.id}
               onPress={() => handleCompanyPress(company)}

@@ -14,50 +14,20 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // ──────────── Search Results Sheet ────────────
 function SearchResultsSheet({
-  query,
   onClose,
   onSelectCompany,
   onSelectSub,
   onSelectFinancial,
 }: {
-  query: string;
   onClose: () => void;
   onSelectCompany: (id: string) => void;
   onSelectSub: (id: string, companyId: string) => void;
   onSelectFinancial: (id: string, companyId: string) => void;
 }) {
-  const { state } = useAppContext();
-  if (!state) return null;
-  const q = query.toLowerCase();
+  const { globalSearchResults } = useAppContext();
+  if (!globalSearchResults) return null;
 
-  const companies = state.companies.filter(c =>
-    c.name?.toLowerCase().includes(q) ||
-    c.structure?.toLowerCase().includes(q) ||
-    c.description?.toLowerCase().includes(q)
-  );
-
-  const subscriptions = state.subscriptions
-    .filter(s => s.name?.toLowerCase().includes(q))
-    .map(s => ({
-      ...s,
-      companyName: state.companies.find(c => c.id === s.companyId)?.name,
-      companyColor: state.companies.find(c => c.id === s.companyId)?.color,
-    }));
-
-  const financials = [
-    ...(state.institutions || []).filter(i => i.name?.toLowerCase().includes(q))
-      .map(i => ({ id: i.id, companyId: i.companyId, name: i.name, subtext: 'Institution', icon: '🏦' })),
-    ...state.financialCards.filter(c => c.name?.toLowerCase().includes(q) || c.institutionName?.toLowerCase().includes(q))
-      .map(c => ({ id: c.id, companyId: c.companyId, name: c.name, subtext: `Card •••• ${c.last4}`, icon: '💳' })),
-    ...state.loans.filter(l => l.name?.toLowerCase().includes(q) || l.lender?.toLowerCase().includes(q))
-      .map(l => ({ id: l.id, companyId: l.companyId, name: l.name, subtext: `Loan • ${l.lender}`, icon: '📑' })),
-  ].map(f => ({
-    ...f,
-    companyName: state.companies.find(c => c.id === f.companyId)?.name,
-    companyColor: state.companies.find(c => c.id === f.companyId)?.color,
-  }));
-
-  const hasResults = companies.length > 0 || subscriptions.length > 0 || financials.length > 0;
+  const { companies, subscriptions, financials, hasResults } = globalSearchResults;
 
   return (
     <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', backgroundColor: 'rgba(17,17,17,0.97)', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', zIndex: 200 }}>
@@ -219,11 +189,11 @@ export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { state, setSelectedCompanyId, setActiveView } = useAppContext();
+  const { state, setSelectedCompanyId, setActiveView, searchQuery, setSearchQuery } = useAppContext();
 
   const [showMenu, setShowMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+
 
   const handleSelectCompany = (id: string) => {
     setSelectedCompanyId(id);
@@ -378,7 +348,6 @@ export default function TabLayout() {
               <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 300 }}>
                 {searchQuery.length > 0 && (
                   <SearchResultsSheet
-                    query={searchQuery}
                     onClose={() => { setShowSearch(false); setSearchQuery(''); }}
                     onSelectCompany={handleSelectCompanyFromSearch}
                     onSelectSub={handleSelectSub}

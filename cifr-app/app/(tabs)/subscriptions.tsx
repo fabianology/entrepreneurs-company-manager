@@ -11,7 +11,7 @@ import { Subscription, SubService, LinkedEmail } from '../../types';
 const genId = () => Math.random().toString(36).substr(2, 9);
 
 export default function SubscriptionsScreen() {
-  const { state, selectedCompanyId, handleUpdateSubscription, handleAddSubscription, handleDeleteSubscription } = useAppContext();
+  const { state, selectedCompanyId, handleUpdateSubscription, handleAddSubscription, handleDeleteSubscription, subMetrics } = useAppContext();
 
   const [editingSub, setEditingSub] = useState<Partial<Subscription> | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -146,14 +146,33 @@ export default function SubscriptionsScreen() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
 
         {/* Header */}
-        <View style={{ marginBottom: 24, marginTop: 8 }}>
+        <View style={{ marginBottom: selectedCompanyId ? 12 : 24, marginTop: 8 }}>
           <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 3, textTransform: 'uppercase', marginLeft: 8, marginBottom: 4 }}>
             {selectedCompanyId ? 'Company Services' : 'All Services'}
           </Text>
           <Text style={{ fontSize: 36, fontWeight: '900', color: '#fff', paddingHorizontal: 8 }}>Tech Stack</Text>
         </View>
 
-        {/* Add Button Row */}
+        {/* Billing Totals Banner — only shown when a company is selected */}
+        {selectedCompanyId && (subMetrics.cycleMonthly > 0 || subMetrics.cycleYearly > 0) && (
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+            {subMetrics.cycleMonthly > 0 && (
+              <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 14 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 2 }}>Monthly</Text>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>${subMetrics.cycleMonthly.toFixed(2)}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '600' }}>{subMetrics.monthlyCount} service{subMetrics.monthlyCount !== 1 ? 's' : ''}</Text>
+              </View>
+            )}
+            {subMetrics.cycleYearly > 0 && (
+              <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 14 }}>
+                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 2 }}>Yearly</Text>
+                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>${subMetrics.cycleYearly.toFixed(2)}</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '600' }}>{subMetrics.yearlyCount} service{subMetrics.yearlyCount !== 1 ? 's' : ''}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 20 }}>
           {selectedCompanyId && (
             <TouchableOpacity onPress={openNew} style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 6 }}>

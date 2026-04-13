@@ -43,6 +43,9 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "geminiApiKey": "AIzaSyAFaBs3UO5oIq95HpW_zJBvhriNEsOTxmE"
     }
   }
 }

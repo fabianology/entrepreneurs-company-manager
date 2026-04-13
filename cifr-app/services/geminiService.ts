@@ -1,9 +1,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
+import Constants from 'expo-constants';
 
-// Initialize Gemini API according to guidelines, using process.env.API_KEY directly
+// Reads from app.json extra.geminiApiKey, falls back to empty string
+const getApiKey = (): string =>
+  (Constants.expoConfig?.extra?.geminiApiKey as string) ?? '';
+
 const getAiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  return new GoogleGenAI({ apiKey: getApiKey() });
 };
+
 
 const FALLBACK_QUOTES = [
   "The best way to predict the future is to create it. - Peter Drucker",
