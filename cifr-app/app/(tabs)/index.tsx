@@ -119,7 +119,7 @@ export default function DashboardScreen() {
                   </TouchableOpacity>
                 </View>
               </View>
-            </TouchableOpacity>
+            </View>
           ))}
 
           {/* Add Company Button */}
