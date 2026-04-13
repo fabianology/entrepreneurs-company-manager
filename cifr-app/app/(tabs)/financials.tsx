@@ -797,27 +797,27 @@ export default function FinancialsScreen() {
   const BOTTOM_PAD = insets.bottom + 120;
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: BOTTOM_PAD }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: BOTTOM_PAD }}>
 
         <CompanyHeader activeTab="financial" />
 
         {/* ── Action Bar ── */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24, paddingLeft: 8 }} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
           <TouchableOpacity onPress={() => setEditingCard({ name: '', cardHolder: '', last4: '', expiry: '', network: 'Visa', type: 'Credit', status: 'Active', limit: 0 })}
-            style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+            style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Card</Text>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Card</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setEditingLoan({ role: 'Lendee', lender: '', name: '', principalAmount: 0, interestRate: 0, status: 'Active' })}
-            style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
+            style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Loan</Text>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Loan</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setEditingInst({ name: '', loginUrl: '', email: '', username: '', password: '', accounts: [] })}
-            style={{ backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            style={{ backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Ionicons name="add" size={14} color="rgba(0,0,0,0.5)" />
-            <Text style={{ color: '#000', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Institution</Text>
+            <Text style={{ color: '#000', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Institution</Text>
           </TouchableOpacity>
         </ScrollView>
 

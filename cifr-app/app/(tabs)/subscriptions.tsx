@@ -150,9 +150,9 @@ export default function SubscriptionsScreen() {
         {/* Add Button Row */}
         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 20 }}>
           {selectedCompanyId && (
-            <TouchableOpacity onPress={openNew} style={{ backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 100, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Ionicons name="add" size={16} color="#000" />
-              <Text style={{ color: '#000', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Service</Text>
+            <TouchableOpacity onPress={openNew} style={{ backgroundColor: '#fff', paddingHorizontal: 16, height: 32, borderRadius: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Ionicons name="add" size={14} color="#000" />
+              <Text style={{ color: '#000', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Service</Text>
             </TouchableOpacity>
           )}
         </View>
