@@ -201,7 +201,16 @@ export default function CompanyDetailScreen() {
             <View className="flex-row items-center gap-2">
               <TextInput
                 value={formState.logoUrl}
-                onChangeText={v => setFormState({ ...formState, logoUrl: v })}
+                onChangeText={v => {
+                  let formatted = v;
+                  if (v && !v.includes(' ') && !v.includes('/') && !v.startsWith('http') && !v.startsWith('file')) {
+                    const parts = v.split('.');
+                    if (parts.length > 1 && parts[parts.length - 1].length >= 2) {
+                      formatted = `https://logo.clearbit.com/${v}`;
+                    }
+                  }
+                  setFormState({ ...formState, logoUrl: formatted });
+                }}
                 className="flex-1 bg-[#111111] border border-white/10 rounded-2xl px-5 py-[12px] text-white font-bold"
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 placeholder="https://example.com/logo.png"
