@@ -109,7 +109,6 @@ export default function CompanyDetailScreen() {
 
         {/* Profile Form */}
         <View className="mb-8">
-          <Text className="text-white/40 font-bold uppercase tracking-widest mb-6">Entity Profile</Text>
           
           {/* Name */}
           <View className="mb-5">
@@ -204,22 +203,6 @@ export default function CompanyDetailScreen() {
               keyboardType="url"
             />
           </View>
-
-          {/* Action Row */}
-          <View className="mt-4 flex-row items-center justify-between border-t border-white/5 pt-6">
-             <TouchableOpacity onPress={() => router.back()}>
-                <Text className="text-xs font-black text-white/40 uppercase tracking-widest">Discard</Text>
-             </TouchableOpacity>
-             <TouchableOpacity 
-               onPress={handleSaveCompany} 
-               disabled={!formState.name}
-               className={`px-6 py-4 rounded-2xl shadow-2xl items-center justify-center ${formState.name ? 'bg-white' : 'bg-white/20'}`}
-             >
-                <Text className={`font-black text-xs uppercase tracking-[0.2em] ${formState.name ? 'text-black' : 'text-white/40'}`}>
-                  Commit Changes
-                </Text>
-             </TouchableOpacity>
-          </View>
         </View>
 
         {/* Quick Jumps */}
@@ -256,6 +239,22 @@ export default function CompanyDetailScreen() {
             <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
           
+        </View>
+
+        {/* Action Row */}
+        <View className="mb-8 flex-row items-center justify-between border-t border-white/5 pt-6">
+           <TouchableOpacity onPress={() => router.back()}>
+              <Text className="text-xs font-black text-white/40 uppercase tracking-widest">Discard</Text>
+           </TouchableOpacity>
+           <TouchableOpacity 
+             onPress={handleSaveCompany} 
+             disabled={!formState.name}
+             className={`px-6 py-4 rounded-2xl shadow-2xl items-center justify-center ${formState.name ? 'bg-white' : 'bg-white/20'}`}
+           >
+              <Text className={`font-black text-xs uppercase tracking-[0.2em] ${formState.name ? 'text-black' : 'text-white/40'}`}>
+                Commit Changes
+              </Text>
+           </TouchableOpacity>
         </View>
 
         {/* Danger Zone */}
