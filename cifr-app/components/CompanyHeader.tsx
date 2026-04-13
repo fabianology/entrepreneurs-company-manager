@@ -48,11 +48,6 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
   return (
     <View style={{ flexDirection: 'column', gap: 16, marginBottom: 24, marginTop: 8, paddingHorizontal: 8 }}>
       
-      {/* Universal Pre-Title to mimic Web */}
-      <Text style={{ fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 3, textTransform: 'uppercase', marginBottom: -8 }}>
-        Company Overview
-      </Text>
-
       {/* Main Row */}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         
