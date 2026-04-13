@@ -803,7 +803,7 @@ export default function FinancialsScreen() {
         <CompanyHeader activeTab="financial" />
 
         {/* ── Action Bar ── */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24, paddingLeft: 8 }} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }} contentContainerStyle={{ flexGrow: 1, gap: 8, paddingVertical: 4, paddingHorizontal: 8 }}>
           <TouchableOpacity onPress={() => setEditingCard({ name: '', cardHolder: '', last4: '', expiry: '', network: 'Visa', type: 'Credit', status: 'Active', limit: 0 })}
             style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
@@ -814,6 +814,7 @@ export default function FinancialsScreen() {
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
             <Text style={{ color: '#fff', fontWeight: '600', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Loan</Text>
           </TouchableOpacity>
+          <View style={{ flex: 1 }} />
           <TouchableOpacity onPress={() => setEditingInst({ name: '', loginUrl: '', email: '', username: '', password: '', accounts: [] })}
             style={{ backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Ionicons name="add" size={14} color="rgba(0,0,0,0.5)" />
