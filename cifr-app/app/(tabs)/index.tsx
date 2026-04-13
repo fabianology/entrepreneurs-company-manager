@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '../../context/AppContext';
 import { Company } from '../../types';
+import { getEntrepreneurialQuote } from '../../services/geminiService';
+
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { state, totalMonthlyBurn, setSelectedCompanyId, filteredCompanies, searchQuery } = useAppContext();
+  const { state, setSelectedCompanyId, filteredCompanies } = useAppContext();
+  const [quote, setQuote] = useState<string>('');
+
+  useEffect(() => {
+    getEntrepreneurialQuote().then(setQuote);
+  }, []);
 
   if (!state) {
     return (
@@ -27,14 +34,13 @@ export default function DashboardScreen() {
     <SafeAreaView className="flex-1 bg-black">
       <ScrollView className="flex-1 p-4">
         {/* Header */}
-        <View className="flex-row items-center justify-between mb-8">
-          <Text className="text-3xl font-black tracking-tighter text-white">CiFr</Text>
-          <View className="items-end">
-            <Text className="text-xs text-stone-500 font-bold uppercase tracking-widest">Total Monthly Burn</Text>
-            <Text className="text-lg font-bold text-red-500">
-              ${totalMonthlyBurn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <View className="items-center mb-10 pt-2 pb-4">
+          <Text className="text-5xl font-black tracking-tighter text-white">CiFr</Text>
+          {quote ? (
+            <Text className="mt-3 text-sm italic font-light text-stone-400 text-center px-4">
+              "{quote.split(' - ')[0]}" — <Text className="font-medium not-italic">{quote.split(' - ')[1] || 'Unknown'}</Text>
             </Text>
-          </View>
+          ) : null}
         </View>
 
         {/* Companies Grid */}
