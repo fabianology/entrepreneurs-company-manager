@@ -266,9 +266,9 @@ export default function TabLayout() {
           tabBarItemStyle: { justifyContent: 'center', alignItems: 'center' }
         }}>
         <Tabs.Screen name="index" options={{ href: null, tabBarIcon: ({ color }) => <Ionicons size={20} name="home" color={color} /> }} />
-        <Tabs.Screen name="subscriptions" options={{ tabBarIcon: ({ color }) => <Ionicons size={20} name="layers" color={color} /> }} />
-        <Tabs.Screen name="financials" options={{ tabBarIcon: ({ color }) => <Ionicons size={20} name="card" color={color} /> }} />
-        <Tabs.Screen name="documents" options={{ tabBarIcon: ({ color }) => <Ionicons size={20} name="document-text" color={color} /> }} />
+        <Tabs.Screen name="subscriptions" options={{ tabBarActiveTintColor: '#0a84ff', tabBarIcon: ({ color }) => <Ionicons size={20} name="layers" color={color} /> }} />
+        <Tabs.Screen name="financials" options={{ tabBarActiveTintColor: '#34C759', tabBarIcon: ({ color }) => <Ionicons size={20} name="card" color={color} /> }} />
+        <Tabs.Screen name="documents" options={{ tabBarActiveTintColor: '#EBC351', tabBarIcon: ({ color }) => <Ionicons size={20} name="document-text" color={color} /> }} />
       </Tabs>
 
       {/* ── Search Bar (full width, above nav row) ── */}
