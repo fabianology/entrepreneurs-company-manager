@@ -209,11 +209,11 @@ export default function CompanyDetailScreen() {
           
           <TouchableOpacity 
             onPress={() => jumpToTab('subscriptions')} 
-            style={{ height: 32 }}
+            style={{ height: 40 }}
             className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
           >
             <View className="flex-row items-center gap-2.5">
-               <Ionicons name="layers" size={14} color="#60A5FA" />
+               <Ionicons name="layers" size={16} color="#60A5FA" />
                <Text className="text-white/90 font-bold text-[12px]">Tech Stack</Text>
             </View>
             <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
@@ -221,11 +221,11 @@ export default function CompanyDetailScreen() {
 
           <TouchableOpacity 
             onPress={() => jumpToTab('financials')} 
-            style={{ height: 32 }}
+            style={{ height: 40 }}
             className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
           >
             <View className="flex-row items-center gap-2.5">
-               <Ionicons name="card" size={14} color="#22c55e" />
+               <Ionicons name="card" size={16} color="#22c55e" />
                <Text className="text-white/90 font-bold text-[12px]">Financials</Text>
             </View>
             <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
@@ -233,11 +233,11 @@ export default function CompanyDetailScreen() {
 
           <TouchableOpacity 
             onPress={() => jumpToTab('documents')} 
-            style={{ height: 32 }}
+            style={{ height: 40 }}
             className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
           >
             <View className="flex-row items-center gap-2.5">
-               <Ionicons name="document-text" size={14} color="#FBBF24" />
+               <Ionicons name="document-text" size={16} color="#FBBF24" />
                <Text className="text-white/90 font-bold text-[12px]">Doc Vault</Text>
             </View>
             <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
