@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -29,6 +29,8 @@ export default function CompanyDetailScreen() {
     logoUrl: company?.logoUrl || '',
     website: company?.website || ''
   });
+
+  const [showStructureMenu, setShowStructureMenu] = useState(false);
 
   if (!company) {
     return (
@@ -106,7 +108,7 @@ export default function CompanyDetailScreen() {
         </View>
 
         {/* Profile Form */}
-        <View className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 mb-8 overflow-hidden">
+        <View className="mb-8">
           <Text className="text-white/40 font-bold uppercase tracking-widest mb-6">Entity Profile</Text>
           
           {/* Name */}
@@ -124,17 +126,36 @@ export default function CompanyDetailScreen() {
           {/* Structure */}
           <View className="mb-5">
             <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
-              {COMPANY_STRUCTURES.map(type => (
-                <TouchableOpacity 
-                  key={type} 
-                  onPress={() => setFormState({ ...formState, structure: type })}
-                  className={`px-4 py-3 rounded-xl border ${formState.structure === type ? 'bg-white/20 border-white/40' : 'bg-[#111111] border-white/10'}`}
-                >
-                  <Text className={`font-bold ${formState.structure === type ? 'text-white' : 'text-white/50'}`}>{type}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <TouchableOpacity 
+              onPress={() => setShowStructureMenu(true)}
+              className="w-full flex-row items-center justify-between bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5"
+            >
+              <Text className="text-white font-bold">{formState.structure}</Text>
+              <Ionicons name="chevron-down" size={18} color="rgba(255,255,255,0.4)" />
+            </TouchableOpacity>
+
+            <Modal visible={showStructureMenu} transparent animationType="fade">
+              <TouchableWithoutFeedback onPress={() => setShowStructureMenu(false)}>
+                <View className="flex-1 bg-black/80 justify-end">
+                   <View className="bg-[#1C1C1E] rounded-t-3xl border-t border-white/10 pt-4 pb-12 max-h-[60%]">
+                     <View className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6" />
+                     <Text className="text-center text-white/50 font-bold uppercase tracking-widest text-xs mb-4">Select Structure</Text>
+                     <ScrollView>
+                       {COMPANY_STRUCTURES.map(type => (
+                         <TouchableOpacity 
+                           key={type} 
+                           onPress={() => { setFormState({ ...formState, structure: type }); setShowStructureMenu(false); }}
+                           className="flex-row items-center justify-between px-8 py-4 border-b border-white/5"
+                         >
+                           <Text className={`font-bold text-lg ${formState.structure === type ? 'text-[#1FE400]' : 'text-white'}`}>{type}</Text>
+                           {formState.structure === type && <Ionicons name="checkmark" size={24} color="#1FE400" />}
+                         </TouchableOpacity>
+                       ))}
+                     </ScrollView>
+                   </View>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
           </View>
 
           {/* Color */}
