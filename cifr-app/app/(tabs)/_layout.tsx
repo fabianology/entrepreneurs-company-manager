@@ -272,31 +272,29 @@ export default function TabLayout() {
       </Tabs>
 
       {/* ── Search Bar (full width, above nav row) ── */}
-      {pathname !== '/' && (
-        <TouchableOpacity
-          onPress={() => { setShowSearch(true); }}
-          activeOpacity={0.85}
-          style={{
-            position: 'absolute',
-            bottom: BOTTOM + 32 + 10,
-            left: 20,
-            right: 20,
-            height: 32,
-            backgroundColor: '#1C1C1E',
-            borderRadius: 40,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.1)',
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 14,
-            gap: 8,
-            zIndex: 50,
-          }}
-        >
-          <Ionicons name="search" size={13} color="rgba(255,255,255,0.3)" />
-          <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 }}>Search</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        onPress={() => { setShowSearch(true); }}
+        activeOpacity={0.85}
+        style={{
+          position: 'absolute',
+          bottom: BOTTOM + 32 + 10,
+          left: 20,
+          right: 20,
+          height: 32,
+          backgroundColor: '#1C1C1E',
+          borderRadius: 40,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 14,
+          gap: 8,
+          zIndex: 50,
+        }}
+      >
+        <Ionicons name="search" size={13} color="rgba(255,255,255,0.3)" />
+        <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 }}>Search</Text>
+      </TouchableOpacity>
 
       {/* ── Tap-outside dismiss overlay ── */}
       {showMenu && (
