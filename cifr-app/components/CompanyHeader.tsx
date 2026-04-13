@@ -62,7 +62,7 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
             width: 48,
             height: 48,
             borderRadius: 12,
-            backgroundColor: (selectedCompany.logoUrl || getFaviconUrl(selectedCompany.website)) ? '#000000' : logoBg,
+            backgroundColor: (selectedCompany.logoUrl || getFaviconUrl(selectedCompany.website)) ? 'transparent' : logoBg,
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 12,

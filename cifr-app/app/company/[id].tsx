@@ -120,7 +120,7 @@ export default function CompanyDetailScreen() {
           <View className="flex-row items-center gap-4 mb-5">
             {/* Left aligned logo */}
             <View 
-              style={{ backgroundColor: (formState.logoUrl || getFaviconUrl(formState.website)) ? '#000000' : (formState.color || '#3b82f6') }}
+              style={{ backgroundColor: (formState.logoUrl || getFaviconUrl(formState.website)) ? 'transparent' : (formState.color || '#3b82f6') }}
               className="w-16 h-16 rounded-2xl items-center justify-center shadow-lg overflow-hidden border border-white/10"
             >
               {(formState.logoUrl || getFaviconUrl(formState.website)) ? (
