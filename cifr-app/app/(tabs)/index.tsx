@@ -72,11 +72,11 @@ export default function DashboardScreen() {
                 <View className="flex-row items-center max-w-[85%]">
                   <TouchableOpacity
                     onPress={() => handleCompanyPress(company)}
-                    style={{ backgroundColor: (company.logoUrl || getFaviconUrl(company.website)) ? '#FFFFFF' : (company.color || '#3b82f6') }}
+                    style={{ backgroundColor: (company.logoUrl || getFaviconUrl(company.website)) ? '#000000' : (company.color || '#3b82f6') }}
                     className="w-12 h-12 rounded-xl items-center justify-center mr-4 overflow-hidden"
                   >
                     {(company.logoUrl || getFaviconUrl(company.website)) ? (
-                      <Image source={{ uri: company.logoUrl || getFaviconUrl(company.website)! }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                      <Image source={{ uri: company.logoUrl || getFaviconUrl(company.website)! }} style={{ width: '70%', height: '70%' }} resizeMode="contain" />
                     ) : (
                       <Text className="text-white font-black text-xl">{company.name.charAt(0)}</Text>
                     )}
