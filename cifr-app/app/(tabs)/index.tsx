@@ -84,7 +84,7 @@ export default function DashboardScreen() {
                 <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.2)" />
               </View>
 
-              <View className="flex-row items-end justify-between border-t border-white/5 pt-4">
+              <View className="border-t border-white/5 pt-4 pb-2">
                 <View className="space-y-1.5">
                   <View className="flex-row items-center">
                     <Ionicons name="time-outline" size={12} color="rgba(255,255,255,0.3)" />
@@ -99,18 +99,19 @@ export default function DashboardScreen() {
                     </Text>
                   </View>
                 </View>
+              </View>
 
-                <View className="flex-row items-center justify-around bg-black/30 w-40 px-1 py-1 rounded-xl border border-white/5">
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/subscriptions'); }} className="p-2">
-                    <Ionicons name="layers" size={14} color="#60A5FA" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
-                    <Ionicons name="card" size={14} color="#22c55e" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
-                    <Ionicons name="document-text" size={14} color="#FBBF24" />
-                  </TouchableOpacity>
-                </View>
+              {/* Absolute Corner Shortcut Array */}
+              <View style={{ position: 'absolute', bottom: 10, right: 10 }} className="flex-row items-center justify-around bg-black/30 w-40 px-1 py-1 rounded-xl border border-white/5 shadow-xl">
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/subscriptions'); }} className="p-2">
+                  <Ionicons name="layers" size={20} color="#60A5FA" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
+                  <Ionicons name="card" size={20} color="#22c55e" />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
+                  <Ionicons name="document-text" size={20} color="#FBBF24" />
+                </TouchableOpacity>
               </View>
             </TouchableOpacity>
           ))}
