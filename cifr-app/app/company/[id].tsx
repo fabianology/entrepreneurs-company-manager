@@ -24,13 +24,21 @@ export default function CompanyDetailScreen() {
 
   const company = state?.companies.find(c => c.id === id);
 
-  const [formState, setFormState] = useState<Partial<Company>>({
+  const originalState = useRef<Partial<Company>>({
     name: company?.name || '',
     structure: company?.structure || 'LLC',
     color: company?.color || BRAND_COLORS[0],
     logoUrl: company?.logoUrl || '',
     website: company?.website || ''
   });
+
+  const [formState, setFormState] = useState<Partial<Company>>(originalState.current);
+  const [isDirty, setIsDirty] = useState(false);
+
+  const updateField = (fields: Partial<Company>) => {
+    setFormState(prev => ({ ...prev, ...fields }));
+    setIsDirty(true);
+  };
 
   const [showStructureMenu, setShowStructureMenu] = useState(false);
 
@@ -53,6 +61,7 @@ export default function CompanyDetailScreen() {
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setFormState(prev => ({ ...prev, logoUrl: result.assets[0].uri }));
+        setIsDirty(true);
       }
     } catch (e) {
       console.log('Document picker error:', e);
@@ -64,13 +73,8 @@ export default function CompanyDetailScreen() {
     formStateRef.current = formState;
   }, [formState]);
 
-  useEffect(() => {
-    return () => {
-      if (formStateRef.current.name && formStateRef.current.name.trim()) {
-        handleUpdateCompany(id as string, formStateRef.current);
-      }
-    };
-  }, []);
+  // Changes only saved via checkmark — X or swipe-down discards
+  useEffect(() => { return () => {}; }, []);
 
   const requestDelete = () => {
     Alert.alert(
@@ -108,10 +112,32 @@ export default function CompanyDetailScreen() {
       
       <ScrollView className="flex-1 p-6" contentContainerStyle={{ paddingBottom: 100 }}>
         
-        {/* Dismiss Button */}
-        <TouchableOpacity onPress={() => router.back()} className="self-end bg-white/10 p-2 rounded-full mb-2">
-          <Ionicons name="close" size={24} color="rgba(255,255,255,0.6)" />
-        </TouchableOpacity>
+        {/* Header: Discard (X) always visible, Save (✓) appears when dirty */}
+        <View className="flex-row justify-end items-center gap-2 mb-2">
+          {isDirty && (
+            <TouchableOpacity
+              onPress={() => {
+                if (formState.name && formState.name.trim()) {
+                  handleUpdateCompany(id as string, formState);
+                }
+                router.back();
+              }}
+              className="bg-green-600/80 p-2 rounded-full"
+            >
+              <Ionicons name="checkmark" size={22} color="#fff" />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={() => {
+              setFormState(originalState.current);
+              setIsDirty(false);
+              router.back();
+            }}
+            className="bg-white/10 p-2 rounded-full"
+          >
+            <Ionicons name="close" size={22} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+        </View>
 
         {/* Profile Form */}
         <View className="mb-8 mt-2">
@@ -135,7 +161,7 @@ export default function CompanyDetailScreen() {
               <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
               <TextInput
                 value={formState.name}
-                onChangeText={v => setFormState({ ...formState, name: v })}
+                onChangeText={v => updateField({ name: v })}
                 className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 placeholder="Acme Holdings Inc."
@@ -160,7 +186,7 @@ export default function CompanyDetailScreen() {
                   {COMPANY_STRUCTURES.map(type => (
                     <TouchableOpacity 
                       key={type} 
-                      onPress={() => { setFormState({ ...formState, structure: type }); setShowStructureMenu(false); }}
+                      onPress={() => { updateField({ structure: type }); setShowStructureMenu(false); }}
                       className="flex-row items-center justify-between px-5 py-3.5 border-t border-white/5"
                     >
                       <Text className={`font-bold text-sm ${formState.structure === type ? 'text-[#1FE400]' : 'text-white/70'}`}>{type}</Text>
@@ -179,7 +205,7 @@ export default function CompanyDetailScreen() {
               {BRAND_COLORS.map(color => (
                 <TouchableOpacity
                   key={color}
-                  onPress={() => setFormState({ ...formState, color, logoUrl: '' })}
+                  onPress={() => updateField({ color, logoUrl: '' })}
                   style={{ backgroundColor: color }}
                   className={`w-8 h-8 rounded-full border border-white/10 items-center justify-center`}
                 >
@@ -197,7 +223,7 @@ export default function CompanyDetailScreen() {
             <View className="flex-row items-center gap-2">
               <TextInput
                 value={formState.website}
-                onChangeText={v => setFormState({ ...formState, website: v })}
+                onChangeText={v => updateField({ website: v })}
                 className="flex-1 bg-[#111111] border border-white/10 rounded-2xl px-5 py-[12px] text-white font-bold"
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 placeholder="service.com"
