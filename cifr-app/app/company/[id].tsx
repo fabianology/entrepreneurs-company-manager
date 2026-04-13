@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image, Modal, TouchableWithoutFeedback } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -43,14 +43,18 @@ export default function CompanyDetailScreen() {
     );
   }
 
-  const handleSaveCompany = () => {
-    if (formState.name?.trim()) {
-      handleUpdateCompany(id as string, formState);
-      Alert.alert("Success", "Entity Profile updated.", [{ text: "OK", onPress: () => router.back() }]);
-    } else {
-      Alert.alert("Error", "Entity name cannot be empty.");
-    }
-  };
+  const formStateRef = useRef(formState);
+  useEffect(() => {
+    formStateRef.current = formState;
+  }, [formState]);
+
+  useEffect(() => {
+    return () => {
+      if (formStateRef.current.name && formStateRef.current.name.trim()) {
+        handleUpdateCompany(id as string, formStateRef.current);
+      }
+    };
+  }, []);
 
   const requestDelete = () => {
     Alert.alert(
@@ -235,21 +239,6 @@ export default function CompanyDetailScreen() {
           
         </View>
 
-        {/* Action Row */}
-        <View className="mb-8 flex-row items-center justify-between border-t border-white/5 pt-6">
-           <TouchableOpacity onPress={() => router.back()}>
-              <Text className="text-xs font-black text-white/40 uppercase tracking-widest">Discard</Text>
-           </TouchableOpacity>
-           <TouchableOpacity 
-             onPress={handleSaveCompany} 
-             disabled={!formState.name}
-             className={`px-6 py-4 rounded-2xl shadow-2xl items-center justify-center ${formState.name ? 'bg-white' : 'bg-white/20'}`}
-           >
-              <Text className={`font-black text-xs uppercase tracking-[0.2em] ${formState.name ? 'text-black' : 'text-white/40'}`}>
-                Commit Changes
-              </Text>
-           </TouchableOpacity>
-        </View>
 
         {/* Danger Zone */}
         <TouchableOpacity onPress={requestDelete} className="p-4 rounded-3xl items-center border border-red-500/30 mb-8 bg-red-500/5">
