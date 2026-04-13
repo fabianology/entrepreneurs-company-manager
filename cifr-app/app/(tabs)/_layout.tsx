@@ -168,12 +168,11 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
               style={{
                 flexDirection: 'row', alignItems: 'center', gap: 12,
                 paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12,
-                backgroundColor: selectedCompanyId === c.id ? '#EBC351' : 'transparent',
+                backgroundColor: selectedCompanyId === c.id ? 'rgba(255,255,255,0.08)' : 'transparent',
                 marginBottom: 2,
               }}
             >
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.color, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.25)' }} />
-              <Text style={{ color: selectedCompanyId === c.id ? '#000' : 'rgba(255,255,255,0.7)', fontWeight: '600', fontSize: 14, flex: 1 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '600', fontSize: 14, flex: 1 }}>
                 {c.name}
               </Text>
             </TouchableOpacity>
@@ -449,7 +448,7 @@ export default function TabLayout() {
             left: 20,
             width: 32,
             height: 32,
-            backgroundColor: showMenu ? '#EBC351' : '#1C1C1E',
+            backgroundColor: showMenu ? 'rgba(255,255,255,0.15)' : '#1C1C1E',
             borderRadius: 16,
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.1)',
@@ -458,7 +457,7 @@ export default function TabLayout() {
             zIndex: 101,
           }}
         >
-          <Ionicons name={showMenu ? 'close' : 'menu'} size={16} color={showMenu ? '#000' : '#fff'} />
+          <Ionicons name={showMenu ? 'close' : 'menu'} size={16} color="#fff" />
         </TouchableOpacity>
       )}
 
