@@ -92,8 +92,8 @@ export default function DashboardScreen() {
                     <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{company.structure}</Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => handleCompanyPress(company)} className="p-2 border border-white/10 bg-white/5 rounded-full">
-                  <Ionicons name="create-outline" size={14} color="rgba(255,255,255,0.7)" />
+                <TouchableOpacity onPress={() => handleCompanyPress(company)} className="absolute top-[10px] right-[10px] z-10 p-2">
+                  <Ionicons name="create-outline" size={16} color="rgba(255,255,255,0.7)" />
                 </TouchableOpacity>
               </View>
 
