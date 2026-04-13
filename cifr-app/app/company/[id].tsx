@@ -124,11 +124,11 @@ export default function CompanyDetailScreen() {
           <View className="flex-row items-center gap-4 mb-5">
             {/* Left aligned logo */}
             <View 
-              style={{ backgroundColor: formState.color || '#3b82f6' }}
+              style={{ backgroundColor: formState.logoUrl ? '#FFFFFF' : (formState.color || '#3b82f6') }}
               className="w-16 h-16 rounded-2xl items-center justify-center shadow-lg overflow-hidden border border-white/10"
             >
               {formState.logoUrl ? (
-                <Image source={{ uri: formState.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <Image source={{ uri: formState.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               ) : (
                 <Text className="text-white font-black text-3xl">{formState.name?.charAt(0) || '?'}</Text>
               )}

@@ -61,7 +61,7 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
             width: 48,
             height: 48,
             borderRadius: 12,
-            backgroundColor: logoBg,
+            backgroundColor: selectedCompany.logoUrl ? '#FFFFFF' : logoBg,
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 12,
@@ -69,7 +69,7 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
           }}
         >
           {selectedCompany.logoUrl ? (
-            <Image source={{ uri: selectedCompany.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+            <Image source={{ uri: selectedCompany.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           ) : (
             <Text style={{ fontSize: 20, color: '#fff', fontWeight: '900' }}>
               {selectedCompany.name.charAt(0)}
