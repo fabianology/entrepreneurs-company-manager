@@ -204,37 +204,43 @@ export default function CompanyDetailScreen() {
         </View>
 
         {/* Quick Jumps */}
-        <Text className="text-white/40 font-bold uppercase tracking-widest mb-4 ml-2">App Navigators</Text>
-        <View className="space-y-3 mb-10">
+        <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">App Navigators</Text>
+        <View className="flex-col gap-[5px] mb-10">
           
-          <TouchableOpacity onPress={() => jumpToTab('subscriptions')} className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="bg-emerald-500/20 p-3 rounded-xl mr-4">
-                 <Ionicons name="layers" size={24} color="#10b981" />
-              </View>
-              <Text className="text-white font-bold text-xl">Tech Stack</Text>
+          <TouchableOpacity 
+            onPress={() => jumpToTab('subscriptions')} 
+            style={{ height: 32 }}
+            className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center gap-2.5">
+               <Ionicons name="layers" size={14} color="#60A5FA" />
+               <Text className="text-white/90 font-bold text-[12px]">Tech Stack</Text>
             </View>
-            <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.2)" />
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => jumpToTab('financials')} className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="bg-blue-500/20 p-3 rounded-xl mr-4">
-                 <Ionicons name="card" size={24} color="#3b82f6" />
-              </View>
-              <Text className="text-white font-bold text-xl">Financials</Text>
+          <TouchableOpacity 
+            onPress={() => jumpToTab('financials')} 
+            style={{ height: 32 }}
+            className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center gap-2.5">
+               <Ionicons name="card" size={14} color="#22c55e" />
+               <Text className="text-white/90 font-bold text-[12px]">Financials</Text>
             </View>
-            <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.2)" />
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => jumpToTab('documents')} className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl flex-row items-center justify-between">
-            <View className="flex-row items-center">
-              <View className="bg-pink-500/20 p-3 rounded-xl mr-4">
-                 <Ionicons name="document-text" size={24} color="#ec4899" />
-              </View>
-              <Text className="text-white font-bold text-xl">Doc Vault</Text>
+          <TouchableOpacity 
+            onPress={() => jumpToTab('documents')} 
+            style={{ height: 32 }}
+            className="bg-[#1C1C1E] border border-white/5 px-4 rounded-xl flex-row items-center justify-between"
+          >
+            <View className="flex-row items-center gap-2.5">
+               <Ionicons name="document-text" size={14} color="#FBBF24" />
+               <Text className="text-white/90 font-bold text-[12px]">Doc Vault</Text>
             </View>
-            <Ionicons name="arrow-forward" size={24} color="rgba(255,255,255,0.2)" />
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.2)" />
           </TouchableOpacity>
           
         </View>
