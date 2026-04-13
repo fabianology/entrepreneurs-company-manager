@@ -185,13 +185,16 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
 }
 
 // ──────────── Custom Tab Bar ────────────
-import Reanimated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 const TAB_WIDTH = 180;
 const TAB_COUNT = 3;
 const SLOT_WIDTH = TAB_WIDTH / TAB_COUNT; // 60px each
 const PILL_WIDTH = 52;
-const PILL_OFFSET = (SLOT_WIDTH - PILL_WIDTH) / 2; // centers pill within slot
+const PILL_OFFSET = (SLOT_WIDTH - PILL_WIDTH) / 2; // centers pill in slot
+const MIN_X = PILL_OFFSET;
+const MAX_X = TAB_WIDTH - PILL_WIDTH - PILL_OFFSET;
 
 const TAB_CONFIGS = [
   { name: 'subscriptions', icon: 'layers' as const, color: '#60A5FA' },
@@ -204,22 +207,42 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const insets = useSafeAreaInsets();
   const BOTTOM = insets.bottom + 12;
 
-  // Find the index among our visible tabs (0=subscriptions, 1=financials, 2=documents)
   const activeTabIndex = TAB_CONFIGS.findIndex(
     (t) => t.name === state.routes[state.index]?.name
   );
   const safeIndex = activeTabIndex < 0 ? 0 : activeTabIndex;
 
   const pillX = useSharedValue(safeIndex * SLOT_WIDTH + PILL_OFFSET);
+  const startX = useSharedValue(0);
 
-  // Animate pill whenever active tab changes
+  // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
     pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 18,
-      stiffness: 180,
-      mass: 0.6,
+      damping: 18, stiffness: 180, mass: 0.6,
     });
   }, [safeIndex]);
+
+  const navigateTo = (index: number) => {
+    navigation.navigate(TAB_CONFIGS[index].name);
+  };
+
+  const panGesture = Gesture.Pan()
+    .onBegin(() => {
+      startX.value = pillX.value;
+    })
+    .onUpdate((e) => {
+      const next = startX.value + e.translationX;
+      pillX.value = Math.max(MIN_X, Math.min(MAX_X, next));
+    })
+    .onEnd(() => {
+      // Snap to nearest slot
+      const slot = Math.round((pillX.value - PILL_OFFSET) / SLOT_WIDTH);
+      const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
+      pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
+        damping: 18, stiffness: 200, mass: 0.5,
+      });
+      runOnJS(navigateTo)(clamped);
+    });
 
   const pillStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: pillX.value }],
@@ -249,31 +272,34 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
         overflow: 'hidden',
       }}
     >
-      {/* Liquid glass sliding pill */}
-      <Reanimated.View
-        style={[
-          pillStyle,
-          {
-            position: 'absolute',
-            width: PILL_WIDTH,
-            height: 24,
-            top: 4,
-            borderRadius: 12,
-            backgroundColor: 'rgba(255,255,255,0.13)',
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.28)',
-          },
-        ]}
-      />
+      {/* Draggable liquid glass pill */}
+      <GestureDetector gesture={panGesture}>
+        <Reanimated.View
+          style={[
+            pillStyle,
+            {
+              position: 'absolute',
+              width: PILL_WIDTH,
+              height: 24,
+              top: 4,
+              borderRadius: 12,
+              backgroundColor: 'rgba(255,255,255,0.13)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.28)',
+              zIndex: 10,
+            },
+          ]}
+        />
+      </GestureDetector>
 
-      {/* Tab icon buttons */}
+      {/* Tab icon buttons — tappable above the pill */}
       {TAB_CONFIGS.map((tab, i) => {
         const isActive = i === safeIndex;
         return (
           <TouchableOpacity
             key={tab.name}
-            onPress={() => navigation.navigate(tab.name)}
-            style={{ width: SLOT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%' }}
+            onPress={() => navigateTo(i)}
+            style={{ width: SLOT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%', zIndex: 20 }}
           >
             <Ionicons
               name={tab.icon}
