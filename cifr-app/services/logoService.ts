@@ -2,19 +2,19 @@ export const getFaviconUrl = (url?: string) => {
     if (!url) return null;
 
     try {
-        // Basic cleanup: remove whitespace and ensure protocol for URL constructor
         let cleanUrl = url.trim();
         if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
             cleanUrl = 'https://' + cleanUrl;
         }
 
-        const urlObj = new URL(cleanUrl);
-        const domain = urlObj.hostname;
+        // Extremely simple domain parser to bypass React Native's lack of native 'URL' robust parsing sometimes
+        const domainMatch = cleanUrl.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
+        const domain = domainMatch;
 
-        // Using Google Favicon API with 128px size for high quality
+        if (!domain || !domain.includes('.')) return null;
+
         return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
     } catch (e) {
-        console.error('Invalid URL for favicon:', url);
         return null;
     }
 };

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '../../context/AppContext';
 import { Company } from '../../types';
+import { getFaviconUrl } from "../../services/logoService";
 import { getEntrepreneurialQuote } from '../../services/geminiService';
 
 
@@ -71,11 +72,11 @@ export default function DashboardScreen() {
                 <View className="flex-row items-center max-w-[85%]">
                   <TouchableOpacity
                     onPress={() => handleCompanyPress(company)}
-                    style={{ backgroundColor: company.logoUrl ? '#FFFFFF' : (company.color || '#3b82f6') }}
+                    style={{ backgroundColor: (company.logoUrl || getFaviconUrl(company.website)) ? '#FFFFFF' : (company.color || '#3b82f6') }}
                     className="w-12 h-12 rounded-xl items-center justify-center mr-4 overflow-hidden"
                   >
-                    {company.logoUrl ? (
-                      <Image source={{ uri: company.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                    {(company.logoUrl || getFaviconUrl(company.website)) ? (
+                      <Image source={{ uri: company.logoUrl || getFaviconUrl(company.website)! }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
                     ) : (
                       <Text className="text-white font-black text-xl">{company.name.charAt(0)}</Text>
                     )}

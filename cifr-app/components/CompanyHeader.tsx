@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import { getFaviconUrl } from "../services/logoService";
 import { useAppContext } from '../context/AppContext';
 
 interface CompanyHeaderProps {
@@ -61,15 +62,15 @@ export default function CompanyHeader({ activeTab }: CompanyHeaderProps) {
             width: 48,
             height: 48,
             borderRadius: 12,
-            backgroundColor: selectedCompany.logoUrl ? '#FFFFFF' : logoBg,
+            backgroundColor: (selectedCompany.logoUrl || getFaviconUrl(selectedCompany.website)) ? '#FFFFFF' : logoBg,
             alignItems: 'center',
             justifyContent: 'center',
             marginRight: 12,
             overflow: 'hidden'
           }}
         >
-          {selectedCompany.logoUrl ? (
-            <Image source={{ uri: selectedCompany.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+          {(selectedCompany.logoUrl || getFaviconUrl(selectedCompany.website)) ? (
+            <Image source={{ uri: selectedCompany.logoUrl || getFaviconUrl(selectedCompany.website)! }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
           ) : (
             <Text style={{ fontSize: 20, color: '#fff', fontWeight: '900' }}>
               {selectedCompany.name.charAt(0)}

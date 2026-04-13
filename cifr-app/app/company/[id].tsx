@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Image, Moda
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
+import { getFaviconUrl } from "../../services/logoService";
 import { useAppContext } from '../../context/AppContext';
 import { Company } from '../../types';
 
@@ -65,13 +66,8 @@ export default function CompanyDetailScreen() {
 
   useEffect(() => {
     return () => {
-      let finalState = { ...formStateRef.current };
-      if (finalState.name && finalState.name.trim()) {
-        if (finalState.website && !finalState.logoUrl) {
-           const domain = finalState.website.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
-           if (domain) finalState.logoUrl = `https://logo.clearbit.com/${domain}`;
-        }
-        handleUpdateCompany(id as string, finalState);
+      if (formStateRef.current.name && formStateRef.current.name.trim()) {
+        handleUpdateCompany(id as string, formStateRef.current);
       }
     };
   }, []);
@@ -124,11 +120,11 @@ export default function CompanyDetailScreen() {
           <View className="flex-row items-center gap-4 mb-5">
             {/* Left aligned logo */}
             <View 
-              style={{ backgroundColor: formState.logoUrl ? '#FFFFFF' : (formState.color || '#3b82f6') }}
+              style={{ backgroundColor: (formState.logoUrl || getFaviconUrl(formState.website)) ? '#FFFFFF' : (formState.color || '#3b82f6') }}
               className="w-16 h-16 rounded-2xl items-center justify-center shadow-lg overflow-hidden border border-white/10"
             >
-              {formState.logoUrl ? (
-                <Image source={{ uri: formState.logoUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              {(formState.logoUrl || getFaviconUrl(formState.website)) ? (
+                <Image source={{ uri: formState.logoUrl || getFaviconUrl(formState.website)! }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
               ) : (
                 <Text className="text-white font-black text-3xl">{formState.name?.charAt(0) || '?'}</Text>
               )}
@@ -201,16 +197,7 @@ export default function CompanyDetailScreen() {
             <View className="flex-row items-center gap-2">
               <TextInput
                 value={formState.logoUrl}
-                onChangeText={v => {
-                  let formatted = v;
-                  if (v && !v.includes(' ') && !v.includes('/') && !v.startsWith('http') && !v.startsWith('file')) {
-                    const parts = v.split('.');
-                    if (parts.length > 1 && parts[parts.length - 1].length >= 2) {
-                      formatted = `https://logo.clearbit.com/${v}`;
-                    }
-                  }
-                  setFormState({ ...formState, logoUrl: formatted });
-                }}
+                onChangeText={v => setFormState({ ...formState, logoUrl: v })}
                 className="flex-1 bg-[#111111] border border-white/10 rounded-2xl px-5 py-[12px] text-white font-bold"
                 placeholderTextColor="rgba(255,255,255,0.2)"
                 placeholder="https://example.com/logo.png"
@@ -232,14 +219,6 @@ export default function CompanyDetailScreen() {
             <TextInput
               value={formState.website}
               onChangeText={v => setFormState({ ...formState, website: v })}
-              onEndEditing={() => {
-                if (formState.website && !formState.logoUrl) {
-                  const domain = formState.website.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
-                  if (domain) {
-                    setFormState(prev => ({ ...prev, logoUrl: `https://logo.clearbit.com/${domain}` }));
-                  }
-                }
-              }}
               className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
               placeholderTextColor="rgba(255,255,255,0.2)"
               placeholder="service.com"
