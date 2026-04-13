@@ -194,6 +194,14 @@ export default function CompanyDetailScreen() {
             <TextInput
               value={formState.website}
               onChangeText={v => setFormState({ ...formState, website: v })}
+              onBlur={() => {
+                if (formState.website && !formState.logoUrl) {
+                  const domain = formState.website.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('/')[0];
+                  if (domain) {
+                    setFormState(prev => ({ ...prev, logoUrl: `https://logo.clearbit.com/${domain}` }));
+                  }
+                }
+              }}
               className="w-full bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5 text-white font-bold"
               placeholderTextColor="rgba(255,255,255,0.2)"
               placeholder="service.com"
