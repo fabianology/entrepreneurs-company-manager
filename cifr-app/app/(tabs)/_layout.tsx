@@ -249,7 +249,7 @@ export default function TabLayout() {
             display: pathname === '/' ? 'none' : 'flex',
             position: 'absolute',
             bottom: BOTTOM,
-            right: 20,
+            left: SCREEN_WIDTH - 200,
             width: 180,
             backgroundColor: '#1C1C1E',
             borderRadius: 40,
