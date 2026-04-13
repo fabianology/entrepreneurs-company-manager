@@ -113,7 +113,7 @@ export default function CompanyDetailScreen() {
           
           {/* Name */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
             <TextInput
               value={formState.name}
               onChangeText={v => setFormState({ ...formState, name: v })}
@@ -125,7 +125,7 @@ export default function CompanyDetailScreen() {
 
           {/* Structure */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
             <TouchableOpacity 
               onPress={() => setShowStructureMenu(true)}
               className="w-full flex-row items-center justify-between bg-[#111111] border border-white/10 rounded-2xl px-5 py-3.5"
@@ -160,14 +160,14 @@ export default function CompanyDetailScreen() {
 
           {/* Color */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-2">Identity Color</Text>
-            <View className="flex-row flex-wrap gap-2">
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Identity Color</Text>
+            <View className="flex-row flex-wrap gap-[6px]">
               {BRAND_COLORS.map(color => (
                 <TouchableOpacity
                   key={color}
                   onPress={() => setFormState({ ...formState, color, logoUrl: '' })}
                   style={{ backgroundColor: color }}
-                  className={`w-10 h-10 rounded-full border border-white/10 items-center justify-center`}
+                  className={`w-8 h-8 rounded-full border border-white/10 items-center justify-center`}
                 >
                   {formState.color === color && !formState.logoUrl && (
                     <View className="w-3 h-3 rounded-full border-2 border-white" />
@@ -179,7 +179,7 @@ export default function CompanyDetailScreen() {
 
           {/* Logo URL */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-1">Logo URL</Text>
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Logo URL</Text>
             <TextInput
               value={formState.logoUrl}
               onChangeText={v => setFormState({ ...formState, logoUrl: v })}
@@ -193,7 +193,7 @@ export default function CompanyDetailScreen() {
 
           {/* Website URL */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em] ml-1 mb-1">Website URL</Text>
+            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Website URL</Text>
             <TextInput
               value={formState.website}
               onChangeText={v => setFormState({ ...formState, website: v })}
