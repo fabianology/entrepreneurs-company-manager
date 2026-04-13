@@ -250,31 +250,44 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
 
   if (pathname === '/') return null;
 
+  // Compose pan + tap as simultaneous so both work on the same container
+  const tapGesture = Gesture.Tap().onEnd((e) => {
+    const slot = Math.floor(e.x / SLOT_WIDTH);
+    const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
+    pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
+      damping: 18, stiffness: 200, mass: 0.5,
+    });
+    runOnJS(navigateTo)(clamped);
+  });
+
+  const composed = Gesture.Simultaneous(panGesture, tapGesture);
+
   return (
-    <View
-      style={{
-        position: 'absolute',
-        bottom: BOTTOM,
-        right: 20,
-        width: TAB_WIDTH,
-        height: 32,
-        backgroundColor: '#1C1C1E',
-        borderRadius: 40,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
-        flexDirection: 'row',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOpacity: 0.5,
-        shadowRadius: 20,
-        elevation: 10,
-        zIndex: 50,
-        overflow: 'hidden',
-      }}
-    >
-      {/* Draggable liquid glass pill */}
-      <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={composed}>
+      <Reanimated.View
+        style={{
+          position: 'absolute',
+          bottom: BOTTOM,
+          right: 20,
+          width: TAB_WIDTH,
+          height: 32,
+          backgroundColor: '#1C1C1E',
+          borderRadius: 40,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
+          flexDirection: 'row',
+          alignItems: 'center',
+          shadowColor: '#000',
+          shadowOpacity: 0.5,
+          shadowRadius: 20,
+          elevation: 10,
+          zIndex: 50,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Liquid glass pill — purely visual, no touch interception */}
         <Reanimated.View
+          pointerEvents="none"
           style={[
             pillStyle,
             {
@@ -286,32 +299,32 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
               backgroundColor: 'rgba(255,255,255,0.13)',
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.28)',
-              zIndex: 10,
             },
           ]}
         />
-      </GestureDetector>
 
-      {/* Tab icon buttons — tappable above the pill */}
-      {TAB_CONFIGS.map((tab, i) => {
-        const isActive = i === safeIndex;
-        return (
-          <TouchableOpacity
-            key={tab.name}
-            onPress={() => navigateTo(i)}
-            style={{ width: SLOT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%', zIndex: 20 }}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={18}
-              color={isActive ? tab.color : 'rgba(255,255,255,0.4)'}
-            />
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+        {/* Icon labels — visual only, gestures handled by container */}
+        {TAB_CONFIGS.map((tab, i) => {
+          const isActive = i === safeIndex;
+          return (
+            <View
+              key={tab.name}
+              pointerEvents="none"
+              style={{ width: SLOT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%' }}
+            >
+              <Ionicons
+                name={tab.icon}
+                size={18}
+                color={isActive ? tab.color : 'rgba(255,255,255,0.4)'}
+              />
+            </View>
+          );
+        })}
+      </Reanimated.View>
+    </GestureDetector>
   );
 }
+
 
 // ──────────── Root Tab Layout ────────────
 export default function TabLayout() {
