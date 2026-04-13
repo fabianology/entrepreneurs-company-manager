@@ -277,7 +277,7 @@ export default function TabLayout() {
         activeOpacity={0.85}
         style={{
           position: 'absolute',
-          bottom: BOTTOM + 32 + 10,
+          bottom: pathname === '/' ? BOTTOM : BOTTOM + 32 + 10,
           left: 20,
           right: 20,
           height: 32,
