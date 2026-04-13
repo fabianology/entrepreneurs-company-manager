@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '../../context/AppContext';
 import { CompanyDocument } from '../../types';
+import CompanyHeader from '../../components/CompanyHeader';
 
 export default function DocumentsScreen() {
   const router = useRouter();
@@ -44,13 +45,8 @@ export default function DocumentsScreen() {
     <SafeAreaView className="flex-1 bg-black">
       <ScrollView className="flex-1 px-4">
         
-        {/* Header */}
-        <View className="mb-6 mt-4">
-          <Text className="text-sm font-bold text-white/40 uppercase tracking-widest pl-2 mb-1">
-            {selectedCompanyId ? 'Company Documents' : 'All Documents'}
-          </Text>
-          <Text className="text-4xl font-black text-white px-2">Doc Vault</Text>
-        </View>
+        <CompanyHeader activeTab="docs" />
+
 
         {/* List */}
         <View className="mb-24 flex-row flex-wrap justify-between">

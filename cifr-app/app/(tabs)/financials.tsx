@@ -4,9 +4,11 @@ import {
   KeyboardAvoidingView, Platform, Pressable, Alert, Clipboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../../types';
+import CompanyHeader from '../../components/CompanyHeader';
 
 // ─────────────────────────── helpers ───────────────────────────
 const fmt = (n: number) =>
@@ -796,10 +798,12 @@ export default function FinancialsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <ScrollView contentContainerStyle={{ paddingTop: 60, paddingHorizontal: 16, paddingBottom: BOTTOM_PAD }}>
+      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingHorizontal: 16, paddingBottom: BOTTOM_PAD }}>
+
+        <CompanyHeader activeTab="financial" />
 
         {/* ── Action Bar ── */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24 }} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 24, paddingLeft: 8 }} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
           <TouchableOpacity onPress={() => setEditingCard({ name: '', cardHolder: '', last4: '', expiry: '', network: 'Visa', type: 'Credit', status: 'Active', limit: 0 })}
             style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
