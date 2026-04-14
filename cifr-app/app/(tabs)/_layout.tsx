@@ -505,8 +505,8 @@ export default function TabLayout() {
                       <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.3)" />
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }}>
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '400', fontSize: 17 }}>Cancel</Text>
+                  <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', marginLeft: 4 }}>
+                    <Ionicons name="close" size={20} color="#fff" />
                   </TouchableOpacity>
                 </View>
               </View>
