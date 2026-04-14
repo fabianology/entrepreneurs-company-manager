@@ -52,15 +52,24 @@ export default function DashboardScreen() {
 
   // Track rapid haptic intervals per company card
   const hapticIntervals = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+  const hapticTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const startRapidHaptic = (id: string) => {
-    if (hapticIntervals.current[id]) return; // already running
-    hapticIntervals.current[id] = setInterval(() => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }, 60);
+    // 180ms delay — a fling will trigger onSwipeableOpen before this fires,
+    // cancelling it cleanly. Only a deliberate hold survives the gate.
+    hapticTimeouts.current[id] = setTimeout(() => {
+      if (hapticIntervals.current[id]) return;
+      hapticIntervals.current[id] = setInterval(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }, 60);
+    }, 180);
   };
 
   const stopRapidHaptic = (id: string) => {
+    if (hapticTimeouts.current[id]) {
+      clearTimeout(hapticTimeouts.current[id]);
+      delete hapticTimeouts.current[id];
+    }
     if (hapticIntervals.current[id]) {
       clearInterval(hapticIntervals.current[id]);
       delete hapticIntervals.current[id];
@@ -150,7 +159,7 @@ export default function DashboardScreen() {
               onSwipeableOpen={(direction) => {
                 stopRapidHaptic(company.id);
                 if (direction === 'left') {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
                   // Fire both simultaneously: close animates while screen opens
