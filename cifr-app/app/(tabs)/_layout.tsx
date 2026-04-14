@@ -662,20 +662,19 @@ export default function TabLayout() {
                 
                 <GestureDetector gesture={
                   Gesture.Pan()
+                    .runOnJS(true)
                     .onUpdate((e) => {
                       if (e.translationY > 5) {
-                        runOnJS(Keyboard.dismiss)();
+                        Keyboard.dismiss();
                       }
                     })
                     .onEnd((e) => {
                       if (e.translationY > 40 || e.velocityY > 500) {
-                        runOnJS(setShowSearch)(false);
-                        runOnJS(setSearchQuery)('');
+                        setShowSearch(false);
+                        setSearchQuery('');
                       } else {
                         // Snap back up if aborted
-                        if (searchInputRef.current) {
-                          runOnJS((ref: any) => ref.current?.focus())({ current: searchInputRef.current });
-                        }
+                        searchInputRef.current?.focus();
                       }
                     })
                 }>
