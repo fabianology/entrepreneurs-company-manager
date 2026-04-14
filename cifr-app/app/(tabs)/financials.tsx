@@ -109,7 +109,7 @@ function Field({ label, value, placeholder, onChangeText, multiline = false, key
 }) {
   return (
     <View style={{ marginBottom: 12 }}>
-      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>{label}</Text>
+      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>{label}</Text>
       <TextInput
         style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontWeight: '500', fontFamily: mono ? 'monospace' : undefined }}
         value={value}
@@ -133,7 +133,7 @@ function SelectField({ label, value, options, onChange }: {
   const cur = options.find(o => o.value === value);
   return (
     <View style={{ marginBottom: 12 }}>
-      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>{label}</Text>
+      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>{label}</Text>
       <TouchableOpacity onPress={() => setOpen(true)} style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500' }}>{cur?.label || 'Select...'}</Text>
         <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.3)" />
@@ -141,7 +141,7 @@ function SelectField({ label, value, options, onChange }: {
       <Modal visible={open} transparent animationType="fade">
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} onPress={() => setOpen(false)}>
           <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#1C1C1E', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, paddingBottom: 32 }}>
-            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, textAlign: 'center', marginBottom: 12 }}>{label}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, textAlign: 'center', marginBottom: 12 }}>{label}</Text>
             {options.map(o => (
               <TouchableOpacity key={o.value} onPress={() => { onChange(o.value); setOpen(false); }}
                 style={{ paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12, backgroundColor: value === o.value ? '#EBC351' : 'transparent', marginBottom: 2 }}>
@@ -166,9 +166,9 @@ function CardVisual({ card, width = 280 }: { card: FinancialCard; width?: number
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13, letterSpacing: 0.5 }} numberOfLines={1}>{card.name}</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginTop: 2 }} numberOfLines={1}>{card.cardHolder || 'NAME ON CARD'}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '500', letterSpacing: 0, marginTop: 2 }} numberOfLines={1}>{card.cardHolder || 'Name on Card'}</Text>
           </View>
-          <Text style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '900', fontSize: 14, fontStyle: 'italic' }}>{card.network}</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '600', fontSize: 14, fontStyle: 'italic' }}>{card.network}</Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <View style={{ width: 36, height: 26, backgroundColor: 'rgba(255,215,80,0.2)', borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,215,80,0.3)', alignItems: 'center', justifyContent: 'center' }}>
@@ -178,11 +178,11 @@ function CardVisual({ card, width = 280 }: { card: FinancialCard; width?: number
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <View>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 7, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 2 }}>Name on Card</Text>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{card.cardHolder || '—'}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '500', letterSpacing: 0, marginBottom: 2 }}>Name on Card</Text>
+            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 11, letterSpacing: 0 }}>{card.cardHolder || '—'}</Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 7, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 2 }}>Expires</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '500', letterSpacing: 0, marginBottom: 2 }}>Expires</Text>
             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 11, fontFamily: 'monospace' }}>{card.expiry || '—'}</Text>
           </View>
         </View>
@@ -270,7 +270,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
           <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, letterSpacing: 1 }}>{inst.id ? 'EDIT BANK' : 'ADD BANK'}</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 20, letterSpacing: 0 }}>{inst.id ? 'Edit Bank' : 'Add Bank'}</Text>
               <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color="rgba(255,255,255,0.4)" /></TouchableOpacity>
             </View>
 
@@ -291,7 +291,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
               {/* Add Card Button */}
               <TouchableOpacity onPress={() => addAccount('Credit Card')} style={{ backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12, height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
                 <Text style={{ fontSize: 20 }}>💳</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>Add Card</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '500', fontSize: 15, letterSpacing: 0 }}>Add Card</Text>
               </TouchableOpacity>
 
               {/* Card-type accounts */}
@@ -325,12 +325,15 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                           <View style={{ flex: 1 }}><Field label="Card Nickname" value={acc.name} placeholder="Chase Sapphire" onChangeText={v => updateAcc(idx, { name: v })} /></View>
                           <View style={{ flex: 1 }}>
                             <SelectField label="Type" value={acc.type} options={cardTypes.map(t => ({ label: t, value: t }))} onChange={v => updateAcc(idx, { type: v as any })} />
+                          <View style={{ flex: 1 }}><Field label="CARD NICKNAME" value={acc.name} placeholder="Chase Sapphire" onChangeText={v => updateAcc(idx, { name: v })} /></View>
+                          <View style={{ flex: 1 }}>
+                            <SelectField label="TYPE" value={acc.type} options={cardTypes.map(t => ({ label: t, value: t }))} onChange={v => updateAcc(idx, { type: v as any })} />
                           </View>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 10 }}>
-                          <View style={{ flex: 1 }}><Field label="Last 4" value={acc.last4} placeholder="1234" onChangeText={v => updateAcc(idx, { last4: v.replace(/\D/g, '').slice(0, 4) })} mono keyboardType="numeric" /></View>
+                          <View style={{ flex: 1 }}><Field label="LAST 4" value={acc.last4} placeholder="1234" onChangeText={v => updateAcc(idx, { last4: v.replace(/\D/g, '').slice(0, 4) })} mono keyboardType="numeric" /></View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Expiry</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4, marginLeft: 2, textTransform: 'uppercase' }}>EXPIRY</Text>
                             <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
                               value={(acc as any).expiry || ''} placeholder="MM/YY" placeholderTextColor="rgba(255,255,255,0.2)" maxLength={5} keyboardType="numeric"
                               onChangeText={v => { let val = v.replace(/\D/g, ''); if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2, 4); updateAcc(idx, { expiry: val } as any); }} />
@@ -362,7 +365,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
               {/* Add Account Button */}
               <TouchableOpacity onPress={() => addAccount('Checking')} style={{ backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12, height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
                 <Text style={{ fontSize: 20 }}>🏦</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>Add Account</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '500', fontSize: 15, letterSpacing: 0 }}>Add Account</Text>
               </TouchableOpacity>
 
               {/* Bank accounts (non-card) */}
@@ -397,7 +400,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
               {/* Add Loan */}
               <TouchableOpacity onPress={() => setShowLoanModal(true)} style={{ backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 12, height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 8 }}>
                 <Text style={{ fontSize: 20 }}>💸</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>Add Loan</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '500', fontSize: 15, letterSpacing: 0 }}>Add Loan</Text>
               </TouchableOpacity>
 
               {/* Loans inside bank */}
@@ -408,18 +411,18 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
                       <View>
                         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{loan.name}</Text>
-                        <Text style={{ color: loan.status === 'Paid Off' ? '#10b981' : '#EBC351', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{loan.status}</Text>
+                        <Text style={{ color: loan.status === 'Paid Off' ? '#10b981' : '#EBC351', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>{loan.status}</Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>${(loan.principalAmount || 0).toLocaleString()}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Loan Amount</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Loan Amount</Text>
                       </View>
                     </View>
                     {amort && (
                       <View style={{ gap: 4 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                          <Text style={{ color: '#EBC351', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Principal {amort.principalPct.toFixed(0)}%</Text>
-                          <Text style={{ color: '#f97316', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Interest {amort.interestPct.toFixed(0)}%</Text>
+                          <Text style={{ color: '#EBC351', fontSize: 11, fontWeight: '600', letterSpacing: 0 }}>Principal {amort.principalPct.toFixed(0)}%</Text>
+                          <Text style={{ color: '#f97316', fontSize: 11, fontWeight: '600', letterSpacing: 0 }}>Interest {amort.interestPct.toFixed(0)}%</Text>
                         </View>
                         <View style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 2, flexDirection: 'row', overflow: 'hidden' }}>
                           <View style={{ height: 4, backgroundColor: '#EBC351', width: `${amort.principalPct}%` as any }} />
@@ -448,9 +451,9 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                 )
               ) : <View />}
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <TouchableOpacity onPress={onClose}><Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onClose}><Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 15, letterSpacing: 0 }}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity onPress={handleSave} style={{ backgroundColor: '#f97316', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Save Bank</Text>
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15, letterSpacing: 0 }}>Save Bank</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -486,7 +489,7 @@ function EditCardModal({ card, onSave, onDelete, onClose }: {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '88%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>{card.id ? 'Edit Card Details' : 'Add New Card'}</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 20, letterSpacing: 0 }}>{card.id ? 'Edit Card Details' : 'Add New Card'}</Text>
               <TouchableOpacity onPress={onClose} style={{ padding: 4 }}><Ionicons name="close" size={20} color="rgba(255,255,255,0.4)" /></TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 80 }}>
@@ -507,7 +510,7 @@ function EditCardModal({ card, onSave, onDelete, onClose }: {
               </View>
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ flex: 2 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Card Number (Last 4)</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Card Number (Last 4)</Text>
                   <View style={{ position: 'relative' }}>
                     <Text style={{ position: 'absolute', left: 12, top: 10, color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace', fontSize: 13, zIndex: 1 }}>•••• •••• •••• </Text>
                     <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingLeft: 128, paddingRight: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
@@ -516,7 +519,7 @@ function EditCardModal({ card, onSave, onDelete, onClose }: {
                   </View>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Expiry</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Expiry</Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace', textAlign: 'center' }}
                     placeholder="MM/YY" placeholderTextColor="rgba(255,255,255,0.2)" maxLength={5} keyboardType="numeric" value={data.expiry || ''}
                     onChangeText={v => { let val = v.replace(/\D/g, ''); if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2, 4); setData(d => ({ ...d, expiry: val })); }} />
@@ -541,9 +544,9 @@ function EditCardModal({ card, onSave, onDelete, onClose }: {
                 )
               ) : <View />}
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <TouchableOpacity onPress={onClose}><Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onClose}><Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 15, letterSpacing: 0 }}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity onPress={() => onSave(data)} style={{ backgroundColor: '#f97316', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Save Card</Text>
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15, letterSpacing: 0 }}>Save Card</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -573,7 +576,7 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
           <View style={{ backgroundColor: '#1C1C1E', borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '92%', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 14, textTransform: 'uppercase', letterSpacing: 1 }}>{loan.id ? 'Edit Loan Details' : 'Add New Financing'}</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 20, letterSpacing: 0 }}>{loan.id ? 'Edit Loan Details' : 'Add New Financing'}</Text>
               <TouchableOpacity onPress={onClose} style={{ padding: 4 }}><Ionicons name="close" size={20} color="rgba(255,255,255,0.4)" /></TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 80 }}>
@@ -583,7 +586,7 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                   {['Lender', 'Lendee'].map(role => (
                     <TouchableOpacity key={role} onPress={() => setData((d: any) => ({ ...d, role }))}
                       style={{ flex: 1, paddingVertical: 8, borderRadius: 20, backgroundColor: data.role === role ? '#EBC351' : 'transparent', alignItems: 'center' }}>
-                      <Text style={{ color: data.role === role ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>{role}</Text>
+                      <Text style={{ color: data.role === role ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 13, letterSpacing: 0 }}>{role}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -597,13 +600,13 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
               <Field label="Loan Summary" value={data.term || ''} placeholder="36 Months notes..." onChangeText={v => setData((d: any) => ({ ...d, term: v }))} multiline />
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Loan Date</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Loan Date</Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13}}
                     value={data.startDate || ''} placeholder="YYYY-MM-DD" placeholderTextColor="rgba(255,255,255,0.2)"
                     onChangeText={v => setData((d: any) => ({ ...d, startDate: v }))} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Paid Off Date</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Paid Off Date</Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13}}
                     value={data.paidOffDate || ''} placeholder="YYYY-MM-DD" placeholderTextColor="rgba(255,255,255,0.2)"
                     onChangeText={v => setData((d: any) => ({ ...d, paidOffDate: v }))} />
@@ -611,13 +614,13 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
               </View>
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', marginBottom: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Loan Amount $</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Loan Amount $</Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
                     value={String(data.principalAmount || '')} placeholder="50000" placeholderTextColor="rgba(255,255,255,0.2)" keyboardType="decimal-pad"
                     onChangeText={v => setData((d: any) => ({ ...d, principalAmount: parseFloat(v) || 0 }))} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>
                     {data.interestType === 'Fixed' ? 'Fixed Fee $' : 'YR APR %'}
                   </Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
@@ -629,13 +632,13 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
               {/* Term + Frequency */}
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-end', marginBottom: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Term (Yrs)</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Term (Yrs)</Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
                     value={String(data.termYears || '')} placeholder="5" placeholderTextColor="rgba(255,255,255,0.2)" keyboardType="number-pad"
                     onChangeText={v => setData((d: any) => ({ ...d, termYears: parseInt(v) || 0 }))} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 4, marginLeft: 2 }}>Term (Mos)</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Term (Mos)</Text>
                   <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
                     value={String(data.termMonths || '')} placeholder="0" placeholderTextColor="rgba(255,255,255,0.2)" keyboardType="number-pad"
                     onChangeText={v => setData((d: any) => ({ ...d, termMonths: parseInt(v) || 0 }))} />
@@ -649,12 +652,12 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
 
               {/* Interest Type */}
               <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6, marginLeft: 2 }}>Interest Type</Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 6, marginLeft: 2 }}>Interest Type</Text>
                 <View style={{ flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.4)', padding: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' }}>
                   {[{ label: 'Interest %', value: 'Percentage' }, { label: 'Fixed Fee', value: 'Fixed' }].map(opt => (
                     <TouchableOpacity key={opt.value} onPress={() => setData((d: any) => ({ ...d, interestType: opt.value }))}
                       style={{ flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: (data.interestType || 'Percentage') === opt.value ? '#EBC351' : 'transparent', alignItems: 'center' }}>
-                      <Text style={{ color: (data.interestType || 'Percentage') === opt.value ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>{opt.label}</Text>
+                      <Text style={{ color: (data.interestType || 'Percentage') === opt.value ? '#000' : 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 13, letterSpacing: 0 }}>{opt.label}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -665,22 +668,22 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                 <View style={{ backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', padding: 16, marginTop: 8 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
                     <View>
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{amort.scheduleFrequency} Pmt</Text>
-                      <Text style={{ color: '#fff', fontWeight: '900', fontSize: 20 }}>{fmt(amort.monthlyPayment)}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>{amort.scheduleFrequency} Pmt</Text>
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 20 }}>{fmt(amort.monthlyPayment)}</Text>
                     </View>
                     <View style={{ alignItems: 'center' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Total Int.</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Total Int.</Text>
                       <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{fmt(amort.totalInterest)}</Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Total Cost</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Total Cost</Text>
                       <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>{fmt(amort.totalCost)}</Text>
                     </View>
                   </View>
                   <View style={{ gap: 4 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ color: '#EBC351', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Principal ({amort.principalPct.toFixed(1)}%)</Text>
-                      <Text style={{ color: '#f97316', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Interest ({amort.interestPct.toFixed(1)}%)</Text>
+                      <Text style={{ color: '#EBC351', fontSize: 11, fontWeight: '600', letterSpacing: 0 }}>Principal ({amort.principalPct.toFixed(1)}%)</Text>
+                      <Text style={{ color: '#f97316', fontSize: 11, fontWeight: '600', letterSpacing: 0 }}>Interest ({amort.interestPct.toFixed(1)}%)</Text>
                     </View>
                     <View style={{ height: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 3, flexDirection: 'row', overflow: 'hidden' }}>
                       <View style={{ flex: amort.principalPct, backgroundColor: '#EBC351', borderRadius: 3 }} />
@@ -691,7 +694,7 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                   {/* Amortization Schedule Toggle */}
                   <TouchableOpacity onPress={() => setShowAmort(!showAmort)}
                     style={{ marginTop: 14, height: 36, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{showAmort ? 'Hide Schedule' : 'Amortization Schedule'}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '500', fontSize: 13, letterSpacing: 0 }}>{showAmort ? 'Hide Schedule' : 'Amortization Schedule'}</Text>
                     <Ionicons name={showAmort ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.4)" />
                   </TouchableOpacity>
 
