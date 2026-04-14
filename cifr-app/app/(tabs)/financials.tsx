@@ -305,8 +305,8 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                         {confirmDeleteAcc === idx ? (
                           <View style={{ flexDirection: 'row', gap: 6 }}>
-                            <TouchableOpacity onPress={() => deleteAcc(idx)} style={{ backgroundColor: 'rgba(239,68,68,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}><Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 11 }}>Delete</Text></TouchableOpacity>
-                            <TouchableOpacity onPress={() => setConfirmDeleteAcc(null)} style={{ paddingHorizontal: 10, paddingVertical: 4 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => deleteAcc(idx)} style={{ backgroundColor: 'rgba(239,68,68,0.2)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 }}><Text style={{ color: '#ef4444', fontWeight: '600', fontSize: 13 }}>Delete</Text></TouchableOpacity>
+                            <TouchableOpacity onPress={() => setConfirmDeleteAcc(null)} style={{ paddingHorizontal: 10, paddingVertical: 4 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500' }}>Cancel</Text></TouchableOpacity>
                           </View>
                         ) : (
                           <TouchableOpacity onPress={() => setConfirmDeleteAcc(idx)}>
@@ -314,7 +314,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                           </TouchableOpacity>
                         )}
                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500' }}>{acc.name || 'New Card'}</Text>
-                        <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontFamily: 'monospace' }}>•••• {acc.last4 || '••••'}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, fontFamily: 'monospace' }}>•••• {acc.last4 || '••••'}</Text>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: (acc as any).status === 'Frozen' ? '#EBC351' : (acc as any).status === 'Expired' ? '#ef4444' : '#1FE400' }} />
                       </View>
                       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={14} color="rgba(255,255,255,0.3)" />
@@ -378,8 +378,8 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                     </TouchableOpacity>
                     {confirmDeleteAcc === idx && (
                       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-                        <TouchableOpacity onPress={() => deleteAcc(idx)} style={{ backgroundColor: 'rgba(239,68,68,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}><Text style={{ color: '#ef4444', fontWeight: '700', fontSize: 12 }}>Delete</Text></TouchableOpacity>
-                        <TouchableOpacity onPress={() => setConfirmDeleteAcc(null)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>Cancel</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={() => deleteAcc(idx)} style={{ backgroundColor: 'rgba(239,68,68,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 }}><Text style={{ color: '#ef4444', fontWeight: '600', fontSize: 13 }}>Delete</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={() => setConfirmDeleteAcc(null)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500' }}>Cancel</Text></TouchableOpacity>
                       </View>
                     )}
                     <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -441,8 +441,8 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                 showDelete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', paddingHorizontal: 12, paddingVertical: 8 }}>
                     <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', letterSpacing: 0 }}>Confirm?</Text>
-                    <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>YES</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>NO</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Yes</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500' }}>No</Text></TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity onPress={() => setShowDelete(true)} style={{ padding: 10 }}>
@@ -536,8 +536,8 @@ function EditCardModal({ card, onSave, onDelete, onClose }: {
                 showDelete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', paddingHorizontal: 12, paddingVertical: 8 }}>
                     <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', letterSpacing: 0 }}>Confirm?</Text>
-                    <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>YES</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>NO</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Yes</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500' }}>No</Text></TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity onPress={() => setShowDelete(true)} style={{ padding: 10 }}><Ionicons name="trash-outline" size={20} color="rgba(255,255,255,0.2)" /></TouchableOpacity>
@@ -709,14 +709,14 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                       <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
                         {amort.schedule.slice(0, 200).map((row, i) => (
                           <View key={row.month} style={{ flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 8, backgroundColor: i % 2 === 0 ? 'rgba(0,0,0,0.25)' : 'transparent' }}>
-                            <Text style={{ flex: 0.6, color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: 'monospace' }}>{row.month}</Text>
-                            <Text style={{ flex: 1, color: 'rgba(255,255,255,0.8)', fontSize: 10, fontFamily: 'monospace', textAlign: 'right' }}>${row.payment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
-                            <Text style={{ flex: 1, color: '#EBC351', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', opacity: 0.8 }}>${row.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
-                            <Text style={{ flex: 1, color: '#f97316', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', opacity: 0.8 }}>${row.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
-                            <Text style={{ flex: 1, color: '#fff', fontSize: 10, fontFamily: 'monospace', textAlign: 'right' }}>${row.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                            <Text style={{ flex: 0.6, color: 'rgba(255,255,255,0.4)', fontSize: 11, fontFamily: 'monospace' }}>{row.month}</Text>
+                            <Text style={{ flex: 1, color: 'rgba(255,255,255,0.8)', fontSize: 11, fontFamily: 'monospace', textAlign: 'right' }}>${row.payment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                            <Text style={{ flex: 1, color: '#EBC351', fontSize: 11, fontFamily: 'monospace', textAlign: 'right', opacity: 0.8 }}>${row.principal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                            <Text style={{ flex: 1, color: '#f97316', fontSize: 11, fontFamily: 'monospace', textAlign: 'right', opacity: 0.8 }}>${row.interest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                            <Text style={{ flex: 1, color: '#fff', fontSize: 11, fontFamily: 'monospace', textAlign: 'right' }}>${row.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
                           </View>
                         ))}
-                        {amort.schedule.length > 200 && <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, textAlign: 'center', padding: 8 }}>…{amort.schedule.length - 200} more periods</Text>}
+                        {amort.schedule.length > 200 && <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'center', padding: 8 }}>…{amort.schedule.length - 200} more periods</Text>}
                       </ScrollView>
                     </View>
                   )}
@@ -728,8 +728,8 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                 showDelete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', paddingHorizontal: 12, paddingVertical: 8 }}>
                     <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', letterSpacing: 0 }}>Confirm?</Text>
-                    <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>YES</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>NO</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '600', fontSize: 13 }}>Yes</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500' }}>No</Text></TouchableOpacity>
                   </View>
                 ) : (
                   <TouchableOpacity onPress={() => setShowDelete(true)} style={{ padding: 10 }}><Ionicons name="trash-outline" size={20} color="rgba(255,255,255,0.2)" /></TouchableOpacity>
@@ -896,7 +896,7 @@ export default function FinancialsScreen() {
                               <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace', fontSize: 14, letterSpacing: 3 }}>•••• •••• •••• {card.last4}</Text>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                                 <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>{card.cardHolder}</Text>
-                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '700' }}>{card.expiry}</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700' }}>{card.expiry}</Text>
                               </View>
                             </>
                           )}
@@ -980,11 +980,11 @@ export default function FinancialsScreen() {
                               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: acc.type === 'Credit Card' ? '#f97316' : acc.type === 'Checking' ? '#EBC351' : '#1FE400' }} />
                               <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '500', letterSpacing: 0 }}>{acc.name}</Text>
                               <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>{acc.type}</Text>
-                              {acc.last4 && <Text style={{ color: '#EBC351', fontSize: 10, fontWeight: '700' }}>••{acc.last4}</Text>}
+                              {acc.last4 && <Text style={{ color: '#EBC351', fontSize: 11, fontWeight: '700' }}>••{acc.last4}</Text>}
                             </View>
                             <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
                               ${((acc as any).monthlyPayment || acc.balance || 0).toLocaleString()}
-                              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>{(acc as any).monthlyPayment ? '/mo' : ''}</Text>
+                              <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{(acc as any).monthlyPayment ? '/mo' : ''}</Text>
                             </Text>
                           </View>
                         ))}
@@ -998,7 +998,7 @@ export default function FinancialsScreen() {
                                 <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '500', letterSpacing: 0 }}>{loan.name}</Text>
                                 <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Loan{loan.interestRate ? ` • ${loan.interestRate}%` : ''}</Text>
                               </View>
-                              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>${pmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}<Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>/mo</Text></Text>
+                              <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>${pmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}<Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>/mo</Text></Text>
                             </View>
                           );
                         })}
