@@ -50,6 +50,23 @@ export default function DashboardScreen() {
   // Width of the left action – must match leftThreshold on Swipeable
   const EDIT_THRESHOLD = 96;
 
+  // Track rapid haptic intervals per company card
+  const hapticIntervals = useRef<Record<string, ReturnType<typeof setInterval>>>({});
+
+  const startRapidHaptic = (id: string) => {
+    if (hapticIntervals.current[id]) return; // already running
+    hapticIntervals.current[id] = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, 60);
+  };
+
+  const stopRapidHaptic = (id: string) => {
+    if (hapticIntervals.current[id]) {
+      clearInterval(hapticIntervals.current[id]);
+      delete hapticIntervals.current[id];
+    }
+  };
+
   const renderLeftActions = (company: Company) => (
     <View
       className="bg-blue-600 justify-center items-start rounded-3xl mb-4 p-5 pl-6 h-[85%]"
@@ -125,15 +142,22 @@ export default function DashboardScreen() {
               leftThreshold={EDIT_THRESHOLD}
               rightThreshold={96}
               overshootLeft={false}
+              onSwipeableWillOpen={(direction) => {
+                if (direction === 'left') {
+                  startRapidHaptic(company.id);
+                }
+              }}
               onSwipeableOpen={(direction) => {
+                stopRapidHaptic(company.id);
                 if (direction === 'left') {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                  swipeRef.current?.close();
+                  // Navigate immediately — screen transition covers the snap-back
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
                   router.push(`/company/${company.id}`);
                 }
               }}
+              onSwipeableClose={() => stopRapidHaptic(company.id)}
             >
               <TouchableOpacity
                 activeOpacity={0.8}
