@@ -339,15 +339,18 @@ export default function SubscriptionsScreen() {
                     <View style={{ paddingHorizontal: 24, paddingBottom: 24, gap: 12 }}>
                       {(sub.subServices || []).map((child, idx) => (
                         <View key={child.id || idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: child.status === 'Paused' ? '#ef4444' : '#1FE400' }} />
-                            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500', textTransform: 'uppercase' }}>{child.name}</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>|</Text>
-                            <Text style={{ color: child.status === 'Paused' ? '#ef4444' : '#1FE400', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{child.status}</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>|</Text>
-                            <Text style={{ color: child.autoPay === 'Manual' ? '#ef4444' : '#1FE400', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
-                              {child.autoPay === 'Manual' ? 'Manual' : 'Auto Pay'}
-                            </Text>
+                          <View style={{ flex: 1, flexDirection: 'column' }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: child.status === 'Paused' ? '#ef4444' : '#1FE400' }} />
+                              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500', textTransform: 'uppercase' }}>{child.name}</Text>
+                            </View>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, marginLeft: 16 }}>
+                              <Text style={{ color: child.status === 'Paused' ? '#ef4444' : '#1FE400', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{child.status}</Text>
+                              <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>|</Text>
+                              <Text style={{ color: child.autoPay === 'Manual' ? '#ef4444' : '#1FE400', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                {child.autoPay === 'Manual' ? 'Manual' : 'Auto Pay'}
+                              </Text>
+                            </View>
                           </View>
                           <Text style={{ color: child.status === 'Paused' ? 'rgba(255,255,255,0.2)' : '#fff', fontSize: 13, fontWeight: '500' }}>
                             ${child.cost.toFixed(2)}<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>/{child.billingCycle === 'Yearly' ? 'yr' : 'mo'}</Text>
