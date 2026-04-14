@@ -333,7 +333,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                         <View style={{ flexDirection: 'row', gap: 10 }}>
                           <View style={{ flex: 1 }}><Field label="LAST 4" value={acc.last4} placeholder="1234" onChangeText={v => updateAcc(idx, { last4: v.replace(/\D/g, '').slice(0, 4) })} mono keyboardType="numeric" /></View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4, marginLeft: 2, textTransform: 'uppercase' }}>EXPIRY</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0, marginBottom: 4, marginLeft: 2 }}>Expiry</Text>
                             <TextInput style={{ backgroundColor: 'rgba(0,0,0,0.3)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff', fontSize: 13, fontFamily: 'monospace' }}
                               value={(acc as any).expiry || ''} placeholder="MM/YY" placeholderTextColor="rgba(255,255,255,0.2)" maxLength={5} keyboardType="numeric"
                               onChangeText={v => { let val = v.replace(/\D/g, ''); if (val.length > 2) val = val.slice(0, 2) + '/' + val.slice(2, 4); updateAcc(idx, { expiry: val } as any); }} />
@@ -440,7 +440,7 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
               {inst.id ? (
                 showDelete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', paddingHorizontal: 12, paddingVertical: 8 }}>
-                    <Text style={{ color: '#f97316', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Confirm?</Text>
+                    <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', letterSpacing: 0 }}>Confirm?</Text>
                     <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>YES</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>NO</Text></TouchableOpacity>
                   </View>
@@ -535,7 +535,7 @@ function EditCardModal({ card, onSave, onDelete, onClose }: {
               {card.id ? (
                 showDelete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', paddingHorizontal: 12, paddingVertical: 8 }}>
-                    <Text style={{ color: '#f97316', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Confirm?</Text>
+                    <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', letterSpacing: 0 }}>Confirm?</Text>
                     <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>YES</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>NO</Text></TouchableOpacity>
                   </View>
@@ -703,7 +703,7 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                       {/* Header */}
                       <View style={{ flexDirection: 'row', backgroundColor: '#1C1C1E', paddingVertical: 8, paddingHorizontal: 8 }}>
                         {[amort.scheduleFrequency === 'Weekly' ? 'Wk' : amort.scheduleFrequency === 'Yearly' ? 'Yr' : 'Mo', 'Pmt', 'Prin', 'Int', 'Bal'].map((h, i) => (
-                          <Text key={h} style={{ flex: i === 0 ? 0.6 : 1, color: i === 2 ? '#EBC351' : i === 3 ? '#f97316' : 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', textAlign: i === 0 ? 'left' : 'right' }}>{h}</Text>
+                          <Text key={h} style={{ flex: i === 0 ? 0.6 : 1, color: i === 2 ? '#EBC351' : i === 3 ? '#f97316' : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0, textAlign: i === 0 ? 'left' : 'right' }}>{h}</Text>
                         ))}
                       </View>
                       <ScrollView style={{ maxHeight: 220 }} nestedScrollEnabled>
@@ -727,7 +727,7 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
               {loan.id ? (
                 showDelete ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', paddingHorizontal: 12, paddingVertical: 8 }}>
-                    <Text style={{ color: '#f97316', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Confirm?</Text>
+                    <Text style={{ color: '#f97316', fontSize: 12, fontWeight: '600', letterSpacing: 0 }}>Confirm?</Text>
                     <TouchableOpacity onPress={onDelete} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>YES</Text></TouchableOpacity>
                     <TouchableOpacity onPress={() => setShowDelete(false)} style={{ paddingHorizontal: 12, paddingVertical: 6 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>NO</Text></TouchableOpacity>
                   </View>
@@ -736,9 +736,9 @@ function EditLoanModal({ loan, onSave, onDelete, onClose }: {
                 )
               ) : <View />}
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <TouchableOpacity onPress={onClose}><Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Cancel</Text></TouchableOpacity>
+                <TouchableOpacity onPress={onClose}><Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 15, letterSpacing: 0 }}>Cancel</Text></TouchableOpacity>
                 <TouchableOpacity onPress={() => onSave(data)} style={{ backgroundColor: '#f97316', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Save Loan</Text>
+                  <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15, letterSpacing: 0 }}>Save Loan</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -769,7 +769,7 @@ export default function FinancialsScreen() {
   if (!state || !selectedCompanyId) {
     return (
       <View style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '700', fontSize: 13, textTransform: 'uppercase', letterSpacing: 2 }}>Select a Company</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '500', fontSize: 13, letterSpacing: 0 }}>Select a Company</Text>
       </View>
     );
   }
@@ -810,18 +810,18 @@ export default function FinancialsScreen() {
           <TouchableOpacity onPress={() => setEditingCard({ name: '', cardHolder: '', last4: '', expiry: '', network: 'Visa', type: 'Credit', status: 'Active', limit: 0 })}
             style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Card</Text>
+            <Text style={{ color: '#fff', fontWeight: '500', fontSize: 12, letterSpacing: 0 }}>Card</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setEditingLoan({ role: 'Lendee', lender: '', name: '', principalAmount: 0, interestRate: 0, status: 'Active' })}
             style={{ backgroundColor: '#1C1C1E', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
             <Ionicons name="add" size={14} color="rgba(255,255,255,0.4)" />
-            <Text style={{ color: '#fff', fontWeight: '600', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Loan</Text>
+            <Text style={{ color: '#fff', fontWeight: '500', fontSize: 12, letterSpacing: 0 }}>Loan</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
           <TouchableOpacity onPress={() => setEditingInst({ name: '', loginUrl: '', email: '', username: '', password: '', accounts: [] })}
             style={{ backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 16, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <Ionicons name="add" size={14} color="rgba(0,0,0,0.5)" />
-            <Text style={{ color: '#000', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Institution</Text>
+            <Text style={{ color: '#000', fontWeight: '600', fontSize: 12, letterSpacing: 0 }}>Institution</Text>
           </TouchableOpacity>
         </ScrollView>
 
@@ -830,7 +830,7 @@ export default function FinancialsScreen() {
           <TouchableOpacity onPress={() => setEditingInst({ name: '', loginUrl: '', email: '', username: '', password: '', accounts: [] })}
             style={{ alignSelf: 'center', width: 300, height: 200, borderRadius: 28, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(28,28,30,0.5)', marginTop: 20 }}>
             <Text style={{ fontSize: 40, marginBottom: 12 }}>🏦</Text>
-            <Text style={{ color: 'rgba(255,255,255,0.5)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>+ Add Your First Institution</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.5)', fontWeight: '500', fontSize: 13, letterSpacing: 0 }}>+ Add Your First Institution</Text>
           </TouchableOpacity>
         )}
 
@@ -838,7 +838,7 @@ export default function FinancialsScreen() {
         {institutions.length > 0 && (
           <View style={{ marginBottom: 32 }}>
             <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 24, marginBottom: 16 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '900', fontSize: 16 }}>Financial Institutions</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '600', fontSize: 16 }}>Financial Institutions</Text>
             </View>
             {institutions.map((inst, instIdx) => {
               const instCards = cards.filter(c => c.institutionName?.toLowerCase() === inst.name.toLowerCase());
@@ -889,13 +889,13 @@ export default function FinancialsScreen() {
                         <View style={{ padding: 14, flex: 1, justifyContent: 'space-between' }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>{card.name}</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '900', fontSize: 12, fontStyle: 'italic' }}>{card.network}</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.7)', fontWeight: '600', fontSize: 12, fontStyle: 'italic' }}>{card.network}</Text>
                           </View>
                           {isPopped && (
                             <>
                               <Text style={{ color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace', fontSize: 14, letterSpacing: 3 }}>•••• •••• •••• {card.last4}</Text>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{card.cardHolder}</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>{card.cardHolder}</Text>
                                 <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '700' }}>{card.expiry}</Text>
                               </View>
                             </>
@@ -915,9 +915,9 @@ export default function FinancialsScreen() {
                           <Ionicons name="business" size={22} color="rgba(255,255,255,0.4)" />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, textTransform: 'uppercase', letterSpacing: 0.5 }}>{inst.name}</Text>
+                          <Text style={{ color: '#fff', fontWeight: '600', fontSize: 17, letterSpacing: 0 }}>{inst.name}</Text>
                           <Text style={{ color: '#fff', fontWeight: '900', fontSize: 17, marginTop: 2 }}>${totalMonthly.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 }}>Mo. Payment</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Mo. Payment</Text>
                         </View>
                       </View>
                       {/* Accounts / Cards / Loans count */}
@@ -925,7 +925,7 @@ export default function FinancialsScreen() {
                         {[{ label: 'Accounts', count: instAccounts }, { label: 'Cards', count: instCards.length }, { label: 'Loans', count: instLoans.length }].map(({ label, count }) => (
                           <View key={label} style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
                             <Text style={{ color: '#EBC351', fontWeight: '700', fontSize: 11 }}>{count}</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>{label}</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 12, letterSpacing: 0 }}>{label}</Text>
                             {label !== 'Loans' && <Text style={{ color: 'rgba(255,255,255,0.15)', marginHorizontal: 4 }}>|</Text>}
                           </View>
                         ))}
@@ -933,8 +933,8 @@ export default function FinancialsScreen() {
                       {/* Credentials */}
                       <View style={{ flexDirection: 'row', gap: 12 }}>
                         <TouchableOpacity onPress={() => copyField(inst.id, 'username', inst.username || inst.email || '')} style={{ flex: 1 }}>
-                          <Text style={{ color: copiedId?.id === inst.id && copiedId?.field === 'username' ? '#f97316' : 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>
-                            {copiedId?.id === inst.id && copiedId?.field === 'username' ? 'Copied' : 'Login ID'}
+                          <Text style={{ color: copiedId?.id === inst.id && copiedId?.field === 'username' ? '#f97316' : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0, marginBottom: 4 }}>
+                            {copiedId?.id === inst.id && copiedId?.field === 'username' ? 'Copied ✓' : 'Login ID'}
                           </Text>
                           <View style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)' }}>
                             <Text style={{ color: '#fff', fontSize: 12, fontWeight: '500' }} numberOfLines={1}>{inst.username || inst.email || '—'}</Text>
@@ -943,8 +943,8 @@ export default function FinancialsScreen() {
                         <View style={{ flex: 1 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                             <TouchableOpacity onPress={() => copyField(inst.id, 'password', inst.password || '')}>
-                              <Text style={{ color: copiedId?.id === inst.id && copiedId?.field === 'password' ? '#f97316' : 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
-                                {copiedId?.id === inst.id && copiedId?.field === 'password' ? 'Copied' : 'Password'}
+                              <Text style={{ color: copiedId?.id === inst.id && copiedId?.field === 'password' ? '#f97316' : 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>
+                                {copiedId?.id === inst.id && copiedId?.field === 'password' ? 'Copied ✓' : 'Password'}
                               </Text>
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => togglePw(inst.id)}>
@@ -966,7 +966,7 @@ export default function FinancialsScreen() {
                     <TouchableOpacity onPress={() => { toggleInst(inst.id); }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)' }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '600', fontSize: 12, textTransform: 'uppercase', letterSpacing: 2 }}>{expanded ? 'Less Details' : 'More Details'}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 13, letterSpacing: 0 }}>{expanded ? 'Less Details' : 'More Details'}</Text>
                         <Text style={{ color: 'rgba(255,255,255,0.2)', fontWeight: '900', fontSize: 12 }}>({instAccounts + instLoans.length})</Text>
                       </View>
                       <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.3)" />
@@ -978,8 +978,8 @@ export default function FinancialsScreen() {
                           <View key={`${acc.id || ai}`} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: acc.type === 'Credit Card' ? '#f97316' : acc.type === 'Checking' ? '#EBC351' : '#1FE400' }} />
-                              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500', textTransform: 'uppercase' }}>{acc.name}</Text>
-                              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{acc.type}</Text>
+                              <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '500', letterSpacing: 0 }}>{acc.name}</Text>
+                              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>{acc.type}</Text>
                               {acc.last4 && <Text style={{ color: '#EBC351', fontSize: 10, fontWeight: '700' }}>••{acc.last4}</Text>}
                             </View>
                             <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
@@ -995,16 +995,16 @@ export default function FinancialsScreen() {
                             <View key={loan.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#EBC351' }} />
-                                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500', textTransform: 'uppercase' }}>{loan.name}</Text>
-                                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Loan{loan.interestRate ? ` • ${loan.interestRate}%` : ''}</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: '500', letterSpacing: 0 }}>{loan.name}</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Loan{loan.interestRate ? ` • ${loan.interestRate}%` : ''}</Text>
                               </View>
                               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>${pmt.toLocaleString(undefined, { maximumFractionDigits: 0 })}<Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>/mo</Text></Text>
                             </View>
                           );
                         })}
-                        {instAccounts + instLoans.length === 0 && <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 2 }}>No linked accounts</Text>}
+                        {instAccounts + instLoans.length === 0 && <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '500', fontSize: 12, letterSpacing: 0 }}>No linked accounts</Text>}
                         <TouchableOpacity onPress={() => setEditingInst(inst)} style={{ paddingTop: 4 }}>
-                          <Text style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 2 }}>+ add account</Text>
+                          <Text style={{ color: 'rgba(255,255,255,0.25)', fontWeight: '500', fontSize: 12, letterSpacing: 0 }}>+ Add Account</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -1019,7 +1019,7 @@ export default function FinancialsScreen() {
         {standaloneLoans.length > 0 && (
           <View style={{ marginBottom: 32 }}>
             <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 24, marginBottom: 16 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '900', fontSize: 16 }}>Loans & Debt</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '600', fontSize: 16 }}>Loans & Debt</Text>
             </View>
             {standaloneLoans.map(loan => {
               const amort = calcAmortization(loan);
@@ -1029,29 +1029,29 @@ export default function FinancialsScreen() {
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>{loan.name}</Text>
-                        {loan.role && <View style={{ borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>{loan.role}</Text></View>}
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 17 }}>{loan.name}</Text>
+                        {loan.role && <View style={{ borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>{loan.role}</Text></View>}
                       </View>
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 10, textTransform: 'uppercase', letterSpacing: 1 }}>{loan.lender || 'Unknown'} | <Text style={{ color: loan.status === 'Paid Off' ? '#10b981' : '#EBC351' }}>{loan.status}</Text></Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 11, letterSpacing: 0 }}>{loan.lender || 'Unknown'} | <Text style={{ color: loan.status === 'Paid Off' ? '#10b981' : '#EBC351' }}>{loan.status}</Text></Text>
                     </View>
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: '#fff', fontWeight: '900', fontSize: 20 }}>${(loan.principalAmount || 0).toLocaleString()}</Text>
-                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>Loan Amount</Text>
+                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 20 }}>${(loan.principalAmount || 0).toLocaleString()}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Loan Amount</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
                     {[['Loan Date', loan.startDate || '—'], ['Interest', `$${(amort?.totalInterest || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`], ['Total', `$${((loan.principalAmount || 0) + (amort?.totalInterest || 0)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`]].map(([label, val]) => (
                       <View key={label} style={{ flex: 1 }}>
-                        <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>{label}</Text>
-                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 12 }}>{val}</Text>
+                        <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '500', letterSpacing: 0, marginBottom: 2 }}>{label}</Text>
+                        <Text style={{ color: '#fff', fontWeight: '600', fontSize: 14 }}>{val}</Text>
                       </View>
                     ))}
                   </View>
                   {amort && (
                     <View style={{ gap: 6 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ color: '#EBC351', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Principal ${amort.totalPrincipal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
-                        <Text style={{ color: '#f97316', fontSize: 9, fontWeight: '700', textTransform: 'uppercase' }}>Interest ${amort.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                        <Text style={{ color: '#EBC351', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Principal ${amort.totalPrincipal.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+                        <Text style={{ color: '#f97316', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>Interest ${amort.totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
                       </View>
                       <View style={{ height: 5, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3, flexDirection: 'row', overflow: 'hidden' }}>
                         <View style={{ flex: amort.principalPct, backgroundColor: '#EBC351' }} />
@@ -1069,7 +1069,7 @@ export default function FinancialsScreen() {
         {cards.length > 0 && (
           <View style={{ marginBottom: 32 }}>
             <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 24, marginBottom: 16 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '900', fontSize: 16 }}>Payment Methods</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.3)', fontWeight: '600', fontSize: 16 }}>Payment Methods</Text>
             </View>
             <View style={{ height: cards.length * 44 + 168, position: 'relative' }}>
               {cards.map((card, ci) => {
