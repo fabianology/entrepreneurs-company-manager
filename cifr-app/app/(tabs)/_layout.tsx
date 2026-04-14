@@ -563,7 +563,10 @@ export default function TabLayout() {
 
       {/* ── Search Bar (dynamic width based on page) ── */}
       <TouchableOpacity
-        onPress={() => { setShowSearch(true); }}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowSearch(true);
+        }}
         activeOpacity={0.85}
         hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
         style={{
@@ -613,7 +616,12 @@ export default function TabLayout() {
       {/* ── Menu Button (right) ── */}
       {pathname !== '/' && (
         <TouchableOpacity
-          onPress={() => setShowMenu(v => !v)}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light), 80);
+            setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light), 160);
+            setShowMenu(v => !v);
+          }}
           style={{
             position: 'absolute',
             bottom: BOTTOM,
