@@ -134,12 +134,12 @@ export default function DashboardScreen() {
                     {(company.logoUrl || getFaviconUrl(company.website)) ? (
                       <Image source={{ uri: company.logoUrl || getFaviconUrl(company.website)! }} style={{ width: '70%', height: '70%' }} resizeMode="contain" />
                     ) : (
-                      <Text className="text-white font-black text-xl">{company.name.charAt(0)}</Text>
+                      <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>{company.name.charAt(0)}</Text>
                     )}
                   </TouchableOpacity>
                   <View className="flex-1">
-                    <Text className="text-lg font-black text-white tracking-tight" numberOfLines={1}>{company.name}</Text>
-                    <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{company.structure}</Text>
+                    <Text style={{ color: '#fff', fontSize: 17, fontWeight: '600', letterSpacing: 0 }} numberOfLines={1}>{company.name}</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '400', letterSpacing: 0, marginTop: 2 }}>{company.structure}</Text>
                   </View>
                 </View>
                 {/* Mo. Burn */}
@@ -148,10 +148,10 @@ export default function DashboardScreen() {
                   if (burn <= 0) return null;
                   return (
                     <View className="items-end">
-                      <Text className="text-white font-black text-base tracking-tight">
+                      <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700', letterSpacing: 0 }}>
                         ${burn >= 1000 ? (burn / 1000).toFixed(1) + 'k' : burn.toFixed(0)}
                       </Text>
-                      <Text className="text-[9px] font-bold text-white/30 uppercase tracking-widest">mo. burn</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '500', letterSpacing: 0 }}>mo. burn</Text>
                     </View>
                   );
                 })()}
@@ -160,15 +160,15 @@ export default function DashboardScreen() {
               <View className="flex-row items-center justify-between border-t border-white/5 pt-4">
                 <View className="flex-col gap-1.5">
                   <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.4)" />
-                    <Text className="text-[11px] font-medium text-white/40">
-                      Modified: <Text className="text-white/80 font-bold">{getTimeAgo(company.lastModified)}</Text>
+                    <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.4)" />
+                    <Text style={{ fontSize: 12, fontWeight: '400', color: 'rgba(255,255,255,0.4)' }}>
+                      Modified: <Text style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '500' }}>{getTimeAgo(company.lastModified)}</Text>
                     </Text>
                   </View>
                   <View className="flex-row items-center gap-1.5">
-                    <Ionicons name="eye-outline" size={14} color="rgba(255,255,255,0.4)" />
-                    <Text className="text-[11px] font-medium text-white/40">
-                      Viewed: <Text className="text-white/80 font-bold">{getTimeAgo(company.lastViewed)}</Text>
+                    <Ionicons name="eye-outline" size={13} color="rgba(255,255,255,0.4)" />
+                    <Text style={{ fontSize: 12, fontWeight: '400', color: 'rgba(255,255,255,0.4)' }}>
+                      Viewed: <Text style={{ color: 'rgba(255,255,255,0.8)', fontWeight: '500' }}>{getTimeAgo(company.lastViewed)}</Text>
                     </Text>
                   </View>
                 </View>

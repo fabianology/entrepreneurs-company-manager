@@ -3,9 +3,6 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Modal, Alert, Pressable, KeyboardAvoidingView, Platform, Clipboard
 } from 'react-native';
-import Reanimated, {
-  useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing
-} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -13,43 +10,6 @@ import { Subscription, SubService, LinkedEmail } from '../../types';
 import CompanyHeader from '../../components/CompanyHeader';
 
 const genId = () => Math.random().toString(36).substr(2, 9);
-
-// Animated glowing border — animates opacity (safe) not borderColor string (crashes)
-function AnimatedBorderBox({ active, children, style }: { active: boolean; children: React.ReactNode; style?: any }) {
-  const anim = useSharedValue(0);
-
-  useEffect(() => {
-    if (active) {
-      anim.value = withRepeat(
-        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sine) }),
-        -1, true
-      );
-    } else {
-      anim.value = withTiming(0, { duration: 300 });
-    }
-  }, [active]);
-
-  const glowStyle = useAnimatedStyle(() => ({ opacity: anim.value }));
-
-  return (
-    <View style={[style, { borderRadius: 12, overflow: 'hidden' }]}>
-      {/* Static dim base border */}
-      <View style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-      }} pointerEvents="none" />
-      {/* Animated bright border */}
-      <Reanimated.View style={[{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-        borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.75)',
-        shadowColor: '#fff', shadowOpacity: 0.35, shadowRadius: 10,
-        shadowOffset: { width: 0, height: 0 },
-      }, glowStyle]} pointerEvents="none" />
-      {children}
-    </View>
-  );
-}
-
 
 export default function SubscriptionsScreen() {
   const { state, selectedCompanyId, handleUpdateSubscription, handleAddSubscription, handleDeleteSubscription, subMetrics } = useAppContext();
@@ -240,26 +200,26 @@ export default function SubscriptionsScreen() {
 
                     {/* Name + Cost */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>{sub.name}</Text>
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 17, letterSpacing: 0, marginBottom: 4 }}>{sub.name}</Text>
                       {sub.pricingModel !== 'free' && (
                         <View style={{ flexDirection: 'row', gap: 16, marginTop: 4 }}>
                           <View>
                             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>${totals.primary.toFixed(2)}</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '900', fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, marginTop: 1 }}>{totals.primaryLabel}</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 11, letterSpacing: 0, marginTop: 1 }}>{totals.primaryLabel}</Text>
                           </View>
                           {totals.secondary > 0 && (
                             <>
                               <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 2 }} />
                               <View>
                                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>${totals.secondary.toFixed(2)}</Text>
-                                <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '900', fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, marginTop: 1 }}>{totals.secondaryLabel}</Text>
+                                <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 11, letterSpacing: 0, marginTop: 1 }}>{totals.secondaryLabel}</Text>
                               </View>
                             </>
                           )}
                           <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.05)', marginVertical: 2 }} />
                           <View>
                             <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>${totals.totalAnnual.toFixed(2)}</Text>
-                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '900', fontSize: 9, textTransform: 'uppercase', letterSpacing: 2, marginTop: 1 }}>est. yearly</Text>
+                            <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '500', fontSize: 11, letterSpacing: 0, marginTop: 1 }}>est. yearly</Text>
                           </View>
                         </View>
                       )}
@@ -271,20 +231,20 @@ export default function SubscriptionsScreen() {
                     {sub.status === 'Paused' ? (
                       <>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#ef4444' }} />
-                        <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>Paused</Text>
+                        <Text style={{ color: '#ef4444', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>Paused</Text>
                       </>
                     ) : (
                       <>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sub.renew === 'Manual' ? '#ef4444' : '#1FE400' }} />
-                        <Text style={{ color: sub.renew === 'Manual' ? '#ef4444' : '#1FE400', fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>
+                        <Text style={{ color: sub.renew === 'Manual' ? '#ef4444' : '#1FE400', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>
                           {sub.pricingModel === 'free' ? 'Free' : sub.renew === 'Manual' ? 'Manual' : 'Auto Renew'}
                         </Text>
                         <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>|</Text>
-                        <Text style={{ color: '#1FE400', fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>
+                        <Text style={{ color: '#1FE400', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>
                           {sub.pricingModel === 'free' ? 'Active' : 'Paid'}
                         </Text>
                         <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10 }}>|</Text>
-                        <Text style={{ color: '#1FE400', fontSize: 11, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>{sub.status}</Text>
+                        <Text style={{ color: '#1FE400', fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 }}>{sub.status}</Text>
                       </>
                     )}
                   </View>
@@ -296,8 +256,8 @@ export default function SubscriptionsScreen() {
                       onPress={() => handleCopy(sub.id, sub.loginId || '', 'login')}
                       style={{ flex: 1 }}
                     >
-                      <Text style={{ color: lastCopied?.id === sub.id && lastCopied.field === 'login' ? '#f97316' : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: 6 }}>
-                        {lastCopied?.id === sub.id && lastCopied.field === 'login' ? 'Copied' : 'Login ID'}
+                      <Text style={{ color: lastCopied?.id === sub.id && lastCopied.field === 'login' ? '#f97316' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0, marginBottom: 6 }}>
+                        {lastCopied?.id === sub.id && lastCopied.field === 'login' ? 'Copied ✓' : 'Login ID'}
                       </Text>
                       <View style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)' }}>
                         <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500' }} numberOfLines={1}>{sub.loginId || '—'}</Text>
@@ -310,8 +270,8 @@ export default function SubscriptionsScreen() {
                       style={{ flex: 1 }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                        <Text style={{ color: lastCopied?.id === sub.id && lastCopied.field === 'password' ? '#f97316' : 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 }}>
-                          {lastCopied?.id === sub.id && lastCopied.field === 'password' ? 'Copied' : 'Password'}
+                        <Text style={{ color: lastCopied?.id === sub.id && lastCopied.field === 'password' ? '#f97316' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500', letterSpacing: 0 }}>
+                          {lastCopied?.id === sub.id && lastCopied.field === 'password' ? 'Copied ✓' : 'Password'}
                         </Text>
                         <TouchableOpacity onPress={() => setVisiblePasswords(prev => toggle(prev, sub.id))}>
                           <Ionicons name={visiblePasswords.has(sub.id) ? 'eye-off' : 'eye'} size={14} color="rgba(255,255,255,0.3)" />
@@ -639,11 +599,7 @@ export default function SubscriptionsScreen() {
                   const eid = child.id || String(idx);
                   const isOpen = expandedModalSubServices.has(eid);
                   return (
-                    <AnimatedBorderBox
-                      key={eid}
-                      active={focusSubServiceId === eid}
-                      style={{ backgroundColor: 'rgba(0,0,0,0.2)', marginBottom: 8, overflow: 'hidden' }}
-                    >
+                    <View key={eid} style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)', marginBottom: 8, overflow: 'hidden' }}>
                       <TouchableOpacity onPress={() => setExpandedModalSubServices(prev => toggle(prev, eid))}
                         style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, height: 47 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -714,7 +670,7 @@ export default function SubscriptionsScreen() {
                           </View>
                         </View>
                       )}
-                    </AnimatedBorderBox>
+                    </View>
                   );
                 })}
               </View>
@@ -796,17 +752,17 @@ export default function SubscriptionsScreen() {
                     </View>
                   ) : (
                     <TouchableOpacity onPress={() => setShowDeleteConfirm(true)}>
-                      <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 }}>Delete</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, fontWeight: '500', letterSpacing: 0 }}>Delete</Text>
                     </TouchableOpacity>
                   )
                 )}
               </View>
               <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
                 <TouchableOpacity onPress={() => setEditingSub(null)}>
-                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 }}>Cancel</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, fontWeight: '500', letterSpacing: 0 }}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={handleSave} style={{ backgroundColor: '#EBC351', borderRadius: 16, paddingHorizontal: 24, paddingVertical: 12 }}>
-                  <Text style={{ color: '#000', fontSize: 11, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2 }}>Save Account</Text>
+                  <Text style={{ color: '#000', fontSize: 15, fontWeight: '600', letterSpacing: 0 }}>Save</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -819,16 +775,16 @@ export default function SubscriptionsScreen() {
 
 const styles = {
   fieldLabel: {
-    color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' as const,
-    textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 6
+    color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500' as const,
+    letterSpacing: 0, marginBottom: 6
   },
   inlineInput: {
     backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 13, fontWeight: '500' as const
   },
   modalLabel: {
-    color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' as const,
-    textTransform: 'uppercase' as const, letterSpacing: 2, marginBottom: 6, marginLeft: 4
+    color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '500' as const,
+    letterSpacing: 0, marginBottom: 6, marginLeft: 4
   },
   modalInput: {
     backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,

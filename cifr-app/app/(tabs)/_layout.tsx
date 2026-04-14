@@ -169,7 +169,7 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
       {/* Companies */}
       {state.companies.length > 0 && (
         <View>
-          <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, paddingHorizontal: 8, paddingVertical: 6 }}>
+          <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '500', letterSpacing: 0, paddingHorizontal: 8, paddingVertical: 6 }}>
             Jump to Company
           </Text>
           {state.companies.map(c => (

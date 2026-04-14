@@ -158,7 +158,7 @@ export default function CompanyDetailScreen() {
 
             {/* Entity Name Input */}
             <View className="flex-1">
-              <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-1">Entity Name</Text>
+              <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 4 }}>Entity Name</Text>
               <TextInput
                 value={formState.name}
                 onChangeText={v => updateField({ name: v })}
@@ -171,7 +171,7 @@ export default function CompanyDetailScreen() {
 
           {/* Structure */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Entity Structure</Text>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>Entity Structure</Text>
             <TouchableOpacity 
               onPress={() => setShowStructureMenu(!showStructureMenu)}
               className={`w-full flex-row items-center justify-between bg-[#111111] border border-white/10 px-5 py-3.5 transition-all ${showStructureMenu ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
@@ -200,7 +200,7 @@ export default function CompanyDetailScreen() {
 
           {/* Color */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Identity Color</Text>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>Identity Color</Text>
             <View className="flex-row flex-wrap gap-[6px]">
               {BRAND_COLORS.map(color => (
                 <TouchableOpacity
@@ -219,7 +219,7 @@ export default function CompanyDetailScreen() {
 
           {/* Website URL */}
           <View className="mb-5">
-            <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">Website URL</Text>
+            <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>Website URL</Text>
             <View className="flex-row items-center gap-2">
               <TextInput
                 value={formState.website}
@@ -241,7 +241,7 @@ export default function CompanyDetailScreen() {
         </View>
 
         {/* Quick Jumps */}
-        <Text className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] ml-1 mb-2">App Navigators</Text>
+        <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>App Navigators</Text>
         <View className="flex-row gap-3 mb-10 w-full">
           
           <TouchableOpacity 
