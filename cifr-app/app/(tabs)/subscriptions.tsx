@@ -14,44 +14,39 @@ import CompanyHeader from '../../components/CompanyHeader';
 
 const genId = () => Math.random().toString(36).substr(2, 9);
 
-// Animated glowing border for the focused sub-service item
+// Animated glowing border — animates opacity (safe) not borderColor string (crashes)
 function AnimatedBorderBox({ active, children, style }: { active: boolean; children: React.ReactNode; style?: any }) {
-  const opacity = useSharedValue(active ? 1 : 0);
+  const anim = useSharedValue(0);
 
   useEffect(() => {
     if (active) {
-      opacity.value = 0;
-      opacity.value = withRepeat(
+      anim.value = withRepeat(
         withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sine) }),
-        -1,
-        true
+        -1, true
       );
     } else {
-      opacity.value = 0;
+      anim.value = withTiming(0, { duration: 300 });
     }
   }, [active]);
 
-  const animStyle = useAnimatedStyle(() => ({
-    borderColor: `rgba(255,255,255,${opacity.value * 0.7})`,
-    shadowOpacity: opacity.value * 0.25,
-  }));
+  const glowStyle = useAnimatedStyle(() => ({ opacity: anim.value }));
 
   return (
-    <Reanimated.View
-      style={[
-        style,
-        {
-          borderWidth: 1,
-          borderRadius: 12,
-          shadowColor: '#fff',
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 0 },
-        },
-        animStyle,
-      ]}
-    >
+    <View style={[style, { borderRadius: 12, overflow: 'hidden' }]}>
+      {/* Static dim base border */}
+      <View style={{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+      }} pointerEvents="none" />
+      {/* Animated bright border */}
+      <Reanimated.View style={[{
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        borderRadius: 12, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.75)',
+        shadowColor: '#fff', shadowOpacity: 0.35, shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+      }, glowStyle]} pointerEvents="none" />
       {children}
-    </Reanimated.View>
+    </View>
   );
 }
 
