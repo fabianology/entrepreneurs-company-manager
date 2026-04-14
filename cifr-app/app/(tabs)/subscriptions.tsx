@@ -279,7 +279,7 @@ export default function SubscriptionsScreen() {
                       onPress={() => setExpandedCardDetails(prev => toggle(prev, sub.id))}
                       style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, height: 47 }}
                     >
-                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600', letterSpacing: 0.2 }}>
                         {isCardExpanded ? 'Less Details' : 'More Details'}
                       </Text>
                       <Ionicons name={isCardExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
@@ -329,8 +329,8 @@ export default function SubscriptionsScreen() {
                     onPress={() => setExpandedSubs(prev => toggle(prev, sub.id))}
                     style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, height: 47 }}
                   >
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>
-                      Supplemental Services <Text style={{ color: 'rgba(255,255,255,0.2)' }}>({sub.subServices?.length || 0})</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600', letterSpacing: 0.2 }}>
+                      Supplemental Services <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>({sub.subServices?.length || 0})</Text>
                     </Text>
                     <Ionicons name={isSubsExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
                   </TouchableOpacity>
@@ -370,8 +370,8 @@ export default function SubscriptionsScreen() {
                     onPress={() => setExpandedEmails(prev => toggle(prev, sub.id))}
                     style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, height: 47 }}
                   >
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500', textTransform: 'uppercase', letterSpacing: 2 }}>
-                      Linked Emails <Text style={{ color: 'rgba(255,255,255,0.2)' }}>({sub.linkedEmails?.length || 0})</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '600', letterSpacing: 0.2 }}>
+                      Linked Emails <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>({sub.linkedEmails?.length || 0})</Text>
                     </Text>
                     <Ionicons name={isEmailsExpanded ? 'chevron-up' : 'chevron-down'} size={16} color="rgba(255,255,255,0.4)" />
                   </TouchableOpacity>
