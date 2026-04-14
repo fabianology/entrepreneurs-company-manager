@@ -280,8 +280,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
 
   // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
-    pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 22, stiffness: 280, mass: 0.5,
+    pillX.value = withTiming(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
+      duration: 180, easing: Easing.out(Easing.cubic)
     });
   }, [safeIndex]);
 
@@ -323,12 +323,12 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       // Snap to nearest slot crisply
       const slot = Math.round((pillX.value - PILL_OFFSET) / SLOT_WIDTH);
       const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
-      // Satisfying micro-bounce lock-in
-      pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-        damping: 22, stiffness: 280, mass: 0.5,
+      // Rigid, quick slide with zero bounce
+      pillX.value = withTiming(clamped * SLOT_WIDTH + PILL_OFFSET, {
+        duration: 200, easing: Easing.out(Easing.cubic)
       });
-      // Shrink back with a tiny energetic bloop
-      pillScale.value = withSpring(1.0, { damping: 20, stiffness: 300 });
+      // Shrink back with crisp snap
+      pillScale.value = withTiming(1.0, { duration: 150, easing: Easing.out(Easing.cubic) });
       runOnJS(navigateTo)(clamped);
     });
 
@@ -345,8 +345,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const tapGesture = Gesture.Tap().onEnd((e) => {
     const slot = Math.floor(e.x / SLOT_WIDTH);
     const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
-    pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 22, stiffness: 280, mass: 0.5,
+    pillX.value = withTiming(clamped * SLOT_WIDTH + PILL_OFFSET, {
+      duration: 180, easing: Easing.out(Easing.cubic)
     });
     runOnJS(navigateTo)(clamped);
   });
@@ -472,6 +472,12 @@ export default function TabLayout() {
   const [showMenu, setShowMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
+  // Search drag physics
+  const searchTranslateY = useSharedValue(0);
+  const searchAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: searchTranslateY.value }]
+  }));
+
 
   const handleSelectCompany = (id: string) => {
     setSelectedCompanyId(id);
@@ -564,6 +570,7 @@ export default function TabLayout() {
       {/* ── Search Bar (dynamic width based on page) ── */}
       <TouchableOpacity
         onPress={() => {
+          searchTranslateY.value = 0;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowSearch(true);
         }}
@@ -658,14 +665,22 @@ export default function TabLayout() {
                 )}
                 
                 <GestureDetector gesture={
-                  Gesture.Pan().onEnd((e) => {
-                    if (e.translationY > 20 || e.velocityY > 500) {
-                      runOnJS(setShowSearch)(false);
-                      runOnJS(setSearchQuery)('');
-                    }
-                  })
+                  Gesture.Pan()
+                    .onUpdate((e) => {
+                      searchTranslateY.value = Math.max(0, e.translationY);
+                    })
+                    .onEnd((e) => {
+                      if (e.translationY > 40 || e.velocityY > 500) {
+                        searchTranslateY.value = withTiming(300, { duration: 250 }, () => {
+                          runOnJS(setShowSearch)(false);
+                          runOnJS(setSearchQuery)('');
+                        });
+                      } else {
+                        searchTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+                      }
+                    })
                 }>
-                  <View style={{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }}>
+                  <Reanimated.View style={[{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }, searchAnimatedStyle]}>
                     {/* Drag Handle */}
                     <View style={{ alignItems: 'center', marginBottom: 12 }}>
                       <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
@@ -696,7 +711,7 @@ export default function TabLayout() {
                         <Ionicons name="close" size={20} color="#fff" />
                       </TouchableOpacity>
                     </View>
-                  </View>
+                  </Reanimated.View>
                 </GestureDetector>
 
               </View>
