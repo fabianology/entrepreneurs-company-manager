@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Modal, Alert, Pressable, KeyboardAvoidingView, Platform, Clipboard
@@ -24,6 +24,9 @@ export default function SubscriptionsScreen() {
   const [expandedSecurity, setExpandedSecurity] = useState(false);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [lastCopied, setLastCopied] = useState<{ id: string; field: string } | null>(null);
+  const [focusSubServiceId, setFocusSubServiceId] = useState<string | null>(null);
+  const editScrollRef = useRef<ScrollView>(null);
+  const subServicesSectionY = useRef<number>(0);
 
   if (!state) return null;
 
@@ -59,13 +62,24 @@ export default function SubscriptionsScreen() {
     });
   };
 
-  const openEdit = (sub: Subscription) => {
+  const openEdit = (sub: Subscription, subServiceId?: string) => {
     setShowDeleteConfirm(false);
     setExpandedSecurity(false);
-    setExpandedModalSubServices(new Set());
+    setExpandedModalSubServices(subServiceId ? new Set([subServiceId]) : new Set());
     setExpandedModalEmails(new Set());
     setEditingSub({ ...sub });
+    setFocusSubServiceId(subServiceId || null);
   };
+
+  // Auto-scroll to sub-services section when opened via a row tap
+  useEffect(() => {
+    if (editingSub && focusSubServiceId) {
+      const timer = setTimeout(() => {
+        editScrollRef.current?.scrollTo({ y: subServicesSectionY.current, animated: true });
+      }, 250);
+      return () => clearTimeout(timer);
+    }
+  }, [editingSub?.id, focusSubServiceId]);
 
   const handleSave = () => {
     if (!editingSub) return;
@@ -338,7 +352,12 @@ export default function SubscriptionsScreen() {
                   {isSubsExpanded && (
                     <View style={{ paddingHorizontal: 24, paddingBottom: 24, gap: 12 }}>
                       {(sub.subServices || []).map((child, idx) => (
-                        <View key={child.id || idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <TouchableOpacity
+                          key={child.id || idx}
+                          activeOpacity={0.7}
+                          onPress={() => openEdit(sub, child.id)}
+                          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+                        >
                           <View style={{ flex: 1, flexDirection: 'column' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500', textTransform: 'uppercase' }}>{child.name}</Text>
@@ -354,7 +373,7 @@ export default function SubscriptionsScreen() {
                           <Text style={{ color: child.status === 'Paused' ? 'rgba(255,255,255,0.2)' : '#fff', fontSize: 13, fontWeight: '500' }}>
                             ${child.cost.toFixed(2)}<Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>/{child.billingCycle === 'Yearly' ? 'yr' : 'mo'}</Text>
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                       ))}
                       <TouchableOpacity onPress={() => { openEdit(sub); setTimeout(addSubService, 100); }}>
                         <Text style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 2, marginTop: 8 }}>+ add item</Text>
@@ -421,7 +440,7 @@ export default function SubscriptionsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 24, gap: 20 }} keyboardShouldPersistTaps="handled">
+            <ScrollView ref={editScrollRef} style={{ flex: 1 }} contentContainerStyle={{ padding: 24, gap: 20 }} keyboardShouldPersistTaps="handled">
 
               {/* Free/Paid Toggle */}
               <View style={{ flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 100, padding: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', alignSelf: 'center', minWidth: 200 }}>
@@ -567,7 +586,10 @@ export default function SubscriptionsScreen() {
               </View>
 
               {/* Sub-Services Manager */}
-              <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 24 }}>
+              <View
+                onLayout={(e) => { subServicesSectionY.current = e.nativeEvent.layout.y; }}
+                style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', paddingTop: 24 }}
+              >
                 <TouchableOpacity onPress={addSubService} style={{ height: 60, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 12 }}>
                   <Text style={{ fontSize: 20 }}>💾</Text>
                   <Text style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '700', fontSize: 11, textTransform: 'uppercase', letterSpacing: 2 }}>Add Supplemental Service</Text>
