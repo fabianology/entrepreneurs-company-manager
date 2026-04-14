@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useAppContext } from '../../context/AppContext';
 import { Company } from '../../types';
@@ -86,6 +87,7 @@ export default function DashboardScreen() {
   }
 
   const handleCompanyPress = (company: Company) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     handleUpdateCompany(company.id, { lastViewed: Date.now() });
     setSelectedCompanyId(company.id);
     router.push(`/company/${company.id}`);
@@ -117,6 +119,7 @@ export default function DashboardScreen() {
               <TouchableOpacity 
                 activeOpacity={0.8}
               onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                 handleUpdateCompany(company.id, { lastViewed: Date.now() });
                 setSelectedCompanyId(company.id);
                 router.push('/financials');
