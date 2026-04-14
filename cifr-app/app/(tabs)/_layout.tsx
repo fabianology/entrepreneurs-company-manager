@@ -1,5 +1,6 @@
 import { Tabs, useRouter, usePathname } from 'expo-router';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
   View, Text, TouchableOpacity, TextInput, Modal,
   ScrollView, Animated, Dimensions, KeyboardAvoidingView,
@@ -382,8 +383,42 @@ export default function TabLayout() {
   };
 
   const BOTTOM = insets.bottom + 12;
+  const TABS = ['subscriptions', 'financials', 'documents'];
+
+  // Edge-swipe navigation — only fires when gesture begins within 60px of screen edge
+  const swipeStartX = useRef(0);
+  const swipeHandled = useRef(false);
+
+  const currentTabIndex = TABS.indexOf(pathname.replace('/', ''));
+
+  const navigateBySwipe = useCallback((direction: 'left' | 'right') => {
+    const idx = currentTabIndex < 0 ? 0 : currentTabIndex;
+    const next = direction === 'left' ? Math.min(idx + 1, TABS.length - 1) : Math.max(idx - 1, 0);
+    if (next !== idx) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push(`/${TABS[next]}` as any);
+    }
+  }, [currentTabIndex, router]);
+
+  const edgeSwipeGesture = Gesture.Pan()
+    .onBegin((e) => {
+      swipeStartX.current = e.x;
+      swipeHandled.current = false;
+    })
+    .onUpdate((e) => {
+      if (swipeHandled.current) return;
+      const isEdgeSwipe = swipeStartX.current < 60 || swipeStartX.current > SCREEN_WIDTH - 60;
+      if (!isEdgeSwipe) return;
+      if (Math.abs(e.translationX) > 50 && Math.abs(e.translationY) < 60) {
+        swipeHandled.current = true;
+        runOnJS(navigateBySwipe)(e.translationX < 0 ? 'left' : 'right');
+      }
+    })
+    .minDistance(30)
+    .activeOffsetX([-20, 20]);
 
   return (
+    <GestureDetector gesture={edgeSwipeGesture}>
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Tabs
         sceneContainerStyle={{ backgroundColor: 'transparent' }}
@@ -524,5 +559,6 @@ export default function TabLayout() {
         </KeyboardAvoidingView>
       </Modal>
     </View>
+    </GestureDetector>
   );
 }
