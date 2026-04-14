@@ -151,9 +151,10 @@ export default function DashboardScreen() {
                 stopRapidHaptic(company.id);
                 if (direction === 'left') {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                  // Navigate immediately — screen transition covers the snap-back
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
+                  // Fire both simultaneously: close animates while screen opens
+                  swipeRef.current?.close();
                   router.push(`/company/${company.id}`);
                 }
               }}
