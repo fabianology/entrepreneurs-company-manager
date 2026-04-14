@@ -281,7 +281,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
     pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 16, stiffness: 280, mass: 0.5,
+      damping: 20, stiffness: 280, mass: 0.5,
     });
   }, [safeIndex]);
 
@@ -325,10 +325,10 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
       // Satisfying micro-bounce lock-in
       pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-        damping: 16, stiffness: 280, mass: 0.5,
+        damping: 20, stiffness: 280, mass: 0.5,
       });
       // Shrink back with a tiny energetic bloop
-      pillScale.value = withSpring(1.0, { damping: 14, stiffness: 300 });
+      pillScale.value = withSpring(1.0, { damping: 18, stiffness: 300 });
       runOnJS(navigateTo)(clamped);
     });
 
@@ -346,7 +346,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     const slot = Math.floor(e.x / SLOT_WIDTH);
     const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
     pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 16, stiffness: 280, mass: 0.5,
+      damping: 20, stiffness: 280, mass: 0.5,
     });
     runOnJS(navigateTo)(clamped);
   });
