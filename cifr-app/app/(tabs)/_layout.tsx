@@ -192,7 +192,7 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
 }
 
 // ──────────── Custom Tab Bar ────────────
-import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate, interpolateColor } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 const TAB_WIDTH = 180;
@@ -233,9 +233,13 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     navigation.navigate(TAB_CONFIGS[index].name);
   };
 
+  const pillScale = useSharedValue(1);
+
   const panGesture = Gesture.Pan()
     .onBegin(() => {
       startX.value = pillX.value;
+      // Expand pill on touch
+      pillScale.value = withSpring(1.35, { damping: 12, stiffness: 200 });
     })
     .onUpdate((e) => {
       const next = startX.value + e.translationX;
@@ -248,12 +252,37 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
         damping: 18, stiffness: 200, mass: 0.5,
       });
+      // Shrink back
+      pillScale.value = withSpring(1.0, { damping: 14, stiffness: 250 });
       runOnJS(navigateTo)(clamped);
     });
 
-  const pillStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: pillX.value }],
-  }));
+  const pillStyle = useAnimatedStyle(() => {
+    // Interpolate a colour tint as the pill slides across the 3 slots
+    const colorTint = interpolateColor(
+      pillX.value,
+      [MIN_X, PILL_OFFSET + SLOT_WIDTH, MAX_X],
+      ['#60A5FA', '#22c55e', '#FBBF24'],
+    );
+    return {
+      transform: [
+        { translateX: pillX.value },
+        { scale: pillScale.value },
+      ],
+      // Pass tint to shadow so the glow shifts colour too
+      shadowColor: colorTint,
+    };
+  });
+
+  // Separate animated style for the colour-tinted inner body layer
+  const pillColorStyle = useAnimatedStyle(() => {
+    const colorTint = interpolateColor(
+      pillX.value,
+      [MIN_X, PILL_OFFSET + SLOT_WIDTH, MAX_X],
+      ['#60A5FA', '#22c55e', '#FBBF24'],
+    );
+    return { backgroundColor: colorTint };
+  });
 
   if (pathname === '/') return null;
 
@@ -289,7 +318,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
           shadowRadius: 20,
           elevation: 10,
           zIndex: 50,
-          overflow: 'hidden',
+          overflow: 'visible',
         }}
       >
         {/* Liquid glass pill — purely visual, no touch interception */}
@@ -330,18 +359,21 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
               backgroundColor: 'rgba(255,255,255,0.7)',
             }}
           />
-          {/* Inner body tint — faint centre glow */}
-          <View
+          {/* Inner body — live colour tint from nearest icon */}
+          <Reanimated.View
             pointerEvents="none"
-            style={{
-              position: 'absolute',
-              top: 2,
-              left: 4,
-              right: 4,
-              bottom: 4,
-              borderRadius: 16,
-              backgroundColor: 'rgba(255,255,255,0.05)',
-            }}
+            style={[
+              pillColorStyle,
+              {
+                position: 'absolute',
+                top: 2,
+                left: 4,
+                right: 4,
+                bottom: 4,
+                borderRadius: 16,
+                opacity: 0.18,
+              },
+            ]}
           />
           {/* Bottom inner shadow — gives the pill depth */}
           <View
