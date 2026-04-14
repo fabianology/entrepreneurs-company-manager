@@ -303,12 +303,60 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
               height: 36,
               top: 4,
               borderRadius: 18,
-              backgroundColor: 'rgba(255,255,255,0.13)',
+              overflow: 'hidden',
+              // Glass base — nearly transparent fill
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              // Bright perimeter border simulates glass edge refraction
               borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.28)',
+              borderColor: 'rgba(255,255,255,0.45)',
+              // Soft shadow for depth
+              shadowColor: 'rgba(255,255,255,0.3)',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.6,
+              shadowRadius: 4,
             },
           ]}
-        />
+        >
+          {/* Top specular highlight — the bright streak across real glass */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 6,
+              right: 6,
+              height: 1.5,
+              borderRadius: 1,
+              backgroundColor: 'rgba(255,255,255,0.7)',
+            }}
+          />
+          {/* Inner body tint — faint centre glow */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 2,
+              left: 4,
+              right: 4,
+              bottom: 4,
+              borderRadius: 16,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+            }}
+          />
+          {/* Bottom inner shadow — gives the pill depth */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 6,
+              right: 6,
+              height: 1,
+              borderRadius: 1,
+              backgroundColor: 'rgba(0,0,0,0.25)',
+            }}
+          />
+        </Reanimated.View>
 
         {/* Icon labels — visual only, gestures handled by container */}
         {TAB_CONFIGS.map((tab, i) => {
