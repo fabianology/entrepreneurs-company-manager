@@ -413,7 +413,7 @@ export default function TabLayout() {
           right: 20,
           height: 36,
           backgroundColor: '#1C1C1E',
-          borderRadius: 10,
+          borderRadius: 18,
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.1)',
           flexDirection: 'row',
