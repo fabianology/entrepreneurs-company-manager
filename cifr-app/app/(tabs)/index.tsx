@@ -76,16 +76,6 @@ export default function DashboardScreen() {
         if (!autoTriggered.current[company.id]) {
           autoTriggered.current[company.id] = true;
           startRapidHaptic(company.id);
-          
-          // Trigger the navigation slightly after holding
-          setTimeout(() => {
-            stopRapidHaptic(company.id);
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            handleUpdateCompany(company.id, { lastViewed: Date.now() });
-            setSelectedCompanyId(company.id);
-            swipeRef.current?.close();
-            router.push(`/company/${company.id}`);
-          }, 350); // requires holding at max extension for 350ms to commit
         }
       } else {
          if (autoTriggered.current[company.id]) {
@@ -175,15 +165,13 @@ export default function DashboardScreen() {
                 // Now handled by drag listener
               }}
               onSwipeableOpen={(direction) => {
-                // If they let go before auto-trigger commits, we handle it here
-                if (direction === 'left' && !autoTriggered.current[company.id]) {
+                if (direction === 'left') {
                   stopRapidHaptic(company.id);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
                   swipeRef.current?.close();
                   router.push(`/company/${company.id}`);
-                  // Note: calling swipeRef.current?.close() ensures it is cleanly closed on return
                 }
               }}
               onSwipeableClose={() => {
