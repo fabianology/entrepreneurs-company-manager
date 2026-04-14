@@ -69,7 +69,7 @@ export default function DashboardScreen() {
     }
   };
 
-  const renderLeftActions = (company: Company, progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+  const renderLeftActions = (company: Company, progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>, swipeRef: React.RefObject<Swipeable>) => {
     // Add real-time drag listener for auto-trigger
     dragX.addListener(({ value }) => {
       if (value > EDIT_THRESHOLD + 20) { // pulled past the threshold
@@ -83,6 +83,7 @@ export default function DashboardScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             handleUpdateCompany(company.id, { lastViewed: Date.now() });
             setSelectedCompanyId(company.id);
+            swipeRef.current?.close();
             router.push(`/company/${company.id}`);
           }, 350); // requires holding at max extension for 350ms to commit
         }
@@ -165,7 +166,7 @@ export default function DashboardScreen() {
             <Swipeable
               key={company.id}
               ref={swipeRef}
-              renderLeftActions={(prog, drag) => renderLeftActions(company, prog, drag)}
+              renderLeftActions={(prog, drag) => renderLeftActions(company, prog, drag, swipeRef)}
               renderRightActions={() => renderRightActions(company)}
               leftThreshold={EDIT_THRESHOLD}
               rightThreshold={96}
@@ -180,8 +181,9 @@ export default function DashboardScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
+                  swipeRef.current?.close();
                   router.push(`/company/${company.id}`);
-                  // Note: not calling swipeRef.close() prior to routing prevents the JS frame freeze
+                  // Note: calling swipeRef.current?.close() ensures it is cleanly closed on return
                 }
               }}
               onSwipeableClose={() => {
