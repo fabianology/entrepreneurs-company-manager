@@ -192,7 +192,7 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
 }
 
 // ──────────── Custom Tab Bar ────────────
-import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate, interpolateColor } from 'react-native-reanimated';
+import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, Easing, runOnJS, interpolate } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 // Magnifying glass icon — scales up + bleeds color as pill passes over it (sfumato)
@@ -280,8 +280,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
 
   // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
-    pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 24, stiffness: 350, mass: 0.4,
+    pillX.value = withTiming(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
+      duration: 180, easing: Easing.out(Easing.cubic)
     });
   }, [safeIndex]);
 
@@ -323,11 +323,12 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       // Snap to nearest slot crisply
       const slot = Math.round((pillX.value - PILL_OFFSET) / SLOT_WIDTH);
       const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
-      pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-        damping: 24, stiffness: 350, mass: 0.4,
+      // Rigid, quick slide with zero bounce
+      pillX.value = withTiming(clamped * SLOT_WIDTH + PILL_OFFSET, {
+        duration: 200, easing: Easing.out(Easing.cubic)
       });
       // Shrink back with crisp snap
-      pillScale.value = withSpring(1.0, { damping: 20, stiffness: 350 });
+      pillScale.value = withTiming(1.0, { duration: 150, easing: Easing.out(Easing.cubic) });
       runOnJS(navigateTo)(clamped);
     });
 
@@ -344,8 +345,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const tapGesture = Gesture.Tap().onEnd((e) => {
     const slot = Math.floor(e.x / SLOT_WIDTH);
     const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
-    pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 24, stiffness: 350, mass: 0.4,
+    pillX.value = withTiming(clamped * SLOT_WIDTH + PILL_OFFSET, {
+      duration: 180, easing: Easing.out(Easing.cubic)
     });
     runOnJS(navigateTo)(clamped);
   });
@@ -560,7 +561,7 @@ export default function TabLayout() {
         <Tabs.Screen name="documents" options={{}} />
       </Tabs>
 
-      {/* ── Search Bar (squeezed between menu button and tab bar) ── */}
+      {/* ── Search Bar (dynamic width based on page) ── */}
       <TouchableOpacity
         onPress={() => { setShowSearch(true); }}
         activeOpacity={0.85}
@@ -568,8 +569,8 @@ export default function TabLayout() {
         style={{
           position: 'absolute',
           bottom: BOTTOM,
-          left: 20 + 44 + 8,
-          right: 20 + TAB_WIDTH + 8,
+          left: pathname === '/' ? 20 : 20 + 44 + 8,
+          right: pathname === '/' ? 20 : 20 + TAB_WIDTH + 8,
           height: 44,
           backgroundColor: 'rgba(28,28,30,0.65)',
           borderRadius: 22,
