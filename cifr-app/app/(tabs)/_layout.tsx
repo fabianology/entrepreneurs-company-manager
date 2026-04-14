@@ -280,9 +280,9 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
           bottom: BOTTOM,
           right: 20,
           width: TAB_WIDTH,
-          height: 32,
+          height: 44,
           backgroundColor: '#1C1C1E',
-          borderRadius: 40,
+          borderRadius: 22,
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.1)',
           flexDirection: 'row',
@@ -303,9 +303,9 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
             {
               position: 'absolute',
               width: PILL_WIDTH,
-              height: 24,
+              height: 36,
               top: 4,
-              borderRadius: 12,
+              borderRadius: 18,
               backgroundColor: 'rgba(255,255,255,0.13)',
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.28)',
@@ -407,12 +407,12 @@ export default function TabLayout() {
         activeOpacity={0.85}
         style={{
           position: 'absolute',
-          bottom: pathname === '/' ? BOTTOM : BOTTOM + 32 + 10,
+          bottom: pathname === '/' ? BOTTOM : BOTTOM + 44 + 10,
           left: 20,
           right: 20,
-          height: 32,
+          height: 44,
           backgroundColor: '#1C1C1E',
-          borderRadius: 40,
+          borderRadius: 22,
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.1)',
           flexDirection: 'row',
@@ -422,8 +422,8 @@ export default function TabLayout() {
           zIndex: 50,
         }}
       >
-        <Ionicons name="search" size={13} color="rgba(255,255,255,0.3)" />
-        <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 }}>Search</Text>
+        <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
+        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17, fontWeight: '400' }}>Search</Text>
       </TouchableOpacity>
 
       {/* ── Tap-outside dismiss overlay ── */}
@@ -438,7 +438,7 @@ export default function TabLayout() {
       {showMenu && (
         <View style={{
           position: 'absolute',
-          bottom: BOTTOM + 32 + 10,
+          bottom: BOTTOM + 44 + 10,
           left: 20,
           zIndex: 100,
         }}>
@@ -457,10 +457,10 @@ export default function TabLayout() {
             position: 'absolute',
             bottom: BOTTOM,
             left: 20,
-            width: 32,
-            height: 32,
+            width: 44,
+            height: 44,
             backgroundColor: showMenu ? 'rgba(255,255,255,0.15)' : '#1C1C1E',
-            borderRadius: 16,
+            borderRadius: 22,
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.1)',
             alignItems: 'center',
@@ -468,7 +468,7 @@ export default function TabLayout() {
             zIndex: 101,
           }}
         >
-          <Ionicons name={showMenu ? 'close' : 'menu'} size={16} color="#fff" />
+          <Ionicons name={showMenu ? 'close' : 'menu'} size={24} color="#fff" />
         </TouchableOpacity>
       )}
 
@@ -490,7 +490,7 @@ export default function TabLayout() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(28,28,30,0.98)', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 16, paddingVertical: 12, paddingBottom: insets.bottom + 12, gap: 10 }}>
                   <Ionicons name="search" size={18} color="rgba(235,195,81,0.8)" />
                   <TextInput
-                    style={{ flex: 1, color: '#fff', fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2 }}
+                    style={{ flex: 1, color: '#fff', fontSize: 17, fontWeight: '400' }}
                     placeholder="Search"
                     placeholderTextColor="rgba(255,255,255,0.25)"
                     value={searchQuery}
@@ -505,7 +505,7 @@ export default function TabLayout() {
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }}>
-                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '700', fontSize: 13 }}>Cancel</Text>
+                    <Text style={{ color: 'rgba(255,255,255,0.4)', fontWeight: '400', fontSize: 17 }}>Cancel</Text>
                   </TouchableOpacity>
                 </View>
               </View>
