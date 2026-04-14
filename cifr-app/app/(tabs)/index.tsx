@@ -125,7 +125,7 @@ export default function DashboardScreen() {
               className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden relative"
             >
               <View className="flex-row items-center justify-between mb-5">
-                <View className="flex-row items-center max-w-[85%]">
+                <View className="flex-row items-center flex-1 mr-4">
                   <TouchableOpacity
                     onPress={() => handleCompanyPress(company)}
                     style={{ backgroundColor: (company.logoUrl || getFaviconUrl(company.website)) ? 'transparent' : (company.color || '#3b82f6') }}
@@ -142,6 +142,19 @@ export default function DashboardScreen() {
                     <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{company.structure}</Text>
                   </View>
                 </View>
+                {/* Mo. Burn */}
+                {(() => {
+                  const burn = calcMonthlyBurn(company.id, state);
+                  if (burn <= 0) return null;
+                  return (
+                    <View className="items-end">
+                      <Text className="text-white font-black text-base tracking-tight">
+                        ${burn >= 1000 ? (burn / 1000).toFixed(1) + 'k' : burn.toFixed(0)}
+                      </Text>
+                      <Text className="text-[9px] font-bold text-white/30 uppercase tracking-widest">mo. burn</Text>
+                    </View>
+                  );
+                })()}
               </View>
 
               <View className="flex-row items-center justify-between border-t border-white/5 pt-4">
@@ -159,20 +172,6 @@ export default function DashboardScreen() {
                     </Text>
                   </View>
                 </View>
-
-                {/* Mo. Burn */}
-                {(() => {
-                  const burn = calcMonthlyBurn(company.id, state);
-                  if (burn <= 0) return null;
-                  return (
-                    <View className="items-end mr-2">
-                      <Text className="text-white font-black text-base tracking-tight">
-                        ${burn >= 1000 ? (burn / 1000).toFixed(1) + 'k' : burn.toFixed(0)}
-                      </Text>
-                      <Text className="text-[9px] font-bold text-white/30 uppercase tracking-widest">mo. burn</Text>
-                    </View>
-                  );
-                })()}
 
                 {/* Inline Flex Shortcut Array with Inverse Margins */}
                 <View style={{ marginRight: -10, marginBottom: -10 }} className="flex-row items-center justify-around bg-black/30 w-40 px-1 py-1 rounded-xl border border-white/5 shadow-xl">
