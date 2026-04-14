@@ -280,8 +280,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
 
   // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
-    pillX.value = withTiming(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      duration: 180, easing: Easing.out(Easing.cubic)
+    pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
+      damping: 16, stiffness: 280, mass: 0.5,
     });
   }, [safeIndex]);
 
@@ -323,12 +323,12 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       // Snap to nearest slot crisply
       const slot = Math.round((pillX.value - PILL_OFFSET) / SLOT_WIDTH);
       const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
-      // Rigid, quick slide with zero bounce
-      pillX.value = withTiming(clamped * SLOT_WIDTH + PILL_OFFSET, {
-        duration: 200, easing: Easing.out(Easing.cubic)
+      // Satisfying micro-bounce lock-in
+      pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
+        damping: 16, stiffness: 280, mass: 0.5,
       });
-      // Shrink back with crisp snap
-      pillScale.value = withTiming(1.0, { duration: 150, easing: Easing.out(Easing.cubic) });
+      // Shrink back with a tiny energetic bloop
+      pillScale.value = withSpring(1.0, { damping: 14, stiffness: 300 });
       runOnJS(navigateTo)(clamped);
     });
 
@@ -345,8 +345,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const tapGesture = Gesture.Tap().onEnd((e) => {
     const slot = Math.floor(e.x / SLOT_WIDTH);
     const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
-    pillX.value = withTiming(clamped * SLOT_WIDTH + PILL_OFFSET, {
-      duration: 180, easing: Easing.out(Easing.cubic)
+    pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
+      damping: 16, stiffness: 280, mass: 0.5,
     });
     runOnJS(navigateTo)(clamped);
   });
