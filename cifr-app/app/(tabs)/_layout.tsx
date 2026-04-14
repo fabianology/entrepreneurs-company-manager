@@ -30,7 +30,7 @@ function SearchResultsSheet({
   const { companies, subscriptions, financials, hasResults } = globalSearchResults;
 
   return (
-    <View style={{ position: 'absolute', bottom: 56, left: 0, right: 0, height: '65%', backgroundColor: 'rgba(17,17,17,0.97)', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', zIndex: 200 }}>
+    <View style={{ position: 'absolute', bottom: 72, left: 0, right: 0, height: '65%', backgroundColor: 'rgba(17,17,17,0.97)', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', zIndex: 200 }}>
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
         {!hasResults ? (
           <View style={{ alignItems: 'center', paddingVertical: 48 }}>
@@ -485,35 +485,37 @@ export default function TabLayout() {
                   />
                 )}
                 
-                {/* Drag Handle */}
-                <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                  <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 10, gap: 10 }}>
-                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 36, paddingHorizontal: 14, gap: 8 }}>
-                    <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
-                    <TextInput
-                      style={{ flex: 1, color: '#fff', fontSize: 17, fontWeight: '400' }}
-                      placeholder="Search"
-                      placeholderTextColor="rgba(255,255,255,0.25)"
-                      value={searchQuery}
-                      onChangeText={setSearchQuery}
-                      autoFocus
-                      returnKeyType="search"
-                      onSubmitEditing={() => { setShowSearch(false); setSearchQuery(''); }}
-                    />
-                    {searchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchQuery('')}>
-                        <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.3)" />
-                      </TouchableOpacity>
-                    )}
+                <View style={{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }}>
+                  {/* Drag Handle */}
+                  <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                    <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
                   </View>
-                  
-                  {/* Separate Close Button */}
-                  <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Ionicons name="close" size={20} color="#fff" />
-                  </TouchableOpacity>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, gap: 10 }}>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 36, paddingHorizontal: 14, gap: 8 }}>
+                      <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
+                      <TextInput
+                        style={{ flex: 1, color: '#fff', fontSize: 17, fontWeight: '400' }}
+                        placeholder="Search"
+                        placeholderTextColor="rgba(255,255,255,0.25)"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        autoFocus
+                        returnKeyType="search"
+                        onSubmitEditing={() => { setShowSearch(false); setSearchQuery(''); }}
+                      />
+                      {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                          <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.3)" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    
+                    {/* Separate Close Button */}
+                    <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="close" size={20} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
               </View>
