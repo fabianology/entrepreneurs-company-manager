@@ -281,7 +281,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
     pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 20, stiffness: 280, mass: 0.5,
+      damping: 22, stiffness: 280, mass: 0.5,
     });
   }, [safeIndex]);
 
@@ -325,10 +325,10 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
       // Satisfying micro-bounce lock-in
       pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-        damping: 20, stiffness: 280, mass: 0.5,
+        damping: 22, stiffness: 280, mass: 0.5,
       });
       // Shrink back with a tiny energetic bloop
-      pillScale.value = withSpring(1.0, { damping: 18, stiffness: 300 });
+      pillScale.value = withSpring(1.0, { damping: 20, stiffness: 300 });
       runOnJS(navigateTo)(clamped);
     });
 
@@ -346,7 +346,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     const slot = Math.floor(e.x / SLOT_WIDTH);
     const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
     pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 20, stiffness: 280, mass: 0.5,
+      damping: 22, stiffness: 280, mass: 0.5,
     });
     runOnJS(navigateTo)(clamped);
   });
@@ -657,38 +657,47 @@ export default function TabLayout() {
                   />
                 )}
                 
-                <View style={{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }}>
-                  {/* Drag Handle */}
-                  <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                    <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, gap: 10 }}>
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 36, paddingHorizontal: 14, gap: 8 }}>
-                      <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
-                      <TextInput
-                        style={{ flex: 1, color: '#fff', fontSize: 17, fontWeight: '400' }}
-                        placeholder="Search"
-                        placeholderTextColor="rgba(255,255,255,0.25)"
-                        value={searchQuery}
-                        onChangeText={setSearchQuery}
-                        autoFocus
-                        returnKeyType="search"
-                        onSubmitEditing={() => { setShowSearch(false); setSearchQuery(''); }}
-                      />
-                      {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                          <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.3)" />
-                        </TouchableOpacity>
-                      )}
+                <GestureDetector gesture={
+                  Gesture.Pan().onEnd((e) => {
+                    if (e.translationY > 20 || e.velocityY > 500) {
+                      runOnJS(setShowSearch)(false);
+                      runOnJS(setSearchQuery)('');
+                    }
+                  })
+                }>
+                  <View style={{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }}>
+                    {/* Drag Handle */}
+                    <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                      <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
                     </View>
-                    
-                    {/* Separate Close Button */}
-                    <TouchableOpacity onPress={() => { setShowSearch(false); setSearchQuery(''); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="close" size={20} color="#fff" />
-                    </TouchableOpacity>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, gap: 10 }}>
+                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 36, paddingHorizontal: 14, gap: 8 }}>
+                        <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
+                        <TextInput
+                          style={{ flex: 1, color: '#fff', fontSize: 17, fontWeight: '400' }}
+                          placeholder="Search"
+                          placeholderTextColor="rgba(255,255,255,0.25)"
+                          value={searchQuery}
+                          onChangeText={setSearchQuery}
+                          autoFocus
+                          returnKeyType="search"
+                          onSubmitEditing={() => { setShowSearch(false); setSearchQuery(''); }}
+                        />
+                        {searchQuery.length > 0 && (
+                          <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSearchQuery(''); }}>
+                            <Ionicons name="close-circle" size={16} color="rgba(255,255,255,0.3)" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      
+                      {/* Separate Close Button */}
+                      <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(false); setSearchQuery(''); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="close" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+                </GestureDetector>
 
               </View>
             </Pressable>
