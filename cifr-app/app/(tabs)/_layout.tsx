@@ -650,11 +650,11 @@ export default function TabLayout() {
 
       {/* ── Search Modal ── */}
       <Modal visible={showSearch} transparent animationType="fade" onRequestClose={() => { setShowSearch(false); setSearchQuery(''); }}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' }} onPress={() => { setShowSearch(false); setSearchQuery(''); }}>
-            <Pressable onPress={() => {}} style={{ flex: 1 }}>
+            <Pressable onPress={() => {}} style={{ flex: 1, justifyContent: 'flex-end' }}>
               {/* Search Input Bar pinned to keyboard */}
-              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 300 }}>
+              <View style={{ width: '100%', zIndex: 300 }}>
                 {searchQuery.length > 0 && (
                   <SearchResultsSheet
                     onClose={() => { setShowSearch(false); setSearchQuery(''); }}
