@@ -15,13 +15,30 @@ const getTimeAgo = (timestamp?: number) => {
   const now = Date.now();
   const diffInMs = now - timestamp;
   const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-
   if (diffInDays === 0) {
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
     if (diffInHours === 0) return 'Just now';
     return `${diffInHours}h ago`;
   }
   return `${diffInDays}d ago`;
+};
+
+const calcMonthlyBurn = (companyId: string, state: any): number => {
+  if (!state) return 0;
+  let total = 0;
+  // Active subscriptions
+  (state.subscriptions || []).filter((s: any) => s.companyId === companyId && s.status === 'Active').forEach((s: any) => {
+    total += s.billingCycle === 'Yearly' ? (s.cost / 12) : s.cost;
+    // Sub-services
+    (s.subServices || []).filter((ss: any) => ss.status === 'Active').forEach((ss: any) => {
+      total += ss.billingCycle === 'Yearly' ? (ss.cost / 12) : ss.cost;
+    });
+  });
+  // Active loans
+  (state.loans || []).filter((l: any) => l.companyId === companyId && l.status === 'Active').forEach((l: any) => {
+    total += l.monthlyPayment || 0;
+  });
+  return total;
 };
 
 export default function DashboardScreen() {
@@ -125,6 +142,19 @@ export default function DashboardScreen() {
                     <Text className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-0.5">{company.structure}</Text>
                   </View>
                 </View>
+                {/* Mo. Burn */}
+                {(() => {
+                  const burn = calcMonthlyBurn(company.id, state);
+                  if (burn <= 0) return null;
+                  return (
+                    <View className="items-end">
+                      <Text className="text-white font-black text-base tracking-tight">
+                        ${burn >= 1000 ? (burn / 1000).toFixed(1) + 'k' : burn.toFixed(0)}
+                      </Text>
+                      <Text className="text-[9px] font-bold text-white/30 uppercase tracking-widest">mo. burn</Text>
+                    </View>
+                  );
+                })()}
               </View>
 
               <View className="flex-row items-center justify-between border-t border-white/5 pt-4">
