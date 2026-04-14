@@ -281,7 +281,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   // Sync pill when tab changes externally (e.g. tap on icon)
   React.useEffect(() => {
     pillX.value = withSpring(safeIndex * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 18, stiffness: 180, mass: 0.6,
+      damping: 24, stiffness: 350, mass: 0.4,
     });
   }, [safeIndex]);
 
@@ -305,8 +305,8 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
   const panGesture = Gesture.Pan()
     .onBegin(() => {
       startX.value = pillX.value;
-      // Expand pill on touch
-      pillScale.value = withSpring(1.35, { damping: 12, stiffness: 200 });
+      // Expand pill on touch with crisp spring
+      pillScale.value = withSpring(1.35, { damping: 20, stiffness: 350 });
     })
     .onUpdate((e) => {
       const next = startX.value + e.translationX;
@@ -320,14 +320,14 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       }
     })
     .onEnd(() => {
-      // Snap to nearest slot
+      // Snap to nearest slot crisply
       const slot = Math.round((pillX.value - PILL_OFFSET) / SLOT_WIDTH);
       const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
       pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-        damping: 18, stiffness: 200, mass: 0.5,
+        damping: 24, stiffness: 350, mass: 0.4,
       });
-      // Shrink back with spring
-      pillScale.value = withSpring(1.0, { damping: 14, stiffness: 250 });
+      // Shrink back with crisp snap
+      pillScale.value = withSpring(1.0, { damping: 20, stiffness: 350 });
       runOnJS(navigateTo)(clamped);
     });
 
@@ -345,7 +345,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     const slot = Math.floor(e.x / SLOT_WIDTH);
     const clamped = Math.max(0, Math.min(TAB_COUNT - 1, slot));
     pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
-      damping: 18, stiffness: 200, mass: 0.5,
+      damping: 24, stiffness: 350, mass: 0.4,
     });
     runOnJS(navigateTo)(clamped);
   });
@@ -392,11 +392,6 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
               // Bright perimeter border simulates glass edge refraction
               borderWidth: 1,
               borderColor: 'rgba(255,255,255,0.45)',
-              // Soft shadow for depth
-              shadowColor: 'rgba(255,255,255,0.3)',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.6,
-              shadowRadius: 4,
             },
           ]}
         >
