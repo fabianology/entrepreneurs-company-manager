@@ -195,6 +195,24 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
 import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate, interpolateColor } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
+// Magnifying glass icon — scales up as the pill moves over it
+function AnimatedTabIcon({ pillX, index, icon, color, isActive }: {
+  pillX: any; index: number; icon: any; color: string; isActive: boolean;
+}) {
+  const iconCenterX = index * SLOT_WIDTH + SLOT_WIDTH / 2;
+  const magnifyStyle = useAnimatedStyle(() => {
+    const pillCenter = pillX.value + PILL_WIDTH / 2;
+    const distance = Math.abs(pillCenter - iconCenterX);
+    const scale = interpolate(distance, [0, SLOT_WIDTH * 0.8], [1.45, 1.0], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' });
+    return { transform: [{ scale }] };
+  });
+  return (
+    <Reanimated.View pointerEvents="none" style={magnifyStyle}>
+      <Ionicons name={icon} size={18} color={isActive ? color : 'rgba(255,255,255,0.4)'} />
+    </Reanimated.View>
+  );
+}
+
 const TAB_WIDTH = 180;
 const TAB_COUNT = 3;
 const SLOT_WIDTH = TAB_WIDTH / TAB_COUNT; // 60px each
@@ -257,32 +275,12 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       runOnJS(navigateTo)(clamped);
     });
 
-  const pillStyle = useAnimatedStyle(() => {
-    // Interpolate a colour tint as the pill slides across the 3 slots
-    const colorTint = interpolateColor(
-      pillX.value,
-      [MIN_X, PILL_OFFSET + SLOT_WIDTH, MAX_X],
-      ['#60A5FA', '#22c55e', '#FBBF24'],
-    );
-    return {
-      transform: [
-        { translateX: pillX.value },
-        { scale: pillScale.value },
-      ],
-      // Pass tint to shadow so the glow shifts colour too
-      shadowColor: colorTint,
-    };
-  });
-
-  // Separate animated style for the colour-tinted inner body layer
-  const pillColorStyle = useAnimatedStyle(() => {
-    const colorTint = interpolateColor(
-      pillX.value,
-      [MIN_X, PILL_OFFSET + SLOT_WIDTH, MAX_X],
-      ['#60A5FA', '#22c55e', '#FBBF24'],
-    );
-    return { backgroundColor: colorTint };
-  });
+  const pillStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: pillX.value },
+      { scale: pillScale.value },
+    ],
+  }));
 
   if (pathname === '/') return null;
 
@@ -359,21 +357,18 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
               backgroundColor: 'rgba(255,255,255,0.7)',
             }}
           />
-          {/* Inner body — live colour tint from nearest icon */}
-          <Reanimated.View
+          {/* Inner body — clear glass fill, no tint */}
+          <View
             pointerEvents="none"
-            style={[
-              pillColorStyle,
-              {
-                position: 'absolute',
-                top: 2,
-                left: 4,
-                right: 4,
-                bottom: 4,
-                borderRadius: 16,
-                opacity: 0.18,
-              },
-            ]}
+            style={{
+              position: 'absolute',
+              top: 2,
+              left: 4,
+              right: 4,
+              bottom: 4,
+              borderRadius: 16,
+              backgroundColor: 'rgba(255,255,255,0.04)',
+            }}
           />
           {/* Bottom inner shadow — gives the pill depth */}
           <View
@@ -390,7 +385,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
           />
         </Reanimated.View>
 
-        {/* Icon labels — visual only, gestures handled by container */}
+        {/* Icon labels — magnified by glass pill as it passes over */}
         {TAB_CONFIGS.map((tab, i) => {
           const isActive = i === safeIndex;
           return (
@@ -399,10 +394,12 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
               pointerEvents="none"
               style={{ width: SLOT_WIDTH, alignItems: 'center', justifyContent: 'center', height: '100%' }}
             >
-              <Ionicons
-                name={tab.icon}
-                size={18}
-                color={isActive ? tab.color : 'rgba(255,255,255,0.4)'}
+              <AnimatedTabIcon
+                pillX={pillX}
+                index={i}
+                icon={tab.icon}
+                color={tab.color}
+                isActive={isActive}
               />
             </View>
           );
