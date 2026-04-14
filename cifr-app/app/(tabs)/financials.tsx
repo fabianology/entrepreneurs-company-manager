@@ -325,9 +325,6 @@ function EditBankModal({ inst, loans, cards, onSave, onDelete, onClose, onAddCar
                           <View style={{ flex: 1 }}><Field label="Card Nickname" value={acc.name} placeholder="Chase Sapphire" onChangeText={v => updateAcc(idx, { name: v })} /></View>
                           <View style={{ flex: 1 }}>
                             <SelectField label="Type" value={acc.type} options={cardTypes.map(t => ({ label: t, value: t }))} onChange={v => updateAcc(idx, { type: v as any })} />
-                          <View style={{ flex: 1 }}><Field label="CARD NICKNAME" value={acc.name} placeholder="Chase Sapphire" onChangeText={v => updateAcc(idx, { name: v })} /></View>
-                          <View style={{ flex: 1 }}>
-                            <SelectField label="TYPE" value={acc.type} options={cardTypes.map(t => ({ label: t, value: t }))} onChange={v => updateAcc(idx, { type: v as any })} />
                           </View>
                         </View>
                         <View style={{ flexDirection: 'row', gap: 10 }}>
