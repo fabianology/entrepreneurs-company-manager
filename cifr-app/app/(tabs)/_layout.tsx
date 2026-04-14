@@ -30,7 +30,7 @@ function SearchResultsSheet({
   const { companies, subscriptions, financials, hasResults } = globalSearchResults;
 
   return (
-    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '65%', backgroundColor: 'rgba(17,17,17,0.97)', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', zIndex: 200 }}>
+    <View style={{ position: 'absolute', bottom: 56, left: 0, right: 0, height: '65%', backgroundColor: 'rgba(17,17,17,0.97)', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', zIndex: 200 }}>
       {/* Handle */}
       <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }}>
         <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
