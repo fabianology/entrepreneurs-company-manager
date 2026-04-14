@@ -243,12 +243,7 @@ function AnimatedTabIcon({ pillX, index, icon, color, isActive }: {
     };
   });
 
-  // Compute the live blended icon color based on proximity
-  const iconColorStyle = useAnimatedStyle(() => {
-    return {}; // used for layout, actual color interpolated below
-  });
-
-  // Since Ionicons color prop can’t be animated directly, we overlay a tinted glow
+  // Since Ionicons color prop can't be animated directly, we use opacity + shadow glow
   return (
     <Reanimated.View pointerEvents="none" style={[animatedProps, colorStyle]}>
       <Ionicons name={icon} size={18} color={isActive ? color : 'rgba(255,255,255,0.4)'} />
@@ -294,11 +289,16 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
 
   const navigateTo = (index: number) => {
     if (index !== lastNavigatedIndex.current) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Strong heavy snap when landing on new page
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       lastNavigatedIndex.current = index;
     }
     navigation.navigate(TAB_CONFIGS[index].name);
   };
+
+  // Subtle tick as pill crosses slot boundaries during drag
+  const lastDragSlot = React.useRef(safeIndex);
+  const selectionHaptic = () => Haptics.selectionAsync();
 
   const pillScale = useSharedValue(1);
 
@@ -311,6 +311,13 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     .onUpdate((e) => {
       const next = startX.value + e.translationX;
       pillX.value = Math.max(MIN_X, Math.min(MAX_X, next));
+      // Tick haptic each time pill crosses a slot boundary
+      const currentSlot = Math.round((pillX.value - PILL_OFFSET) / SLOT_WIDTH);
+      const clamped = Math.max(0, Math.min(TAB_COUNT - 1, currentSlot));
+      if (clamped !== lastDragSlot.current) {
+        lastDragSlot.current = clamped;
+        runOnJS(selectionHaptic)();
+      }
     })
     .onEnd(() => {
       // Snap to nearest slot
@@ -319,7 +326,7 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
       pillX.value = withSpring(clamped * SLOT_WIDTH + PILL_OFFSET, {
         damping: 18, stiffness: 200, mass: 0.5,
       });
-      // Shrink back
+      // Shrink back with spring
       pillScale.value = withSpring(1.0, { damping: 14, stiffness: 250 });
       runOnJS(navigateTo)(clamped);
     });
