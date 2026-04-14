@@ -405,14 +405,15 @@ export default function TabLayout() {
       <TouchableOpacity
         onPress={() => { setShowSearch(true); }}
         activeOpacity={0.85}
+        hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
         style={{
           position: 'absolute',
           bottom: pathname === '/' ? BOTTOM : BOTTOM + 44 + 10,
           left: 20,
           right: 20,
-          height: 44,
+          height: 36,
           backgroundColor: '#1C1C1E',
-          borderRadius: 22,
+          borderRadius: 10,
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.1)',
           flexDirection: 'row',
