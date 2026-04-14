@@ -52,38 +52,57 @@ export default function DashboardScreen() {
 
   // Track rapid haptic intervals per company card
   const hapticIntervals = useRef<Record<string, ReturnType<typeof setInterval>>>({});
-  const hapticTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Track if we already triggered from drag
+  const autoTriggered = useRef<Record<string, boolean>>({});
 
   const startRapidHaptic = (id: string) => {
-    // 180ms delay — a fling will trigger onSwipeableOpen before this fires,
-    // cancelling it cleanly. Only a deliberate hold survives the gate.
-    hapticTimeouts.current[id] = setTimeout(() => {
-      if (hapticIntervals.current[id]) return;
-      hapticIntervals.current[id] = setInterval(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }, 60);
-    }, 180);
+    if (hapticIntervals.current[id]) return;
+    hapticIntervals.current[id] = setInterval(() => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }, 60);
   };
 
   const stopRapidHaptic = (id: string) => {
-    if (hapticTimeouts.current[id]) {
-      clearTimeout(hapticTimeouts.current[id]);
-      delete hapticTimeouts.current[id];
-    }
     if (hapticIntervals.current[id]) {
       clearInterval(hapticIntervals.current[id]);
       delete hapticIntervals.current[id];
     }
   };
 
-  const renderLeftActions = (company: Company) => (
-    <View
-      className="bg-blue-600 justify-center items-start rounded-3xl mb-4 p-5 pl-6 h-[85%]"
-      style={{ width: EDIT_THRESHOLD }}
-    >
-      <Ionicons name="create-outline" size={24} color="#fff" />
-    </View>
-  );
+  const renderLeftActions = (company: Company, progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>) => {
+    // Add real-time drag listener for auto-trigger
+    dragX.addListener(({ value }) => {
+      if (value > EDIT_THRESHOLD + 20) { // pulled past the threshold
+        if (!autoTriggered.current[company.id]) {
+          autoTriggered.current[company.id] = true;
+          startRapidHaptic(company.id);
+          
+          // Trigger the navigation slightly after holding
+          setTimeout(() => {
+            stopRapidHaptic(company.id);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            handleUpdateCompany(company.id, { lastViewed: Date.now() });
+            setSelectedCompanyId(company.id);
+            router.push(`/company/${company.id}`);
+          }, 350); // requires holding at max extension for 350ms to commit
+        }
+      } else {
+         if (autoTriggered.current[company.id]) {
+           autoTriggered.current[company.id] = false;
+           stopRapidHaptic(company.id);
+         }
+      }
+    });
+
+    return (
+      <View
+        className="bg-blue-600 justify-center items-start rounded-3xl mb-4 p-5 pl-6 h-[85%]"
+        style={{ width: EDIT_THRESHOLD }}
+      >
+        <Ionicons name="create-outline" size={24} color="#fff" />
+      </View>
+    );
+  };
 
   const renderRightActions = (company: Company) => (
     <TouchableOpacity 
@@ -146,28 +165,29 @@ export default function DashboardScreen() {
             <Swipeable
               key={company.id}
               ref={swipeRef}
-              renderLeftActions={() => renderLeftActions(company)}
+              renderLeftActions={(prog, drag) => renderLeftActions(company, prog, drag)}
               renderRightActions={() => renderRightActions(company)}
               leftThreshold={EDIT_THRESHOLD}
               rightThreshold={96}
-              overshootLeft={false}
+              overshootLeft={true}
               onSwipeableWillOpen={(direction) => {
-                if (direction === 'left') {
-                  startRapidHaptic(company.id);
-                }
+                // Now handled by drag listener
               }}
               onSwipeableOpen={(direction) => {
-                stopRapidHaptic(company.id);
-                if (direction === 'left') {
+                // If they let go before auto-trigger commits, we handle it here
+                if (direction === 'left' && !autoTriggered.current[company.id]) {
+                  stopRapidHaptic(company.id);
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
-                  // Fire both simultaneously: close animates while screen opens
-                  swipeRef.current?.close();
                   router.push(`/company/${company.id}`);
+                  // Note: not calling swipeRef.close() prior to routing prevents the JS frame freeze
                 }
               }}
-              onSwipeableClose={() => stopRapidHaptic(company.id)}
+              onSwipeableClose={() => {
+                 stopRapidHaptic(company.id);
+                 autoTriggered.current[company.id] = false;
+              }}
             >
               <TouchableOpacity
                 activeOpacity={0.8}
