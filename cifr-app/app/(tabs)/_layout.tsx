@@ -4,7 +4,7 @@ import * as Haptics from 'expo-haptics';
 import {
   View, Text, TouchableOpacity, TextInput, Modal,
   ScrollView, Animated, Dimensions, KeyboardAvoidingView,
-  Platform, Pressable
+  Platform, Pressable, Keyboard
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -472,11 +472,8 @@ export default function TabLayout() {
   const [showMenu, setShowMenu] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
 
-  // Search drag physics
-  const searchTranslateY = useSharedValue(0);
-  const searchAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: searchTranslateY.value }]
-  }));
+  // Store ref to input so we can pop keyboard back up if drag is aborted
+  const searchInputRef = useRef<TextInput>(null);
 
 
   const handleSelectCompany = (id: string) => {
@@ -570,7 +567,6 @@ export default function TabLayout() {
       {/* ── Search Bar (dynamic width based on page) ── */}
       <TouchableOpacity
         onPress={() => {
-          searchTranslateY.value = 0;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           setShowSearch(true);
         }}
@@ -667,20 +663,23 @@ export default function TabLayout() {
                 <GestureDetector gesture={
                   Gesture.Pan()
                     .onUpdate((e) => {
-                      searchTranslateY.value = Math.max(0, e.translationY);
+                      if (e.translationY > 5) {
+                        runOnJS(Keyboard.dismiss)();
+                      }
                     })
                     .onEnd((e) => {
                       if (e.translationY > 40 || e.velocityY > 500) {
-                        searchTranslateY.value = withTiming(300, { duration: 250 }, () => {
-                          runOnJS(setShowSearch)(false);
-                          runOnJS(setSearchQuery)('');
-                        });
+                        runOnJS(setShowSearch)(false);
+                        runOnJS(setSearchQuery)('');
                       } else {
-                        searchTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+                        // Snap back up if aborted
+                        if (searchInputRef.current) {
+                          runOnJS((ref: any) => ref.current?.focus())({ current: searchInputRef.current });
+                        }
                       }
                     })
                 }>
-                  <Reanimated.View style={[{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }, searchAnimatedStyle]}>
+                  <View style={{ backgroundColor: '#000', paddingTop: 10, paddingBottom: 10 }}>
                     {/* Drag Handle */}
                     <View style={{ alignItems: 'center', marginBottom: 12 }}>
                       <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
@@ -690,6 +689,7 @@ export default function TabLayout() {
                       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 36, paddingHorizontal: 14, gap: 8 }}>
                         <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
                         <TextInput
+                          ref={searchInputRef}
                           style={{ flex: 1, color: '#fff', fontSize: 17, fontWeight: '400' }}
                           placeholder="Search"
                           placeholderTextColor="rgba(255,255,255,0.25)"
@@ -711,7 +711,7 @@ export default function TabLayout() {
                         <Ionicons name="close" size={20} color="#fff" />
                       </TouchableOpacity>
                     </View>
-                  </Reanimated.View>
+                  </View>
                 </GestureDetector>
 
               </View>
