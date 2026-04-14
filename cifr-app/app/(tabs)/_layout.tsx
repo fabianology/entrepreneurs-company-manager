@@ -397,30 +397,30 @@ export default function TabLayout() {
         <Tabs.Screen name="documents" options={{}} />
       </Tabs>
 
-      {/* ── Search Bar (full width, above nav row) ── */}
+      {/* ── Search Bar (squeezed between menu button and tab bar) ── */}
       <TouchableOpacity
         onPress={() => { setShowSearch(true); }}
         activeOpacity={0.85}
-        hitSlop={{ top: 8, bottom: 8, left: 0, right: 0 }}
+        hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
         style={{
           position: 'absolute',
-          bottom: pathname === '/' ? BOTTOM : BOTTOM + 44 + 10,
-          left: 20,
-          right: 20,
-          height: 36,
+          bottom: BOTTOM,
+          left: 20 + 44 + 8,
+          right: 20 + TAB_WIDTH + 8,
+          height: 44,
           backgroundColor: '#1C1C1E',
-          borderRadius: 18,
+          borderRadius: 22,
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.1)',
           flexDirection: 'row',
           alignItems: 'center',
-          paddingHorizontal: 14,
-          gap: 8,
+          paddingHorizontal: 12,
+          gap: 6,
           zIndex: 50,
         }}
       >
-        <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
-        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 17, fontWeight: '400' }}>Search</Text>
+        <Ionicons name="search" size={15} color="rgba(255,255,255,0.4)" />
+        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 15, fontWeight: '400' }}>Search</Text>
       </TouchableOpacity>
 
       {/* ── Tap-outside dismiss overlay ── */}
