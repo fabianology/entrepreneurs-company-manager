@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "cifr-app",
-    "slug": "cifr-app",
+    "slug": "cifrapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.vibing.cifrapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -45,7 +49,12 @@
       "reactCompiler": true
     },
     "extra": {
-      "geminiApiKey": "AIzaSyAFaBs3UO5oIq95HpW_zJBvhriNEsOTxmE"
-    }
+      "geminiApiKey": "AIzaSyAFaBs3UO5oIq95HpW_zJBvhriNEsOTxmE",
+      "router": {},
+      "eas": {
+        "projectId": "9395bbed-0f1e-4bdb-83a6-6ba79efa59ae"
+      }
+    },
+    "owner": "vibing"
   }
 }
