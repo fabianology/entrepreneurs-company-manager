@@ -31,10 +31,6 @@ function SearchResultsSheet({
 
   return (
     <View style={{ position: 'absolute', bottom: 56, left: 0, right: 0, height: '65%', backgroundColor: 'rgba(17,17,17,0.97)', borderTopLeftRadius: 32, borderTopRightRadius: 32, borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)', overflow: 'hidden', zIndex: 200 }}>
-      {/* Handle */}
-      <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 8 }}>
-        <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
-      </View>
       <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 48 }}>
         {!hasResults ? (
           <View style={{ alignItems: 'center', paddingVertical: 48 }}>
@@ -489,6 +485,11 @@ export default function TabLayout() {
                   />
                 )}
                 
+                {/* Drag Handle */}
+                <View style={{ alignItems: 'center', marginBottom: 12 }}>
+                  <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+                </View>
+
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 10, gap: 10 }}>
                   <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: '#1C1C1E', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', height: 36, paddingHorizontal: 14, gap: 8 }}>
                     <Ionicons name="search" size={16} color="rgba(255,255,255,0.4)" />
