@@ -3,6 +3,9 @@ import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   Modal, Alert, Pressable, KeyboardAvoidingView, Platform, Clipboard
 } from 'react-native';
+import Reanimated, {
+  useSharedValue, useAnimatedStyle, withRepeat, withTiming, Easing
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -10,6 +13,48 @@ import { Subscription, SubService, LinkedEmail } from '../../types';
 import CompanyHeader from '../../components/CompanyHeader';
 
 const genId = () => Math.random().toString(36).substr(2, 9);
+
+// Animated glowing border for the focused sub-service item
+function AnimatedBorderBox({ active, children, style }: { active: boolean; children: React.ReactNode; style?: any }) {
+  const opacity = useSharedValue(active ? 1 : 0);
+
+  useEffect(() => {
+    if (active) {
+      opacity.value = 0;
+      opacity.value = withRepeat(
+        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sine) }),
+        -1,
+        true
+      );
+    } else {
+      opacity.value = 0;
+    }
+  }, [active]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    borderColor: `rgba(255,255,255,${opacity.value * 0.7})`,
+    shadowOpacity: opacity.value * 0.25,
+  }));
+
+  return (
+    <Reanimated.View
+      style={[
+        style,
+        {
+          borderWidth: 1,
+          borderRadius: 12,
+          shadowColor: '#fff',
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 0 },
+        },
+        animStyle,
+      ]}
+    >
+      {children}
+    </Reanimated.View>
+  );
+}
+
 
 export default function SubscriptionsScreen() {
   const { state, selectedCompanyId, handleUpdateSubscription, handleAddSubscription, handleDeleteSubscription, subMetrics } = useAppContext();
@@ -599,7 +644,11 @@ export default function SubscriptionsScreen() {
                   const eid = child.id || String(idx);
                   const isOpen = expandedModalSubServices.has(eid);
                   return (
-                    <View key={eid} style={{ backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)', marginBottom: 8, overflow: 'hidden' }}>
+                    <AnimatedBorderBox
+                      key={eid}
+                      active={focusSubServiceId === eid}
+                      style={{ backgroundColor: 'rgba(0,0,0,0.2)', marginBottom: 8, overflow: 'hidden' }}
+                    >
                       <TouchableOpacity onPress={() => setExpandedModalSubServices(prev => toggle(prev, eid))}
                         style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, height: 47 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -670,7 +719,7 @@ export default function SubscriptionsScreen() {
                           </View>
                         </View>
                       )}
-                    </View>
+                    </AnimatedBorderBox>
                   );
                 })}
               </View>
