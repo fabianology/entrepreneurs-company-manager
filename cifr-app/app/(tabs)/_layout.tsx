@@ -195,19 +195,62 @@ function QuickMenuPopover({ onSelectDashboard, onSelectCompany }: {
 import Reanimated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolate, interpolateColor } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-// Magnifying glass icon — scales up as the pill moves over it
+// Magnifying glass icon — scales up + bleeds color as pill passes over it (sfumato)
 function AnimatedTabIcon({ pillX, index, icon, color, isActive }: {
   pillX: any; index: number; icon: any; color: string; isActive: boolean;
 }) {
   const iconCenterX = index * SLOT_WIDTH + SLOT_WIDTH / 2;
-  const magnifyStyle = useAnimatedStyle(() => {
+
+  const animatedProps = useAnimatedStyle(() => {
     const pillCenter = pillX.value + PILL_WIDTH / 2;
     const distance = Math.abs(pillCenter - iconCenterX);
-    const scale = interpolate(distance, [0, SLOT_WIDTH * 0.8], [1.45, 1.0], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' });
-    return { transform: [{ scale }] };
+
+    // Scale: magnify as glass passes over
+    const scale = interpolate(
+      distance,
+      [0, SLOT_WIDTH * 0.8],
+      [1.45, 1.0],
+      { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' }
+    );
+
+    // Proximity 0→full bloom over half a slot width
+    const proximity = interpolate(
+      distance,
+      [0, SLOT_WIDTH * 0.55],
+      [1.0, 0.0],
+      { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' }
+    );
+
+    return { transform: [{ scale }], opacity: isActive ? 1 : 0.4 + proximity * 0.6 };
   });
+
+  // Separate animated style for the color tint on the icon wrapper
+  const colorStyle = useAnimatedStyle(() => {
+    const pillCenter = pillX.value + PILL_WIDTH / 2;
+    const distance = Math.abs(pillCenter - iconCenterX);
+    const proximity = interpolate(
+      distance,
+      [0, SLOT_WIDTH * 0.55],
+      [1.0, 0.0],
+      { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' }
+    );
+    // Bloom glow behind icon as glass passes
+    return {
+      shadowColor: color,
+      shadowOpacity: isActive ? 0 : proximity * 0.9,
+      shadowRadius: proximity * 8,
+      shadowOffset: { width: 0, height: 0 },
+    };
+  });
+
+  // Compute the live blended icon color based on proximity
+  const iconColorStyle = useAnimatedStyle(() => {
+    return {}; // used for layout, actual color interpolated below
+  });
+
+  // Since Ionicons color prop can’t be animated directly, we overlay a tinted glow
   return (
-    <Reanimated.View pointerEvents="none" style={magnifyStyle}>
+    <Reanimated.View pointerEvents="none" style={[animatedProps, colorStyle]}>
       <Ionicons name={icon} size={18} color={isActive ? color : 'rgba(255,255,255,0.4)'} />
     </Reanimated.View>
   );
@@ -247,7 +290,13 @@ function CustomTabBar({ state, navigation }: { state: any; navigation: any }) {
     });
   }, [safeIndex]);
 
+  const lastNavigatedIndex = React.useRef(safeIndex);
+
   const navigateTo = (index: number) => {
+    if (index !== lastNavigatedIndex.current) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      lastNavigatedIndex.current = index;
+    }
     navigation.navigate(TAB_CONFIGS[index].name);
   };
 
