@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -47,13 +47,16 @@ export default function DashboardScreen() {
   const { state, setSelectedCompanyId, filteredCompanies, handleAddCompany, handleUpdateCompany, handleDeleteCompany } = useAppContext();
   const [quote, setQuote] = useState<string>('');
 
+  // Width of the left action – must match leftThreshold on Swipeable
+  const EDIT_THRESHOLD = 96;
+
   const renderLeftActions = (company: Company) => (
-    <TouchableOpacity 
-      onPress={() => router.push(`/company/${company.id}`)}
-      className="bg-blue-600 justify-center items-start rounded-3xl mb-4 p-5 w-24 pl-6 h-[85%]"
+    <View
+      className="bg-blue-600 justify-center items-start rounded-3xl mb-4 p-5 pl-6 h-[85%]"
+      style={{ width: EDIT_THRESHOLD }}
     >
       <Ionicons name="create-outline" size={24} color="#fff" />
-    </TouchableOpacity>
+    </View>
   );
 
   const renderRightActions = (company: Company) => (
@@ -110,23 +113,38 @@ export default function DashboardScreen() {
         <View className="mb-16">
           <Text className="text-sm font-bold text-white/40 uppercase tracking-widest px-2 mb-4">Your Companies</Text>
           
-          {filteredCompanies.map((company) => (
-            <Swipeable 
-              key={company.id} 
+          {filteredCompanies.map((company) => {
+            // Per-card ref so we can close after auto-navigate
+            const swipeRef = React.createRef<Swipeable>();
+            return (
+            <Swipeable
+              key={company.id}
+              ref={swipeRef}
               renderLeftActions={() => renderLeftActions(company)}
               renderRightActions={() => renderRightActions(company)}
-            >
-              <TouchableOpacity 
-                activeOpacity={0.8}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                handleUpdateCompany(company.id, { lastViewed: Date.now() });
-                setSelectedCompanyId(company.id);
-                router.push('/financials');
+              leftThreshold={EDIT_THRESHOLD}
+              rightThreshold={96}
+              overshootLeft={false}
+              onSwipeableOpen={(direction) => {
+                if (direction === 'left') {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  swipeRef.current?.close();
+                  handleUpdateCompany(company.id, { lastViewed: Date.now() });
+                  setSelectedCompanyId(company.id);
+                  router.push(`/company/${company.id}`);
+                }
               }}
-              key={company.id}
-              className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden relative"
             >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  handleUpdateCompany(company.id, { lastViewed: Date.now() });
+                  setSelectedCompanyId(company.id);
+                  router.push('/financials');
+                }}
+                className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden relative"
+              >
               <View className="flex-row items-center justify-between mb-5">
                 <View className="flex-row items-center flex-1 mr-4">
                   <TouchableOpacity
@@ -178,20 +196,21 @@ export default function DashboardScreen() {
 
                 {/* Inline Flex Shortcut Array with Inverse Margins */}
                 <View style={{ marginRight: -10, marginBottom: -10 }} className="flex-row items-center justify-around bg-black/30 w-40 px-1 py-1 rounded-xl border border-white/5 shadow-xl">
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/subscriptions'); }} className="p-2">
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/subscriptions'); }} className="p-2">
                     <Ionicons name="layers" size={20} color="#60A5FA" />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
                     <Ionicons name="card" size={20} color="#22c55e" />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
+                  <TouchableOpacity onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
                     <Ionicons name="document-text" size={20} color="#FBBF24" />
                   </TouchableOpacity>
                 </View>
               </View>
             </TouchableOpacity>
             </Swipeable>
-          ))}
+          );
+          })}
 
           {/* Add Company Button */}
           <TouchableOpacity 
