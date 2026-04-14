@@ -341,7 +341,7 @@ export default function SubscriptionsScreen() {
                         <View key={child.id || idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                           <View style={{ flex: 1, flexDirection: 'column' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: child.status === 'Paused' ? '#ef4444' : '#1FE400' }} />
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' }} />
                               <Text style={{ color: '#fff', fontSize: 13, fontWeight: '500', textTransform: 'uppercase' }}>{child.name}</Text>
                             </View>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, marginLeft: 16 }}>
