@@ -23,6 +23,7 @@ struct CompanyDetailView: View {
     @State private var showEditCompany = false
     @State private var swipeHandled = false
     @State private var showMenu = false
+    @Namespace private var tabNamespace
 
     var body: some View {
         VStack(spacing: 0) {
@@ -119,21 +120,21 @@ struct CompanyDetailView: View {
                                 vm.activeTab = tab
                             }
                         } label: {
-                            Image(systemName: tab.icon)
-                                .font(.system(size: 14, weight: vm.activeTab == tab ? .bold : .medium))
-                                .foregroundStyle(vm.activeTab == tab ? .white : Color.white.opacity(0.4))
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
+                            ZStack {
+                                if vm.activeTab == tab {
+                                    RoundedRectangle(cornerRadius: 22)
+                                        .fill(Color.white.opacity(0.15))
+                                        .matchedGeometryEffect(id: "ACTIVE_TAB", in: tabNamespace)
+                                }
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 14, weight: vm.activeTab == tab ? .bold : .medium))
+                                    .foregroundStyle(vm.activeTab == tab ? .white : Color.white.opacity(0.4))
+                            }
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
-                }
-                .background(alignment: .leading) {
-                    // Sliding indicator pill
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 44, height: 44)
-                        .offset(x: CGFloat(AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0) * 44.0)
                 }
                 .liquidGlass(cornerRadius: 22)
             }
