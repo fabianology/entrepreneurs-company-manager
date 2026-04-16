@@ -38,27 +38,17 @@ struct CompanyDetailView: View {
                 .padding(.bottom, 20)
 
             // ── Content ──────────────────────────────────────────────────
-            TabView(selection: Binding(
-                get: { vm.activeTab },
-                set: { newTab in
-                    if newTab != vm.activeTab {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    }
-                    vm.activeTab = newTab
-                    dragOffset = 0
+            Group {
+                switch vm.activeTab {
+                case .subscriptions:
+                    SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, vm: vm)
+                case .financial:
+                    FinancialView(company: company, cards: cards, institutions: institutions, loans: loans, vm: vm)
+                case .documents:
+                    DocumentListView(company: company, documents: documents, vm: vm)
                 }
-            )) {
-                SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, vm: vm)
-                    .tag(AppViewModel.CompanyTab.subscriptions)
-                FinancialView(company: company, cards: cards, institutions: institutions, loans: loans, vm: vm)
-                    .tag(AppViewModel.CompanyTab.financial)
-                DocumentListView(company: company, documents: documents, vm: vm)
-                    .tag(AppViewModel.CompanyTab.documents)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea(edges: .bottom)
         }
-
         .background(Color.black)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditCompany) {
@@ -136,24 +126,42 @@ struct CompanyDetailView: View {
             DragGesture(minimumDistance: 20, coordinateSpace: .global)
                 .onChanged { value in
                     if swipeHandled { return }
+                    
+                    let screenWidth = UIScreen.main.bounds.width
+                    let startX = value.startLocation.x
+                    
+                    let isEdgeSwipe = startX < 120 || startX > screenWidth - 120
+                    if !isEdgeSwipe { return }
+                    
                     let transX = value.translation.width
                     let transY = value.translation.height
+                    
                     if abs(transX) > 50 && abs(transY) < 60 {
                         swipeHandled = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            if transX > 0 {
-                                if vm.activeTab == .subscriptions { dismiss() }
-                                else if vm.activeTab == .financial { vm.activeTab = .subscriptions }
-                                else if vm.activeTab == .documents { vm.activeTab = .financial }
-                            } else {
-                                if vm.activeTab == .subscriptions { vm.activeTab = .financial }
-                                else if vm.activeTab == .financial { vm.activeTab = .documents }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        
+                        if transX > 0 {
+                            // Swipe Left to Right (Go Back / Dismiss)
+                            if vm.activeTab == .subscriptions {
+                                dismiss()
+                            } else if vm.activeTab == .financial {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
+                            } else if vm.activeTab == .documents {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            }
+                        } else {
+                            // Swipe Right to Left (Go Forward)
+                            if vm.activeTab == .subscriptions {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            } else if vm.activeTab == .financial {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .documents }
                             }
                         }
                     }
                 }
-                .onEnded { _ in swipeHandled = false }
+                .onEnded { _ in
+                    swipeHandled = false
+                }
         )
         .navigationBarBackButtonHidden(true)
     }
@@ -262,26 +270,13 @@ struct CompanyDetailView: View {
         }
         .frame(width: 180, height: 44)
         .background(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
-                )
-                .frame(width: 58, height: 34)
-                .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
-                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset + 1)
-                .animation(.spring(response: 0.28, dampingFraction: 0.72), value: currentTabIndex)
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.clear)
+                .frame(width: 60, height: 36)
+                .liquidGlass(cornerRadius: 18)
+                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset)
         }
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(.ultraThinMaterial)
-                RoundedRectangle(cornerRadius: 22)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 0.5)
-            }
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .liquidGlass(cornerRadius: 22)
         .highPriorityGesture(
             DragGesture(minimumDistance: 5)
                 .onChanged { value in

@@ -591,10 +591,6 @@ struct LoanCardView: View {
 }
 
 // MARK: - Edit Sheets (Institution, Card, Loan)
-
-// ─────────────────────────────────────────────
-// MARK:  Institution Sheet
-// ─────────────────────────────────────────────
 struct EditInstitutionSheet: View {
     @Bindable var institution: Institution
     @Bindable var vm: AppViewModel
@@ -605,194 +601,67 @@ struct EditInstitutionSheet: View {
     @State private var showPassword = false
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .top) {
-                Color.black.ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            Color(hex: "#1C1C1E").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // ── Title bar ──────────────────────────────────────────────
+                HStack {
+                    Text(isNew ? "Add Bank" : "Edit Bank")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button {
+                        if isNew { vm.deleteInstitution(institution, context: context) }
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                            .frame(width: 30, height: 30)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                .padding(.bottom, 20)
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
+                    VStack(spacing: 14) {
+                        // ── 2-column field grid ────────────────────────────
+                        HStack(spacing: 12) {
+                            bankField(label: "Institution", placeholder: "Mercury",
+                                      text: Binding(get: { institution.name }, set: { institution.name = $0 }))
+                            bankField(label: "Website", placeholder: "bank.com",
+                                      text: Binding(get: { institution.loginUrl }, set: { institution.loginUrl = $0 }))
+                                .keyboardType(.URL)
+                        }
+                        HStack(spacing: 12) {
+                            bankField(label: "Login ID", placeholder: "user_admin",
+                                      text: Binding(get: { institution.username.isEmpty ? institution.email : institution.username },
+                                                    set: { institution.username = $0 }))
+                            bankField(label: "Password", placeholder: "······",
+                                      text: Binding(get: { institution.password }, set: { institution.password = $0 }),
+                                      isSecure: !showPassword)
+                        }
 
-                        // ── Top action row ──────────────────────────────
-                        HStack {
-                            Button { if isNew { vm.deleteInstitution(institution, context: context) }; dismiss() } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                    .padding(10)
-                                    .background(Color.white.opacity(0.1))
-                                    .clipShape(Circle())
+                        // ── Action buttons ─────────────────────────────────
+                        VStack(spacing: 10) {
+                            addSubItemButton(emoji: "💳", label: "Add Card") {
+                                _ = vm.addCard(context: context, companyId: institution.companyId ?? "")
                             }
-                            Spacer()
-                            Button { validate() } label: {
-                                Text(isNew ? "SAVE BANK" : "SAVE CHANGES")
-                                    .font(.system(size: 11, weight: .black))
-                                    .tracking(1)
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 22)
-                                    .padding(.vertical, 10)
-                                    .background(Color.white)
-                                    .clipShape(Capsule())
+                            addSubItemButton(emoji: "🏦", label: "Add Account") {
+                                var accs = institution.accounts
+                                accs.append(InstitutionAccount())
+                                institution.accounts = accs
+                            }
+                            addSubItemButton(emoji: "💸", label: "Add Loan") {
+                                _ = vm.addLoan(context: context, companyId: institution.companyId ?? "")
                             }
                         }
 
-                        // ── Hero name card ───────────────────────────────
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 14) {
-                                if !institution.loginUrl.isEmpty {
-                                    FaviconImage(website: institution.loginUrl, size: 44)
-                                } else {
-                                    Image(systemName: "building.columns")
-                                        .font(.system(size: 22, weight: .semibold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                        .frame(width: 44, height: 44)
-                                }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("INSTITUTION NAME")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1.2)
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                    TextField("e.g. Chase Bank", text: Binding(get: { institution.name }, set: { institution.name = $0 }))
-                                        .font(.system(size: 26, weight: .black))
-                                        .foregroundStyle(.white)
-                                        .tint(Color.zifrGold)
-                                }
-                            }
-                        }
-                        .padding(22)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(hex: "#1C1C1E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-
-                        // ── Web Credentials ──────────────────────────────
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text("WEB CREDENTIALS")
-                                .font(.system(size: 10, weight: .black))
-                                .tracking(1.2)
-                                .foregroundStyle(Color.white.opacity(0.4))
-                                .padding(.horizontal, 4)
-                                .padding(.bottom, 10)
-
-                            VStack(spacing: 0) {
-                                // Login URL
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("LOGIN URL")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    TextField("chase.com", text: Binding(get: { institution.loginUrl }, set: { institution.loginUrl = $0 }))
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(.white)
-                                        .keyboardType(.URL)
-                                        .autocapitalization(.none)
-                                        .autocorrectionDisabled()
-                                        .tint(Color.zifrGold)
-                                        .padding(.horizontal, 14).padding(.vertical, 12)
-                                        .background(Color.black.opacity(0.4))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                .padding(.horizontal, 20).padding(.vertical, 16)
-
-                                Divider().background(Color.white.opacity(0.05))
-
-                                // Username
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("USERNAME / LOGIN ID")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    TextField("admin@startup.com", text: Binding(get: { institution.username }, set: { institution.username = $0 }))
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(.white)
-                                        .autocapitalization(.none)
-                                        .autocorrectionDisabled()
-                                        .tint(Color.zifrGold)
-                                        .padding(.horizontal, 14).padding(.vertical, 12)
-                                        .background(Color.black.opacity(0.4))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                .padding(.horizontal, 20).padding(.vertical, 16)
-
-                                Divider().background(Color.white.opacity(0.05))
-
-                                // Password
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
-                                        Text("PASSWORD")
-                                            .font(.system(size: 10, weight: .black))
-                                            .tracking(1)
-                                            .foregroundStyle(Color.white.opacity(0.35))
-                                        Spacer()
-                                        Button { showPassword.toggle() } label: {
-                                            Image(systemName: showPassword ? "eye.slash" : "eye")
-                                                .font(.system(size: 13))
-                                                .foregroundStyle(Color.white.opacity(0.35))
-                                        }
-                                    }
-                                    Group {
-                                        if showPassword {
-                                            TextField("••••••••", text: Binding(get: { institution.password }, set: { institution.password = $0 }))
-                                        } else {
-                                            SecureField("••••••••", text: Binding(get: { institution.password }, set: { institution.password = $0 }))
-                                        }
-                                    }
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.white)
-                                    .tint(Color.zifrGold)
-                                    .padding(.horizontal, 14).padding(.vertical, 12)
-                                    .background(Color.black.opacity(0.4))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                .padding(.horizontal, 20).padding(.vertical, 16)
-                            }
-                            .background(Color(hex: "#1C1C1E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-                        }
-
-                        // ── Linked Accounts ──────────────────────────────
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("LINKED ACCOUNTS (\(institution.accounts.count))")
-                                    .font(.system(size: 10, weight: .black))
-                                    .tracking(1.2)
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                Spacer()
-                                Button {
-                                    var accs = institution.accounts
-                                    accs.append(InstitutionAccount())
-                                    institution.accounts = accs
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    Text("+ Add")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color.zifrGold)
-                                }
-                            }
-                            .padding(.horizontal, 4)
-
-                            VStack(spacing: 0) {
-                                if institution.accounts.isEmpty {
-                                    Text("No internal accounts tracked.")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.2))
-                                        .frame(maxWidth: .infinity)
-                                        .padding(24)
-                                } else {
-                                    ForEach(Array(institution.accounts.enumerated()), id: \.element.id) { idx, acc in
-                                        VStack(spacing: 0) {
-                                            if idx > 0 { Divider().background(Color.white.opacity(0.05)) }
-                                            accountRow(idx: idx, acc: acc)
-                                        }
-                                    }
-                                }
-                            }
-                            .background(Color(hex: "#1C1C1E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-                        }
-
-                        // ── Delete ───────────────────────────────────────
+                        // ── Delete (edit mode only) ────────────────────────
                         if !isNew {
                             if showDelete {
                                 deleteConfirm {
@@ -804,124 +673,98 @@ struct EditInstitutionSheet: View {
                                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                                     showDelete = true
                                 } label: {
-                                    Text("Delete Institution")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.red)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                        .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.red.opacity(0.3), lineWidth: 1))
+                                    Label("Delete Institution", systemImage: "trash")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.red.opacity(0.7))
                                 }
+                                .padding(.top, 8)
                             }
                         }
-
-                        Spacer(minLength: 60)
                     }
                     .padding(.horizontal, 20)
-                    .padding(.top, 16)
+                    .padding(.bottom, 110)
                 }
             }
-            .navigationBarHidden(true)
+
+            // ── Sticky bottom bar ──────────────────────────────────────────
+            VStack(spacing: 0) {
+                Divider().background(Color.white.opacity(0.06))
+                HStack(spacing: 0) {
+                    Button("Cancel") {
+                        if isNew { vm.deleteInstitution(institution, context: context) }
+                        dismiss()
+                    }
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .frame(maxWidth: .infinity)
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        vm.saveInstitution(institution, context: context)
+                        dismiss()
+                    } label: {
+                        Text("Save Bank")
+                            .font(.system(size: 16, weight: .black))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.trailing, 20)
+                }
+                .frame(height: 72)
+                .background(Color(hex: "#1C1C1E"))
+            }
         }
+        .interactiveDismissDisabled(isNew)
     }
 
-    private func validate() {
-        guard !institution.name.trimmingCharacters(in: .whitespaces).isEmpty else {
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            return
+    private func bankField(label: String, placeholder: String, text: Binding<String>, isSecure: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.4))
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: text)
+                } else {
+                    TextField(placeholder, text: text)
+                }
+            }
+            .font(.system(size: 14, weight: .regular))
+            .foregroundStyle(.white)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        vm.saveInstitution(institution, context: context)
-        dismiss()
+        .frame(maxWidth: .infinity)
     }
 
-    @ViewBuilder
-    private func accountRow(idx: Int, acc: InstitutionAccount) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                TextField("Account name", text: Binding(
-                    get: { acc.name },
-                    set: { val in
-                        var list = institution.accounts
-                        list[idx].name = val
-                        institution.accounts = list
-                    }
-                ))
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
-                .tint(Color.zifrGold)
-
-                Spacer()
-
-                Button {
-                    var list = institution.accounts
-                    list.remove(at: idx)
-                    institution.accounts = list
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.red.opacity(0.6))
-                }
+    private func addSubItemButton(emoji: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        }) {
+            HStack(spacing: 12) {
+                Text(emoji).font(.system(size: 20))
+                Text(label)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
             }
-
-            HStack(spacing: 16) {
-                // Last 4
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("LAST 4").font(.system(size: 9, weight: .black)).tracking(0.8).foregroundStyle(Color.white.opacity(0.3))
-                    TextField("x1234", text: Binding(
-                        get: { acc.last4 },
-                        set: { val in var l = institution.accounts; l[idx].last4 = val; institution.accounts = l }
-                    ))
-                    .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                    .keyboardType(.numberPad)
-                    .tint(Color.zifrGold)
-                    .frame(maxWidth: 60)
-                    .padding(.bottom, 4)
-                    .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1) }
-                }
-
-                // Balance
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("BALANCE").font(.system(size: 9, weight: .black)).tracking(0.8).foregroundStyle(Color.white.opacity(0.3))
-                    HStack(spacing: 2) {
-                        Text("$").font(.system(size: 12)).foregroundStyle(Color.white.opacity(0.4))
-                        TextField("0.00", value: Binding(
-                            get: { acc.balance },
-                            set: { val in var l = institution.accounts; l[idx].balance = val; institution.accounts = l }
-                        ), format: .number)
-                        .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                        .keyboardType(.decimalPad)
-                        .tint(Color.zifrGold)
-                        .frame(maxWidth: 90)
-                    }
-                    .padding(.bottom, 4)
-                    .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1) }
-                }
-
-                Spacer()
-
-                // Type picker
-                Picker("Type", selection: Binding(
-                    get: { acc.type },
-                    set: { val in var l = institution.accounts; l[idx].type = val; institution.accounts = l }
-                )) {
-                    ForEach(InstitutionAccount.allTypes, id: \.self) { Text($0).tag($0) }
-                }
-                .pickerStyle(.menu)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.zifrGold)
-                .padding(.horizontal, 8).padding(.vertical, 6)
-                .background(Color.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(Color.white.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
-        .padding(18)
-        .animation(.none, value: institution.accounts.count)
+        .buttonStyle(.plain)
     }
 }
 
-// ─────────────────────────────────────────────
-// MARK:  Card Sheet
-// ─────────────────────────────────────────────
 struct EditCardSheet: View {
     @Bindable var card: FinancialCard
     @Bindable var vm: AppViewModel
@@ -930,244 +773,70 @@ struct EditCardSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
 
-    // Derive a background gradient color from institution name (mirrors cifr JS logic)
-    private var heroGradient: LinearGradient {
-        let name = card.institutionName.lowercased()
-        let top: Color
-        let bot: Color
-        if name.contains("chase") || name.contains("amex") || name.contains("citi") {
-            top = Color(hex: "#1e3a5f"); bot = Color(hex: "#0f2040")
-        } else if name.contains("bofa") || name.contains("bank of america") || name.contains("wells") {
-            top = Color(hex: "#5f1e1e"); bot = Color(hex: "#3a0f0f")
-        } else if name.contains("discover") {
-            top = Color(hex: "#6b2d0f"); bot = Color(hex: "#3a1a08")
-        } else if name.contains("td bank") || name.contains("fidelity") {
-            top = Color(hex: "#0f3b25"); bot = Color(hex: "#082015")
-        } else if card.network == "Amex" {
-            top = Color(hex: "#2e3a4a"); bot = Color(hex: "#1a222d")
-        } else {
-            let hex = card.colorHex.isEmpty ? "#1C1C1E" : card.colorHex
-            top = Color(hex: hex).opacity(0.9); bot = Color(hex: hex)
-        }
-        return LinearGradient(colors: [top, bot], startPoint: .topLeading, endPoint: .bottomTrailing)
-    }
-
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                Color.black.ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-
-                        // ── Top action row ──────────────────────────────
-                        HStack {
-                            Button { if isNew { vm.deleteCard(card, context: context) }; dismiss() } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                    .padding(10)
-                                    .background(Color.white.opacity(0.1))
-                                    .clipShape(Circle())
-                            }
-                            Spacer()
-                            Button { vm.saveCard(card, context: context); dismiss() } label: {
-                                Text(isNew ? "SAVE CARD" : "SAVE CHANGES")
-                                    .font(.system(size: 11, weight: .black))
-                                    .tracking(1)
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 22).padding(.vertical, 10)
-                                    .background(Color.white)
-                                    .clipShape(Capsule())
-                            }
-                        }
-
-                        // ── Live card hero ───────────────────────────────
-                        ZStack(alignment: .bottom) {
-                            heroGradient
-                            // Subtle noise overlay
-                            RoundedRectangle(cornerRadius: 32)
-                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-
-                            VStack(spacing: 0) {
-                                // Top row: nickname + network
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        TextField("CARD NICKNAME", text: Binding(get: { card.name }, set: { card.name = $0 }))
-                                            .font(.system(size: 12, weight: .black))
-                                            .tracking(1)
-                                            .foregroundStyle(.white)
-                                            .textCase(.uppercase)
-                                            .tint(Color.zifrGold)
-                                        TextField("Bank Name", text: Binding(get: { card.institutionName }, set: { card.institutionName = $0 }))
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.55))
-                                            .tint(Color.zifrGold)
-                                    }
-                                    Spacer()
-                                    TextField("Visa", text: Binding(get: { card.network }, set: { card.network = $0 }))
-                                        .font(.system(size: 13, weight: .black))
-                                        .italic()
-                                        .foregroundStyle(Color.white.opacity(0.9))
-                                        .multilineTextAlignment(.trailing)
-                                        .tint(Color.zifrGold)
-                                        .frame(maxWidth: 80)
-                                }
-
-                                Spacer()
-
-                                // Card number row
-                                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                                    Text("•••• •••• ••••")
-                                        .font(.system(size: 22, weight: .regular, design: .monospaced))
-                                        .tracking(2)
-                                        .foregroundStyle(Color.white.opacity(0.9))
-                                    TextField("1234", text: Binding(get: { card.last4 }, set: { card.last4 = $0 }))
-                                        .font(.system(size: 22, weight: .regular, design: .monospaced))
-                                        .tracking(2)
-                                        .foregroundStyle(Color.white.opacity(0.9))
-                                        .keyboardType(.numberPad)
-                                        .tint(Color.zifrGold)
-                                        .frame(maxWidth: 70)
-                                }
-                                .padding(.bottom, 12)
-
-                                // Bottom row: cardholder + expiry
-                                HStack {
-                                    TextField("CARDHOLDER NAME", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
-                                        .font(.system(size: 11, weight: .bold))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.75))
-                                        .textCase(.uppercase)
-                                        .tint(Color.zifrGold)
-                                    Spacer()
-                                    TextField("MM/YY", text: Binding(get: { card.expiry }, set: { card.expiry = $0 }))
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.75))
-                                        .multilineTextAlignment(.trailing)
-                                        .keyboardType(.numbersAndPunctuation)
-                                        .tint(Color.zifrGold)
-                                        .frame(maxWidth: 55)
-                                }
-                            }
-                            .padding(24)
-                        }
-                        .frame(height: 220)
-                        .clipShape(RoundedRectangle(cornerRadius: 32))
-                        .shadow(color: .black.opacity(0.5), radius: 20, y: 10)
-
-                        // ── Card Logistics ───────────────────────────────
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text("CARD LOGISTICS")
-                                .font(.system(size: 10, weight: .black))
-                                .tracking(1.2)
-                                .foregroundStyle(Color.white.opacity(0.4))
-                                .padding(.horizontal, 4)
-                                .padding(.bottom, 10)
-
-                            VStack(spacing: 0) {
-                                // Credit / Debit toggle
-                                HStack(spacing: 0) {
-                                    ForEach(FinancialCard.types, id: \.self) { t in
-                                        Button { card.type = t } label: {
-                                            Text(t == "Credit" ? "Credit Card" : "Debit")
-                                                .font(.system(size: 11, weight: .black))
-                                                .tracking(0.5)
-                                                .foregroundStyle(card.type == t ? .black : Color.white.opacity(0.35))
-                                                .frame(maxWidth: .infinity)
-                                                .padding(.vertical, 10)
-                                                .background(card.type == t ? Color.white : Color.clear)
-                                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                        }
-                                    }
-                                }
-                                .padding(4)
-                                .background(Color.black.opacity(0.5))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .padding(.horizontal, 20).padding(.top, 18).padding(.bottom, 4)
-
-                                Divider().background(Color.white.opacity(0.05)).padding(.vertical, 16)
-
-                                // Network + Status pickers
-                                HStack(spacing: 12) {
-                                    pickerCell(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
-                                    pickerCell(label: "STATUS", sel: Binding(get: { card.status }, set: { card.status = $0 }), opts: FinancialCard.statuses)
-                                }
-                                .padding(.horizontal, 20).padding(.bottom, 18)
-
-                                Divider().background(Color.white.opacity(0.05))
-
-                                // Limit
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("LIMIT / AVAILABLE BALANCE")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    HStack {
-                                        Text("$").font(.system(size: 16)).foregroundStyle(Color.white.opacity(0.4))
-                                        TextField("0.00", value: Binding(get: { card.limit }, set: { card.limit = $0 }), format: .number)
-                                            .font(.system(size: 18, weight: .bold))
-                                            .foregroundStyle(.white)
-                                            .keyboardType(.decimalPad)
-                                            .tint(Color.zifrGold)
-                                    }
-                                    .padding(.bottom, 4)
-                                    .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1) }
-                                }
-                                .padding(.horizontal, 20).padding(.vertical, 18)
-                            }
-                            .background(Color(hex: "#1C1C1E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-                        }
-
-                        // ── Delete ───────────────────────────────────────
-                        if !isNew {
-                            if showDelete {
-                                deleteConfirm { vm.deleteCard(card, context: context); dismiss() } cancel: { showDelete = false }
-                            } else {
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                    showDelete = true
-                                } label: {
-                                    Text("Delete Card")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.red)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                        .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.red.opacity(0.3), lineWidth: 1))
-                                }
-                            }
-                        }
-
-                        Spacer(minLength: 60)
+            ScrollView {
+                VStack(spacing: 14) {
+                    ZifrField(label: "Nickname", placeholder: "Amex Gold", text: Binding(get: { card.name }, set: { card.name = $0 }))
+                    ZifrField(label: "Institution", placeholder: "American Express", text: Binding(get: { card.institutionName }, set: { card.institutionName = $0 }))
+                    ZifrField(label: "Card Holder", placeholder: "John Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
+                    HStack(spacing: 12) {
+                        ZifrField(label: "Last 4", placeholder: "1234", text: Binding(get: { card.last4 }, set: { card.last4 = $0 })).keyboardType(.numberPad)
+                        ZifrField(label: "Expiry", placeholder: "12/28", text: Binding(get: { card.expiry }, set: { card.expiry = $0 })).keyboardType(.numbersAndPunctuation)
                     }
-                    .padding(.horizontal, 20).padding(.top, 16)
+                    HStack(spacing: 12) {
+                        pickerCell(label: "Network", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
+                        pickerCell(label: "Type", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
+                        pickerCell(label: "Status", sel: Binding(get: { card.status }, set: { card.status = $0 }), opts: FinancialCard.statuses)
+                    }
+                    ZifrField(label: "Login", placeholder: "username / email", text: Binding(get: { card.login }, set: { card.login = $0 }))
+                    ZifrField(label: "Password", placeholder: "••••••••", text: Binding(get: { card.password }, set: { card.password = $0 }))
+                    if !isNew {
+                        if showDelete {
+                            deleteConfirm { vm.deleteCard(card, context: context); dismiss() } cancel: { showDelete = false }
+                        } else {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDelete = true
+                            } label: {
+                                Label("Delete Card", systemImage: "trash")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.red.opacity(0.7))
+                            }
+                        }
+                    }
+                }
+                .padding(20).padding(.bottom, 40)
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle(isNew ? "New Card" : "Edit Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { if isNew { vm.deleteCard(card, context: context) }; dismiss() }
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { vm.saveCard(card, context: context); dismiss() }
+                        .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
                 }
             }
-            .navigationBarHidden(true)
+            .interactiveDismissDisabled(isNew)
         }
     }
 
     private func pickerCell(label: String, sel: Binding<String>, opts: [String]) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 9, weight: .black))
-                .tracking(0.8)
-                .foregroundStyle(Color.white.opacity(0.35))
+            Text(label).zifrLabel()
             Picker(label, selection: sel) { ForEach(opts, id: \.self) { Text($0).tag($0) } }
-                .pickerStyle(.menu)
-                .foregroundStyle(Color.zifrGold)
+                .pickerStyle(.menu).foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10).padding(.vertical, 8)
-                .background(Color.white.opacity(0.06))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 8).padding(.vertical, 8)
+                .background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 }
 
-// ─────────────────────────────────────────────
-// MARK:  Loan Sheet
-// ─────────────────────────────────────────────
 struct EditLoanSheet: View {
     @Bindable var loan: Loan
     @Bindable var vm: AppViewModel
@@ -1176,231 +845,84 @@ struct EditLoanSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
 
-    // Live amortization calculator (matches cifr JS logic exactly)
-    private var amort: (monthly: Double, totalInterest: Double, totalCost: Double)? {
-        let principal = loan.principalAmount
-        let rate      = loan.interestRate
-        let totalMo   = Double(loan.termYears) * 12.0 + Double(loan.termMonths)
-        guard principal > 0, totalMo > 0 else { return nil }
-
-        let perPeriod = (rate / 100.0) / 12.0
-        let payment: Double
-        if perPeriod <= 0 {
-            payment = principal / totalMo
-        } else {
-            let factor = pow(1 + perPeriod, totalMo)
-            payment = principal * (perPeriod * factor) / (factor - 1)
-        }
-
-        var balance = principal
-        var totalInterest = 0.0
-        for _ in 1...Int(totalMo) {
-            let interest = balance * perPeriod
-            balance -= (payment - interest)
-            totalInterest += interest
-        }
-        return (payment, totalInterest, principal + totalInterest)
-    }
-
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                Color.black.ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-
-                        // ── Top action row ──────────────────────────────
-                        HStack {
-                            Button { if isNew { vm.deleteLoan(loan, context: context) }; dismiss() } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                    .padding(10)
-                                    .background(Color.white.opacity(0.1))
-                                    .clipShape(Circle())
-                            }
-                            Spacer()
-                            Button { vm.saveLoan(loan, context: context); dismiss() } label: {
-                                Text(isNew ? "SAVE LOAN" : "SAVE CHANGES")
-                                    .font(.system(size: 11, weight: .black))
-                                    .tracking(1)
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 22).padding(.vertical, 10)
-                                    .background(Color.white)
-                                    .clipShape(Capsule())
-                            }
-                        }
-
-                        // ── Hero card ────────────────────────────────────
-                        VStack(alignment: .leading, spacing: 16) {
-                            // Loan name + lender
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("LOAN NAME")
-                                    .font(.system(size: 10, weight: .black))
-                                    .tracking(1.2)
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                TextField("e.g. Equipment Financing", text: Binding(get: { loan.name }, set: { loan.name = $0 }))
-                                    .font(.system(size: 26, weight: .black))
-                                    .foregroundStyle(.white)
-                                    .tint(Color.zifrGold)
-                                TextField("Bank of America", text: Binding(get: { loan.lender }, set: { loan.lender = $0 }))
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                    .tint(Color.zifrGold)
-                            }
-
-                            Divider().background(Color.white.opacity(0.06))
-
-                            // Principal + Balance row
-                            HStack(spacing: 20) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("PRINCIPAL")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    HStack(spacing: 3) {
-                                        Text("$").font(.system(size: 16)).foregroundStyle(Color.white.opacity(0.4))
-                                        TextField("0.00", value: Binding(get: { loan.principalAmount }, set: { loan.principalAmount = $0 }), format: .number)
-                                            .font(.system(size: 22, weight: .black)).foregroundStyle(.white)
-                                            .keyboardType(.decimalPad).tint(Color.zifrGold)
-                                    }
-                                    .padding(.bottom, 4)
-                                    .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1) }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("REMAINING")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    HStack(spacing: 3) {
-                                        Text("$").font(.system(size: 16)).foregroundStyle(Color.red.opacity(0.5))
-                                        TextField("0.00", value: Binding(get: { loan.remainingBalance }, set: { loan.remainingBalance = $0 }), format: .number)
-                                            .font(.system(size: 22, weight: .black)).foregroundStyle(Color.red.opacity(0.85))
-                                            .keyboardType(.decimalPad).tint(Color.zifrGold)
-                                    }
-                                    .padding(.bottom, 4)
-                                    .overlay(alignment: .bottom) { Rectangle().fill(Color.red.opacity(0.2)).frame(height: 1) }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                        .padding(22)
-                        .background(Color(hex: "#1C1C1E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-
-                        // ── Amortization Details ─────────────────────────
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text("AMORTIZATION DETAILS")
-                                .font(.system(size: 10, weight: .black))
-                                .tracking(1.2)
-                                .foregroundStyle(Color.white.opacity(0.4))
-                                .padding(.horizontal, 4)
-                                .padding(.bottom, 10)
-
-                            VStack(spacing: 0) {
-                                // APR / Term years / Term months
-                                HStack(spacing: 10) {
-                                    amortField(label: "APR %", placeholder: "5.5",
-                                        value: Binding(get: { loan.interestRate }, set: { loan.interestRate = $0 }))
-                                    amortField(label: "TERM (YRS)", placeholder: "3",
-                                        value: Binding(
-                                            get: { Double(loan.termYears) },
-                                            set: { loan.termYears = Int($0) }))
-                                    amortField(label: "TERM (MO)", placeholder: "0",
-                                        value: Binding(
-                                            get: { Double(loan.termMonths) },
-                                            set: { loan.termMonths = Int($0) }))
-                                }
-                                .padding(.horizontal, 20).padding(.vertical, 18)
-
-                                Divider().background(Color.white.opacity(0.05))
-
-                                // Calculated burn block
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text("CALCULATED BURN")
-                                        .font(.system(size: 10, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.25))
-                                        .padding(.bottom, 14)
-
-                                    HStack {
-                                        Text("Monthly Note").font(.system(size: 14, weight: .medium)).foregroundStyle(Color.white.opacity(0.7))
-                                        Spacer()
-                                        Text(amort != nil ? "$\(String(format: "%.2f", amort!.monthly))" : "$0.00")
-                                            .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                                    }.padding(.bottom, 8)
-
-                                    HStack {
-                                        Text("Interest Over Life").font(.system(size: 14, weight: .medium)).foregroundStyle(Color.white.opacity(0.7))
-                                        Spacer()
-                                        Text(amort != nil ? "$\(String(format: "%.2f", amort!.totalInterest))" : "$0.00")
-                                            .font(.system(size: 14, weight: .bold)).foregroundStyle(Color.red.opacity(0.85))
-                                    }.padding(.bottom, 14)
-
-                                    Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1).padding(.bottom, 14)
-
-                                    HStack {
-                                        Text("TOTAL COST")
-                                            .font(.system(size: 11, weight: .black))
-                                            .tracking(0.8)
-                                            .foregroundStyle(Color.white.opacity(0.35))
-                                        Spacer()
-                                        Text(amort != nil ? "$\(String(format: "%.2f", amort!.totalCost))" : "$0.00")
-                                            .font(.system(size: 20, weight: .black)).foregroundStyle(.white)
-                                    }
-                                }
-                                .padding(.horizontal, 20).padding(.vertical, 20)
-                            }
-                            .background(Color(hex: "#1C1C1E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-                        }
-
-                        // ── Delete ───────────────────────────────────────
-                        if !isNew {
-                            if showDelete {
-                                deleteConfirm { vm.deleteLoan(loan, context: context); dismiss() } cancel: { showDelete = false }
-                            } else {
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                    showDelete = true
-                                } label: {
-                                    Text("Delete Loan")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.red)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                        .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.red.opacity(0.3), lineWidth: 1))
-                                }
-                            }
-                        }
-
-                        Spacer(minLength: 60)
+            ScrollView {
+                VStack(spacing: 14) {
+                    ZifrField(label: "Loan Name", placeholder: "Startup Loan", text: Binding(get: { loan.name }, set: { loan.name = $0 }))
+                    ZifrField(label: "Lender", placeholder: "Chase Bank", text: Binding(get: { loan.lender }, set: { loan.lender = $0 }))
+                    HStack(spacing: 12) {
+                        numField(label: "Principal", val: Binding(get: { loan.principalAmount }, set: { loan.principalAmount = $0 }))
+                        numField(label: "Remaining", val: Binding(get: { loan.remainingBalance }, set: { loan.remainingBalance = $0 }))
                     }
-                    .padding(.horizontal, 20).padding(.top, 16)
+                    HStack(spacing: 12) {
+                        numField(label: "Monthly Payment", val: Binding(get: { loan.monthlyPayment }, set: { loan.monthlyPayment = $0 }))
+                        numField(label: "Interest Rate", val: Binding(get: { loan.interestRate }, set: { loan.interestRate = $0 }))
+                    }
+                    HStack(spacing: 12) {
+                        ZifrField(label: "Term", placeholder: "36 months", text: Binding(get: { loan.term }, set: { loan.term = $0 }))
+                        ZifrField(label: "Start Date", placeholder: "MM/DD/YYYY", text: Binding(get: { loan.startDate }, set: { loan.startDate = $0 }))
+                    }
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Role").zifrLabel()
+                            Picker("Role", selection: Binding(get: { loan.role }, set: { loan.role = $0 })) {
+                                ForEach(Loan.roles, id: \.self) { Text($0).tag($0) }
+                            }.pickerStyle(.segmented)
+                        }
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Status").zifrLabel()
+                            Picker("Status", selection: Binding(get: { loan.status }, set: { loan.status = $0 })) {
+                                ForEach(Loan.statuses, id: \.self) { Text($0).tag($0) }
+                            }.pickerStyle(.menu).foregroundStyle(.white)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8).padding(.vertical, 8)
+                                .background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                    if !isNew {
+                        if showDelete {
+                            deleteConfirm { vm.deleteLoan(loan, context: context); dismiss() } cancel: { showDelete = false }
+                        } else {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDelete = true
+                            } label: {
+                                Label("Delete Loan", systemImage: "trash")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.red.opacity(0.7))
+                            }
+                        }
+                    }
+                }
+                .padding(20).padding(.bottom, 40)
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle(isNew ? "New Loan" : "Edit Loan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { if isNew { vm.deleteLoan(loan, context: context) }; dismiss() }
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { vm.saveLoan(loan, context: context); dismiss() }
+                        .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
                 }
             }
-            .navigationBarHidden(true)
+            .interactiveDismissDisabled(isNew)
         }
     }
 
-    private func amortField(label: String, placeholder: String, value: Binding<Double>) -> some View {
+    private func numField(label: String, val: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.system(size: 9, weight: .black))
-                .tracking(0.8)
-                .foregroundStyle(Color.white.opacity(0.35))
-            TextField(placeholder, value: value, format: .number)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(.white)
+            Text(label).zifrLabel()
+            TextField("0", value: val, format: .number)
                 .keyboardType(.decimalPad)
-                .tint(Color.zifrGold)
+                .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
                 .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(Color.black.opacity(0.4))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.07), lineWidth: 1))
         }
     }
 }
