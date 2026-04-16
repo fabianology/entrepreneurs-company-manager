@@ -269,7 +269,8 @@ struct InstitutionCardView: View {
     @State private var expanded = false
 
     var body: some View {
-        Button(action: onEdit) {
+        VStack(spacing: 0) {
+            Button(action: onEdit) {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 18) {
                     // Header Block
@@ -341,7 +342,6 @@ struct InstitutionCardView: View {
                 }
                 .padding(22)
             }
-            .background(Color(hex: "#1C1C1E"))
         }
         .buttonStyle(.plain)
         
@@ -397,6 +397,8 @@ struct InstitutionCardView: View {
                 .background(Color(hex: "#1C1C1E"))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
+        }
+        
         }
         .background(Color(hex: "#1C1C1E"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
