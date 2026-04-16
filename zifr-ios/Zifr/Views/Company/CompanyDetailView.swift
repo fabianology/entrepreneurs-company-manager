@@ -20,6 +20,11 @@ struct CompanyDetailView: View {
     var documents: [CompanyDocument] { allDocuments.filter { $0.companyId == company.id } }
 
     @State private var showEditCompany = false
+    @State private var dragOffset: CGFloat = 0
+    
+    private var currentTabIndex: Int {
+        AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -193,32 +198,54 @@ struct CompanyDetailView: View {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         vm.activeTab = tab
+                        dragOffset = 0
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
-                            .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
-                    }
-                    .frame(width: 60)
-                    .frame(height: 36)
-                    .background(
-                        Group {
-                            if vm.activeTab == tab {
-                                // Glass pill on active
-                                RoundedRectangle(cornerRadius: 18)
-                                    .fill(Color.white.opacity(0.04))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 18)
-                                            .stroke(Color.white.opacity(0.35), lineWidth: 1)
-                                    )
-                            }
-                        }
-                    )
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
+                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
+                        .frame(width: 60, height: 36)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
         }
         .frame(width: 180, height: 44)
+        .background(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.clear)
+                .frame(width: 60, height: 36)
+                .liquidGlass(cornerRadius: 18)
+                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            let maxOffset = CGFloat(AppViewModel.CompanyTab.allCases.count - 1) * 60.0
+                            var rawOffset = CGFloat(currentTabIndex) * 60.0 + value.translation.width
+                            
+                            if rawOffset < 0 {
+                                rawOffset = rawOffset * 0.3
+                            } else if rawOffset > maxOffset {
+                                rawOffset = maxOffset + (rawOffset - maxOffset) * 0.3
+                            }
+                            
+                            dragOffset = rawOffset - (CGFloat(currentTabIndex) * 60.0)
+                        }
+                        .onEnded { value in
+                            let finalX = CGFloat(currentTabIndex) * 60.0 + value.translation.width + value.predictedEndTranslation.width * 0.2
+                            let targetIndex = min(max(Int(round(finalX / 60.0)), 0), AppViewModel.CompanyTab.allCases.count - 1)
+                            
+                            if targetIndex != currentTabIndex {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }
+                            
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                vm.activeTab = AppViewModel.CompanyTab.allCases[targetIndex]
+                                dragOffset = 0
+                            }
+                        }
+                )
+        }
         .liquidGlass(cornerRadius: 22)
     }
 
