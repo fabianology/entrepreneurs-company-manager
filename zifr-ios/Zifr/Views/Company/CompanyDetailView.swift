@@ -21,6 +21,7 @@ struct CompanyDetailView: View {
 
     @State private var showEditCompany = false
     @State private var dragOffset: CGFloat = 0
+    @State private var swipeHandled = false
     
     private var currentTabIndex: Int {
         AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
@@ -106,6 +107,47 @@ struct CompanyDetailView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
         }
+        .gesture(
+            DragGesture(minimumDistance: 20, coordinateSpace: .global)
+                .onChanged { value in
+                    if swipeHandled { return }
+                    
+                    let screenWidth = UIScreen.main.bounds.width
+                    let startX = value.startLocation.x
+                    
+                    let isEdgeSwipe = startX < 60 || startX > screenWidth - 60
+                    if !isEdgeSwipe { return }
+                    
+                    let transX = value.translation.width
+                    let transY = value.translation.height
+                    
+                    if abs(transX) > 50 && abs(transY) < 60 {
+                        swipeHandled = true
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        
+                        if transX > 0 {
+                            // Swipe Left to Right (Go Back / Dismiss)
+                            if vm.activeTab == .subscriptions {
+                                dismiss()
+                            } else if vm.activeTab == .financial {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
+                            } else if vm.activeTab == .documents {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            }
+                        } else {
+                            // Swipe Right to Left (Go Forward)
+                            if vm.activeTab == .subscriptions {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            } else if vm.activeTab == .financial {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .documents }
+                            }
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    swipeHandled = false
+                }
+        )
     }
 
     // MARK: - Company Header (mirrors CiFr's CompanyHeader.tsx)
