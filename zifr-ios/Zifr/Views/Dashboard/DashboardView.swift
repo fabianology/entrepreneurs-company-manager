@@ -13,9 +13,10 @@ struct DashboardView: View {
     @Bindable var vm: AppViewModel
     @State private var showAddCompany = false
     @State private var editingCompany: Company? = nil
+    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     // Header
@@ -36,33 +37,34 @@ struct DashboardView: View {
                     // Company cards
                     LazyVStack(spacing: 16) {
                         ForEach(filteredCompanies) { company in
-                            NavigationLink(value: company) {
-                                CompanyCardView(
-                                    company: company,
-                                    monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
-                                    onEdit: { editingCompany = company },
-                                    onViewSubscriptions: {
-                                        vm.selectedCompany = company
-                                        vm.activeTab = .subscriptions
-                                        vm.touchCompany(company, context: context)
-                                    },
-                                    onViewFinancials: {
-                                        vm.selectedCompany = company
-                                        vm.activeTab = .financial
-                                        vm.touchCompany(company, context: context)
-                                    },
-                                    onViewDocuments: {
-                                        vm.selectedCompany = company
-                                        vm.activeTab = .documents
-                                        vm.touchCompany(company, context: context)
-                                    }
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .simultaneousGesture(TapGesture().onEnded {
+                            CompanyCardView(
+                                company: company,
+                                monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
+                                onEdit: { editingCompany = company },
+                                onViewSubscriptions: {
+                                    vm.selectedCompany = company
+                                    vm.activeTab = .subscriptions
+                                    vm.touchCompany(company, context: context)
+                                    path.append(company)
+                                },
+                                onViewFinancials: {
+                                    vm.selectedCompany = company
+                                    vm.activeTab = .financial
+                                    vm.touchCompany(company, context: context)
+                                    path.append(company)
+                                },
+                                onViewDocuments: {
+                                    vm.selectedCompany = company
+                                    vm.activeTab = .documents
+                                    vm.touchCompany(company, context: context)
+                                    path.append(company)
+                                }
+                            )
+                            .onTapGesture {
                                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                                 vm.touchCompany(company, context: context)
-                            })
+                                path.append(company)
+                            }
                         }
 
                         // Add company button — CiFr dashed style
@@ -154,13 +156,13 @@ struct DashboardView: View {
                 let parts = vm.quote.components(separatedBy: " - ")
                 VStack(spacing: 2) {
                     Text("\"\(parts.first ?? vm.quote)\"")
-                        .font(.system(size: 13, weight: .light))
+                        .font(.system(size: 15, weight: .light))
                         .italic()
                         .foregroundStyle(Color.white.opacity(0.45))
                         .multilineTextAlignment(.center)
                     if parts.count > 1 {
                         Text("— \(parts[1])")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.3))
                     }
                 }
