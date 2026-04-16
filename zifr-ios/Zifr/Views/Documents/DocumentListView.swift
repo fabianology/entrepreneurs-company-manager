@@ -27,15 +27,15 @@ struct DocumentListView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(.black)
                             Text("DOCUMENT")
-                                .font(.system(size: 13, weight: .heavy))
+                                .font(.system(size: 12, weight: .heavy))
                                 .tracking(1)
                                 .foregroundStyle(.black)
                         }
-                        .padding(.horizontal, 22)
-                        .frame(height: 44)
+                        .padding(.horizontal, 20)
+                        .frame(height: 36)
                         .background(Color.white)
                         .clipShape(Capsule())
                     }
