@@ -19,6 +19,19 @@ struct EditSubscriptionSheet: View {
     @State private var subDraft = SubService()
     @State private var subDraftIndex: Int? = nil
 
+    // Dirty-state tracking — fingerprint of initial values captured on appear
+    @State private var initialFingerprint = ""
+
+    private var currentFingerprint: String {
+        "\(sub.name)|\(sub.website)|\(sub.pricingModel)|\(sub.status)|\(sub.cost)|" +
+        "\(sub.billingCycle)|\(sub.nextRenewal)|\(sub.paymentMethod)|\(sub.renew)|" +
+        "\(sub.loginId)|\(sub.password)|\(sub.twoFactorAuth)|\(sub.recoveryMethod)|\(sub.notes)"
+    }
+
+    private var isDirty: Bool {
+        isNew || currentFingerprint != initialFingerprint
+    }
+
     // Flat list of payable accounts from all passed institutions
     private var payableAccounts: [InstitutionAccount] {
         institutions.flatMap { $0.accounts }
@@ -281,6 +294,7 @@ struct EditSubscriptionSheet: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .onAppear { initialFingerprint = currentFingerprint }
             .navigationTitle(isNew ? "New Service" : "Edit Service")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -296,6 +310,7 @@ struct EditSubscriptionSheet: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .tint(isDirty ? .green : nil)
                     .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
@@ -378,7 +393,7 @@ struct SubServicesSection: View {
                                 Text("·").foregroundStyle(.tertiary).font(.caption)
                                 Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(ss.autoPay == .auto ? Color.green : Color.secondary)
                             }
                         }
                         Spacer()
@@ -424,15 +439,40 @@ struct SubServiceHUD: View {
     let onSave: () -> Void
     let onCancel: () -> Void
 
+    @State private var initialDraft: SubService? = nil
+
+    private var isDirty: Bool {
+        guard let initial = initialDraft else { return isNew && !draft.name.isEmpty }
+        return draft.name != initial.name ||
+               draft.cost != initial.cost ||
+               draft.billingCycle != initial.billingCycle ||
+               draft.autoPay != initial.autoPay ||
+               draft.status != initial.status ||
+               draft.purpose != initial.purpose
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    // Name
-                    LabeledContent("Name") {
+                    // Name + Status toggle on the same row
+                    HStack(spacing: 12) {
+                        Text("Name")
+                            .foregroundStyle(.secondary)
                         TextField("e.g. Premium Plan", text: $draft.name)
-                            .multilineTextAlignment(.trailing)
                             .autocorrectionDisabled()
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(draft.status == .active ? "Active" : "Paused")
+                                .font(.caption)
+                                .foregroundStyle(draft.status == .active ? .green : .red)
+                            Toggle("", isOn: Binding(
+                                get: { draft.status == .active },
+                                set: { draft.status = $0 ? .active : .paused }
+                            ))
+                            .labelsHidden()
+                            .tint(draft.status == .active ? .green : .red)
+                        }
                     }
 
                     // Cost + Cycle in one row
@@ -452,35 +492,29 @@ struct SubServiceHUD: View {
                         .pickerStyle(.segmented)
                     }
 
-                    // Auto Pay + Status — single row, two toggles
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
+                    // Auto Pay — toggle, green = on
+                    Toggle(isOn: Binding(
+                        get: { draft.autoPay == .auto },
+                        set: { draft.autoPay = $0 ? .auto : .manual }
+                    )) {
+                        HStack(spacing: 4) {
                             Text("Auto Pay")
+                            Text(draft.autoPay == .auto ? "· On" : "· Off")
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Toggle("", isOn: Binding(
-                                get: { draft.autoPay == .auto },
-                                set: { draft.autoPay = $0 ? .auto : .manual }
-                            ))
-                            .labelsHidden()
-                            .tint(.green)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(draft.status == .active ? "Active" : "Paused")
-                                .font(.caption)
-                                .foregroundStyle(draft.status == .active ? .green : .red)
-                            Toggle("", isOn: Binding(
-                                get: { draft.status == .active },
-                                set: { draft.status = $0 ? .active : .paused }
-                            ))
-                            .labelsHidden()
-                            .tint(draft.status == .active ? .green : .red)
+                                .foregroundStyle(draft.autoPay == .auto ? Color.green : Color.secondary)
                         }
                     }
-                    .padding(.vertical, 4)
+                    .tint(.green)
+                }
+
+                Section {
+                    TextField("What is this service for?",
+                              text: $draft.purpose,
+                              axis: .vertical)
+                        .lineLimit(3)
+                        .font(.body)
+                } header: {
+                    Text("Purpose")
                 }
             }
             .navigationTitle(isNew ? "New Service" : "Edit Service")
@@ -492,9 +526,11 @@ struct SubServiceHUD: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isNew ? "Add" : "Save", action: onSave)
                         .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
                         .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
+            .onAppear { initialDraft = draft }
         }
     }
 }
