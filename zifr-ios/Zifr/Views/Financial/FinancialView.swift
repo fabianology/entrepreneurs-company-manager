@@ -34,11 +34,11 @@ struct FinancialView: View {
                             newInst = vm.addInstitution(context: context, companyId: company.id)
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "plus").font(.system(size: 14)).foregroundStyle(Color.black.opacity(0.5))
-                                Text("Institution").font(.system(size: 12, weight: .semibold)).foregroundStyle(.black)
+                                Image(systemName: "plus").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.black.opacity(0.5))
+                                Text("Institution").font(.system(size: 14, weight: .semibold)).foregroundStyle(.black)
                             }
-                            .padding(.horizontal, 16)
-                            .frame(height: 32)
+                            .padding(.horizontal, 20)
+                            .frame(height: 44)
                             .background(Color.white)
                             .clipShape(Capsule())
                         }
@@ -126,11 +126,11 @@ struct FinancialView: View {
             action()
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: icon).font(.system(size: 14)).foregroundStyle(Color.white.opacity(0.4))
-                Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
+                Image(systemName: icon).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                Text(label).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
             }
-            .padding(.horizontal, 16)
-            .frame(height: 32)
+            .padding(.horizontal, 20)
+            .frame(height: 44)
             .background(Color(hex: "#1C1C1E"))
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))

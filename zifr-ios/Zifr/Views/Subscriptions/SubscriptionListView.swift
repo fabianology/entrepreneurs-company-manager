@@ -22,15 +22,15 @@ struct SubscriptionListView: View {
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(.black)
                             Text("SERVICE")
-                                .font(.system(size: 9, weight: .black))
+                                .font(.system(size: 13, weight: .heavy))
                                 .tracking(1)
                                 .foregroundStyle(.black)
                         }
-                        .padding(.horizontal, 16)
-                        .frame(height: 32)
+                        .padding(.horizontal, 22)
+                        .frame(height: 44)
                         .background(Color.white)
                         .clipShape(Capsule())
                     }
