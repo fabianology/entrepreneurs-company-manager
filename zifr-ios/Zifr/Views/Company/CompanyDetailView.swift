@@ -248,14 +248,66 @@ struct CompanyDetailView: View {
         }
     }
 
-    // MARK: - Native Segmented Tab Bar
+    // MARK: - App-styled Heavy Segmented Control
     private var cifrTabBar: some View {
-        Picker("Tabs", selection: $vm.activeTab) {
+        HStack(spacing: 0) {
             ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
-                Image(systemName: tab.icon).tag(tab)
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.activeTab = tab
+                        dragOffset = 0
+                    }
+                } label: {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
+                        .foregroundStyle(vm.activeTab == tab ? .white : Color.white.opacity(0.4))
+                        .frame(width: 60, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
+        .frame(width: 180, height: 44)
+        .background(alignment: .leading) {
+            // Sliding Pill Background (Segmented Style)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(hex: "#636366"))
+                .frame(width: 56, height: 38)
+                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
+                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset + 2) // +2 centers the 56px pill within the 60px slot
+        }
+        // Segmented Control Outer Container Style
+        .background(Color.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 5)
+                .onChanged { value in
+                    let maxOffset = CGFloat(AppViewModel.CompanyTab.allCases.count - 1) * 60.0
+                    var rawOffset = CGFloat(currentTabIndex) * 60.0 + value.translation.width
+                    
+                    if rawOffset < 0 {
+                        rawOffset = rawOffset * 0.3
+                    } else if rawOffset > maxOffset {
+                        rawOffset = maxOffset + (rawOffset - maxOffset) * 0.3
+                    }
+                    
+                    dragOffset = rawOffset - (CGFloat(currentTabIndex) * 60.0)
+                }
+                .onEnded { value in
+                    let finalX = CGFloat(currentTabIndex) * 60.0 + value.translation.width + value.predictedEndTranslation.width * 0.2
+                    let targetIndex = min(max(Int(round(finalX / 60.0)), 0), AppViewModel.CompanyTab.allCases.count - 1)
+                    
+                    if targetIndex != currentTabIndex {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                    
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.activeTab = AppViewModel.CompanyTab.allCases[targetIndex]
+                        dragOffset = 0
+                    }
+                }
+        )
     }
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
