@@ -51,15 +51,6 @@ struct CompanyDetailView: View {
         }
         .background(Color.black)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showEditCompany = true } label: {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-            }
-        }
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
         }
