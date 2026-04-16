@@ -109,6 +109,33 @@ struct CompanyDetailView: View {
                     .liquidGlass(cornerRadius: 22)
                 }
                 .buttonStyle(.plain)
+
+                // Inline Tab Navigator
+                HStack(spacing: 0) {
+                    ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                vm.activeTab = tab
+                            }
+                        } label: {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 14, weight: vm.activeTab == tab ? .bold : .medium))
+                                .foregroundStyle(vm.activeTab == tab ? .white : Color.white.opacity(0.4))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(alignment: .leading) {
+                    // Sliding indicator pill
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 44, height: 44)
+                        .offset(x: CGFloat(AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0) * 44.0)
+                }
+                .liquidGlass(cornerRadius: 22)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
