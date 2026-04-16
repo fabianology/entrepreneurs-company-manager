@@ -22,8 +22,8 @@ struct EditCompanySheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Logo preview + upload
-                    VStack(spacing: 16) {
+                    // Entity Name Row
+                    HStack(spacing: 16) {
                         ZStack {
                             if let data = logoData, let ui = UIImage(data: data) {
                                 Image(uiImage: ui)
@@ -33,19 +33,53 @@ struct EditCompanySheet: View {
                                 ZStack {
                                     Color(hex: colorHex)
                                     Text(name.isEmpty ? "?" : String(name.prefix(1)).uppercased())
-                                        .font(.system(size: 36, weight: .black, design: .rounded))
+                                        .font(.system(size: 28, weight: .black, design: .rounded))
                                         .foregroundStyle(.white)
                                 }
                             }
+                            
+                            if logoData != nil {
+                                Button { logoData = nil } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundStyle(.red, .white)
+                                        .font(.system(size: 20))
+                                }
+                                .padding(4)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                .offset(x: 8, y: -8)
+                            }
                         }
-                        .frame(width: 90, height: 90)
-                        .clipShape(RoundedRectangle(cornerRadius: 22))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                        .frame(width: 76, height: 76)
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                        
+                        formSection {
+                            ZifrField(label: "Entity Name", placeholder: "Acme Holdings LLC", text: $name)
+                        }
+                    }
+                    .padding(.top, 8)
 
+                    // Website Row
+                    HStack(spacing: 16) {
+                        formSection {
+                            ZifrField(label: "Website", placeholder: "acme.com", text: $website)
+                                .keyboardType(.URL)
+                        }
+                        
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                            Label("Upload Logo", systemImage: "photo")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                            VStack(spacing: 6) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 20, weight: .semibold))
+                                Text("UPLOAD")
+                                    .font(.system(size: 9, weight: .black))
+                                    .tracking(1)
+                            }
+                            .foregroundStyle(Color.white.opacity(0.8))
+                            .frame(width: 76)
+                            .frame(maxHeight: .infinity) // fills height of HStack defined by formSection
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.12), lineWidth: 1))
                         }
                         .onChange(of: selectedPhoto) { _, item in
                             Task {
@@ -54,21 +88,8 @@ struct EditCompanySheet: View {
                                 }
                             }
                         }
-
-                        if logoData != nil {
-                            Button("Remove Logo") { logoData = nil }
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.red.opacity(0.7))
-                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 8)
-
-                    formSection {
-                        ZifrField(label: "Entity Name", placeholder: "Acme Holdings LLC", text: $name)
-                        ZifrField(label: "Website", placeholder: "acme.com", text: $website)
-                            .keyboardType(.URL)
-                    }
+                    .fixedSize(horizontal: false, vertical: true) // forces HStack to adhere to formSection's natural height
 
                     // Structure picker
                     VStack(alignment: .leading, spacing: 8) {
@@ -209,18 +230,32 @@ struct EditCompanySheet: View {
             .navigationTitle(isEditing ? "Edit Entity" : "New Entity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditing ? "Save" : "Create") {
-                        save()
-                        dismiss()
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    HStack(spacing: 16) {
+                        // Cancel (X)
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.6))
+                                .frame(width: 32, height: 32)
+                                .background(Color.white.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        
+                        // Save (Checkmark)
+                        Button {
+                            save()
+                            dismiss()
+                        } label: {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(name.isEmpty ? Color.white.opacity(0.3) : .black)
+                                .frame(width: 32, height: 32)
+                                .background(name.isEmpty ? Color.white.opacity(0.1) : .white)
+                                .clipShape(Circle())
+                        }
+                        .disabled(name.isEmpty)
                     }
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(name.isEmpty ? Color.white.opacity(0.2) : .white)
-                    .disabled(name.isEmpty)
                 }
             }
         }
