@@ -99,9 +99,7 @@ struct FinancialView: View {
                                     .padding(.top, 24)
                                     .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)), alignment: .top)
                                 
-                                ForEach(standaloneCards) { card in
-                                    FinancialCardView(card: card, onEdit: { editingCard = card })
-                                }
+                                standaloneWalletStack(cards: standaloneCards)
                                 ForEach(standaloneLoans) { loan in
                                     LoanCardView(loan: loan, onEdit: { editingLoan = loan })
                                 }
@@ -184,6 +182,39 @@ struct FinancialView: View {
         }
         .padding(.bottom, 24)
     }
+
+    @ViewBuilder
+    private func standaloneWalletStack(cards: [FinancialCard]) -> some View {
+        let peekOffset: CGFloat = 36
+        let cardH: CGFloat = 110
+        
+        if !cards.isEmpty {
+            ZStack(alignment: .bottom) {
+                ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                    let isPopped = poppedCardId == card.id
+                    let yOffset = isPopped ? -(cardH + CGFloat(cards.count) * peekOffset + 10) : -(CGFloat(index) * peekOffset)
+                    let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
+                    
+                    FinancialCardVisual(card: card, isPopped: isPopped)
+                        .frame(height: cardH)
+                        .scaleEffect(scale)
+                        .offset(y: yOffset)
+                        .zIndex(isPopped ? 25 : Double(cards.count - index))
+                        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isPopped)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
+                        .onTapGesture {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if poppedCardId == card.id { poppedCardId = nil } else { poppedCardId = card.id }
+                        }
+                        .onLongPressGesture {
+                            editingCard = card
+                        }
+                }
+            }
+            .padding(.top, CGFloat(cards.count) * peekOffset + 8)
+            .padding(.bottom, 16)
+        }
+    }
 }
 
 // ── Shared Card Visual (Mini overlapping view for stack) ──
@@ -197,22 +228,26 @@ struct FinancialCardVisual: View {
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(isPopped ? Color.white.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1))
                 .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
             
+            let isLight = card.colorHex.uppercased() == "#FFFFFF"
+            let primaryColor = isLight ? Color.black : Color.white
+            let secondaryColor = isLight ? Color.black.opacity(0.7) : Color.white.opacity(0.7)
+            
             VStack {
                 HStack(alignment: .top) {
                     Text(card.name.isEmpty ? "Card" : card.name)
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(primaryColor)
                     Spacer()
                     Text(card.network)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.7))
+                        .foregroundStyle(secondaryColor)
                         .italic()
                 }
                 Spacer()
                 if isPopped {
                     Text("•••• •••• •••• \(card.last4)")
                         .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(0.85))
+                        .foregroundStyle(isLight ? Color.black.opacity(0.85) : Color.white.opacity(0.85))
                         .tracking(3)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 8)
@@ -220,11 +255,11 @@ struct FinancialCardVisual: View {
                     HStack {
                         Text(card.cardHolder.isEmpty ? "Name on Card" : card.cardHolder)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.6))
+                            .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
                         Spacer()
                         Text(card.expiry.isEmpty ? "—" : card.expiry)
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.6))
+                            .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
                     }
                 }
             }
@@ -443,6 +478,19 @@ struct FinancialCardView: View {
 
 private extension FinancialCard {
     var colorHex: String {
+        let inst = institutionName.lowercased()
+        if inst.contains("apple") { return "#FFFFFF" }
+        if inst.contains("chase") { return "#1a3f8f" }
+        if inst.contains("america") || inst.contains("bofa") { return "#8f1a1a" }
+        if inst.contains("wells fargo") { return "#8f1a1a" }
+        if inst.contains("citi") { return "#1a6a8f" }
+        if inst.contains("capital one") { return "#1a1a8f" }
+        if inst.contains("american express") || inst.contains("amex") { return "#1a7a8a" }
+        if inst.contains("discover") { return "#b85000" }
+        if inst.contains("mercury") { return "#1a3a8f" }
+        if inst.contains("stripe") { return "#3a1a8f" }
+        if inst.contains("ramp") { return "#3a7a00" }
+
         switch network {
         case "Visa": return "#1A1F71"
         case "Mastercard": return "#8B0000"
