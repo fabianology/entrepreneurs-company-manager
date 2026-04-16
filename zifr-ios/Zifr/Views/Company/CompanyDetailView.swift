@@ -139,7 +139,7 @@ struct CompanyDetailView: View {
                     let screenWidth = UIScreen.main.bounds.width
                     let startX = value.startLocation.x
                     
-                    let isEdgeSwipe = startX < 60 || startX > screenWidth - 60
+                    let isEdgeSwipe = startX < 120 || startX > screenWidth - 120
                     if !isEdgeSwipe { return }
                     
                     let transX = value.translation.width
@@ -172,6 +172,7 @@ struct CompanyDetailView: View {
                     swipeHandled = false
                 }
         )
+        .navigationBarBackButtonHidden(true)
     }
 
     // MARK: - Company Header (mirrors CiFr's CompanyHeader.tsx)
