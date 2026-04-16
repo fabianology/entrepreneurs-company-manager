@@ -35,7 +35,7 @@
 
 /* Begin PBXFileReference section */
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
-		03CAB6D4DDF65D7F0680343C /* Zifr.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zifr.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		03CAB6D4DDF65D7F0680343C /* Zifr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zifr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0F35D3D91F4D431D42B40709 /* FinancialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialCard.swift; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
 		3141954F83AF71011D282471 /* Color+Zifr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Zifr.swift"; sourceTree = "<group>"; };
@@ -235,11 +235,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-					DFA8A0CFBEEDA205986E9DFC = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 3E1FBE7A6D1150C9D1962549 /* Build configuration list for PBXProject "Zifr" */;
 			developmentRegion = en;
@@ -300,6 +295,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = WYYJ6FGYRP;
 				INFOPLIST_FILE = Zifr/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -316,6 +312,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = WYYJ6FGYRP;
 				INFOPLIST_FILE = Zifr/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

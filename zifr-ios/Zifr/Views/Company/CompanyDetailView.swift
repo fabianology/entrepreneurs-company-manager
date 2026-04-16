@@ -26,6 +26,28 @@ struct CompanyDetailView: View {
     private var currentTabIndex: Int {
         AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
     }
+    
+    // Dynamic Icon Interpolation Physics
+    private func iconDistance(for tabIndex: Int) -> CGFloat {
+        let pillX = CGFloat(currentTabIndex) * 60.0 + dragOffset
+        let pillCenter = pillX + 30.0
+        let iconCenter = CGFloat(tabIndex) * 60.0 + 30.0
+        return abs(pillCenter - iconCenter)
+    }
+
+    private func iconScale(for tabIndex: Int) -> CGFloat {
+        let distance = iconDistance(for: tabIndex)
+        if distance >= 48.0 { return 1.0 } // 60 * 0.8
+        let progress = 1.0 - (distance / 48.0)
+        return 1.0 + (0.45 * progress) // scales up to 1.45x
+    }
+
+    private func iconProximity(for tabIndex: Int) -> CGFloat {
+        let distance = iconDistance(for: tabIndex)
+        if distance >= 33.0 { return 0.0 } // 60 * 0.55
+        let progress = 1.0 - (distance / 33.0)
+        return progress // 0.0 -> 1.0 bloom
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -236,6 +258,10 @@ struct CompanyDetailView: View {
     private var cifrTabBar: some View {
         HStack(spacing: 0) {
             ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
+                let tabIndex = AppViewModel.CompanyTab.allCases.firstIndex(of: tab) ?? 0
+                let tScale = iconScale(for: tabIndex)
+                let tProx = iconProximity(for: tabIndex)
+                
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -245,7 +271,10 @@ struct CompanyDetailView: View {
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
-                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
+                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white)
+                        .scaleEffect(tScale)
+                        .opacity(vm.activeTab == tab ? 1.0 : 0.4 + (tProx * 0.6))
+                        .shadow(color: tabColor(tab).opacity(vm.activeTab == tab ? 0 : tProx * 0.9), radius: tProx * 8, x: 0, y: 0)
                         .frame(width: 60, height: 36)
                         .contentShape(Rectangle())
                 }
