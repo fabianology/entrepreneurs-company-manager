@@ -131,12 +131,11 @@ struct FinancialView: View {
     @ViewBuilder
     private func walletStackForInstitution(inst: Institution, instCards: [FinancialCard], instLoans: [Loan]) -> some View {
         let peekOffset: CGFloat = 36
-        let cardH: CGFloat = 110 // Must roughly match the layout frame height
+        let cardH: CGFloat = 110
         
-        VStack(spacing: 0) {
-            // Cards absolute rendering via zstack to overlap natively
+        ZStack(alignment: .top) {
             if !instCards.isEmpty {
-                ZStack(alignment: .bottom) {
+                ZStack(alignment: .top) {
                     ForEach(Array(instCards.enumerated()), id: \.element.id) { index, card in
                         let isPopped = poppedCardId == card.id
                         let yOffset = isPopped ? -(cardH + CGFloat(instCards.count) * peekOffset + 10) : -(peekOffset + CGFloat(index) * peekOffset)
@@ -158,10 +157,9 @@ struct FinancialView: View {
                             }
                     }
                 }
-                .padding(.top, CGFloat(instCards.count) * peekOffset + 8) // Push content down internally so the cards have room at the top
+                .zIndex(10)
             }
             
-            // Core institution card goes on top
             InstitutionCardView(
                 institution: inst,
                 totalMonthlyPayment: instLoans.reduce(0) { $0 + $1.monthlyPayment },
@@ -171,6 +169,7 @@ struct FinancialView: View {
             )
             .zIndex(20)
         }
+        .padding(.top, instCards.isEmpty ? 0 : CGFloat(instCards.count) * peekOffset + 16)
         .padding(.bottom, 24)
     }
 
