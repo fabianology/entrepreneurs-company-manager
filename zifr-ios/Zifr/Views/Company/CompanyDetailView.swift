@@ -248,12 +248,12 @@ struct CompanyDetailView: View {
         }
     }
 
-    // MARK: - App-styled Heavy Segmented Control
+    // MARK: - CiFr-style Tab Pill Bar
     private var cifrTabBar: some View {
         HStack(spacing: 0) {
             ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
                 Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         vm.activeTab = tab
                         dragOffset = 0
@@ -261,8 +261,8 @@ struct CompanyDetailView: View {
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
-                        .foregroundStyle(vm.activeTab == tab ? .white : Color.white.opacity(0.4))
-                        .frame(width: 60, height: 44)
+                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
+                        .frame(width: 60, height: 36)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -270,16 +270,15 @@ struct CompanyDetailView: View {
         }
         .frame(width: 180, height: 44)
         .background(alignment: .leading) {
-            // Sliding Pill Background (Segmented Style)
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(hex: "#636366"))
-                .frame(width: 56, height: 38)
-                .shadow(color: .black.opacity(0.15), radius: 2, x: 0, y: 1)
-                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset + 2) // +2 centers the 56px pill within the 60px slot
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.white.opacity(0.12))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+                .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+                .frame(width: 60, height: 36)
+                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset)
         }
-        // Segmented Control Outer Container Style
-        .background(Color.white.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .liquidGlass(cornerRadius: 22)
         .highPriorityGesture(
             DragGesture(minimumDistance: 5)
                 .onChanged { value in
