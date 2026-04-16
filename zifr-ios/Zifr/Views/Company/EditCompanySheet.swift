@@ -122,35 +122,85 @@ struct EditCompanySheet: View {
                         .padding(.horizontal, 4)
                     }
 
-                    if isEditing {
-                        if showDeleteConfirm {
-                            HStack(spacing: 20) {
-                                Text("Delete this entity?")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.red)
-                                Button("Yes, Delete") {
-                                    if let company { vm.deleteCompany(company, context: context) }
-                                    dismiss()
+                    VStack(spacing: 30) {
+                        // App Navigators
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("APP NAVIGATORS")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .padding(.leading, 4)
+                            
+                            HStack(spacing: 12) {
+                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#60A5FA"), text: "Subscriptions") {
+                                    if let company { vm.selectedCompany = company; vm.activeTab = .subscriptions; dismiss() }
                                 }
-                                .font(.system(size: 12, weight: .black))
-                                .foregroundStyle(.red)
-                                Button("Cancel") { showDeleteConfirm = false }
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.4))
+                                navButton(icon: "creditcard", color: Color(hex: "#22c55e"), text: "Financials") {
+                                    if let company { vm.selectedCompany = company; vm.activeTab = .financial; dismiss() }
+                                }
+                                navButton(icon: "doc.text", color: Color(hex: "#FBBF24"), text: "Docs") {
+                                    if let company { vm.selectedCompany = company; vm.activeTab = .documents; dismiss() }
+                                }
                             }
-                            .padding(16)
-                            .glassCard(cornerRadius: 16)
-                        } else {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                showDeleteConfirm = true
-                            } label: {
-                                Label("Delete Entity", systemImage: "trash")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.red.opacity(0.7))
+                        }
+
+                        // Tutorial
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "play.circle")
+                                Text("Tutorial")
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Color.black)
+                            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 22))
+                        }
+                        .buttonStyle(.plain)
+
+                        // Delete
+                        if isEditing {
+                            if showDeleteConfirm {
+                                HStack(spacing: 20) {
+                                    Text("Delete this entity?")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(.red)
+                                    Button("Yes, Delete") {
+                                        if let company { vm.deleteCompany(company, context: context) }
+                                        dismiss()
+                                    }
+                                    .font(.system(size: 12, weight: .black))
+                                    .foregroundStyle(.red)
+                                    Button("Cancel") { showDeleteConfirm = false }
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                }
+                                .padding(16)
+                                .frame(maxWidth: .infinity)
+                                .glassCard(cornerRadius: 16)
+                            } else {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                    showDeleteConfirm = true
+                                } label: {
+                                    Text("DELETE \(name.isEmpty ? "ENTITY" : name.uppercased())")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .tracking(2)
+                                        .foregroundStyle(.red)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 16)
+                                        .background(Color.red.opacity(0.05))
+                                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.red.opacity(0.3), lineWidth: 1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
+                    .padding(.top, 10)
                 }
                 .padding(20)
                 .padding(.bottom, 40)
@@ -194,6 +244,29 @@ struct EditCompanySheet: View {
         } else {
             vm.addCompany(context: context, name: name, structure: structure, colorHex: colorHex, logoData: logoData, website: website)
         }
+    }
+
+    private func navButton(icon: String, color: Color, text: String, action: @escaping () -> Void) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        } label: {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundStyle(color)
+                Text(text)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color(hex: "#1C1C1E"))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.05), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 }
 
