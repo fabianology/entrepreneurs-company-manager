@@ -18,8 +18,8 @@ final class AppViewModel {
 
         var icon: String {
             switch self {
-            case .subscriptions: return "square.3.layers.3d"
-            case .financial:     return "creditcard"
+            case .subscriptions: return "creditcard"
+            case .financial:     return "square.3.layers.3d"
             case .documents:     return "doc.text"
             }
         }

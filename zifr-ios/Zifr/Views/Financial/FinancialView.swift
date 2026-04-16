@@ -661,7 +661,7 @@ struct EditInstitutionSheet: View {
                         // ── Action buttons ─────────────────────────────────
                         VStack(spacing: 10) {
                             addSubItemButton(emoji: "💳", label: "Add Card") {
-                                _ = vm.addCard(context: context, companyId: institution.companyId ?? "")
+                                _ = vm.addCard(context: context, companyId: institution.companyId)
                             }
                             addSubItemButton(emoji: "🏦", label: "Add Account") {
                                 var accs = institution.accounts
@@ -669,7 +669,7 @@ struct EditInstitutionSheet: View {
                                 institution.accounts = accs
                             }
                             addSubItemButton(emoji: "💸", label: "Add Loan") {
-                                _ = vm.addLoan(context: context, companyId: institution.companyId ?? "")
+                                _ = vm.addLoan(context: context, companyId: institution.companyId)
                             }
                         }
 

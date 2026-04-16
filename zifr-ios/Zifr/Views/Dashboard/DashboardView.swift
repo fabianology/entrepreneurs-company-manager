@@ -40,77 +40,33 @@ struct DashboardView: View {
 
                 // Company cards
                 ForEach(filteredCompanies) { company in
-                    ZStack {
-                        CompanyCardView(
-                            company: company,
-                            monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
-                            onEdit: { editingCompany = company },
-                            onViewSubscriptions: {
-                                vm.selectedCompany = company
-                                vm.activeTab = .subscriptions
-                                vm.touchCompany(company, context: context)
-                                path.append(company)
-                            },
-                            onViewFinancials: {
-                                vm.selectedCompany = company
-                                vm.activeTab = .financial
-                                vm.touchCompany(company, context: context)
-                                path.append(company)
-                            },
-                            onViewDocuments: {
-                                vm.selectedCompany = company
-                                vm.activeTab = .documents
-                                vm.touchCompany(company, context: context)
-                                path.append(company)
+                    CompanyCardView(
+                        company: company,
+                        monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
+                        onEdit: { editingCompany = company },
+                        onViewSubscriptions: {
+                            vm.selectedCompany = company
+                            vm.activeTab = .subscriptions
+                            vm.touchCompany(company, context: context)
+                            path.append(company)
+                        },
+                        onViewFinancials: {
+                            vm.selectedCompany = company
+                            vm.activeTab = .financial
+                            vm.touchCompany(company, context: context)
+                            path.append(company)
+                        },
+                        onViewDocuments: {
+                            vm.selectedCompany = company
+                            vm.activeTab = .documents
+                            vm.touchCompany(company, context: context)
+                            path.append(company)
                         }
                     )
                     .onTapGesture {
                         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                         vm.touchCompany(company, context: context)
                         path.append(company)
-                    }
-                        
-                        if companyToDelete == company {
-                            VStack(spacing: 12) {
-                                Text("This will delete everything associated with this entity. Continue?")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .multilineTextAlignment(.center)
-                                    .padding(.horizontal, 24)
-                                
-                                HStack(spacing: 24) {
-                                    Button("Yes") {
-                                        withAnimation {
-                                            vm.deleteCompany(company, context: context)
-                                            companyToDelete = nil
-                                        }
-                                    }
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 10)
-                                    .background(Color.white.opacity(0.2))
-                                    .clipShape(Capsule())
-                                    
-                                    Button("No") {
-                                        withAnimation { companyToDelete = nil }
-                                    }
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-                                }
-                                .padding(.top, 4)
-                            }
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 24).fill(.ultraThinMaterial)
-                                    RoundedRectangle(cornerRadius: 24).fill(Color.red.opacity(0.5))
-                                }
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 24))
-                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                            .zIndex(1)
-                        }
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -123,7 +79,7 @@ struct DashboardView: View {
                         }
                         .tint(Color.indigo)
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
                             companyToDelete = company
                         } label: {
@@ -177,6 +133,32 @@ struct DashboardView: View {
                     vm: vm, companies: companies, subscriptions: subscriptions,
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
+            }
+            .confirmationDialog(
+                "Delete Company",
+                isPresented: Binding(
+                    get: { companyToDelete != nil },
+                    set: { isPresented in
+                        if !isPresented { companyToDelete = nil }
+                    }
+                ),
+                titleVisibility: .visible
+            ) {
+                if let companyName = companyToDelete?.name {
+                    Button("Delete \(companyName)", role: .destructive) {
+                        if let company = companyToDelete {
+                            withAnimation {
+                                vm.deleteCompany(company, context: context)
+                            }
+                            companyToDelete = nil
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    companyToDelete = nil
+                }
+            } message: {
+                Text("This will permanently delete this company and all associated data. This action cannot be undone.")
             }
             .overlay(alignment: .bottom) {
                 Button {
