@@ -70,9 +70,7 @@ struct CompanyDetailView: View {
                         .font(.system(size: 20))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
-                        .background(Color(hex: "#1C1C1E").opacity(0.85))
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .liquidGlass(cornerRadius: 22)
                 }
                 .buttonStyle(.plain)
 
@@ -92,9 +90,7 @@ struct CompanyDetailView: View {
                     }
                     .padding(.horizontal, 12)
                     .frame(height: 44)
-                    .background(Color(hex: "#1C1C1E").opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                    .liquidGlass(cornerRadius: 22)
                 }
                 .buttonStyle(.plain)
 
@@ -223,14 +219,7 @@ struct CompanyDetailView: View {
             }
         }
         .frame(width: 180, height: 44)
-        .background(
-            RoundedRectangle(cornerRadius: 22)
-                .fill(Color(hex: "#1C1C1E").opacity(0.65))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                )
-        )
+        .liquidGlass(cornerRadius: 22)
     }
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {

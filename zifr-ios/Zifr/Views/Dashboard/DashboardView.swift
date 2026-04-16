@@ -127,9 +127,7 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal, 16)
                     .frame(height: 44)
-                    .background(Color(hex: "#1C1C1E").opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 22))
-                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                    .liquidGlass(cornerRadius: 22)
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 20)

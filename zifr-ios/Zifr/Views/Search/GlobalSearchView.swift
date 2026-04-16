@@ -46,8 +46,7 @@ struct GlobalSearchView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color.white.opacity(0.07))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .liquidGlass(cornerRadius: 14)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
 
