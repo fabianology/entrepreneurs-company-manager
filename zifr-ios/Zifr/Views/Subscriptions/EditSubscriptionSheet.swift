@@ -349,6 +349,7 @@ struct EditSubscriptionSheet: View {
                     .foregroundStyle(.white)
                 }
             }
+            .interactiveDismissDisabled(isNew)
         }
     }
 }

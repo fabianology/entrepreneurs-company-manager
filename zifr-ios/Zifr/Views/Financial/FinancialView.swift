@@ -432,6 +432,7 @@ struct EditInstitutionSheet: View {
                         .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
                 }
             }
+            .interactiveDismissDisabled(isNew)
         }
     }
 }
@@ -492,6 +493,7 @@ struct EditCardSheet: View {
                         .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
                 }
             }
+            .interactiveDismissDisabled(isNew)
         }
     }
 
@@ -580,6 +582,7 @@ struct EditLoanSheet: View {
                         .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
                 }
             }
+            .interactiveDismissDisabled(isNew)
         }
     }
 

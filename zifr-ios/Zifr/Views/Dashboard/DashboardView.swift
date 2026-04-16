@@ -156,7 +156,7 @@ struct DashboardView: View {
                 let parts = vm.quote.components(separatedBy: " - ")
                 VStack(spacing: 2) {
                     Text("\"\(parts.first ?? vm.quote)\"")
-                        .font(.system(size: 15, weight: .light))
+                        .font(.system(size: 14, weight: .light))
                         .italic()
                         .foregroundStyle(Color.white.opacity(0.45))
                         .multilineTextAlignment(.center)

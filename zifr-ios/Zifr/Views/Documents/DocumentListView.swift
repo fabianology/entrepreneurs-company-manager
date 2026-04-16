@@ -223,6 +223,7 @@ struct EditDocumentSheet: View {
                         .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
                 }
             }
+            .interactiveDismissDisabled(isNew)
         }
     }
 }
