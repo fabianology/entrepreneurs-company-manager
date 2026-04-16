@@ -82,9 +82,8 @@ struct EditSubscriptionSheet: View {
                                         .padding(.vertical, 14)
                                         .padding(.trailing, 12)
                                     }
-                                    .background(Color(hex: "#111111"))
+                                    .background(Color.white.opacity(0.04))
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
                                 }
 
                                 VStack(alignment: .leading, spacing: 6) {
@@ -116,9 +115,8 @@ struct EditSubscriptionSheet: View {
                                             }
                                         }
                                     }
-                                    .background(Color.black.opacity(0.4))
+                                    .background(Color.white.opacity(0.04))
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05), lineWidth: 1))
                                 }
                             }
                         }
@@ -155,9 +153,8 @@ struct EditSubscriptionSheet: View {
                                 }
                             }
                         }
-                        .background(Color(hex: "#242426"))
+                        .background(Color.white.opacity(0.04))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.05), lineWidth: 1))
                         .frame(width: 256)
                         .frame(maxWidth: .infinity, alignment: .center)
 
@@ -192,9 +189,8 @@ struct EditSubscriptionSheet: View {
                                             }
                                         }
                                     }
-                                    .background(Color.black.opacity(0.2))
+                                    .background(Color.white.opacity(0.04))
                                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05), lineWidth: 1))
                                 }
                             }
                         }
@@ -211,9 +207,8 @@ struct EditSubscriptionSheet: View {
                                 .frame(minHeight: 80)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color(hex: "#111111"))
+                                .background(Color.white.opacity(0.04))
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
 
                         // ── Security & Recovery accordion ─────────────────────
@@ -258,9 +253,8 @@ struct EditSubscriptionSheet: View {
                                                 }
                                             }
                                         }
-                                        .background(Color.black.opacity(0.2))
+                                        .background(Color.white.opacity(0.04))
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.05), lineWidth: 1))
                                     }
                                     ZifrField(label: "Recovery", placeholder: "Phone, email...",
                                               text: Binding(get: { sub.recoveryMethod }, set: { sub.recoveryMethod = $0 }))
@@ -410,9 +404,8 @@ struct SubServicesEditor: View {
                     }
                 }
                 .padding(12)
-                .background(Color.black.opacity(0.2))
+                .background(Color.white.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
         }
     }
@@ -458,9 +451,8 @@ struct LinkedEmailsEditor: View {
                         .font(.system(size: 12)).foregroundStyle(Color.white.opacity(0.6))
                 }
                 .padding(12)
-                .background(Color.black.opacity(0.2))
+                .background(Color.white.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
         }
     }
