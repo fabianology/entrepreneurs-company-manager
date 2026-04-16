@@ -21,9 +21,13 @@ struct CompanyDetailView: View {
     var documents: [CompanyDocument] { allDocuments.filter { $0.companyId == company.id } }
 
     @State private var showEditCompany = false
+    @State private var dragOffset: CGFloat = 0
     @State private var swipeHandled = false
     @State private var showMenu = false
-    @Namespace private var tabNamespace
+    
+    private var currentTabIndex: Int {
+        AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -111,32 +115,9 @@ struct CompanyDetailView: View {
                 }
                 .buttonStyle(.plain)
 
-                // Inline Tab Navigator
-                HStack(spacing: 0) {
-                    ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                                vm.activeTab = tab
-                            }
-                        } label: {
-                            ZStack {
-                                if vm.activeTab == tab {
-                                    RoundedRectangle(cornerRadius: 22)
-                                        .fill(Color.white.opacity(0.15))
-                                        .matchedGeometryEffect(id: "ACTIVE_TAB", in: tabNamespace)
-                                }
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 14, weight: vm.activeTab == tab ? .bold : .medium))
-                                    .foregroundStyle(vm.activeTab == tab ? .white : Color.white.opacity(0.4))
-                            }
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .liquidGlass(cornerRadius: 22)
+                // Tab Bar
+                cifrTabBar
+                    .frame(width: 180)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
@@ -215,9 +196,9 @@ struct CompanyDetailView: View {
             let moTotal = monthlyActive.reduce(0.0) { $0 + $1.cost } + yearlyActive.reduce(0.0) { $0 + $1.cost / 12 }
             let yrTotal = monthlyActive.reduce(0.0) { $0 + $1.cost * 12 } + yearlyActive.reduce(0.0) { $0 + $1.cost }
 
-            HStack(spacing: 0) {
+            HStack(spacing: 4) {
                 Text("💵🔥 ")
-                    .font(.system(size: 13))
+                    .font(.system(size: 17))
                 metricPair(label: "mo.", value: moTotal, count: monthlyActive.count)
                 Divider()
                     .frame(width: 1, height: 12)
@@ -227,47 +208,112 @@ struct CompanyDetailView: View {
             }
 
         case .financial:
-            HStack(spacing: 14) {
+            HStack(spacing: 18) {
                 emojiCount("🏦", institutions.count)
                 emojiCount("💳", cards.count)
                 emojiCount("📑", loans.count)
             }
 
         case .documents:
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Text("📑")
-                    .font(.system(size: 13))
+                    .font(.system(size: 17))
                 Text("Document Vault")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.4))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.5))
             }
         }
     }
 
     private func metricPair(label: String, value: Double, count: Int) -> some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
             Text("$\(String(format: "%.0f", value))")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white)
             Text("(\(count))")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
         }
     }
 
     private func emojiCount(_ emoji: String, _ n: Int) -> some View {
-        HStack(spacing: 5) {
-            Text(emoji).font(.system(size: 13))
+        HStack(spacing: 6) {
+            Text(emoji).font(.system(size: 17))
             Text("(\(n))")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.5))
         }
     }
 
     // MARK: - CiFr-style Tab Pill Bar
+    private var cifrTabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
+                Button {
+                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.activeTab = tab
+                        dragOffset = 0
+                    }
+                } label: {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
+                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
+                        .frame(width: 60, height: 36)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(width: 180, height: 44)
+        .background(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color.clear)
+                .frame(width: 60, height: 36)
+                .liquidGlass(cornerRadius: 18)
+                .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset)
+        }
+        .liquidGlass(cornerRadius: 22)
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 5)
+                .onChanged { value in
+                    let maxOffset = CGFloat(AppViewModel.CompanyTab.allCases.count - 1) * 60.0
+                    var rawOffset = CGFloat(currentTabIndex) * 60.0 + value.translation.width
+                    
+                    if rawOffset < 0 {
+                        rawOffset = rawOffset * 0.3
+                    } else if rawOffset > maxOffset {
+                        rawOffset = maxOffset + (rawOffset - maxOffset) * 0.3
+                    }
+                    
+                    dragOffset = rawOffset - (CGFloat(currentTabIndex) * 60.0)
+                }
+                .onEnded { value in
+                    let finalX = CGFloat(currentTabIndex) * 60.0 + value.translation.width + value.predictedEndTranslation.width * 0.2
+                    let targetIndex = min(max(Int(round(finalX / 60.0)), 0), AppViewModel.CompanyTab.allCases.count - 1)
+                    
+                    if targetIndex != currentTabIndex {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                    
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.activeTab = AppViewModel.CompanyTab.allCases[targetIndex]
+                        dragOffset = 0
+                    }
+                }
+        )
+    }
+
+    private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
+        switch tab {
+        case .subscriptions: return Color(hex: "#60A5FA")
+        case .financial:     return Color(hex: "#22c55e")
+        case .documents:     return Color(hex: "#FBBF24")
+        }
+    }
 
     // MARK: - Quick Menu Popover
     private var quickMenuPopover: some View {
