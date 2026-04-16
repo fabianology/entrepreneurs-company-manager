@@ -51,7 +51,7 @@ struct CompanyCardView: View {
             HStack(alignment: .center) {
 
                 // Time metadata (left)
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: 10) {
                     metaRow(icon: "clock", label: "Modified:", value: company.lastModified.timeAgoDisplay())
                     metaRow(icon: "eye", label: "Viewed:", value: company.lastViewed.timeAgoDisplay())
                 }
@@ -67,11 +67,10 @@ struct CompanyCardView: View {
                 .background(Color.black.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.05), lineWidth: 1))
-                .padding(.trailing, -8)
-                .padding(.bottom, -8)
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 18)
+            .padding(.top, 16)
+            .padding(.bottom, 16)
             .overlay(alignment: .top) {
                 Rectangle()
                     .fill(Color.white.opacity(0.05))
@@ -112,6 +111,8 @@ struct CompanyCardView: View {
                 .font(.system(size: 20, weight: .regular))
                 .foregroundStyle(color)
                 .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.borderless)
     }
 }
