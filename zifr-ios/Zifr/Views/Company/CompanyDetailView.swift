@@ -59,7 +59,11 @@ struct CompanyDetailView: View {
             HStack(spacing: 8) {
                 // Menu Button (just dismisses back to dashboard for now)
                 Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    let gen = UIImpactFeedbackGenerator(style: .light)
+                    gen.prepare()
+                    gen.impactOccurred()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { gen.impactOccurred() }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { gen.impactOccurred() }
                     dismiss()
                 } label: {
                     Image(systemName: "line.3.horizontal")

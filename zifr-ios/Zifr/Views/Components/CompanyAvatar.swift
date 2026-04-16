@@ -19,7 +19,7 @@ struct CompanyAvatar: View {
                         initialsView
                     }
                 }
-                .background(Color.white)
+                .background(Color.clear)
             } else {
                 initialsView
             }
