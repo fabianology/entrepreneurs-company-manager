@@ -70,21 +70,12 @@ struct FinancialView: View {
                     } else {
                         // Institutions Block
                         if !institutions.isEmpty {
-                            VStack(alignment: .leading, spacing: 16) {
-                                Text("Financial Institutions")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.3))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.top, 24)
-                                    .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)), alignment: .top)
-                                
                                 ForEach(institutions) { inst in
                                     let instCards = cards.filter { $0.institutionName.lowercased() == inst.name.lowercased() }
                                     let instLoans = loans.filter { $0.lender.lowercased() == inst.name.lowercased() }
                                     walletStackForInstitution(inst: inst, instCards: instCards, instLoans: instLoans)
                                 }
                             }
-                        }
                         
                         // Remaining standalone accounts block
                         let standaloneCards = cards.filter { c in !institutions.contains { $0.name.lowercased() == c.institutionName.lowercased() } }
@@ -283,16 +274,19 @@ struct InstitutionCardView: View {
             VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 18) {
                     // Header Block
-                    HStack(alignment: .top) {
+                    HStack(alignment: .top, spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.white.opacity(0.05))
-                                .frame(width: 52, height: 52)
-                            Image(systemName: "building.columns")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.8))
+                                .frame(width: 56, height: 56)
+                            if !institution.loginUrl.isEmpty {
+                                FaviconImage(website: institution.loginUrl, size: 36)
+                            } else {
+                                Image(systemName: "building.columns")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.8))
+                            }
                         }
-                        .padding(.trailing, 10)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(institution.name.isEmpty ? "New Bank" : institution.name)
@@ -358,21 +352,21 @@ struct InstitutionCardView: View {
             Button {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
             } label: {
-                HStack(spacing: 6) {
-                    Text(expanded ? "Less Details" : "More Details")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                    Text("(\(institution.accounts.count + loanCount))")
-                        .font(.system(size: 12, weight: .black))
+                HStack(spacing: 0) {
+                    Text(expanded ? "Less Details " : "More Details ")
+                        .font(.system(size: 14, weight: .semibold))
+                        .tracking(0.2)
+                        .foregroundStyle(Color.white.opacity(0.5))
+                    + Text("(\(institution.accounts.count + loanCount))")
+                        .font(.system(size: 13))
                         .foregroundStyle(Color.white.opacity(0.2))
                     Spacer()
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.3))
-                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.4))
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
+                .padding(.horizontal, 24)
+                .frame(height: 47)
                 .background(Color(hex: "#1C1C1E"))
             }
             .buttonStyle(.plain)
@@ -399,8 +393,8 @@ struct InstitutionCardView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 18)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
                 .background(Color(hex: "#1C1C1E"))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
