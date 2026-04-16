@@ -120,7 +120,7 @@ struct SubscriptionCardView: View {
                         // Logo — 56×56 rounded-16 rgba(255,255,255,0.05) bg
                         ZStack {
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.05))
+                                .fill(Color.clear)
                                 .frame(width: 56, height: 56)
                             if !sub.website.isEmpty {
                                 FaviconImage(website: sub.website, size: 36)

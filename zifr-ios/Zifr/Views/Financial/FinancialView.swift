@@ -277,7 +277,7 @@ struct InstitutionCardView: View {
                     HStack(alignment: .top, spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.05))
+                                .fill(Color.clear)
                                 .frame(width: 56, height: 56)
                             if !institution.loginUrl.isEmpty {
                                 FaviconImage(website: institution.loginUrl, size: 36)
