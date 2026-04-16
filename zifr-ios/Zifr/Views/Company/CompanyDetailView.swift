@@ -5,6 +5,7 @@ struct CompanyDetailView: View {
     let company: Company
     @Bindable var vm: AppViewModel
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
     @Query private var allSubscriptions: [Subscription]
     @Query private var allCards: [FinancialCard]
@@ -27,11 +28,6 @@ struct CompanyDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 20)
-
-            // ── Tab bar — pill style matching CiFr ───────────────────────
-            cifrTabBar
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
 
             // ── Content ──────────────────────────────────────────────────
             Group {
@@ -58,6 +54,52 @@ struct CompanyDetailView: View {
         }
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
+        }
+        .overlay(alignment: .bottom) {
+            HStack(spacing: 8) {
+                // Menu Button (just dismisses back to dashboard for now)
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    dismiss()
+                } label: {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color(hex: "#1C1C1E").opacity(0.85))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+
+                // Search Bar
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    vm.showSearch = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text("Search")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(height: 44)
+                    .background(Color(hex: "#1C1C1E").opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.15), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+
+                // Tab Bar
+                cifrTabBar
+                    .frame(width: 180)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
         }
     }
 
@@ -158,7 +200,7 @@ struct CompanyDetailView: View {
                             .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
                             .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
                     }
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 60)
                     .frame(height: 36)
                     .background(
                         Group {
@@ -173,11 +215,10 @@ struct CompanyDetailView: View {
                             }
                         }
                     )
-                    .padding(.vertical, 4)
                 }
             }
         }
-        .padding(.horizontal, 4)
+        .frame(width: 180, height: 44)
         .background(
             RoundedRectangle(cornerRadius: 22)
                 .fill(Color(hex: "#1C1C1E").opacity(0.65))

@@ -109,21 +109,29 @@ struct DashboardView: View {
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { vm.showSearch = true } label: {
+            .overlay(alignment: .bottom) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    vm.showSearch = true
+                } label: {
+                    HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text("Search")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        Spacer()
                     }
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    .background(Color(hex: "#1C1C1E").opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.15), lineWidth: 1))
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showAddCompany = true } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
         }
     }
