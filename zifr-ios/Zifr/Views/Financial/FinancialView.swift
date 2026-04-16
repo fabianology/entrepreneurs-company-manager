@@ -270,55 +270,70 @@ struct InstitutionCardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+
+            // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
-                VStack(alignment: .leading, spacing: 18) {
-                    // Header Block
-                    HStack(alignment: .top, spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.clear)
-                                .frame(width: 56, height: 56)
-                            if !institution.loginUrl.isEmpty {
-                                FaviconImage(website: institution.loginUrl, size: 36)
-                            } else {
-                                Image(systemName: "building.columns")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-                            }
+                HStack(alignment: .top, spacing: 16) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 16).fill(Color.clear).frame(width: 56, height: 56)
+                        if !institution.loginUrl.isEmpty {
+                            FaviconImage(website: institution.loginUrl, size: 36)
+                        } else {
+                            Image(systemName: "building.columns")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.8))
                         }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(institution.name.isEmpty ? "New Bank" : institution.name)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
-                            Text(totalMonthlyPayment.currencyString)
-                                .font(.system(size: 17, weight: .black))
-                                .foregroundStyle(.white)
-                            Text("Mo. Payment")
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.35))
-                        }
-                        Spacer()
                     }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(institution.name.isEmpty ? "New Bank" : institution.name)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text(totalMonthlyPayment.currencyString)
+                            .font(.system(size: 17, weight: .black))
+                            .foregroundStyle(.white)
+                        Text("Mo. Payment")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.35))
+                    }
+                    Spacer()
                 }
                 .padding(.horizontal, 22)
                 .padding(.top, 22)
-                .padding(.bottom, 16)
+                .padding(.bottom, 12)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            
-            // Credentials Block (Outside Main Edit Button)
-            HStack(spacing: 12) {
-                copyableCredential(id: institution.id, label: "Login ID", value: institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username, field: "login")
-                copyableCredential(id: institution.id, label: "Password", value: institution.password, field: "password", isPassword: true)
+
+            // ── Counts row ─────────────────────────────────────────────────
+            HStack(spacing: 8) {
+                countLabel(count: institution.accounts.count, label: "Accounts", showDivider: true)
+                countLabel(count: cardCount, label: "Cards", showDivider: true)
+                countLabel(count: loanCount, label: "Loans", showDivider: false)
             }
             .padding(.horizontal, 22)
-            .padding(.bottom, 22)
-        
-            // Accordion (Outside main button so it doesn't trigger edit)
-            VStack(spacing: 0) {
-                Divider().background(Color.white.opacity(0.05))
+            .padding(.bottom, 16)
+
+            // ── Credentials (tap-to-copy, not editable via main button) ────
+            HStack(spacing: 12) {
+                copyableCredential(
+                    id: institution.id,
+                    label: "Login ID",
+                    value: institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username,
+                    field: "login"
+                )
+                copyableCredential(
+                    id: institution.id,
+                    label: "Password",
+                    value: institution.password,
+                    field: "password",
+                    isPassword: true
+                )
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 18)
+
+            // ── Accordion ──────────────────────────────────────────────────
+            Divider().background(Color.white.opacity(0.05))
             Button {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
             } label: {
@@ -337,7 +352,6 @@ struct InstitutionCardView: View {
                 }
                 .padding(.horizontal, 24)
                 .frame(height: 47)
-                .background(Color(hex: "#1C1C1E"))
             }
             .buttonStyle(.plain)
 
@@ -365,17 +379,15 @@ struct InstitutionCardView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
-                .background(Color(hex: "#1C1C1E"))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
-        }
-        
         }
         .background(Color(hex: "#1C1C1E"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
     }
-    
+
+
     private func copyableCredential(id: String, label: String, value: String, field: String, isPassword: Bool = false) -> some View {
         let isCopied = copiedField == field
         return VStack(alignment: .leading, spacing: 6) {
@@ -774,66 +786,217 @@ struct EditCardSheet: View {
     @State private var showDelete = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 14) {
-                    ZifrField(label: "Nickname", placeholder: "Amex Gold", text: Binding(get: { card.name }, set: { card.name = $0 }))
-                    ZifrField(label: "Institution", placeholder: "American Express", text: Binding(get: { card.institutionName }, set: { card.institutionName = $0 }))
-                    ZifrField(label: "Card Holder", placeholder: "John Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
-                    HStack(spacing: 12) {
-                        ZifrField(label: "Last 4", placeholder: "1234", text: Binding(get: { card.last4 }, set: { card.last4 = $0 })).keyboardType(.numberPad)
-                        ZifrField(label: "Expiry", placeholder: "12/28", text: Binding(get: { card.expiry }, set: { card.expiry = $0 })).keyboardType(.numbersAndPunctuation)
+        ZStack(alignment: .bottom) {
+            Color(hex: "#1C1C1E").ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                // ── Header Bar ─────────────────────────────────────────────
+                HStack {
+                    Button {
+                        if isNew { vm.deleteCard(card, context: context) }
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
                     }
+
+                    Spacer()
+
                     HStack(spacing: 12) {
-                        pickerCell(label: "Network", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
-                        pickerCell(label: "Type", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
-                        pickerCell(label: "Status", sel: Binding(get: { card.status }, set: { card.status = $0 }), opts: FinancialCard.statuses)
-                    }
-                    ZifrField(label: "Login", placeholder: "username / email", text: Binding(get: { card.login }, set: { card.login = $0 }))
-                    ZifrField(label: "Password", placeholder: "••••••••", text: Binding(get: { card.password }, set: { card.password = $0 }))
-                    if !isNew {
-                        if showDelete {
-                            deleteConfirm { vm.deleteCard(card, context: context); dismiss() } cancel: { showDelete = false }
-                        } else {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                showDelete = true
-                            } label: {
-                                Label("Delete Card", systemImage: "trash")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.red.opacity(0.7))
-                            }
+                        Text(isNew ? "New Card" : "Edit Card")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                        
+                        Text("|").foregroundStyle(Color.white.opacity(0.2))
+                        
+                        Text("••••")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+
+                        Text("|").foregroundStyle(Color.white.opacity(0.2))
+
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(card.status == "Active" ? Color.green : (card.status == "Frozen" ? Color.orange : Color.red))
+                                .frame(width: 6, height: 6)
+                            Text(card.status.uppercased())
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(card.status == "Active" ? Color.green : (card.status == "Frozen" ? Color.orange : Color.red))
                         }
                     }
+
+                    Spacer()
+
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                    }
                 }
-                .padding(20).padding(.bottom, 40)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                
+                Divider().background(Color.white.opacity(0.06))
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        
+                        // ── Row 1
+                        HStack(spacing: 16) {
+                            cardField(label: "CARD NICKNAME", placeholder: "Chase Sapphire", text: Binding(get: { card.name }, set: { card.name = $0 }))
+                            cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
+                        }
+
+                        // ── Row 2
+                        HStack(spacing: 16) {
+                            cardField(label: "LAST 4", placeholder: "1234", text: Binding(get: { card.last4 }, set: { card.last4 = $0 })).keyboardType(.numberPad)
+                            cardPicker(label: "AUTOPAY", sel: Binding(get: { card.autopay }, set: { card.autopay = $0 }), opts: FinancialCard.autopayOptions)
+                        }
+
+                        // ── Row 3
+                        HStack(spacing: 16) {
+                            cardField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("NAME ON CARD").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.4)).tracking(0.5)
+                                HStack(spacing: 0) {
+                                    Button(action: { card.cardHolderType = "Mine" }) {
+                                        Text("MINE")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(card.cardHolderType == "Mine" ? .white : Color.white.opacity(0.4))
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                            .background(card.cardHolderType == "Mine" ? Color.white.opacity(0.15) : Color.clear)
+                                    }
+                                    Button(action: { card.cardHolderType = "Assigned" }) {
+                                        Text("ASSIGNED")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(card.cardHolderType == "Assigned" ? .white : Color.white.opacity(0.4))
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                            .background(card.cardHolderType == "Assigned" ? Color.white.opacity(0.15) : Color.clear)
+                                    }
+                                }
+                                .frame(height: 36)
+                                .background(Color.white.opacity(0.04))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+
+                        // ── Row 4
+                        HStack(spacing: 16) {
+                            cardField(label: "EXPIRY", placeholder: "MM/YY", text: Binding(get: { card.expiry }, set: { card.expiry = $0 }))
+                            cardPicker(label: "STATUS", sel: Binding(get: { card.status }, set: { card.status = $0 }), opts: FinancialCard.statuses)
+                        }
+
+                        // ── Row 5
+                        HStack(spacing: 16) {
+                            cardField(label: "PAID FROM", placeholder: "Select account...", text: Binding(get: { card.paidFrom }, set: { card.paidFrom = $0 }))
+                            cardField(label: "PAID ON", placeholder: "15th of Month", text: Binding(get: { card.paidOn }, set: { card.paidOn = $0 }))
+                        }
+
+                        // ── Row 6 (Currency)
+                        HStack(spacing: 16) {
+                            moneyField(label: "BALANCE", value: Binding(get: { card.balance }, set: { card.balance = $0 }))
+                            moneyField(label: "CREDIT LIMIT", value: Binding(get: { card.limit }, set: { card.limit = $0 }))
+                        }
+
+                        // ── Row 7
+                        HStack(spacing: 16) {
+                            moneyField(label: "MO. PAYMENT", value: Binding(get: { card.moPayment }, set: { card.moPayment = $0 }))
+                            Color.clear.frame(maxWidth: .infinity) // Spacer
+                        }
+
+                        if !isNew {
+                            if showDelete {
+                                deleteConfirm { vm.deleteCard(card, context: context); dismiss() } cancel: { showDelete = false }
+                                    .padding(.top, 10)
+                            } else {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                    showDelete = true
+                                } label: {
+                                    Label("Delete Card", systemImage: "trash")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.red.opacity(0.7))
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.vertical, 20)
+                                }
+                            }
+                        }
+
+                    }
+                    .padding(20)
+                    .padding(.bottom, 60)
+                }
             }
-            .background(Color(hex: "#1C1C1E"))
-            .navigationTitle(isNew ? "New Card" : "Edit Card")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { if isNew { vm.deleteCard(card, context: context) }; dismiss() }
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { vm.saveCard(card, context: context); dismiss() }
-                        .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
-                }
+        }
+        .interactiveDismissDisabled(isNew)
+        .onDisappear {
+            // Auto-save on dismiss
+            if !isNew || (!card.name.isEmpty || !card.institutionName.isEmpty) {
+                vm.saveCard(card, context: context)
             }
-            .interactiveDismissDisabled(isNew)
         }
     }
 
-    private func pickerCell(label: String, sel: Binding<String>, opts: [String]) -> some View {
+    // Custom helper for basic text fields
+    private func cardField(label: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).zifrLabel()
-            Picker(label, selection: sel) { ForEach(opts, id: \.self) { Text($0).tag($0) } }
-                .pickerStyle(.menu).foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8).padding(.vertical, 8)
-                .background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 12))
+            Text(label).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.4)).tracking(0.5)
+            TextField(placeholder, text: text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
+        .frame(maxWidth: .infinity)
+    }
+
+    // Custom helper for Pickers
+    private func cardPicker(label: String, sel: Binding<String>, opts: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.4)).tracking(0.5)
+            Menu {
+                ForEach(opts, id: \.self) { opt in
+                    Button(action: { sel.wrappedValue = opt }) {
+                        Text(opt)
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(sel.wrappedValue.isEmpty ? opts.first ?? "" : sel.wrappedValue)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 10)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // Custom helper for Currency fields
+    private func moneyField(label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.4)).tracking(0.5)
+            HStack(spacing: 8) {
+                Text("$").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
+                TextField("0.00", value: value, format: .number)
+                    .keyboardType(.decimalPad)
+                    .font(.system(size: 14, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
