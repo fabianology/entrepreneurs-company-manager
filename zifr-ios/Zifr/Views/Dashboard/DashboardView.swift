@@ -62,8 +62,13 @@ struct DashboardView: View {
                                 vm.activeTab = .documents
                                 vm.touchCompany(company, context: context)
                                 path.append(company)
-                            }
-                        )
+                        }
+                    )
+                    .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                        vm.touchCompany(company, context: context)
+                        path.append(company)
+                    }
                         
                         if companyToDelete == company {
                             VStack(spacing: 12) {
@@ -106,11 +111,6 @@ struct DashboardView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                             .zIndex(1)
                         }
-                    }
-                    .onTapGesture {
-                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                        vm.touchCompany(company, context: context)
-                        path.append(company)
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)

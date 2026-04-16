@@ -283,36 +283,36 @@ struct CompanyDetailView: View {
                 .frame(width: 60, height: 36)
                 .liquidGlass(cornerRadius: 18)
                 .offset(x: CGFloat(currentTabIndex) * 60.0 + dragOffset)
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            let maxOffset = CGFloat(AppViewModel.CompanyTab.allCases.count - 1) * 60.0
-                            var rawOffset = CGFloat(currentTabIndex) * 60.0 + value.translation.width
-                            
-                            if rawOffset < 0 {
-                                rawOffset = rawOffset * 0.3
-                            } else if rawOffset > maxOffset {
-                                rawOffset = maxOffset + (rawOffset - maxOffset) * 0.3
-                            }
-                            
-                            dragOffset = rawOffset - (CGFloat(currentTabIndex) * 60.0)
-                        }
-                        .onEnded { value in
-                            let finalX = CGFloat(currentTabIndex) * 60.0 + value.translation.width + value.predictedEndTranslation.width * 0.2
-                            let targetIndex = min(max(Int(round(finalX / 60.0)), 0), AppViewModel.CompanyTab.allCases.count - 1)
-                            
-                            if targetIndex != currentTabIndex {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            }
-                            
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                vm.activeTab = AppViewModel.CompanyTab.allCases[targetIndex]
-                                dragOffset = 0
-                            }
-                        }
-                )
         }
         .liquidGlass(cornerRadius: 22)
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 5)
+                .onChanged { value in
+                    let maxOffset = CGFloat(AppViewModel.CompanyTab.allCases.count - 1) * 60.0
+                    var rawOffset = CGFloat(currentTabIndex) * 60.0 + value.translation.width
+                    
+                    if rawOffset < 0 {
+                        rawOffset = rawOffset * 0.3
+                    } else if rawOffset > maxOffset {
+                        rawOffset = maxOffset + (rawOffset - maxOffset) * 0.3
+                    }
+                    
+                    dragOffset = rawOffset - (CGFloat(currentTabIndex) * 60.0)
+                }
+                .onEnded { value in
+                    let finalX = CGFloat(currentTabIndex) * 60.0 + value.translation.width + value.predictedEndTranslation.width * 0.2
+                    let targetIndex = min(max(Int(round(finalX / 60.0)), 0), AppViewModel.CompanyTab.allCases.count - 1)
+                    
+                    if targetIndex != currentTabIndex {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    }
+                    
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        vm.activeTab = AppViewModel.CompanyTab.allCases[targetIndex]
+                        dragOffset = 0
+                    }
+                }
+        )
     }
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
