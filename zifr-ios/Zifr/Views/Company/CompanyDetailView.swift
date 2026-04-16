@@ -2,11 +2,12 @@ import SwiftUI
 import SwiftData
 
 struct CompanyDetailView: View {
-    let company: Company
+    @State var company: Company
     @Bindable var vm: AppViewModel
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
+    @Query(sort: \Company.name) private var allCompanies: [Company]
     @Query private var allSubscriptions: [Subscription]
     @Query private var allCards: [FinancialCard]
     @Query private var allInstitutions: [Institution]
@@ -22,31 +23,10 @@ struct CompanyDetailView: View {
     @State private var showEditCompany = false
     @State private var dragOffset: CGFloat = 0
     @State private var swipeHandled = false
+    @State private var showMenu = false
     
     private var currentTabIndex: Int {
         AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
-    }
-    
-    // Dynamic Icon Interpolation Physics
-    private func iconDistance(for tabIndex: Int) -> CGFloat {
-        let pillX = CGFloat(currentTabIndex) * 60.0 + dragOffset
-        let pillCenter = pillX + 30.0
-        let iconCenter = CGFloat(tabIndex) * 60.0 + 30.0
-        return abs(pillCenter - iconCenter)
-    }
-
-    private func iconScale(for tabIndex: Int) -> CGFloat {
-        let distance = iconDistance(for: tabIndex)
-        if distance >= 48.0 { return 1.0 } // 60 * 0.8
-        let progress = 1.0 - (distance / 48.0)
-        return 1.0 + (0.45 * progress) // scales up to 1.45x
-    }
-
-    private func iconProximity(for tabIndex: Int) -> CGFloat {
-        let distance = iconDistance(for: tabIndex)
-        if distance >= 33.0 { return 0.0 } // 60 * 0.55
-        let progress = 1.0 - (distance / 33.0)
-        return progress // 0.0 -> 1.0 bloom
     }
 
     var body: some View {
@@ -83,21 +63,40 @@ struct CompanyDetailView: View {
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
         }
+        .overlay(alignment: .bottomLeading) {
+            if showMenu {
+                Color.black.opacity(0.001)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showMenu = false }
+                    }
+                
+                quickMenuPopover
+                    .padding(.leading, 20)
+                    .padding(.bottom, 64)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomLeading)))
+            }
+        }
         .overlay(alignment: .bottom) {
             HStack(spacing: 8) {
-                // Menu Button (just dismisses back to dashboard for now)
+                // Menu Button
                 Button {
                     let gen = UIImpactFeedbackGenerator(style: .light)
                     gen.prepare()
                     gen.impactOccurred()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { gen.impactOccurred() }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { gen.impactOccurred() }
-                    dismiss()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showMenu.toggle()
+                    }
                 } label: {
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 20))
+                    Image(systemName: showMenu ? "xmark" : "line.3.horizontal")
+                        .font(.system(size: showMenu ? 16 : 20, weight: showMenu ? .bold : .regular))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
+                        .background(showMenu ? Color.white.opacity(0.25) : Color.clear)
+                        .clipShape(Circle())
                         .liquidGlass(cornerRadius: 22)
                 }
                 .buttonStyle(.plain)
@@ -258,10 +257,6 @@ struct CompanyDetailView: View {
     private var cifrTabBar: some View {
         HStack(spacing: 0) {
             ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
-                let tabIndex = AppViewModel.CompanyTab.allCases.firstIndex(of: tab) ?? 0
-                let tScale = iconScale(for: tabIndex)
-                let tProx = iconProximity(for: tabIndex)
-                
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -271,10 +266,7 @@ struct CompanyDetailView: View {
                 } label: {
                     Image(systemName: tab.icon)
                         .font(.system(size: 15, weight: vm.activeTab == tab ? .semibold : .regular))
-                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white)
-                        .scaleEffect(tScale)
-                        .opacity(vm.activeTab == tab ? 1.0 : 0.4 + (tProx * 0.6))
-                        .shadow(color: tabColor(tab).opacity(vm.activeTab == tab ? 0 : tProx * 0.9), radius: tProx * 8, x: 0, y: 0)
+                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : Color.white.opacity(0.4))
                         .frame(width: 60, height: 36)
                         .contentShape(Rectangle())
                 }
@@ -326,5 +318,92 @@ struct CompanyDetailView: View {
         case .financial:     return Color(hex: "#22c55e")
         case .documents:     return Color(hex: "#FBBF24")
         }
+    }
+
+    // MARK: - Quick Menu Popover
+    private var quickMenuPopover: some View {
+        VStack(spacing: 0) {
+            // Dashboard row
+            HStack(spacing: 6) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showMenu = false }
+                    dismiss()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Color.white.opacity(0.65))
+                        Text("Dashboard")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.85))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(Color.white.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    // admin coming soon
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                        .frame(width: 42, height: 42)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.bottom, 6)
+
+            // Companies List
+            if !allCompanies.isEmpty {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Jump to Company")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .padding(.top, 4)
+
+                    ForEach(allCompanies) { c in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                company = c
+                                vm.touchCompany(c, context: context)
+                                showMenu = false
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(c.name)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                                    .lineLimit(1)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .background(c.id == company.id ? Color.white.opacity(0.08) : Color.clear)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(8)
+        .frame(width: 240)
+        .background(Color(red: 17/255, green: 17/255, blue: 17/255).opacity(0.97))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.6), radius: 24, x: 0, y: 0)
     }
 }
