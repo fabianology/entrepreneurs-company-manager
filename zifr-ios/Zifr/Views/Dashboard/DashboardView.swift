@@ -13,87 +13,110 @@ struct DashboardView: View {
     @Bindable var vm: AppViewModel
     @State private var showAddCompany = false
     @State private var editingCompany: Company? = nil
+    @State private var companyToDelete: Company? = nil
     @State private var path = NavigationPath()
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    // Header
+            List {
+                // Header Group
+                VStack(spacing: 0) {
                     headerSection
                         .padding(.top, 8)
                         .padding(.bottom, 40)
 
-                    // Section label — matches CiFr "Your Companies"
                     Text("Your Companies")
                         .font(.system(size: 12, weight: .bold))
                         .textCase(.uppercase)
                         .tracking(4)
                         .foregroundStyle(Color.white.opacity(0.4))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 4)
                         .padding(.bottom, 16)
-
-                    // Company cards
-                    LazyVStack(spacing: 16) {
-                        ForEach(filteredCompanies) { company in
-                            CompanyCardView(
-                                company: company,
-                                monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
-                                onEdit: { editingCompany = company },
-                                onViewSubscriptions: {
-                                    vm.selectedCompany = company
-                                    vm.activeTab = .subscriptions
-                                    vm.touchCompany(company, context: context)
-                                    path.append(company)
-                                },
-                                onViewFinancials: {
-                                    vm.selectedCompany = company
-                                    vm.activeTab = .financial
-                                    vm.touchCompany(company, context: context)
-                                    path.append(company)
-                                },
-                                onViewDocuments: {
-                                    vm.selectedCompany = company
-                                    vm.activeTab = .documents
-                                    vm.touchCompany(company, context: context)
-                                    path.append(company)
-                                }
-                            )
-                            .onTapGesture {
-                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                vm.touchCompany(company, context: context)
-                                path.append(company)
-                            }
-                        }
-
-                        // Add company button — CiFr dashed style
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            showAddCompany = true
-                        } label: {
-                            VStack(spacing: 10) {
-                                Image(systemName: "plus")
-                                    .font(.system(size: 26, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                Text("Create New Entity")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 28)
-                            .background(
-                                RoundedRectangle(cornerRadius: 24)
-                                    .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
-                                    .foregroundStyle(Color.white.opacity(0.2))
-                            )
-                        }
-                        .padding(.top, 4)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 120)
                 }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+
+                // Company cards
+                ForEach(filteredCompanies) { company in
+                    CompanyCardView(
+                        company: company,
+                        monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
+                        onEdit: { editingCompany = company },
+                        onViewSubscriptions: {
+                            vm.selectedCompany = company
+                            vm.activeTab = .subscriptions
+                            vm.touchCompany(company, context: context)
+                            path.append(company)
+                        },
+                        onViewFinancials: {
+                            vm.selectedCompany = company
+                            vm.activeTab = .financial
+                            vm.touchCompany(company, context: context)
+                            path.append(company)
+                        },
+                        onViewDocuments: {
+                            vm.selectedCompany = company
+                            vm.activeTab = .documents
+                            vm.touchCompany(company, context: context)
+                            path.append(company)
+                        }
+                    )
+                    .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                        vm.touchCompany(company, context: context)
+                        path.append(company)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            editingCompany = company
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        .tint(Color.indigo)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            companyToDelete = company
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .tint(.red)
+                    }
+                }
+
+                // Add company button
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showAddCompany = true
+                } label: {
+                    VStack(spacing: 10) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 26, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text("Create New Entity")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
+                            .foregroundStyle(Color.white.opacity(0.2))
+                    )
+                }
+                .padding(.top, 4)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .background(Color.black)
             .scrollIndicators(.hidden)
             .navigationDestination(for: Company.self) { company in
@@ -110,6 +133,26 @@ struct DashboardView: View {
                     vm: vm, companies: companies, subscriptions: subscriptions,
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
+            }
+            .alert("Delete Company", isPresented: Binding(
+                get: { companyToDelete != nil },
+                set: { if !$0 { companyToDelete = nil } }
+            )) {
+                Button("Delete", role: .destructive) {
+                    if let c = companyToDelete {
+                        withAnimation {
+                            vm.deleteCompany(c, context: context)
+                        }
+                        companyToDelete = nil
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    companyToDelete = nil
+                }
+            } message: {
+                if let c = companyToDelete {
+                    Text("Are you sure you want to delete '\(c.name)'? This permanently deletes the company and all its services and data.")
+                }
             }
             .overlay(alignment: .bottom) {
                 Button {
