@@ -63,7 +63,7 @@ struct CompanyDetailView: View {
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
         }
-        .overlay(alignment: .bottomLeading) {
+        .overlay {
             if showMenu {
                 Color.black.opacity(0.001)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -71,10 +71,13 @@ struct CompanyDetailView: View {
                     .onTapGesture {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showMenu = false }
                     }
-                
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if showMenu {
                 quickMenuPopover
                     .padding(.leading, 20)
-                    .padding(.bottom, 64)
+                    .padding(.bottom, 72)
                     .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .bottomLeading)))
             }
         }
