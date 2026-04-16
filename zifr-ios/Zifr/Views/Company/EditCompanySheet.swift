@@ -230,12 +230,14 @@ struct EditCompanySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    HStack(spacing: 20) {
+                    HStack(spacing: 12) {
                         // Cancel (X)
                         Button { dismiss() } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.6))
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 36, height: 36)
+                                .liquidGlass(cornerRadius: 18)
                         }
                         
                         // Save (Checkmark)
@@ -245,8 +247,10 @@ struct EditCompanySheet: View {
                             dismiss()
                         } label: {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle((hasChanges && !name.isEmpty) ? Color.green : Color.white.opacity(0.3))
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle((hasChanges && !name.isEmpty) ? Color.green : Color.white.opacity(0.5))
+                                .frame(width: 36, height: 36)
+                                .liquidGlass(cornerRadius: 18)
                                 .animation(.spring(response: 0.3, dampingFraction: 0.6), value: hasChanges)
                         }
                         .disabled(!hasChanges || name.isEmpty)
