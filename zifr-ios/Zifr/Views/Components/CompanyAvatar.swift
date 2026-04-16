@@ -26,10 +26,6 @@ struct CompanyAvatar: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: size * 0.35))
-        .overlay(
-            RoundedRectangle(cornerRadius: size * 0.35)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
     }
 
     private var initialsView: some View {

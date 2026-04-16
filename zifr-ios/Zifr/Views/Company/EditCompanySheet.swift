@@ -51,7 +51,6 @@ struct EditCompanySheet: View {
                         }
                         .frame(width: 76, height: 76)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.12), lineWidth: 1))
                         
                         formSection {
                             ZifrField(label: "Entity Name", placeholder: "Acme Holdings LLC", text: $name)
@@ -231,35 +230,43 @@ struct EditCompanySheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 20) {
                         // Cancel (X)
                         Button { dismiss() } label: {
                             Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(Color.white.opacity(0.6))
-                                .frame(width: 32, height: 32)
-                                .background(Color.white.opacity(0.1))
-                                .clipShape(Circle())
                         }
                         
                         // Save (Checkmark)
                         Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             save()
                             dismiss()
                         } label: {
                             Image(systemName: "checkmark")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(name.isEmpty ? Color.white.opacity(0.3) : .black)
-                                .frame(width: 32, height: 32)
-                                .background(name.isEmpty ? Color.white.opacity(0.1) : .white)
-                                .clipShape(Circle())
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle((hasChanges && !name.isEmpty) ? Color.green : Color.white.opacity(0.3))
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: hasChanges)
                         }
-                        .disabled(name.isEmpty)
+                        .disabled(!hasChanges || name.isEmpty)
                     }
                 }
             }
         }
         .onAppear { prefill() }
+    }
+
+    private var hasChanges: Bool {
+        if let c = company {
+            return name != c.name ||
+                   structure != c.structure ||
+                   colorHex != c.colorHex ||
+                   website != c.website ||
+                   logoData != c.logoData
+        } else {
+            return !name.isEmpty
+        }
     }
 
     private func prefill() {
@@ -299,7 +306,6 @@ struct EditCompanySheet: View {
             .padding(.vertical, 16)
             .background(Color(hex: "#1C1C1E"))
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.05), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
