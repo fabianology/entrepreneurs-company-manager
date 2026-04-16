@@ -40,7 +40,7 @@ struct CompanyAvatar: View {
     private func faviconURL(for website: String) -> URL? {
         var host = website
         if !host.hasPrefix("http") { host = "https://\(host)" }
-        guard let url = URL(string: host), let scheme = url.scheme, let h = url.host else { return nil }
+        guard let url = URL(string: host), let _ = url.scheme, let h = url.host else { return nil }
         return URL(string: "https://www.google.com/s2/favicons?domain=\(h)&sz=128")
     }
 }

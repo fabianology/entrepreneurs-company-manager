@@ -9,7 +9,7 @@ struct DocumentListView: View {
 
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
-    @State private var openURL: URL? = nil
+    @State private var openURL: IdentifiableURL? = nil
 
     var grouped: [String: [CompanyDocument]] {
         Dictionary(grouping: documents, by: \.type)
@@ -67,7 +67,7 @@ struct DocumentListView: View {
                                         editingDoc = doc
                                     } onOpen: {
                                         if let u = URL(string: doc.url.hasPrefix("http") ? doc.url : "https://\(doc.url)") {
-                                            openURL = u
+                                            openURL = IdentifiableURL(url: u)
                                         }
                                     }
                                     .padding(.horizontal, 20)
@@ -86,8 +86,8 @@ struct DocumentListView: View {
         .sheet(item: $editingDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: false)
         }
-        .sheet(item: $openURL) { url in
-            SafariView(url: url)
+        .sheet(item: $openURL) { wrapper in
+            SafariView(url: wrapper.url)
         }
     }
 
@@ -237,6 +237,7 @@ struct SafariView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
 
-extension URL: Identifiable {
-    public var id: String { absoluteString }
+struct IdentifiableURL: Identifiable {
+    let id = UUID()
+    let url: URL
 }
