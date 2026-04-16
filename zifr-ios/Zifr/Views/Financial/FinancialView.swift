@@ -20,32 +20,30 @@ struct FinancialView: View {
         ScrollView {
             VStack(spacing: 0) {
                 // ── Action Bar ──
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        actionButton(icon: "plus", label: "Card") {
-                            newCard = vm.addCard(context: context, companyId: company.id)
-                        }
-                        actionButton(icon: "plus", label: "Loan") {
-                            newLoan = vm.addLoan(context: context, companyId: company.id)
-                        }
-                        Spacer(minLength: 20)
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            newInst = vm.addInstitution(context: context, companyId: company.id)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.black.opacity(0.5))
-                                Text("Institution").font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
-                            }
-                            .padding(.horizontal, 18)
-                            .frame(height: 36)
-                            .background(Color.white)
-                            .clipShape(Capsule())
-                        }
+                HStack(spacing: 8) {
+                    actionButton(icon: "plus", label: "Card") {
+                        newCard = vm.addCard(context: context, companyId: company.id)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 4)
+                    actionButton(icon: "plus", label: "Loan") {
+                        newLoan = vm.addLoan(context: context, companyId: company.id)
+                    }
+                    Spacer()
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newInst = vm.addInstitution(context: context, companyId: company.id)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.black.opacity(0.5))
+                            Text("Institution").font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
+                        }
+                        .padding(.horizontal, 18)
+                        .frame(height: 36)
+                        .background(Color.white)
+                        .clipShape(Capsule())
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 4)
                 .padding(.bottom, 24)
                 
                 // ── Main Wallet Stack ──
@@ -267,11 +265,12 @@ struct InstitutionCardView: View {
     let loanCount: Int
     let onEdit: () -> Void
     @State private var expanded = false
+    @State private var copiedField: String? = nil
+    @State private var passwordRevealed = false
 
     var body: some View {
         VStack(spacing: 0) {
             Button(action: onEdit) {
-            VStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 18) {
                     // Header Block
                     HStack(alignment: .top, spacing: 16) {
@@ -300,54 +299,26 @@ struct InstitutionCardView: View {
                                 .foregroundStyle(Color.white.opacity(0.35))
                         }
                         Spacer()
-                        Image(systemName: "pencil")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.white.opacity(0.25))
-                    }
-                    
-                    // Counts
-                    HStack(spacing: 8) {
-                        countLabel(count: institution.accounts.count, label: "Accounts", showDivider: true)
-                        countLabel(count: cardCount, label: "Cards", showDivider: true)
-                        countLabel(count: loanCount, label: "Loans", showDivider: false)
-                    }
-                    
-                    // Credentials
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Login ID").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.white.opacity(0.35))
-                            Text(institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .padding(.horizontal, 12).padding(.vertical, 8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.black.opacity(0.2))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.03), lineWidth: 1))
-                        }
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Password").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.white.opacity(0.35))
-                            Text(institution.password.isEmpty ? "—" : "••••••••")
-                                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .padding(.horizontal, 12).padding(.vertical, 8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.black.opacity(0.2))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.03), lineWidth: 1))
-                        }
                     }
                 }
-                .padding(22)
+                .padding(.horizontal, 22)
+                .padding(.top, 22)
+                .padding(.bottom, 16)
+                .contentShape(Rectangle())
             }
-        }
-        .buttonStyle(.plain)
+            .buttonStyle(.plain)
+            
+            // Credentials Block (Outside Main Edit Button)
+            HStack(spacing: 12) {
+                copyableCredential(id: institution.id, label: "Login ID", value: institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username, field: "login")
+                copyableCredential(id: institution.id, label: "Password", value: institution.password, field: "password", isPassword: true)
+            }
+            .padding(.horizontal, 22)
+            .padding(.bottom, 22)
         
-        // Accordion (Outside main button so it doesn't trigger edit)
-        VStack(spacing: 0) {
-            Divider().background(Color.white.opacity(0.05))
+            // Accordion (Outside main button so it doesn't trigger edit)
+            VStack(spacing: 0) {
+                Divider().background(Color.white.opacity(0.05))
             Button {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
             } label: {
@@ -405,6 +376,48 @@ struct InstitutionCardView: View {
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
     }
     
+    private func copyableCredential(id: String, label: String, value: String, field: String, isPassword: Bool = false) -> some View {
+        let isCopied = copiedField == field
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 5) {
+                Text(isCopied ? "Copied ✓" : label)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isCopied ? Color.orange : Color.white.opacity(0.4))
+                if isPassword {
+                    Button {
+                        passwordRevealed.toggle()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Image(systemName: passwordRevealed ? "eye.slash" : "eye")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.3))
+                    }
+                }
+            }
+
+            Button {
+                guard !value.isEmpty else { return }
+                UIPasteboard.general.string = value
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation { copiedField = field }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    withAnimation { copiedField = nil }
+                }
+            } label: {
+                Text(value.isEmpty ? "—" : (isPassword && !passwordRevealed ? String(repeating: "•", count: Swift.min(value.count, 8)) : value))
+                    .font(.system(size: 12, weight: .medium, design: isPassword ? .monospaced : .default))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.black.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private func countLabel(count: Int, label: String, showDivider: Bool) -> some View {
         HStack(spacing: 4) {
             Text("\(count)")
