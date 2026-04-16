@@ -166,3 +166,49 @@ struct FaviconImage: View {
         return URL(string: "https://www.google.com/s2/favicons?domain=\(h)&sz=128")
     }
 }
+
+// MARK: - Safe Double Field (fixes HIG decimal truncation & forced 0)
+struct DoubleField: View {
+    let placeholder: String
+    @Binding var value: Double
+    @State private var text: String = ""
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .keyboardType(.decimalPad)
+            .onAppear { syncFromValue() }
+            .onChange(of: text) { newValue in
+                processTextChange(newValue)
+            }
+            .onChange(of: value) { _ in
+                syncFromValue()
+            }
+    }
+
+    private func processTextChange(_ newValue: String) {
+        let clean = newValue.replacingOccurrences(of: ",", with: ".")
+        if let d = Double(clean) {
+            if value != d { value = d }
+        } else if newValue.isEmpty {
+            if value != 0 { value = 0 }
+        }
+    }
+
+    private func syncFromValue() {
+        if value == 0 {
+            // Only clear if the text is not an active decimal representing 0 (like "0.")
+            if let currentVal = Double(text.replacingOccurrences(of: ",", with: ".")), currentVal == 0 && text.contains(".") {
+                return
+            }
+            if !text.isEmpty { text = "" }
+            return
+        }
+        
+        if let currentTextDouble = Double(text.replacingOccurrences(of: ",", with: ".")), currentTextDouble == value {
+            return // avoid wiping user's formatting like decimal trail
+        }
+        
+        let isInt = floor(value) == value
+        text = isInt ? String(format: "%.0f", value) : String(value)
+    }
+}

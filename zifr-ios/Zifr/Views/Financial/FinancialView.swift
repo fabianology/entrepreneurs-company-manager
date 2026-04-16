@@ -987,8 +987,7 @@ struct EditCardSheet: View {
             Text(label).font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.4)).tracking(0.5)
             HStack(spacing: 8) {
                 Text("$").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
-                TextField("0.00", value: value, format: .number)
-                    .keyboardType(.decimalPad)
+                DoubleField(placeholder: "0.00", value: value)
                     .font(.system(size: 14, weight: .medium, design: .monospaced))
                     .foregroundStyle(.white)
             }
@@ -1080,8 +1079,7 @@ struct EditLoanSheet: View {
     private func numField(label: String, val: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label).zifrLabel()
-            TextField("0", value: val, format: .number)
-                .keyboardType(.decimalPad)
+            DoubleField(placeholder: "0.00", value: val)
                 .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
                 .padding(.horizontal, 12).padding(.vertical, 10)
                 .background(Color.white.opacity(0.05)).clipShape(RoundedRectangle(cornerRadius: 12))

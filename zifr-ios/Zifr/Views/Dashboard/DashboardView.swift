@@ -64,9 +64,8 @@ struct DashboardView: View {
                         }
                     )
                     .onTapGesture {
-                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                        vm.touchCompany(company, context: context)
-                        path.append(company)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        editingCompany = company
                     }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)

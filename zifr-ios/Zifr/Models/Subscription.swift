@@ -20,9 +20,10 @@ struct SubService: Codable, Identifiable, Hashable {
 struct LinkedEmail: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var email: String = ""
+    var provider: String = ""       // e.g. Gmail, iCloud, Outlook
     var forwarding: String = ""
     var usedFor: String = ""
-    var usedIn: String = ""
+    var usedIn: String = ""         // tag infrastructure placeholder
     var accessMethod: String = ""
     var notes: [String] = []
 }

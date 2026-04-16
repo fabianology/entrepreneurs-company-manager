@@ -19,6 +19,11 @@ struct EditSubscriptionSheet: View {
     @State private var subDraft = SubService()
     @State private var subDraftIndex: Int? = nil
 
+    // Linked email HUD state — also lifted to NavigationStack level
+    @State private var showEmailHUD = false
+    @State private var emailDraft = LinkedEmail()
+    @State private var emailDraftIndex: Int? = nil
+
     // Dirty-state tracking — fingerprint of initial values captured on appear
     @State private var initialFingerprint = ""
 
@@ -142,18 +147,30 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Billing (Paid only)
                 if !sub.isFree {
                     Section {
-                        LabeledContent("Cost") {
-                            HStack(spacing: 2) {
-                                Text("$")
+                        // Cost (50%) + Auto Pay (50%) in one row
+                        HStack(spacing: 0) {
+                            HStack(spacing: 6) {
+                                Text("Cost")
                                     .foregroundStyle(.secondary)
-                                TextField("0.00", value: Binding(
-                                    get: { sub.cost },
-                                    set: { sub.cost = $0 }
-                                ), format: .number)
-                                .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
+                                HStack(spacing: 2) {
+                                    Text("$").foregroundStyle(.secondary)
+                                    DoubleField(placeholder: "0.00", value: Binding(
+                                        get: { sub.cost },
+                                        set: { sub.cost = $0 }
+                                    ))
+                                    .frame(width: 56)
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                            Divider()
+                                .padding(.horizontal, 8)
+
+                            Toggle("Auto Pay", isOn: autoPayBinding)
+                                .tint(.green)
+                                .frame(maxWidth: .infinity)
                         }
+
                         Picker("Cycle", selection: Binding(
                             get: { sub.billingCycle },
                             set: { newCycle in
@@ -202,9 +219,6 @@ struct EditSubscriptionSheet: View {
                             }
                             .pickerStyle(.menu)
                         }
-
-                        Toggle("Auto Pay", isOn: autoPayBinding)
-                            .tint(.green)
                     } header: {
                         Text("Billing")
                     }
@@ -274,7 +288,20 @@ struct EditSubscriptionSheet: View {
                 )
 
                 // MARK: – Linked Emails
-                LinkedEmailsSection(sub: sub)
+                LinkedEmailsSection(
+                    sub: sub,
+                    onAdd: {
+                        emailDraft = LinkedEmail()
+                        emailDraftIndex = nil
+                        showEmailHUD = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    },
+                    onEdit: { idx, email in
+                        emailDraft = email
+                        emailDraftIndex = idx
+                        showEmailHUD = true
+                    }
+                )
 
                 // MARK: – Danger Zone
                 if !isNew {
@@ -295,7 +322,7 @@ struct EditSubscriptionSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .onAppear { initialFingerprint = currentFingerprint }
-            .navigationTitle(isNew ? "New Service" : "Edit Service")
+            .navigationTitle(sub.name.isEmpty ? "New Service" : sub.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -344,7 +371,27 @@ struct EditSubscriptionSheet: View {
                     },
                     onCancel: { showSubServiceHUD = false }
                 )
-                .presentationDetents([.height(400)])
+                .presentationDetents([.height(420)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
+            .sheet(isPresented: $showEmailHUD) {
+                LinkedEmailHUD(
+                    draft: $emailDraft,
+                    isNew: emailDraftIndex == nil,
+                    onSave: {
+                        var emails = sub.linkedEmails
+                        if let idx = emailDraftIndex {
+                            emails[idx] = emailDraft
+                        } else {
+                            emails.append(emailDraft)
+                        }
+                        sub.linkedEmails = emails
+                        showEmailHUD = false
+                    },
+                    onCancel: { showEmailHUD = false }
+                )
+                .presentationDetents([.height(500)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }
@@ -365,10 +412,12 @@ struct SubServicesSection: View {
                 HStack {
                     Spacer()
                     Text("💾  Add Supplemental Service")
-                        .font(.body)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
             }
+            .listRowBackground(Color(uiColor: .systemFill))
 
             ForEach(sub.subServices.indices, id: \.self) { i in
                 let ss = sub.subServices[i]
@@ -480,8 +529,7 @@ struct SubServiceHUD: View {
                         HStack(spacing: 2) {
                             Text("$")
                                 .foregroundStyle(.secondary)
-                            TextField("0.00", value: $draft.cost, format: .number)
-                                .keyboardType(.decimalPad)
+                            DoubleField(placeholder: "0.00", value: $draft.cost)
                                 .frame(width: 64)
                         }
                         Divider()
@@ -493,17 +541,10 @@ struct SubServiceHUD: View {
                     }
 
                     // Auto Pay — toggle, green = on
-                    Toggle(isOn: Binding(
+                    Toggle("Auto Pay", isOn: Binding(
                         get: { draft.autoPay == .auto },
                         set: { draft.autoPay = $0 ? .auto : .manual }
-                    )) {
-                        HStack(spacing: 4) {
-                            Text("Auto Pay")
-                            Text(draft.autoPay == .auto ? "· On" : "· Off")
-                                .font(.caption)
-                                .foregroundStyle(draft.autoPay == .auto ? Color.green : Color.secondary)
-                        }
-                    }
+                    ))
                     .tint(.green)
                 }
 
@@ -517,7 +558,7 @@ struct SubServiceHUD: View {
                     Text("Purpose")
                 }
             }
-            .navigationTitle(isNew ? "New Service" : "Edit Service")
+            .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -539,57 +580,162 @@ struct SubServiceHUD: View {
 
 struct LinkedEmailsSection: View {
     @Bindable var sub: Subscription
+    let onAdd: () -> Void
+    let onEdit: (Int, LinkedEmail) -> Void
 
     var body: some View {
         Section {
-            ForEach($sub.linkedEmails) { $email in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        TextField("Email address", text: $email.email)
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .font(.body.weight(.medium))
-                        Spacer()
-                        Button(role: .destructive) {
-                            withAnimation {
-                                sub.linkedEmails.removeAll { $0.id == email.id }
-                            }
-                        } label: {
-                            Image(systemName: "minus.circle.fill")
-                                .foregroundStyle(.red)
-                                .font(.title3)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    TextField("Purpose (e.g. Billing, Admin)", text: $email.usedFor)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    TextField("Access method (e.g. Google SSO)", text: $email.accessMethod)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 4)
-
-            }
-
-            Button {
-                withAnimation {
-                    var emails = sub.linkedEmails
-                    emails.append(LinkedEmail())
-                    sub.linkedEmails = emails
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                }
-            } label: {
+            Button { onAdd() } label: {
                 HStack {
                     Spacer()
                     Text("📨  Add Linked Email")
-                        .font(.body)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.primary)
                     Spacer()
                 }
             }
-        } header: {
-            Text("Linked Emails")
+            .listRowBackground(Color(uiColor: .systemFill))
+
+            ForEach(sub.linkedEmails.indices, id: \.self) { i in
+                let em = sub.linkedEmails[i]
+                Button {
+                    onEdit(i, em)
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(em.email.isEmpty ? "No address" : em.email)
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.primary)
+                            HStack(spacing: 6) {
+                                if !em.provider.isEmpty {
+                                    Text(em.provider)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text("·").font(.caption).foregroundStyle(.tertiary)
+                                }
+                                if !em.usedFor.isEmpty {
+                                    Text(em.usedFor)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.vertical, 2)
+                }
+                .buttonStyle(.plain)
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        withAnimation {
+                            var emails = sub.linkedEmails
+                            emails.remove(at: i)
+                            sub.linkedEmails = emails
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: – Linked Email HUD
+
+struct LinkedEmailHUD: View {
+    @Binding var draft: LinkedEmail
+    let isNew: Bool
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    @State private var initialDraft: LinkedEmail? = nil
+
+    private var isDirty: Bool {
+        guard let initial = initialDraft else { return isNew && !draft.email.isEmpty }
+        return draft.email != initial.email ||
+               draft.provider != initial.provider ||
+               draft.usedFor != initial.usedFor ||
+               draft.accessMethod != initial.accessMethod ||
+               draft.notes != initial.notes
+    }
+
+    // notes stored as [String]; bind as a single multiline string
+    private var notesBinding: Binding<String> {
+        Binding(
+            get: { draft.notes.joined(separator: "\n") },
+            set: { draft.notes = $0.components(separatedBy: "\n").filter { !$0.isEmpty } }
+        )
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // MARK: Email Details
+                Section {
+                    LabeledContent("Address") {
+                        TextField("name@example.com", text: $draft.email)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    LabeledContent("Provider") {
+                        TextField("Gmail, iCloud, Outlook…", text: $draft.provider)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    LabeledContent("Used For") {
+                        TextField("Billing, Admin, Support…", text: $draft.usedFor)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    LabeledContent("Access Method") {
+                        TextField("Google SSO, Password…", text: $draft.accessMethod)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    // Used In — placeholder for future tag infrastructure
+                    LabeledContent("Used In") {
+                        TextField("Tag placeholder", text: $draft.usedIn)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Email Details")
+                }
+
+                // MARK: Notes
+                Section {
+                    TextField("Add notes…", text: notesBinding, axis: .vertical)
+                        .lineLimit(3)
+                        .font(.body)
+                } header: {
+                    Text("Notes")
+                }
+            }
+            .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isNew ? "Add" : "Save", action: onSave)
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
+                        .disabled(draft.email.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            .onAppear { initialDraft = draft }
         }
     }
 }
