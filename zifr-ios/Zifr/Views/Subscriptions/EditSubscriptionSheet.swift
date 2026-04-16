@@ -354,22 +354,8 @@ struct SubServicesEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Supplemental Services")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
-                Spacer()
-                Button {
-                    var services = sub.subServices
-                    services.append(SubService())
-                    sub.subServices = services
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
-                }
-            }
+            Text("Supplemental Services")
+                .zifrLabel()
 
             ForEach($sub.subServices) { $ss in
                 VStack(spacing: 10) {
@@ -407,8 +393,29 @@ struct SubServicesEditor: View {
                 .background(Color.white.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
+            }
+            
+            Button {
+                var services = sub.subServices
+                services.append(SubService())
+                sub.subServices = services
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                HStack(spacing: 8) {
+                    Text("🧩").font(.system(size: 16))
+                    Text("Add Supplemental Service")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
         }
-    }
 }
 
 // MARK: - Linked Emails Editor
@@ -417,22 +424,8 @@ struct LinkedEmailsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Linked Emails")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
-                Spacer()
-                Button {
-                    var emails = sub.linkedEmails
-                    emails.append(LinkedEmail())
-                    sub.linkedEmails = emails
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
-                }
-            }
+            Text("Linked Emails")
+                .zifrLabel()
 
             ForEach($sub.linkedEmails) { $email in
                 VStack(spacing: 8) {
@@ -455,5 +448,26 @@ struct LinkedEmailsEditor: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
+            
+            Button {
+                var emails = sub.linkedEmails
+                emails.append(LinkedEmail())
+                sub.linkedEmails = emails
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                HStack(spacing: 8) {
+                    Text("📬").font(.system(size: 16))
+                    Text("Add Linked Email")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
     }
-}
