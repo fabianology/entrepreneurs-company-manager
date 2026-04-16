@@ -14,180 +14,379 @@ struct FinancialView: View {
     @State private var newCard: FinancialCard? = nil
     @State private var newInst: Institution? = nil
     @State private var newLoan: Loan? = nil
-
+    @State private var poppedCardId: String? = nil
+    
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 24) {
-                // Institutions
-                sectionBlock(
-                    title: "Banks & Institutions",
-                    count: institutions.count,
-                    onAdd: { newInst = vm.addInstitution(context: context, companyId: company.id) }
-                ) {
-                    ForEach(institutions) { inst in
-                        InstitutionCardView(institution: inst, onEdit: { editingInst = inst })
+            VStack(spacing: 0) {
+                // ── Action Bar ──
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        actionButton(icon: "plus", label: "Card") {
+                            newCard = vm.addCard(context: context, companyId: company.id)
+                        }
+                        actionButton(icon: "plus", label: "Loan") {
+                            newLoan = vm.addLoan(context: context, companyId: company.id)
+                        }
+                        Spacer(minLength: 20)
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            newInst = vm.addInstitution(context: context, companyId: company.id)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus").font(.system(size: 14)).foregroundStyle(Color.black.opacity(0.5))
+                                Text("Institution").font(.system(size: 12, weight: .semibold)).foregroundStyle(.black)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 32)
+                            .background(Color.white)
+                            .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 4)
+                }
+                .padding(.bottom, 24)
+                
+                // ── Main Wallet Stack ──
+                LazyVStack(spacing: 24) {
+                    if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
+                        // Empty State
+                        Button {
+                            newInst = vm.addInstitution(context: context, companyId: company.id)
+                        } label: {
+                            VStack(spacing: 12) {
+                                Text("🏦").font(.system(size: 40))
+                                Text("+ Add Your First Institution")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                            }
+                            .frame(width: 300, height: 200)
+                            .background(Color(hex: "#1C1C1E").opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 28))
+                            .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [6])))
+                        }
+                        .padding(.top, 20)
+                    } else {
+                        // Institutions Block
+                        if !institutions.isEmpty {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Financial Institutions")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, 24)
+                                    .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)), alignment: .top)
+                                
+                                ForEach(institutions) { inst in
+                                    let instCards = cards.filter { $0.institutionName.lowercased() == inst.name.lowercased() }
+                                    let instLoans = loans.filter { $0.lender.lowercased() == inst.name.lowercased() }
+                                    walletStackForInstitution(inst: inst, instCards: instCards, instLoans: instLoans)
+                                }
+                            }
+                        }
+                        
+                        // Remaining standalone accounts block
+                        let standaloneCards = cards.filter { c in !institutions.contains { $0.name.lowercased() == c.institutionName.lowercased() } }
+                        let standaloneLoans = loans.filter { l in !institutions.contains { $0.name.lowercased() == l.lender.lowercased() } }
+                        
+                        if !standaloneCards.isEmpty || !standaloneLoans.isEmpty {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text("Other Standalone Accounts")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.top, 24)
+                                    .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)), alignment: .top)
+                                
+                                ForEach(standaloneCards) { card in
+                                    FinancialCardView(card: card, onEdit: { editingCard = card })
+                                }
+                                ForEach(standaloneLoans) { loan in
+                                    LoanCardView(loan: loan, onEdit: { editingLoan = loan })
+                                }
+                            }
+                        }
                     }
                 }
-
-                // Cards
-                sectionBlock(
-                    title: "Payment Cards",
-                    count: cards.count,
-                    onAdd: { newCard = vm.addCard(context: context, companyId: company.id) }
-                ) {
-                    ForEach(cards) { card in
-                        FinancialCardView(card: card, onEdit: { editingCard = card })
-                    }
-                }
-
-                // Loans
-                sectionBlock(
-                    title: "Loans & Financing",
-                    count: loans.count,
-                    onAdd: { newLoan = vm.addLoan(context: context, companyId: company.id) }
-                ) {
-                    ForEach(loans) { loan in
-                        LoanCardView(loan: loan, onEdit: { editingLoan = loan })
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 120)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 120)
         }
         .scrollIndicators(.hidden)
-        // Institution sheet
-        .sheet(item: $newInst) { i in
-            EditInstitutionSheet(institution: i, vm: vm, isNew: true)
-        }
-        .sheet(item: $editingInst) { i in
-            EditInstitutionSheet(institution: i, vm: vm, isNew: false)
-        }
-        // Card sheet
-        .sheet(item: $newCard) { c in
-            EditCardSheet(card: c, vm: vm, isNew: true)
-        }
-        .sheet(item: $editingCard) { c in
-            EditCardSheet(card: c, vm: vm, isNew: false)
-        }
-        // Loan sheet
-        .sheet(item: $newLoan) { l in
-            EditLoanSheet(loan: l, vm: vm, isNew: true)
-        }
-        .sheet(item: $editingLoan) { l in
-            EditLoanSheet(loan: l, vm: vm, isNew: false)
+        .sheet(item: $newInst) { i in EditInstitutionSheet(institution: i, vm: vm, isNew: true) }
+        .sheet(item: $editingInst) { i in EditInstitutionSheet(institution: i, vm: vm, isNew: false) }
+        .sheet(item: $newCard) { c in EditCardSheet(card: c, vm: vm, isNew: true) }
+        .sheet(item: $editingCard) { c in EditCardSheet(card: c, vm: vm, isNew: false) }
+        .sheet(item: $newLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: true) }
+        .sheet(item: $editingLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: false) }
+    }
+    
+    private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: icon).font(.system(size: 14)).foregroundStyle(Color.white.opacity(0.4))
+                Text(label).font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 32)
+            .background(Color(hex: "#1C1C1E"))
+            .clipShape(Capsule())
+            .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
     }
-
+    
     @ViewBuilder
-    private func sectionBlock<Content: View>(title: String, count: Int, onAdd: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 12, weight: .bold))
-                    .textCase(.uppercase)
-                    .tracking(3)
-                    .foregroundStyle(Color.white.opacity(0.4))
-                Spacer()
-                Button(action: { UIImpactFeedbackGenerator(style: .medium).impactOccurred(); onAdd() }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.black)
-                        Text("ADD")
-                            .font(.system(size: 9, weight: .black))
-                            .tracking(1)
-                            .foregroundStyle(.black)
+    private func walletStackForInstitution(inst: Institution, instCards: [FinancialCard], instLoans: [Loan]) -> some View {
+        let peekOffset: CGFloat = 36
+        let cardH: CGFloat = 110 // Must roughly match the layout frame height
+        
+        VStack(spacing: 0) {
+            // Cards absolute rendering via zstack to overlap natively
+            if !instCards.isEmpty {
+                ZStack(alignment: .bottom) {
+                    ForEach(Array(instCards.enumerated()), id: \.element.id) { index, card in
+                        let isPopped = poppedCardId == card.id
+                        let yOffset = isPopped ? -(cardH + CGFloat(instCards.count) * peekOffset + 10) : -(peekOffset + CGFloat(index) * peekOffset)
+                        let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
+                        
+                        FinancialCardVisual(card: card, isPopped: isPopped)
+                            .frame(height: cardH)
+                            .scaleEffect(scale)
+                            .offset(y: yOffset)
+                            .zIndex(isPopped ? 25 : Double(instCards.count - index))
+                            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isPopped)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
+                            .onTapGesture {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                if poppedCardId == card.id { poppedCardId = nil } else { poppedCardId = card.id }
+                            }
+                            .onLongPressGesture {
+                                editingCard = card
+                            }
                     }
-                    .padding(.horizontal, 14)
-                    .frame(height: 28)
-                    .background(Color.white)
-                    .clipShape(Capsule())
+                }
+                .padding(.top, CGFloat(instCards.count) * peekOffset + 8) // Push content down internally so the cards have room at the top
+            }
+            
+            // Core institution card goes on top
+            InstitutionCardView(
+                institution: inst,
+                totalMonthlyPayment: instLoans.reduce(0) { $0 + $1.monthlyPayment },
+                cardCount: instCards.count,
+                loanCount: instLoans.count,
+                onEdit: { editingInst = inst }
+            )
+            .zIndex(20)
+        }
+        .padding(.bottom, 24)
+    }
+}
+
+// ── Shared Card Visual (Mini overlapping view for stack) ──
+struct FinancialCardVisual: View {
+    let card: FinancialCard
+    let isPopped: Bool
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(hex: card.colorHex))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(isPopped ? Color.white.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1))
+                .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
+            
+            VStack {
+                HStack(alignment: .top) {
+                    Text(card.name.isEmpty ? "Card" : card.name)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Text(card.network)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .italic()
+                }
+                Spacer()
+                if isPopped {
+                    Text("•••• •••• •••• \(card.last4)")
+                        .font(.system(size: 14, weight: .regular, design: .monospaced))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                        .tracking(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 8)
+                    
+                    HStack {
+                        Text(card.cardHolder.isEmpty ? "Name on Card" : card.cardHolder)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                        Spacer()
+                        Text(card.expiry.isEmpty ? "—" : card.expiry)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    }
                 }
             }
-            content()
+            .padding(14)
         }
+        .contentShape(Rectangle())
     }
 }
 
 // MARK: - Institution Card
 struct InstitutionCardView: View {
     let institution: Institution
+    let totalMonthlyPayment: Double
+    let cardCount: Int
+    let loanCount: Int
     let onEdit: () -> Void
     @State private var expanded = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            Button(action: onEdit) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.zifrGold.opacity(0.15))
-                            .frame(width: 44, height: 44)
-                        Image(systemName: "building.columns")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.zifrGold)
+        Button(action: onEdit) {
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 18) {
+                    // Header Block
+                    HStack(alignment: .top) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.05))
+                                .frame(width: 52, height: 52)
+                            Image(systemName: "building.columns")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.8))
+                        }
+                        .padding(.trailing, 10)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(institution.name.isEmpty ? "New Bank" : institution.name)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text(totalMonthlyPayment.currencyString)
+                                .font(.system(size: 17, weight: .black))
+                                .foregroundStyle(.white)
+                            Text("Mo. Payment")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.35))
+                        }
+                        Spacer()
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.25))
                     }
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(institution.name.isEmpty ? "New Bank" : institution.name)
-                            .font(.system(size: 15, weight: .black))
-                            .foregroundStyle(.white)
-                        Text("\(institution.accounts.count) accounts")
-                            .zifrLabel()
+                    
+                    // Counts
+                    HStack(spacing: 8) {
+                        countLabel(count: institution.accounts.count, label: "Accounts", showDivider: true)
+                        countLabel(count: cardCount, label: "Cards", showDivider: true)
+                        countLabel(count: loanCount, label: "Loans", showDivider: false)
                     }
-                    Spacer()
-                    Image(systemName: "pencil")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.white.opacity(0.25))
+                    
+                    // Credentials
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Login ID").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.white.opacity(0.35))
+                            Text(institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .padding(.horizontal, 12).padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.black.opacity(0.2))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.03), lineWidth: 1))
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Password").font(.system(size: 11, weight: .medium)).foregroundStyle(Color.white.opacity(0.35))
+                            Text(institution.password.isEmpty ? "—" : "••••••••")
+                                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .padding(.horizontal, 12).padding(.vertical, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.black.opacity(0.2))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.03), lineWidth: 1))
+                        }
+                    }
                 }
-                .padding(16)
+                .padding(22)
+            }
+            .background(Color(hex: "#1C1C1E"))
+        }
+        .buttonStyle(.plain)
+        
+        // Accordion (Outside main button so it doesn't trigger edit)
+        VStack(spacing: 0) {
+            Divider().background(Color.white.opacity(0.05))
+            Button {
+                withAnimation(.spring(response: 0.35)) { expanded.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(expanded ? "Less Details" : "More Details")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                    Text("(\(institution.accounts.count + loanCount))")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(Color.white.opacity(0.2))
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(Color(hex: "#1C1C1E"))
             }
             .buttonStyle(.plain)
 
-            if !institution.accounts.isEmpty {
-                Divider().background(Color.white.opacity(0.06))
-                Button {
-                    withAnimation(.spring(response: 0.35)) { expanded.toggle() }
-                } label: {
-                    HStack {
-                        Text(expanded ? "Hide Accounts" : "Show Accounts")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.35))
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.25))
-                            .rotationEffect(.degrees(expanded ? 180 : 0))
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 40)
-                }
-
-                if expanded {
-                    VStack(spacing: 8) {
-                        ForEach(institution.accounts) { acc in
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(acc.name.isEmpty ? "Account" : acc.name)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    Text("\(acc.type) • ••\(acc.last4)")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                }
-                                Spacer()
-                                Text(acc.balance.currencyString)
-                                    .font(.system(size: 13, weight: .bold, design: .monospaced))
+            if expanded {
+                VStack(spacing: 12) {
+                    ForEach(institution.accounts) { acc in
+                        HStack(spacing: 10) {
+                            Circle()
+                                .fill(acc.type == "Credit Card" ? Color.orange : (acc.type == "Checking" ? Color.zifrGold : Color.green))
+                                .frame(width: 6, height: 6)
+                            Text(acc.name.isEmpty ? "Account" : acc.name)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.85))
+                            Text(acc.type)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.35))
+                            Spacer()
+                            if !acc.last4.isEmpty {
+                                Text("••\(acc.last4)")
+                                    .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(Color.zifrGold)
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 14)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+                .background(Color(hex: "#1C1C1E"))
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .glassCard(cornerRadius: 20)
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
+    }
+    
+    private func countLabel(count: Int, label: String, showDivider: Bool) -> some View {
+        HStack(spacing: 4) {
+            Text("\(count)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.zifrGold)
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.4))
+            if showDivider {
+                Text("|").foregroundStyle(Color.white.opacity(0.15)).padding(.horizontal, 4)
+            }
+        }
     }
 }
 
