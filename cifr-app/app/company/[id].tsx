@@ -9,7 +9,7 @@ import { Company } from '../../types';
 
 const BRAND_COLORS = [
   '#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#3b82f6',
-  '#8b5cf6', '#ec4899', '#64748b', '#000000'
+  '#8b5cf6', '#ec4899', '#FF6600', '#64748b', '#000000'
 ];
 
 const COMPANY_STRUCTURES = [
@@ -169,6 +169,28 @@ export default function CompanyDetailScreen() {
             </View>
           </View>
 
+          {/* Website URL */}
+          <View className="mb-5">
+            <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>Website URL</Text>
+            <View className="flex-row items-center gap-2">
+              <TextInput
+                value={formState.website}
+                onChangeText={v => updateField({ website: v })}
+                className="flex-1 bg-[#111111] border border-white/10 rounded-2xl px-5 py-[12px] text-white font-bold"
+                placeholderTextColor="rgba(255,255,255,0.2)"
+                placeholder="service.com"
+                autoCapitalize="none"
+                keyboardType="url"
+              />
+              <TouchableOpacity 
+                onPress={handleUploadMedia} 
+                className="bg-[#111111] border border-white/10 rounded-2xl p-[11px] items-center justify-center flex-row gap-2"
+              >
+                <Ionicons name="cloud-upload" size={20} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {/* Structure */}
           <View className="mb-5">
             <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>Entity Structure</Text>
@@ -217,27 +239,7 @@ export default function CompanyDetailScreen() {
             </View>
           </View>
 
-          {/* Website URL */}
-          <View className="mb-5">
-            <Text style={{ fontSize: 12, fontWeight: '500', color: 'rgba(255,255,255,0.5)', letterSpacing: 0, marginLeft: 4, marginBottom: 8 }}>Website URL</Text>
-            <View className="flex-row items-center gap-2">
-              <TextInput
-                value={formState.website}
-                onChangeText={v => updateField({ website: v })}
-                className="flex-1 bg-[#111111] border border-white/10 rounded-2xl px-5 py-[12px] text-white font-bold"
-                placeholderTextColor="rgba(255,255,255,0.2)"
-                placeholder="service.com"
-                autoCapitalize="none"
-                keyboardType="url"
-              />
-              <TouchableOpacity 
-                onPress={handleUploadMedia} 
-                className="bg-[#111111] border border-white/10 rounded-2xl p-[11px] items-center justify-center flex-row gap-2"
-              >
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          </View>
+
         </View>
 
         {/* Quick Jumps */}
@@ -270,6 +272,27 @@ export default function CompanyDetailScreen() {
           
         </View>
 
+
+        {/* Tutorial */}
+        <TouchableOpacity
+          onPress={() => {/* TODO: open tutorial */}}
+          style={{
+            minHeight: 44,
+            backgroundColor: '#000000',
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.2)',
+            borderRadius: 24,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            paddingHorizontal: 20,
+            marginBottom: 12,
+          }}
+        >
+          <Ionicons name="play-circle-outline" size={18} color="#fff" />
+          <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600', letterSpacing: 0 }}>Tutorial</Text>
+        </TouchableOpacity>
 
         {/* Danger Zone */}
         <TouchableOpacity onPress={requestDelete} className="p-4 rounded-3xl items-center border border-red-500/30 mb-8 bg-red-500/5">

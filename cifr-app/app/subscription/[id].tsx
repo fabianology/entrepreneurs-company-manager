@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Switch } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, Switch, ActionSheetIOS, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
@@ -44,6 +44,79 @@ export default function SubscriptionDetailScreen() {
 
   const [showPassword, setShowPassword] = useState(false);
 
+  const updateSubField = (key: keyof Subscription, value: any) => {
+    setEditingSub(prev => ({ ...prev, [key]: value }));
+  };
+
+  // ─── Paid From options ────────────────────────────────────────────────────
+  // Build a rich list of payment sources from institutions & financial cards
+  // scoped to this subscription's company.
+  const companyId = editingSub.companyId || selectedCompanyId || '';
+
+  const paymentOptions = useMemo(() => {
+    const opts: { label: string; value: string }[] = [
+      { label: 'None', value: '' }
+    ];
+
+    // Institution accounts (checking, savings, debit)
+    const bankTypes = new Set(['Checking', 'Savings', 'Debit Card', 'Debit (Linked)']);
+    (state?.institutions || [])
+      .filter(inst => inst.companyId === companyId)
+      .forEach(inst => {
+        inst.accounts
+          .filter(acct => bankTypes.has(acct.type))
+          .forEach(acct => {
+            opts.push({
+              label: `${inst.name} — ${acct.type} ••••${acct.last4}`,
+              value: `${inst.name} ${acct.type} ••••${acct.last4}`,
+            });
+          });
+      });
+
+    // Financial cards (credit & debit)
+    (state?.financialCards || [])
+      .filter(card => card.companyId === companyId)
+      .forEach(card => {
+        const network = card.network || card.type;
+        opts.push({
+          label: `${card.name} — ${network} ••••${card.last4}`,
+          value: `${card.name} ${network} ••••${card.last4}`,
+        });
+      });
+
+    return opts;
+  }, [state, companyId]);
+
+  const showPaidFromPicker = useCallback(() => {
+    const optionLabels = paymentOptions.map(o => o.label);
+    const cancelIndex = optionLabels.length; // we'll add Cancel at the end
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: 'Paid From',
+          message: 'Select the account or card used to pay for this service.',
+          options: [...optionLabels, 'Cancel'],
+          cancelButtonIndex: cancelIndex,
+          // Highlight the currently selected option
+          destructiveButtonIndex: undefined,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === cancelIndex) return;
+          updateSubField('paymentMethod', paymentOptions[buttonIndex].value);
+        }
+      );
+    } else {
+      // Android / web fallback — build Alert buttons
+      const buttons = paymentOptions.map((opt) => ({
+        text: opt.label,
+        onPress: () => updateSubField('paymentMethod', opt.value),
+      }));
+      buttons.push({ text: 'Cancel', onPress: () => {} });
+      Alert.alert('Paid From', 'Select the account or card used to pay for this service.', buttons);
+    }
+  }, [paymentOptions, updateSubField]);
+
   const handleSave = () => {
     if (!editingSub.name || editingSub.name.trim() === '') {
       Alert.alert('Missing Name', 'Please enter a name for the service.');
@@ -74,10 +147,6 @@ export default function SubscriptionDetailScreen() {
         }
       ]
     );
-  };
-
-  const updateSubField = (key: keyof Subscription, value: any) => {
-    setEditingSub(prev => ({ ...prev, [key]: value }));
   };
 
   const addEmptySubService = () => {
@@ -170,6 +239,34 @@ export default function SubscriptionDetailScreen() {
                 trackColor={{ false: "#3f3f46", true: "#1FE400" }}
               />
             </View>
+        </View>
+
+        {/* Paid From — Apple HIG pull-down button */}
+        <Text className="text-[11px] font-black uppercase tracking-widest text-white/40 mb-3 px-4">Payment</Text>
+        <View className="bg-[#1C1C1E] border border-white/5 rounded-[24px] p-5 mb-6">
+          <Text className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-3">Paid From</Text>
+          <TouchableOpacity
+            onPress={showPaidFromPicker}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between bg-black/40 rounded-2xl px-4 py-3"
+          >
+            <View className="flex-row items-center flex-1 mr-2">
+              <Ionicons
+                name="card-outline"
+                size={16}
+                color={editingSub.paymentMethod ? '#EBC351' : 'rgba(255,255,255,0.3)'}
+                style={{ marginRight: 10 }}
+              />
+              <Text
+                className="text-sm font-semibold flex-1"
+                style={{ color: editingSub.paymentMethod ? '#ffffff' : 'rgba(255,255,255,0.25)' }}
+                numberOfLines={1}
+              >
+                {editingSub.paymentMethod || 'Select account or card…'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-down" size={14} color="rgba(255,255,255,0.4)" />
+          </TouchableOpacity>
         </View>
 
         {/* Credentials Form */}

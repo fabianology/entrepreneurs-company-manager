@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
+  View, Text, ScrollView, TouchableOpacity, TextInput, Image,
   Modal, Alert, Pressable, KeyboardAvoidingView, Platform, Clipboard
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,8 +8,194 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../../context/AppContext';
 import { Subscription, SubService, LinkedEmail } from '../../types';
 import CompanyHeader from '../../components/CompanyHeader';
+import { getFaviconUrl } from '../../services/logoService';
 
 const genId = () => Math.random().toString(36).substr(2, 9);
+
+// ─── Helper: derive payable account labels from company institutions ──────────
+const PAYABLE_ACCOUNT_TYPES = new Set([
+  'Checking', 'Savings', 'Credit Card', 'Debit Card', 'Debit (Linked)'
+]);
+
+function getLinkedAccountOptions(
+  state: any,
+  companyId: string | null
+): { label: string; sublabel: string; icon: string }[] {
+  if (!state || !companyId) return [];
+  const options: { label: string; sublabel: string; icon: string }[] = [];
+  const seen = new Set<string>();
+
+  // From Institutions → accounts
+  (state.institutions || [])
+    .filter((inst: any) => inst.companyId === companyId)
+    .forEach((inst: any) => {
+      (inst.accounts || [])
+        .filter((acc: any) => PAYABLE_ACCOUNT_TYPES.has(acc.type))
+        .forEach((acc: any) => {
+          const isCard =
+            acc.type === 'Credit Card' ||
+            acc.type === 'Debit Card' ||
+            acc.type === 'Debit (Linked)';
+          const networkPrefix = acc.network ? `${acc.network} ` : '';
+          const label = isCard
+            ? `${networkPrefix}••${acc.last4}`
+            : `${inst.name} ••${acc.last4}`;
+          if (!seen.has(label)) {
+            seen.add(label);
+            options.push({
+              label,
+              sublabel: isCard ? `${inst.name} · ${acc.type}` : acc.type,
+              icon: isCard ? '💳' : '🏦',
+            });
+          }
+        });
+    });
+
+  // From standalone FinancialCards
+  (state.financialCards || [])
+    .filter((c: any) => c.companyId === companyId && c.status === 'Active')
+    .forEach((c: any) => {
+      const networkPrefix = c.network ? `${c.network} ` : '';
+      const label = `${networkPrefix}••${c.last4}`;
+      if (!seen.has(label)) {
+        seen.add(label);
+        options.push({
+          label,
+          sublabel: `${c.institutionName || c.name} · ${c.type} Card`,
+          icon: '💳',
+        });
+      }
+    });
+
+  return options;
+}
+
+// ─── Paid From Picker Sheet ────────────────────────────────────────────────────
+function PaidFromPicker({
+  visible, onClose, onSelect, currentValue, state, companyId,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelect: (value: string) => void;
+  currentValue: string;
+  state: any;
+  companyId: string | null;
+}) {
+  const [customText, setCustomText] = React.useState('');
+  const options = getLinkedAccountOptions(state, companyId);
+
+  React.useEffect(() => {
+    if (!visible) setCustomText('');
+  }, [visible]);
+
+  const commit = (value: string) => { onSelect(value); onClose(); };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' }} onPress={onClose}>
+        <Pressable
+          onPress={() => {}}
+          style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0,
+            backgroundColor: '#1C1C1E',
+            borderTopLeftRadius: 28, borderTopRightRadius: 28,
+            borderTopWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+            paddingBottom: 48,
+          }}
+        >
+          {/* Drag handle */}
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 20 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)' }} />
+          </View>
+
+          {/* Header */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20 }}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 17 }}>Paid From</Text>
+            {!!currentValue && (
+              <TouchableOpacity onPress={() => commit('')}>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Clear</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Linked accounts */}
+          {options.length > 0 ? (
+            <View style={{ paddingHorizontal: 16, marginBottom: 20 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginLeft: 4, marginBottom: 10 }}>
+                Linked Accounts
+              </Text>
+              {options.map((opt, i) => {
+                const isSelected = currentValue === opt.label;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    onPress={() => commit(opt.label)}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 14,
+                      backgroundColor: isSelected ? 'rgba(31,228,0,0.08)' : 'rgba(255,255,255,0.04)',
+                      borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
+                      borderWidth: 1, borderColor: isSelected ? 'rgba(31,228,0,0.3)' : 'rgba(255,255,255,0.06)',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 22 }}>{opt.icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>{opt.label}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>{opt.sublabel}</Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color="#1FE400" />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : (
+            <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+              <Text style={{ color: 'rgba(255,255,255,0.25)', fontSize: 13, textAlign: 'center' }}>
+                No linked bank accounts found for this company.
+              </Text>
+            </View>
+          )}
+
+          {/* Divider */}
+          <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 16, marginBottom: 16 }} />
+
+          {/* Custom entry */}
+          <View style={{ paddingHorizontal: 16 }}>
+            <Text style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginLeft: 4, marginBottom: 10 }}>
+              Custom
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TextInput
+                style={{
+                  flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 14,
+                  paddingHorizontal: 14, paddingVertical: 12,
+                  borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+                  color: '#fff', fontSize: 14,
+                }}
+                placeholder="e.g. PayPal, Wire transfer..."
+                placeholderTextColor="rgba(255,255,255,0.25)"
+                value={customText}
+                onChangeText={setCustomText}
+                returnKeyType="done"
+                onSubmitEditing={() => { if (customText.trim()) commit(customText.trim()); }}
+              />
+              <TouchableOpacity
+                onPress={() => { if (customText.trim()) commit(customText.trim()); }}
+                style={{
+                  backgroundColor: customText.trim() ? '#fff' : 'rgba(255,255,255,0.08)',
+                  borderRadius: 14, paddingHorizontal: 18,
+                  alignItems: 'center', justifyContent: 'center', minHeight: 44,
+                }}
+              >
+                <Text style={{ color: customText.trim() ? '#000' : 'rgba(255,255,255,0.25)', fontWeight: '700', fontSize: 14 }}>Set</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
 
 export default function SubscriptionsScreen() {
   const { state, selectedCompanyId, handleUpdateSubscription, handleAddSubscription, handleDeleteSubscription, subMetrics } = useAppContext();
@@ -27,6 +213,19 @@ export default function SubscriptionsScreen() {
   const [focusSubServiceId, setFocusSubServiceId] = useState<string | null>(null);
   const editScrollRef = useRef<ScrollView>(null);
   const subServicesSectionY = useRef<number>(0);
+
+  // Paid-From picker
+  const [showPaidFromPicker, setShowPaidFromPicker] = useState(false);
+  const [paidFromCurrentValue, setPaidFromCurrentValue] = useState('');
+  const [paidFromCompanyId, setPaidFromCompanyId] = useState<string | null>(null);
+  const paidFromCallback = useRef<((v: string) => void) | null>(null);
+
+  const openPaidFromPicker = (companyId: string | null, currentValue: string, cb: (v: string) => void) => {
+    setPaidFromCompanyId(companyId);
+    setPaidFromCurrentValue(currentValue);
+    paidFromCallback.current = cb;
+    setShowPaidFromPicker(true);
+  };
 
   if (!state) return null;
 
@@ -194,8 +393,16 @@ export default function SubscriptionsScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
                     {/* Logo */}
-                    <View style={{ width: 56, height: 56, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
-                      <Text style={{ color: '#fff', fontWeight: '900', fontSize: 22, opacity: 0.8 }}>{sub.name.charAt(0)}</Text>
+                    <View style={{ width: 56, height: 56, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 16, overflow: 'hidden' }}>
+                      {getFaviconUrl(sub.website) ? (
+                        <Image
+                          source={{ uri: getFaviconUrl(sub.website)! }}
+                          style={{ width: 36, height: 36 }}
+                          resizeMode="contain"
+                        />
+                      ) : (
+                        <Text style={{ color: '#fff', fontWeight: '900', fontSize: 22, opacity: 0.8 }}>{sub.name.charAt(0)}</Text>
+                      )}
                     </View>
 
                     {/* Name + Cost */}
@@ -303,13 +510,15 @@ export default function SubscriptionsScreen() {
                       <View style={{ paddingHorizontal: 24, paddingBottom: 24, flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
                         <View style={{ flex: 1, minWidth: '40%' }}>
                           <Text style={styles.fieldLabel}>Paid From</Text>
-                          <TextInput
-                            style={styles.inlineInput}
-                            value={sub.paymentMethod || ''}
-                            placeholder="Linked card..."
-                            placeholderTextColor="rgba(255,255,255,0.2)"
-                            onChangeText={text => handleUpdateSubscription(sub.id, { paymentMethod: text })}
-                          />
+                          <TouchableOpacity
+                            style={[styles.inlineInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 34 }]}
+                            onPress={() => openPaidFromPicker(sub.companyId, sub.paymentMethod || '', text => handleUpdateSubscription(sub.id, { paymentMethod: text }))}
+                          >
+                            <Text style={{ color: sub.paymentMethod ? '#fff' : 'rgba(255,255,255,0.2)', fontSize: 13, fontWeight: '500', flex: 1 }} numberOfLines={1}>
+                              {sub.paymentMethod || 'Linked card...'}
+                            </Text>
+                            <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.3)" />
+                          </TouchableOpacity>
                         </View>
                         <View style={{ flex: 1, minWidth: '40%' }}>
                           <Text style={styles.fieldLabel}>Due On</Text>
@@ -428,7 +637,7 @@ export default function SubscriptionsScreen() {
         onRequestClose={() => setEditingSub(null)}
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: '#1C1C1E' }}>
+          <View style={{ flex: 1, backgroundColor: '#1C1C1E', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
 
             {/* Modal Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)', paddingTop: 20 }}>
@@ -530,7 +739,15 @@ export default function SubscriptionsScreen() {
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.modalLabel}>Paid From</Text>
-                    <TextInput style={styles.modalInput} value={editingSub?.paymentMethod || ''} placeholder="Partner's card..." placeholderTextColor="rgba(255,255,255,0.2)" onChangeText={t => updateSub({ paymentMethod: t })} />
+                    <TouchableOpacity
+                      style={[styles.modalInput, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 38 }]}
+                      onPress={() => openPaidFromPicker(editingSub?.companyId || selectedCompanyId, editingSub?.paymentMethod || '', v => updateSub({ paymentMethod: v }))}
+                    >
+                      <Text style={{ color: editingSub?.paymentMethod ? '#fff' : 'rgba(255,255,255,0.2)', fontSize: 13, fontWeight: '500', flex: 1 }} numberOfLines={1}>
+                        {editingSub?.paymentMethod || "Linked card..."}
+                      </Text>
+                      <Ionicons name="chevron-down" size={12} color="rgba(255,255,255,0.3)" />
+                    </TouchableOpacity>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.modalLabel}>Auto Pay</Text>
@@ -768,7 +985,25 @@ export default function SubscriptionsScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+        {/* Picker must live INSIDE the pageSheet modal to appear above it on iOS */}
+        <PaidFromPicker
+          visible={showPaidFromPicker}
+          onClose={() => setShowPaidFromPicker(false)}
+          onSelect={(v) => { paidFromCallback.current?.(v); }}
+          currentValue={paidFromCurrentValue}
+          state={state}
+          companyId={paidFromCompanyId}
+        />
       </Modal>
+
+      <PaidFromPicker
+        visible={showPaidFromPicker}
+        onClose={() => setShowPaidFromPicker(false)}
+        onSelect={(v) => { paidFromCallback.current?.(v); }}
+        currentValue={paidFromCurrentValue}
+        state={state}
+        companyId={paidFromCompanyId}
+      />
     </SafeAreaView>
   );
 }
@@ -787,7 +1022,7 @@ const styles = {
     letterSpacing: 0, marginBottom: 6, marginLeft: 4
   },
   modalInput: {
-    backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.03)', color: '#fff', fontSize: 13, fontWeight: '500' as const
+    backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', color: '#fff', fontSize: 13, fontWeight: '500' as const
   }
 };

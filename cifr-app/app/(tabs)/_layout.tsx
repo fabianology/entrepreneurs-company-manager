@@ -525,12 +525,20 @@ export default function TabLayout() {
 
   const navigateBySwipe = useCallback((direction: 'left' | 'right') => {
     const idx = currentTabIndex < 0 ? 0 : currentTabIndex;
+    if (direction === 'right' && idx === 0) {
+      // Swiping right from subscriptions → go to dashboard
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setSelectedCompanyId(null);
+      setActiveView('dashboard');
+      router.push('/');
+      return;
+    }
     const next = direction === 'left' ? Math.min(idx + 1, TABS.length - 1) : Math.max(idx - 1, 0);
     if (next !== idx) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       router.push(`/${TABS[next]}` as any);
     }
-  }, [currentTabIndex, router]);
+  }, [currentTabIndex, router, setSelectedCompanyId, setActiveView]);
 
   const edgeSwipeGesture = Gesture.Pan()
     .onBegin((e) => {
@@ -547,7 +555,8 @@ export default function TabLayout() {
       }
     })
     .minDistance(30)
-    .activeOffsetX([-20, 20]);
+    .activeOffsetX([-20, 20])
+    .enabled(pathname !== '/');
 
   return (
     <GestureDetector gesture={edgeSwipeGesture}>

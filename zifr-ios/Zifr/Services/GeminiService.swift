@@ -1,0 +1,80 @@
+import Foundation
+
+// MARK: - Gemini REST API Service
+actor GeminiService {
+    static let shared = GeminiService()
+
+    private var apiKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "GeminiAPIKey") as? String ?? ""
+    }
+
+    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    private let fallbackQuotes = [
+        "The best way to predict the future is to create it. - Peter Drucker",
+        "The way to get started is to quit talking and begin doing. - Walt Disney",
+        "Your time is limited, so don't waste it living someone else's life. - Steve Jobs",
+        "If you are not embarrassed by the first version of your product, you've launched too late. - Reid Hoffman",
+        "Risk more than others think is safe. Dream more than others think is practical. - Howard Schultz"
+    ]
+
+    // MARK: - Generic Generate
+    private func generate(model: String = "gemini-2.0-flash", prompt: String) async throws -> String {
+        let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body: [String: Any] = [
+            "contents": [["parts": [["text": prompt]]]],
+            "generationConfig": ["temperature": 0.8]
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let candidates = json?["candidates"] as? [[String: Any]]
+        let content = candidates?.first?["content"] as? [String: Any]
+        let parts = content?["parts"] as? [[String: Any]]
+        return parts?.first?["text"] as? String ?? ""
+    }
+
+    // MARK: - Entrepreneurial Quote
+    func getEntrepreneurialQuote() async -> String {
+        let prompt = "Provide one short, highly inspiring quote for entrepreneurs or business owners. Return only the quote and the author name separated by \" - \". Example: \"The way to get started is to quit talking and begin doing. - Walt Disney\""
+        do {
+            let result = try await generate(prompt: prompt)
+            return result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? fallbackQuotes.randomElement()!
+                : result.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            return fallbackQuotes.randomElement()!
+        }
+    }
+
+    // MARK: - Email Purpose
+    func generateEmailPurpose(for subscriptionName: String) async -> String {
+        let prompt = "Provide a very short (max 12 words), professional explanation of what the primary account email for \"\(subscriptionName)\" is typically used for in a company. Focus on things like 'Primary Admin', 'Billing notifications', 'Team invites', 'SSO ownership'. Example for GitHub: \"Receives all pull request notifications, team invites, and security alerts.\" Return ONLY the purpose text, no quotes or prefix."
+        do {
+            return try await generate(prompt: prompt)
+        } catch {
+            return ""
+        }
+    }
+
+    // MARK: - Portfolio Insights
+    func askPortfolioQuestion(data: String, question: String) async -> String {
+        let prompt = """
+        You are a smart portfolio manager assistant for an entrepreneur.
+        Here is the minified data of all companies and subscriptions: \(data)
+        User Question: "\(question)"
+        Instructions:
+        1. Answer briefly and directly (max 2 sentences).
+        2. If the user asks about costs, sum them up across relevant companies.
+        3. Be helpful and professional.
+        """
+        do {
+            return try await generate(model: "gemini-2.0-flash", prompt: prompt)
+        } catch {
+            return "Could not process that query right now."
+        }
+    }
+}

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Modal, TextInput,
-  KeyboardAvoidingView, Platform, Pressable, Alert, Clipboard
+  KeyboardAvoidingView, Platform, Pressable, Alert, Clipboard, Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -9,6 +9,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppContext } from '../../context/AppContext';
 import { FinancialCard, Loan, Institution, InstitutionAccount } from '../../types';
 import CompanyHeader from '../../components/CompanyHeader';
+import { getFaviconUrl } from '../../services/logoService';
 
 // ─────────────────────────── helpers ───────────────────────────
 const fmt = (n: number) =>
@@ -908,8 +909,16 @@ export default function FinancialsScreen() {
                     <View style={{ padding: 22 }}>
                       {/* Header */}
                       <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 }}>
-                        <View style={{ width: 52, height: 52, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-                          <Ionicons name="business" size={22} color="rgba(255,255,255,0.4)" />
+                        <View style={{ width: 52, height: 52, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 14, overflow: 'hidden' }}>
+                          {getFaviconUrl(inst.loginUrl) ? (
+                            <Image
+                              source={{ uri: getFaviconUrl(inst.loginUrl)! }}
+                              style={{ width: 34, height: 34 }}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <Ionicons name="business" size={22} color="rgba(255,255,255,0.4)" />
+                          )}
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: '#fff', fontWeight: '600', fontSize: 17, letterSpacing: 0 }}>{inst.name}</Text>

@@ -194,12 +194,12 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     onPress={() => handleCompanyPress(company)}
                     style={{ backgroundColor: (company.logoUrl || getFaviconUrl(company.website)) ? 'transparent' : (company.color || '#3b82f6') }}
-                    className="w-12 h-12 rounded-xl items-center justify-center mr-4 overflow-hidden"
+                    className="w-14 h-14 rounded-xl items-center justify-center mr-4 overflow-hidden"
                   >
                     {(company.logoUrl || getFaviconUrl(company.website)) ? (
                       <Image source={{ uri: company.logoUrl || getFaviconUrl(company.website)! }} style={{ width: '70%', height: '70%' }} resizeMode="contain" />
                     ) : (
-                      <Text style={{ color: '#fff', fontSize: 17, fontWeight: '700' }}>{company.name.charAt(0)}</Text>
+                      <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>{company.name.charAt(0)}</Text>
                     )}
                   </TouchableOpacity>
                   <View className="flex-1">
@@ -239,15 +239,15 @@ export default function DashboardScreen() {
                 </View>
 
                 {/* Inline Flex Shortcut Array with Inverse Margins */}
-                <View style={{ marginRight: -10, marginBottom: -10 }} className="flex-row items-center justify-around bg-black/30 w-40 px-1 py-1 rounded-xl border border-white/5 shadow-xl">
+                <View style={{ marginRight: -10, marginBottom: -10 }} className="flex-row items-center justify-around bg-black/30 w-44 px-1 py-1 rounded-xl border border-white/5 shadow-xl">
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/subscriptions'); }} className="p-2">
-                    <Ionicons name="layers" size={20} color="#60A5FA" />
+                    <Ionicons name="layers" size={24} color="#60A5FA" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/financials'); }} className="p-2">
-                    <Ionicons name="card" size={20} color="#22c55e" />
+                    <Ionicons name="card" size={24} color="#22c55e" />
                   </TouchableOpacity>
                   <TouchableOpacity onPress={(e) => { e.stopPropagation(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); handleUpdateCompany(company.id, { lastViewed: Date.now() }); setSelectedCompanyId(company.id); router.push('/documents'); }} className="p-2">
-                    <Ionicons name="document-text" size={20} color="#FBBF24" />
+                    <Ionicons name="document-text" size={24} color="#FBBF24" />
                   </TouchableOpacity>
                 </View>
               </View>
