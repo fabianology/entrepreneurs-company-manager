@@ -11,9 +11,9 @@ struct FinancialView: View {
     @State private var editingCard: FinancialCard? = nil
     @State private var editingInst: Institution? = nil
     @State private var editingLoan: Loan? = nil
-    @State private var showAddCard = false
-    @State private var showAddInst = false
-    @State private var showAddLoan = false
+    @State private var newCard: FinancialCard? = nil
+    @State private var newInst: Institution? = nil
+    @State private var newLoan: Loan? = nil
 
     var body: some View {
         ScrollView {
@@ -22,7 +22,7 @@ struct FinancialView: View {
                 sectionBlock(
                     title: "Banks & Institutions",
                     count: institutions.count,
-                    onAdd: { showAddInst = true }
+                    onAdd: { newInst = vm.addInstitution(context: context, companyId: company.id) }
                 ) {
                     ForEach(institutions) { inst in
                         InstitutionCardView(institution: inst, onEdit: { editingInst = inst })
@@ -33,7 +33,7 @@ struct FinancialView: View {
                 sectionBlock(
                     title: "Payment Cards",
                     count: cards.count,
-                    onAdd: { showAddCard = true }
+                    onAdd: { newCard = vm.addCard(context: context, companyId: company.id) }
                 ) {
                     ForEach(cards) { card in
                         FinancialCardView(card: card, onEdit: { editingCard = card })
@@ -44,7 +44,7 @@ struct FinancialView: View {
                 sectionBlock(
                     title: "Loans & Financing",
                     count: loans.count,
-                    onAdd: { showAddLoan = true }
+                    onAdd: { newLoan = vm.addLoan(context: context, companyId: company.id) }
                 ) {
                     ForEach(loans) { loan in
                         LoanCardView(loan: loan, onEdit: { editingLoan = loan })
@@ -56,24 +56,21 @@ struct FinancialView: View {
         }
         .scrollIndicators(.hidden)
         // Institution sheet
-        .sheet(isPresented: $showAddInst) {
-            let i = vm.addInstitution(context: context, companyId: company.id)
+        .sheet(item: $newInst) { i in
             EditInstitutionSheet(institution: i, vm: vm, isNew: true)
         }
         .sheet(item: $editingInst) { i in
             EditInstitutionSheet(institution: i, vm: vm, isNew: false)
         }
         // Card sheet
-        .sheet(isPresented: $showAddCard) {
-            let c = vm.addCard(context: context, companyId: company.id)
+        .sheet(item: $newCard) { c in
             EditCardSheet(card: c, vm: vm, isNew: true)
         }
         .sheet(item: $editingCard) { c in
             EditCardSheet(card: c, vm: vm, isNew: false)
         }
         // Loan sheet
-        .sheet(isPresented: $showAddLoan) {
-            let l = vm.addLoan(context: context, companyId: company.id)
+        .sheet(item: $newLoan) { l in
             EditLoanSheet(loan: l, vm: vm, isNew: true)
         }
         .sheet(item: $editingLoan) { l in

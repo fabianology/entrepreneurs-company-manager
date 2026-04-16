@@ -8,7 +8,7 @@ struct DocumentListView: View {
     @Environment(\.modelContext) private var context
 
     @State private var editingDoc: CompanyDocument? = nil
-    @State private var showAddSheet = false
+    @State private var newDoc: CompanyDocument? = nil
     @State private var openURL: URL? = nil
 
     var grouped: [String: [CompanyDocument]] {
@@ -21,7 +21,10 @@ struct DocumentListView: View {
                 // Add button row
                 HStack {
                     Spacer()
-                    Button { showAddSheet = true } label: {
+                    Button { 
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newDoc = vm.addDocument(context: context, companyId: company.id) 
+                    } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 11, weight: .bold))
@@ -77,8 +80,7 @@ struct DocumentListView: View {
             .padding(.bottom, 120)
         }
         .scrollIndicators(.hidden)
-        .sheet(isPresented: $showAddSheet) {
-            let doc = vm.addDocument(context: context, companyId: company.id)
+        .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true)
         }
         .sheet(item: $editingDoc) { doc in
@@ -99,7 +101,10 @@ struct DocumentListView: View {
             Text("Store formation docs, contracts, and more")
                 .font(.system(size: 13)).foregroundStyle(Color.white.opacity(0.35))
                 .multilineTextAlignment(.center)
-            Button("Add Document") { showAddSheet = true }
+            Button("Add Document") { 
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                newDoc = vm.addDocument(context: context, companyId: company.id) 
+            }
                 .font(.system(size: 13, weight: .black)).foregroundStyle(.black)
                 .padding(.horizontal, 24).padding(.vertical, 12)
                 .background(.white).clipShape(Capsule())

@@ -8,7 +8,7 @@ struct SubscriptionListView: View {
     @Environment(\.modelContext) private var context
 
     @State private var editingSub: Subscription? = nil
-    @State private var showAddSheet = false
+    @State private var newSub: Subscription? = nil
 
     var body: some View {
         ScrollView {
@@ -16,7 +16,10 @@ struct SubscriptionListView: View {
                 // Add button row — exact CiFr style
                 HStack {
                     Spacer()
-                    Button(action: { showAddSheet = true }) {
+                    Button(action: { 
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newSub = vm.addSubscription(context: context, companyId: company.id) 
+                    }) {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 11, weight: .bold))
@@ -51,14 +54,16 @@ struct SubscriptionListView: View {
         .sheet(item: $editingSub) { sub in
             EditSubscriptionSheet(sub: sub, institutions: institutions, vm: vm, isNew: false)
         }
-        .sheet(isPresented: $showAddSheet) {
-            let newSub = vm.addSubscription(context: context, companyId: company.id)
-            EditSubscriptionSheet(sub: newSub, institutions: institutions, vm: vm, isNew: true)
+        .sheet(item: $newSub) { sub in
+            EditSubscriptionSheet(sub: sub, institutions: institutions, vm: vm, isNew: true)
         }
     }
 
     private var emptyState: some View {
-        Button(action: { showAddSheet = true }) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            newSub = vm.addSubscription(context: context, companyId: company.id)
+        }) {
             VStack(spacing: 16) {
                 Text("🌐")
                     .font(.system(size: 28))
