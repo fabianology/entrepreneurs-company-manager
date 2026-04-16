@@ -19,9 +19,9 @@ final class FinancialCard {
     var paidFrom: String
     var paidOn: String
     var autopay: String
-    var balance: Double
-    var moPayment: Double
-    var cardHolderType: String
+    var balance: Double = 0.0
+    var moPayment: Double = 0.0
+    var cardHolderType: String = "Mine"
 
     init(
         id: String = UUID().uuidString,
