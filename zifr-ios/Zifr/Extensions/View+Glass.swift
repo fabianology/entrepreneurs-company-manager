@@ -19,28 +19,18 @@ struct GlassCardModifier: ViewModifier {
     }
 }
 
-// MARK: - Liquid Glass Modifier (ultra-thin blur layer)
+// MARK: - Liquid Glass Modifier (native HIG material)
 struct LiquidGlassModifier: ViewModifier {
     var cornerRadius: CGFloat = 24
 
     func body(content: Content) -> some View {
         content
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(.ultraThinMaterial)
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.18), Color.white.opacity(0.04)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                }
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(.white.opacity(0.2), lineWidth: 0.5)
             )
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 4)
     }
 }
 

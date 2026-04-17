@@ -31,16 +31,16 @@ struct GlobalSearchView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.4))
+                        .foregroundStyle(.secondary)
                     TextField("Search companies, services, cards...", text: $vm.searchQuery)
                         .focused($searchFocused)
                         .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.primary)
                         .autocorrectionDisabled()
                     if !vm.searchQuery.isEmpty {
                         Button { vm.searchQuery = "" } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Color.white.opacity(0.3))
+                                .foregroundStyle(.tertiary)
                         }
                     }
                 }

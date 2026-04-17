@@ -3,7 +3,7 @@ import SwiftData
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var context
-    @Query(sort: \Company.lastViewed, order: .reverse) private var companies: [Company]
+    @Query(sort: \Company.lastViewed, order: .forward) private var companies: [Company]
     @Query private var subscriptions: [Subscription]
     @Query private var cards: [FinancialCard]
     @Query private var institutions: [Institution]
@@ -166,11 +166,11 @@ struct DashboardView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
-                            .font(.system(size: 15))
-                            .foregroundStyle(Color.white.opacity(0.4))
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(.secondary)
                         Text("Search")
                             .font(.system(size: 15))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .foregroundStyle(.secondary)
                         Spacer()
                     }
                     .padding(.horizontal, 16)
