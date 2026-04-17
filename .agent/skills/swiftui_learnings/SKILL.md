@@ -26,3 +26,11 @@ This document summarizes the core SwiftUI architectural lessons and specialized 
 ## 5. Overriding Invasive Gestures
 - Embedded `.gesture(DragGesture())` bindings are incredibly greedy in SwiftUI. If you place a drag recognizer on a primary pane wrapped in a generic `NavigationStack`, it typically intercepts the OS-level edge-swipe navigation handling. 
 - Strategically removing navigation `dismiss()` parameters from edge-sweep interceptors allowed the interaction array to be exclusively optimized for paginating content (flipping through tabs array), preventing frustrating UI crashes or unintended screen dismissals out of the root view.
+
+## 6. High-Fidelity Modal Architecture (HUDs vs Sheets)
+- **Nested Presentation Bugs**: Traditionally, launching nested iOS `.sheet` overlays out of custom `ZStack` components can break the environment's `dismiss()` capability and lead to visually frozen states. 
+- **The NavigationStack Form Fix**: By strictly elevating all edit environments (like adding Cards or Services) into structural `NavigationStack` -> `Form` blocks nested inside `.sheet(item:)` bindings—coupled with `.presentationDetents` to construct native "HUDs"—we ensure completely secure SwiftData saving routines and guaranteed dismissal behaviors aligned tightly with Apple's HIG formats.
+
+## 7. Dynamic `zIndex` & Flattened Element Popping
+- **The Nested ZStack Trap**: Z-Index properties (`.zIndex()`) apply ONLY locally between immediate siblings sharing a container block. A view buried deep inside an internal `ZStack(alignment: .top)` cannot physically push its `.zIndex` high enough to arbitrarily overlap a sibling of its parent component.
+- **Flattening for Intersecting Animations**: When building complex interactive layouts (like a nested stack of credit cards sliding *up and natively over* an adjacent Bank block), you must completely "flatten" the structure. By removing nested `ZStack` wrappers and exposing the elements functionally as unified siblings inside the root container, dynamically toggling `.zIndex` (e.g., from `10` -> `25` upon tap) allows components to seamlessly float forward and backward above adjacent items with organic, fluid spring animations!
