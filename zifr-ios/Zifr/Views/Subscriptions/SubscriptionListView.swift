@@ -90,7 +90,7 @@ struct SubscriptionListView: View {
 // MARK: - Subscription Card (exact CiFr layout)
 
 struct SubscriptionCardView: View {
-    let sub: Subscription
+    @Bindable var sub: Subscription
     let onEdit: () -> Void
 
     @State private var expanded = false
@@ -98,6 +98,18 @@ struct SubscriptionCardView: View {
     @State private var showLinkedEmails = false
     @State private var copiedField: String? = nil // "login" | "password"
     @State private var passwordRevealed = false
+
+    // Sub-service HUD state
+    @State private var showSubServiceHUD = false
+    @State private var subDraft = SubService()
+    @State private var subDraftIndex: Int? = nil
+    @State private var isNewSubService = false
+
+    // Linked email HUD state
+    @State private var showEmailHUD = false
+    @State private var emailDraft = LinkedEmail()
+    @State private var emailDraftIndex: Int? = nil
+    @State private var isNewEmail = false
 
     // Billing totals — mirrors CiFr calcTotals()
     var primaryTotal: Double {
@@ -160,7 +172,6 @@ struct SubscriptionCardView: View {
                     if !sub.isFree {
                         HStack(spacing: 8) {
                             statusDot(sub: sub)
-                            statusPipe()
                             Text(sub.isFree ? "Free" : (sub.renew == "Manual" ? "Manual" : "Auto Renew"))
                                 .font(.system(size: 11, weight: .semibold))
                                 .textCase(.uppercase)
@@ -192,6 +203,7 @@ struct SubscriptionCardView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
                 }
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -226,38 +238,46 @@ struct SubscriptionCardView: View {
             }
             if showSubServices {
                 VStack(spacing: 12) {
-                    ForEach(sub.subServices) { ss in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(ss.name.isEmpty ? "Unnamed" : ss.name.uppercased())
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(.white)
-                                HStack(spacing: 8) {
-                                    Text(ss.status == .active ? "Active" : "Paused")
-                                        .font(.system(size: 9, weight: .black))
-                                        .textCase(.uppercase)
-                                        .tracking(1)
-                                        .foregroundStyle(ss.status == .active ? Color.zifrGreen : Color.red)
-                                    Text("|").foregroundStyle(Color.white.opacity(0.2))
-                                    Text(ss.billingCycle == .monthly ? "Auto Pay" : "Manual")
-                                        .font(.system(size: 9, weight: .black))
-                                        .textCase(.uppercase)
-                                        .tracking(1)
-                                        .foregroundStyle(Color.zifrGreen)
+                    ForEach(sub.subServices.indices, id: \.self) { i in
+                        let ss = sub.subServices[i]
+                        Button {
+                            subDraft = ss
+                            subDraftIndex = i
+                            isNewSubService = false
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            showSubServiceHUD = true
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                    
+                                    HStack(spacing: 6) {
+                                        Text(ss.status == .active ? "Active" : "Paused")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(ss.status == .active ? Color.zifrGreen : Color.red)
+                                        
+                                        Text("·").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
+                                        
+                                        Text(ss.billingCycle == .monthly ? "Auto Pay" : "Manual")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.6))
+                                    }
+                                }
+                                Spacer()
+                                HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                    Text("$\(String(format: "%.0f", ss.cost))")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(ss.status == .active ? .white : Color.white.opacity(0.4))
+                                    Text("/\(ss.billingCycle == .monthly ? "mo" : "yr")")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.5))
                                 }
                             }
-                            Spacer()
-                            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                Text("$\(String(format: "%.2f", ss.cost))")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(ss.status == .active ? .white : Color.white.opacity(0.2))
-                                Text("/\(ss.billingCycle == .monthly ? "mo" : "yr")")
-                                    .font(.system(size: 9, weight: .black))
-                                    .textCase(.uppercase)
-                                    .tracking(1)
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                            }
+                            .padding(.vertical, 4)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -272,37 +292,60 @@ struct SubscriptionCardView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
             if showLinkedEmails {
-                VStack(spacing: 0) {
-                    ForEach(Array(sub.linkedEmails.enumerated()), id: \.element.id) { i, email in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Email")
-                                    .font(.system(size: 8, weight: .black))
-                                    .textCase(.uppercase)
-                                    .tracking(2)
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                Text(email.email.isEmpty ? "—" : email.email)
-                                    .font(.system(size: 12, weight: .black))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
+                VStack(spacing: 12) {
+                    ForEach(sub.linkedEmails.indices, id: \.self) { i in
+                        let email = sub.linkedEmails[i]
+                        Button {
+                            emailDraft = email
+                            emailDraftIndex = i
+                            isNewEmail = false
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            showEmailHUD = true
+                        } label: {
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    // Email + tag pill inline
+                                    HStack(spacing: 8) {
+                                        Text(email.email.isEmpty ? "No Address" : email.email)
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundStyle(.white)
+                                            .lineLimit(1)
+                                        
+                                        if !email.usedIn.isEmpty {
+                                            Text(email.usedIn.uppercased())
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundStyle(Color.white.opacity(0.8))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.white.opacity(0.12))
+                                                .clipShape(Capsule())
+                                        }
+                                    }
+                                    // Role row
+                                    HStack(spacing: 6) {
+                                        Text("Role")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        
+                                        Text("·").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
+                                        
+                                        Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(.white)
+                                    }
+                                    // Notes (only if present)
+                                    if !email.notes.isEmpty {
+                                        Text("Notes: \(email.notes.joined(separator: " · "))")
+                                            .font(.system(size: 13, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                            .lineLimit(2)
+                                    }
+                                }
+                                Spacer()
                             }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 3) {
-                                Text("Used For")
-                                    .font(.system(size: 8, weight: .black))
-                                    .textCase(.uppercase)
-                                    .tracking(2)
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                Text(email.usedFor.isEmpty ? "—" : email.usedFor)
-                                    .font(.system(size: 12, weight: .black))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                            }
+                            .padding(.vertical, 4)
                         }
-                        .padding(.vertical, 8)
-                        if i < sub.linkedEmails.count - 1 {
-                            Divider().background(Color.white.opacity(0.05))
-                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -317,13 +360,55 @@ struct SubscriptionCardView: View {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(Color.white.opacity(0.05), lineWidth: 1)
         )
+        // ── Sub-service HUD ───────────────────────────────────────────────
+        .sheet(isPresented: $showSubServiceHUD) {
+            SubServiceHUD(
+                draft: $subDraft,
+                isNew: isNewSubService,
+                onSave: {
+                    var services = sub.subServices
+                    if let idx = subDraftIndex {
+                        services[idx] = subDraft
+                    } else {
+                        services.append(subDraft)
+                    }
+                    sub.subServices = services
+                    showSubServiceHUD = false
+                },
+                onCancel: { showSubServiceHUD = false }
+            )
+            .presentationDetents([.height(420)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+        }
+        // ── Linked email HUD ─────────────────────────────────────────────
+        .sheet(isPresented: $showEmailHUD) {
+            LinkedEmailHUD(
+                draft: $emailDraft,
+                isNew: isNewEmail,
+                onSave: {
+                    var emails = sub.linkedEmails
+                    if let idx = emailDraftIndex {
+                        emails[idx] = emailDraft
+                    } else {
+                        emails.append(emailDraft)
+                    }
+                    sub.linkedEmails = emails
+                    showEmailHUD = false
+                },
+                onCancel: { showEmailHUD = false }
+            )
+            .presentationDetents([.height(500)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+        }
     }
 
     // MARK: - Helpers
 
     private func costColumn(value: Double, label: String) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text("$\(String(format: "%.2f", value))")
+            Text("$\(String(format: "%.0f", value))")
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
             Text(label)
@@ -389,16 +474,16 @@ struct SubscriptionCardView: View {
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Text(isCopied ? "Copied ✓" : label)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isCopied ? Color.orange : Color.white.opacity(0.4))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(isCopied ? Color.orange : Color.white.opacity(0.5))
                 if isPassword {
                     Button {
                         passwordRevealed.toggle()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Image(systemName: passwordRevealed ? "eye.slash" : "eye")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.white.opacity(0.3))
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.4))
                     }
                 }
             }
@@ -414,16 +499,16 @@ struct SubscriptionCardView: View {
             } label: {
                 HStack {
                     Text(isPassword && !passwordRevealed ? "••••••••" : (value.isEmpty ? "—" : value))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(value.isEmpty ? Color.white.opacity(0.2) : .white)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(value.isEmpty ? Color.white.opacity(0.3) : .white)
                         .lineLimit(1)
                     Spacer()
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
                 .background(Color.black.opacity(0.2))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
         }
     }
@@ -431,10 +516,10 @@ struct SubscriptionCardView: View {
     private func detailCell(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.4))
-            Text(value)
                 .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
+            Text(value)
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

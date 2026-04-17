@@ -60,8 +60,8 @@ struct CompanyCardView: View {
 
                 // Icon shortcuts (right) — exact CiFr: blue/green/amber
                 HStack(spacing: 0) {
-                    shortcutBtn(icon: "creditcard", color: Color(hex: "#60A5FA"), action: onViewSubscriptions)
-                    shortcutBtn(icon: "square.3.layers.3d", color: Color(hex: "#22c55e"), action: onViewFinancials)
+                    shortcutBtn(icon: "square.3.layers.3d", color: Color(hex: "#60A5FA"), action: onViewSubscriptions)
+                    shortcutBtn(icon: "creditcard", color: Color(hex: "#22c55e"), action: onViewFinancials)
                     shortcutBtn(icon: "doc.text", color: Color(hex: "#FBBF24"), action: onViewDocuments)
                 }
                 .background(Color.black.opacity(0.3))

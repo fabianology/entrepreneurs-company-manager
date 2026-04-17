@@ -135,30 +135,6 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Identity
                 Section {
                      VStack(spacing: 16) {
-                        // Status — inline single row (top)
-                        HStack(spacing: 12) {
-                            Text("STATUS")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            StatusDot(isGreen: sub.status == "Active")
-                            Text(sub.status == "Active" ? "Active" : "Paused")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
-                            Spacer()
-                            Toggle("", isOn: Binding(
-                                get: { sub.status == "Active" },
-                                set: { sub.status = $0 ? "Active" : "Paused" }
-                            ))
-                            .labelsHidden()
-                            .tint(.green)
-                            .scaleEffect(0.8)
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-
                         HStack(spacing: 12) {
                             ZifrField(
                                 label: "SERVICE NAME",
@@ -208,6 +184,31 @@ struct EditSubscriptionSheet: View {
                                 }
                             }
                         }
+
+                        // Status — inline single row (below login)
+                        HStack(spacing: 12) {
+                            Text("STATUS")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            StatusDot(isGreen: sub.status == "Active")
+                            Text(sub.status == "Active" ? "Active" : "Paused")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { sub.status == "Active" },
+                                set: { sub.status = $0 ? "Active" : "Paused" }
+                            ))
+                            .labelsHidden()
+                            .tint(.green)
+                            .scaleEffect(0.8)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+
                         // Thin divider
                         Rectangle()
                             .fill(Color.white.opacity(0.07))

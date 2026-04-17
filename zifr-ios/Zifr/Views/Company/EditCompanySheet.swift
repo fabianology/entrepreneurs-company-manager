@@ -151,10 +151,10 @@ struct EditCompanySheet: View {
                                 .padding(.leading, 4)
                             
                             HStack(spacing: 12) {
-                                navButton(icon: "creditcard", color: Color(hex: "#60A5FA"), text: "Subscriptions") {
+                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#60A5FA"), text: "Subscriptions") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .subscriptions; dismiss() }
                                 }
-                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#22c55e"), text: "Financials") {
+                                navButton(icon: "creditcard", color: Color(hex: "#22c55e"), text: "Financials") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .financial; dismiss() }
                                 }
                                 navButton(icon: "doc.text", color: Color(hex: "#FBBF24"), text: "Docs") {
