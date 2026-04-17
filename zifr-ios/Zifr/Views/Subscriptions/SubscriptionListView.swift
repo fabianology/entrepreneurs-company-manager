@@ -144,7 +144,7 @@ struct SubscriptionCardView: View {
                         }
 
                         // Name + costs
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 0) {
                             Text(sub.name.isEmpty ? "Service" : sub.name)
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.white)
@@ -159,7 +159,6 @@ struct SubscriptionCardView: View {
                                     dividerLine()
                                     costColumn(value: totalAnnual, label: "est. yearly")
                                 }
-                                .padding(.top, 4)
                             }
                         }
                         Spacer(minLength: 0)
