@@ -134,7 +134,31 @@ struct EditSubscriptionSheet: View {
 
                 // MARK: – Identity
                 Section {
-                    VStack(spacing: 16) {
+                     VStack(spacing: 16) {
+                        // Status — inline single row (top)
+                        HStack(spacing: 12) {
+                            Text("STATUS")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            StatusDot(isGreen: sub.status == "Active")
+                            Text(sub.status == "Active" ? "Active" : "Paused")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { sub.status == "Active" },
+                                set: { sub.status = $0 ? "Active" : "Paused" }
+                            ))
+                            .labelsHidden()
+                            .tint(.green)
+                            .scaleEffect(0.8)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+
                         HStack(spacing: 12) {
                             ZifrField(
                                 label: "SERVICE NAME",
@@ -340,29 +364,6 @@ struct EditSubscriptionSheet: View {
                                 }
                             }
 
-                            // Status — inline single row (below Renews On)
-                            HStack(spacing: 12) {
-                                Text("STATUS")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                StatusDot(isGreen: sub.status == "Active")
-                                Text(sub.status == "Active" ? "Active" : "Paused")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                Toggle("", isOn: Binding(
-                                    get: { sub.status == "Active" },
-                                    set: { sub.status = $0 ? "Active" : "Paused" }
-                                ))
-                                .labelsHidden()
-                                .tint(.green)
-                                .scaleEffect(0.8)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         .padding(.vertical, 4)
                     } header: { EmptyView() }
@@ -371,10 +372,31 @@ struct EditSubscriptionSheet: View {
                     .listRowSeparator(.hidden)
                 }
 
-
-
                 if detailLevel == "Detailed" {
-                    // MARK: – Security & Recovery
+                    // MARK: – Notes (before Security)
+                    Section {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("NOTES")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            TextField("Add a note…",
+                                      text: Binding(get: { sub.notes }, set: { sub.notes = $0 }),
+                                      axis: .vertical)
+                                .lineLimit(3...6)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                    } header: { EmptyView() }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
+                    .listRowSeparator(.hidden)
+
+                    // MARK: – Security & Recovery (below Notes)
                     // Reveal button — shown only when section is hidden
                     if !showSecurity {
                         Section {
@@ -466,30 +488,17 @@ struct EditSubscriptionSheet: View {
                         .listRowSeparator(.hidden)
                     }
 
-                    // MARK: – Notes
+                    // MARK: – Supplemental Services
+                    // Thin divider above SubServices
                     Section {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("NOTES")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            TextField("Add a note…",
-                                      text: Binding(get: { sub.notes }, set: { sub.notes = $0 }),
-                                      axis: .vertical)
-                                .lineLimit(3...6)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color(hex: "#111111"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                        }
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(height: 1)
                     } header: { EmptyView() }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
                     .listRowSeparator(.hidden)
 
-                    // MARK: – Supplemental Services
                     SubServicesSection(
                         sub: sub,
                         onAdd: {
@@ -633,74 +642,84 @@ struct SubServicesSection: View {
 
     var body: some View {
         Section {
-            Button { onAdd() } label: {
-                HStack {
-                    Spacer()
-                    Text("💾  Add Supplemental Service")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                }
-            }
-            .listRowBackground(Color(uiColor: .systemFill))
-
-            ForEach(sub.subServices.indices, id: \.self) { i in
-                let ss = sub.subServices[i]
-                Button {
-                    onEdit(i, ss)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(.primary)
-                            HStack(spacing: 6) {
-                                if ss.cost > 0 {
-                                    Text("$\(ss.cost, specifier: "%.2f")")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text("·").foregroundStyle(.tertiary).font(.caption)
-                                }
-                                Text(ss.billingCycle.rawValue)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text("·").foregroundStyle(.tertiary).font(.caption)
-                                Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
-                                    .font(.caption)
-                                    .foregroundStyle(ss.autoPay == .auto ? Color.green : Color.secondary)
-                            }
-                        }
+            VStack(spacing: 12) {
+                // Add button
+                Button { onAdd() } label: {
+                    HStack {
                         Spacer()
-                        Text(ss.status.rawValue)
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(
-                                Capsule().fill(ss.status == .active
-                                    ? Color.green.opacity(0.15)
-                                    : Color.orange.opacity(0.15))
-                            )
-                            .foregroundStyle(ss.status == .active ? .green : .orange)
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.tertiary)
+                        Text("💾  Add Supplemental Service")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                        Spacer()
                     }
-                    .padding(.vertical, 2)
+                    .frame(height: 40)
+                    .background(Color(hex: "#F7F6F2"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        withAnimation {
-                            var services = sub.subServices
-                            services.remove(at: i)
-                            sub.subServices = services
+
+                ForEach(sub.subServices.indices, id: \.self) { i in
+                    let ss = sub.subServices[i]
+                    Button { onEdit(i, ss) } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                HStack(spacing: 6) {
+                                    if ss.cost > 0 {
+                                        Text("$\(ss.cost, specifier: "%.2f")")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.45))
+                                        Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                    }
+                                    Text(ss.billingCycle.rawValue)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                    Text(ss.autoPay == .auto ? "Auto" : "Manual")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(ss.autoPay == .auto ? Color.green.opacity(0.8) : Color.white.opacity(0.3))
+                                }
+                            }
+                            Spacer()
+                            // Status pill
+                            Text(ss.status.rawValue.uppercased())
+                                .font(.system(size: 9, weight: .black))
+                                .tracking(0.5)
+                                .foregroundStyle(ss.status == .active ? Color.green : Color.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background((ss.status == .active ? Color.green : Color.orange).opacity(0.12))
+                                .clipShape(Capsule())
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.2))
                         }
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            withAnimation {
+                                var services = sub.subServices
+                                services.remove(at: i)
+                                sub.subServices = services
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
-        }
+        } header: { EmptyView() }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
+        .listRowSeparator(.hidden)
     }
 }
 
@@ -729,60 +748,134 @@ struct SubServiceHUD: View {
         NavigationStack {
             Form {
                 Section {
-                    // Name + Status toggle on the same row
-                    HStack(spacing: 12) {
-                        Text("Name")
-                            .foregroundStyle(.secondary)
-                        TextField("e.g. Premium Plan", text: $draft.name)
+                    VStack(spacing: 12) {
+
+                        // Row 1: Name + Status
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "NAME",
+                                placeholder: "e.g. Premium Plan",
+                                text: $draft.name
+                            )
                             .autocorrectionDisabled()
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(draft.status == .active ? "Active" : "Paused")
-                                .font(.caption)
-                                .foregroundStyle(draft.status == .active ? .green : .red)
-                            Toggle("", isOn: Binding(
-                                get: { draft.status == .active },
-                                set: { draft.status = $0 ? .active : .paused }
-                            ))
-                            .labelsHidden()
-                            .tint(draft.status == .active ? .green : .red)
+
+                            // Status card
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("STATUS")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                HStack {
+                                    StatusDot(isGreen: draft.status == .active)
+                                    Text(draft.status == .active ? "Active" : "Paused")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: { draft.status == .active },
+                                        set: { draft.status = $0 ? .active : .paused }
+                                    ))
+                                    .labelsHidden()
+                                    .tint(.green)
+                                    .scaleEffect(0.8)
+                                }
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            }
+                        }
+
+                        // Row 2: Cost + Billing Cycle
+                        HStack(spacing: 12) {
+                            // Cost card
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("COST")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                HStack(spacing: 4) {
+                                    Text("$")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    DoubleField(placeholder: "0.00", value: $draft.cost)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            }
+
+                            // Billing Cycle card
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("CYCLE")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                Picker("", selection: $draft.billingCycle) {
+                                    Text("Monthly").tag(SubService.BillingCycle.monthly)
+                                    Text("Yearly").tag(SubService.BillingCycle.yearly)
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.segmented)
+                            }
+                        }
+
+                        // Row 3: Auto Pay card (full width)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("AUTO PAY")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            HStack {
+                                Text(draft.autoPay == .auto ? "Enabled" : "Manual")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(draft.autoPay == .auto ? Color.green : Color.white)
+                                Spacer()
+                                Toggle("", isOn: Binding(
+                                    get: { draft.autoPay == .auto },
+                                    set: { draft.autoPay = $0 ? .auto : .manual }
+                                ))
+                                .labelsHidden()
+                                .tint(.green)
+                                .scaleEffect(0.8)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+
+                        // Row 4: Purpose (full width)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("PURPOSE")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            TextField("What is this service for?",
+                                      text: $draft.purpose,
+                                      axis: .vertical)
+                                .lineLimit(2...4)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white)
+                                .autocorrectionDisabled()
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
                     }
-
-                    // Cost + Cycle in one row
-                    HStack(spacing: 12) {
-                        HStack(spacing: 2) {
-                            Text("$")
-                                .foregroundStyle(.secondary)
-                            DoubleField(placeholder: "0.00", value: $draft.cost)
-                                .frame(width: 64)
-                        }
-                        Divider()
-                        Picker("", selection: $draft.billingCycle) {
-                            Text("Monthly").tag(SubService.BillingCycle.monthly)
-                            Text("Yearly").tag(SubService.BillingCycle.yearly)
-                        }
-                        .pickerStyle(.segmented)
-                    }
-
-                    // Auto Pay — toggle, green = on
-                    Toggle("Auto Pay", isOn: Binding(
-                        get: { draft.autoPay == .auto },
-                        set: { draft.autoPay = $0 ? .auto : .manual }
-                    ))
-                    .tint(.green)
-                }
-
-                Section {
-                    TextField("What is this service for?",
-                              text: $draft.purpose,
-                              axis: .vertical)
-                        .lineLimit(3)
-                        .font(.body)
-                } header: {
-                    Text("Purpose")
-                }
+                    .padding(.vertical, 4)
+                } header: { EmptyView() }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowSeparator(.hidden)
             }
+            .listSectionSpacing(0)
             .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -810,62 +903,75 @@ struct LinkedEmailsSection: View {
 
     var body: some View {
         Section {
-            Button { onAdd() } label: {
-                HStack {
-                    Spacer()
-                    Text("📨  Add Linked Email")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                }
-            }
-            .listRowBackground(Color(uiColor: .systemFill))
-
-            ForEach(sub.linkedEmails.indices, id: \.self) { i in
-                let em = sub.linkedEmails[i]
-                Button {
-                    onEdit(i, em)
-                } label: {
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(em.email.isEmpty ? "No address" : em.email)
-                                .font(.body.weight(.medium))
-                                .foregroundStyle(.primary)
-                            HStack(spacing: 6) {
-                                if !em.provider.isEmpty {
-                                    Text(em.provider)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Text("·").font(.caption).foregroundStyle(.tertiary)
-                                }
-                                if !em.usedFor.isEmpty {
-                                    Text(em.usedFor)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
+            VStack(spacing: 12) {
+                // Add button
+                Button { onAdd() } label: {
+                    HStack {
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.tertiary)
+                        Text("📨  Add Linked Email")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                        Spacer()
                     }
-                    .padding(.vertical, 2)
+                    .frame(height: 40)
+                    .background(Color(hex: "#F7F6F2"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        withAnimation {
-                            var emails = sub.linkedEmails
-                            emails.remove(at: i)
-                            sub.linkedEmails = emails
+
+                ForEach(sub.linkedEmails.indices, id: \.self) { i in
+                    let em = sub.linkedEmails[i]
+                    Button { onEdit(i, em) } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(em.email.isEmpty ? "No address" : em.email)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                HStack(spacing: 6) {
+                                    if !em.provider.isEmpty {
+                                        Text(em.provider)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.45))
+                                        Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                    }
+                                    if !em.usedFor.isEmpty {
+                                        Text(em.usedFor)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.45))
+                                    }
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.2))
                         }
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            withAnimation {
+                                var emails = sub.linkedEmails
+                                emails.remove(at: i)
+                                sub.linkedEmails = emails
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
-        }
+        } header: { EmptyView() }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
+        .listRowSeparator(.hidden)
     }
 }
 
@@ -899,54 +1005,77 @@ struct LinkedEmailHUD: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: Email Details
                 Section {
-                    LabeledContent("Address") {
-                        TextField("name@example.com", text: $draft.email)
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                    }
+                    VStack(spacing: 12) {
 
-                    LabeledContent("Provider") {
-                        TextField("Gmail, iCloud, Outlook…", text: $draft.provider)
-                            .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                    }
+                        // Row 1: Address (full width)
+                        ZifrField(
+                            label: "EMAIL ADDRESS",
+                            placeholder: "name@example.com",
+                            text: $draft.email
+                        )
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
 
-                    LabeledContent("Used For") {
-                        TextField("Billing, Admin, Support…", text: $draft.usedFor)
+                        // Row 2: Provider + Used For
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "PROVIDER",
+                                placeholder: "Gmail, iCloud…",
+                                text: $draft.provider
+                            )
                             .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                    }
 
-                    LabeledContent("Access Method") {
-                        TextField("Google SSO, Password…", text: $draft.accessMethod)
+                            ZifrField(
+                                label: "USED FOR",
+                                placeholder: "Billing, Admin…",
+                                text: $draft.usedFor
+                            )
                             .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                    }
+                        }
 
-                    // Used In — placeholder for future tag infrastructure
-                    LabeledContent("Used In") {
-                        TextField("Tag placeholder", text: $draft.usedIn)
+                        // Row 3: Access Method + Used In
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "ACCESS METHOD",
+                                placeholder: "Google SSO, Password…",
+                                text: $draft.accessMethod
+                            )
                             .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("Email Details")
-                }
 
-                // MARK: Notes
-                Section {
-                    TextField("Add notes…", text: notesBinding, axis: .vertical)
-                        .lineLimit(3)
-                        .font(.body)
-                } header: {
-                    Text("Notes")
-                }
+                            ZifrField(
+                                label: "USED IN",
+                                placeholder: "Tag…",
+                                text: $draft.usedIn
+                            )
+                            .autocorrectionDisabled()
+                        }
+
+                        // Row 4: Notes (full width)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("NOTES")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            TextField("Add notes…", text: notesBinding, axis: .vertical)
+                                .lineLimit(2...4)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white)
+                                .autocorrectionDisabled()
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: { EmptyView() }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowSeparator(.hidden)
             }
+            .listSectionSpacing(0)
             .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
