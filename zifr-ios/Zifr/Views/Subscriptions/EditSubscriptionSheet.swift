@@ -24,6 +24,9 @@ struct EditSubscriptionSheet: View {
     @State private var emailDraft = LinkedEmail()
     @State private var emailDraftIndex: Int? = nil
 
+    // User preference for form density
+    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
+
     // Dirty-state tracking — fingerprint of initial values captured on appear
     @State private var initialFingerprint = ""
 
@@ -81,227 +84,372 @@ struct EditSubscriptionSheet: View {
         )
     }
 
+    private var detailSliderBinding: Binding<Double> {
+        Binding<Double>(
+            get: {
+                switch detailLevel {
+                case "Essentials": return 0.0
+                case "Less Detail": return 1.0
+                default: return 2.0
+                }
+            },
+            set: { val in
+                let newState = val < 0.5 ? "Essentials" : (val < 1.5 ? "Less Detail" : "Detailed")
+                if newState != detailLevel {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    detailLevel = newState
+                }
+            }
+        )
+    }
+
     var body: some View {
         NavigationStack {
             Form {
 
-                // MARK: – Paid / Free toggle (top-level segmented control)
-                Picker("Pricing", selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 })) {
-                    Text("Paid").tag("paid")
-                    Text("Free").tag("free")
+                // MARK: – Top Controls
+                VStack(spacing: 12) {
+                    Picker("Pricing", selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 })) {
+                        Text("Paid").tag("paid")
+                        Text("Free").tag("free")
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    Slider(value: detailSliderBinding, in: 0...2, step: 1) {
+                        Text("Detail Level")
+                    } minimumValueLabel: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                            .foregroundStyle(Color.white.opacity(0.3))
+                            .font(.system(size: 13, weight: .bold))
+                    } maximumValueLabel: {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundStyle(Color.white.opacity(0.3))
+                            .font(.system(size: 13, weight: .bold))
+                    }
+                    .tint(.black)
                 }
-                .pickerStyle(.segmented)
                 .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                 .listRowBackground(Color.clear)
 
                 // MARK: – Identity
                 Section {
-                    LabeledContent("Name") {
-                        TextField("Shopify", text: Binding(get: { sub.name }, set: { sub.name = $0 }))
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                    }
-                    LabeledContent("Website") {
-                        TextField("shopify.com", text: Binding(get: { sub.website }, set: { sub.website = $0 }))
-                            .multilineTextAlignment(.trailing)
-                            .keyboardType(.URL)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }
-                    LabeledContent("Login ID") {
-                        TextField("username or email", text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 }))
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                            .textInputAutocapitalization(.never)
-                    }
-                    LabeledContent("Password") {
-                        HStack(spacing: 8) {
-                            Group {
-                                if showPassword {
-                                    TextField("••••••••", text: Binding(get: { sub.password }, set: { sub.password = $0 }))
-                                        .autocorrectionDisabled()
-                                        .textInputAutocapitalization(.never)
-                                } else {
-                                    SecureField("••••••••", text: Binding(get: { sub.password }, set: { sub.password = $0 }))
+                    VStack(spacing: 16) {
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "SERVICE NAME",
+                                placeholder: "e.g. Shopify",
+                                text: Binding(get: { sub.name }, set: { sub.name = $0 })
+                            )
+                            
+                            if detailLevel != "Essentials" {
+                                ZifrField(
+                                    label: "WEBSITE",
+                                    placeholder: "shopify.com",
+                                    text: Binding(get: { sub.website }, set: { sub.website = $0 }),
+                                    keyboardType: .URL
+                                )
+                                .textInputAutocapitalization(.never)
+                            }
+                        }
+                        
+                        if detailLevel != "Essentials" {
+                            HStack(spacing: 12) {
+                                ZifrField(
+                                    label: "LOGIN ID",
+                                    placeholder: "username or email",
+                                    text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 })
+                                )
+                                .textInputAutocapitalization(.never)
+                                
+                                ZStack(alignment: .bottomTrailing) {
+                                    ZifrField(
+                                        label: "PASSWORD",
+                                        placeholder: "••••••••",
+                                        text: Binding(get: { sub.password }, set: { sub.password = $0 }),
+                                        isSecure: !showPassword
+                                    )
+                                    .textInputAutocapitalization(.never)
+                                    
+                                    Button {
+                                        showPassword.toggle()
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    } label: {
+                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                            .padding()
+                                    }
+                                    .padding(.bottom, 2)
                                 }
                             }
-                            .multilineTextAlignment(.trailing)
-                            Button {
-                                showPassword.toggle()
-                            } label: {
-                                Image(systemName: showPassword ? "eye.slash" : "eye")
-                                    .foregroundStyle(.secondary)
-                                    .font(.footnote)
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
-                    Picker("Status", selection: Binding(get: { sub.status }, set: { sub.status = $0 })) {
-                        Text("Active").tag("Active")
-                        Text("Paused").tag("Paused")
-                    }
+                    .padding(.vertical, 4)
                 } header: {
-                    Text("Service")
+                    SectionHeader(title: "Service Identity").padding(.bottom, 8)
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowSeparator(.hidden)
 
                 // MARK: – Billing (Paid only)
                 if !sub.isFree {
                     Section {
-                        // Cost (50%) + Auto Pay (50%) in one row
-                        HStack(spacing: 0) {
-                            HStack(spacing: 6) {
-                                Text("Cost")
-                                    .foregroundStyle(.secondary)
-                                HStack(spacing: 2) {
-                                    Text("$").foregroundStyle(.secondary)
-                                    DoubleField(placeholder: "0.00", value: Binding(
-                                        get: { sub.cost },
-                                        set: { sub.cost = $0 }
-                                    ))
-                                    .frame(width: 56)
+                        VStack(spacing: 16) {
+
+                            // Row 1: Cost + Auto Pay
+                            HStack(spacing: 12) {
+                                // Cost card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("COST")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    HStack(spacing: 4) {
+                                        Text("$")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        DoubleField(placeholder: "0.00", value: Binding(
+                                            get: { sub.cost },
+                                            set: { sub.cost = $0 }
+                                        ))
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#111111"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                }
+
+                                // Auto Pay card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("AUTO PAY")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    HStack {
+                                        Text(autoPayBinding.wrappedValue ? "Enabled" : "Manual")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(autoPayBinding.wrappedValue ? Color.green : Color.white)
+                                        Spacer()
+                                        Toggle("", isOn: autoPayBinding)
+                                            .labelsHidden()
+                                            .tint(.green)
+                                            .scaleEffect(0.8)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#111111"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
 
-                            Divider()
-                                .padding(.horizontal, 8)
+                            // Row 2: Billing Cycle — styled segmented control card
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("BILLING CYCLE")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                Picker("Cycle", selection: Binding(
+                                    get: { sub.billingCycle },
+                                    set: { newCycle in
+                                        if newCycle != sub.billingCycle {
+                                            sub.nextRenewal = newCycle == "Monthly" ? "1" : ""
+                                        }
+                                        sub.billingCycle = newCycle
+                                    }
+                                )) {
+                                    Text("Monthly").tag("Monthly")
+                                    Text("Yearly").tag("Yearly")
+                                }
+                                .pickerStyle(.segmented)
+                            }
 
-                            Toggle("Auto Pay", isOn: autoPayBinding)
+                            // Row 3: Renewal + Paid From (detail levels only)
+                            if detailLevel != "Essentials" {
+                                HStack(spacing: 12) {
+                                    // Renewal card
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("RENEWS ON")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        if sub.billingCycle == "Monthly" {
+                                            Picker("", selection: dayBinding) {
+                                                ForEach(1...31, id: \.self) { day in
+                                                    Text(ordinal(day)).tag(day)
+                                                }
+                                            }
+                                            .labelsHidden()
+                                            .padding(.leading, 6)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .frame(height: 44)
+                                            .background(Color(hex: "#111111"))
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        } else {
+                                            DatePicker("", selection: renewalDateBinding, displayedComponents: .date)
+                                                .labelsHidden()
+                                                .datePickerStyle(.compact)
+                                                .padding(.leading, 10)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .frame(height: 44)
+                                                .background(Color(hex: "#111111"))
+                                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        }
+                                    }
+
+                                    // Paid From card
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("PAID FROM")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        if payableAccounts.isEmpty {
+                                            TextField("Card or account", text: Binding(
+                                                get: { sub.paymentMethod },
+                                                set: { sub.paymentMethod = $0 }
+                                            ))
+                                            .autocorrectionDisabled()
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 12)
+                                            .background(Color(hex: "#111111"))
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        } else {
+                                            Picker("", selection: Binding(
+                                                get: { sub.paymentMethod },
+                                                set: { sub.paymentMethod = $0 }
+                                            )) {
+                                                Text("None").tag("")
+                                                ForEach(payableAccounts) { account in
+                                                    Text(account.name.isEmpty ? account.type : account.name)
+                                                        .tag(account.name.isEmpty ? account.type : account.name)
+                                                }
+                                            }
+                                            .labelsHidden()
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 10)
+                                            .background(Color(hex: "#111111"))
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Status — inline single row (below Renews On)
+                            HStack(spacing: 12) {
+                                Text("STATUS")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                StatusDot(isGreen: sub.status == "Active")
+                                Text(sub.status == "Active" ? "Active" : "Paused")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Toggle("", isOn: Binding(
+                                    get: { sub.status == "Active" },
+                                    set: { sub.status = $0 ? "Active" : "Paused" }
+                                ))
+                                .labelsHidden()
                                 .tint(.green)
-                                .frame(maxWidth: .infinity)
+                                .scaleEffect(0.8)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        .padding(.vertical, 4)
+                    } header: {
+                        SectionHeader(title: "Billing").padding(.bottom, 8)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                    .listRowSeparator(.hidden)
+                }
 
-                        Picker("Cycle", selection: Binding(
-                            get: { sub.billingCycle },
-                            set: { newCycle in
-                                // Reset renewal when switching cycles
-                                if newCycle != sub.billingCycle {
-                                    sub.nextRenewal = newCycle == "Monthly" ? "1" : ""
-                                }
-                                sub.billingCycle = newCycle
+
+
+                if detailLevel == "Detailed" {
+                    // MARK: – Security & Recovery
+                    Section {
+                        Picker("Two-Factor Auth", selection: Binding(get: { sub.twoFactorAuth }, set: { sub.twoFactorAuth = $0 })) {
+                            ForEach(twoFAOptions, id: \.self) { opt in
+                                Text(opt).tag(opt)
                             }
-                        )) {
-                            Text("Monthly").tag("Monthly")
-                            Text("Yearly").tag("Yearly")
                         }
-                        .pickerStyle(.segmented)
-
-                        // Renewal — adapts to cycle
-                        if sub.billingCycle == "Monthly" {
-                            Picker("Renews On", selection: dayBinding) {
-                                ForEach(1...31, id: \.self) { day in
-                                    Text(ordinal(day)).tag(day)
-                                }
-                            }
-                        } else {
-                            DatePicker(
-                                "Renewal Date",
-                                selection: renewalDateBinding,
-                                displayedComponents: .date
-                            )
-                            .datePickerStyle(.compact)
-                        }
-
-                        // Paid From — Picker over known accounts, fallback to free text
-                        if payableAccounts.isEmpty {
-                            LabeledContent("Paid From") {
-                                TextField("Card or account", text: Binding(get: { sub.paymentMethod }, set: { sub.paymentMethod = $0 }))
-                                    .multilineTextAlignment(.trailing)
-                                    .autocorrectionDisabled()
-                            }
-                        } else {
-                            Picker("Paid From", selection: Binding(get: { sub.paymentMethod }, set: { sub.paymentMethod = $0 })) {
-                                Text("None").tag("")
-                                ForEach(payableAccounts) { account in
-                                    Text(account.name.isEmpty ? account.type : account.name)
-                                        .tag(account.name.isEmpty ? account.type : account.name)
-                                }
-                            }
-                            .pickerStyle(.menu)
+                        .pickerStyle(.menu)
+                        LabeledContent("Recovery") {
+                            TextField("Phone, email…", text: Binding(get: { sub.recoveryMethod }, set: { sub.recoveryMethod = $0 }))
+                                .multilineTextAlignment(.trailing)
+                                .autocorrectionDisabled()
                         }
                     } header: {
-                        Text("Billing")
+                        Text("Security & Recovery")
                     }
-                }
 
-
-                // MARK: – Security & Recovery
-                Section {
-                    Picker("Two-Factor Auth", selection: Binding(get: { sub.twoFactorAuth }, set: { sub.twoFactorAuth = $0 })) {
-                        ForEach(twoFAOptions, id: \.self) { opt in
-                            Text(opt).tag(opt)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    LabeledContent("Recovery") {
-                        TextField("Phone, email…", text: Binding(get: { sub.recoveryMethod }, set: { sub.recoveryMethod = $0 }))
-                            .multilineTextAlignment(.trailing)
-                            .autocorrectionDisabled()
-                    }
-                } header: {
-                    Text("Security & Recovery")
-                }
-
-                // MARK: – Notes
-                Section {
-                    ZStack(alignment: .topLeading) {
-                        // 3 ruled lines, each at 90 % of the row width
-                        Canvas { ctx, size in
-                            let rowH = size.height / 3
-                            for i in 1...3 {
-                                let y = rowH * CGFloat(i) - 0.5
-                                var path = Path()
-                                path.move(to: CGPoint(x: size.width * 0.05, y: y))
-                                path.addLine(to: CGPoint(x: size.width * 0.95, y: y))
-                                ctx.stroke(path,
-                                           with: .color(.secondary.opacity(0.25)),
-                                           lineWidth: 0.5)
+                    // MARK: – Notes
+                    Section {
+                        ZStack(alignment: .topLeading) {
+                            // 3 ruled lines, each at 90 % of the row width
+                            Canvas { ctx, size in
+                                let rowH = size.height / 3
+                                for i in 1...3 {
+                                    let y = rowH * CGFloat(i) - 0.5
+                                    var path = Path()
+                                    path.move(to: CGPoint(x: size.width * 0.05, y: y))
+                                    path.addLine(to: CGPoint(x: size.width * 0.95, y: y))
+                                    ctx.stroke(path,
+                                               with: .color(.secondary.opacity(0.25)),
+                                               lineWidth: 0.5)
+                                }
                             }
+                            .allowsHitTesting(false)
+
+                            TextField("Add a note…",
+                                      text: Binding(get: { sub.notes }, set: { sub.notes = $0 }),
+                                      axis: .vertical)
+                                .lineLimit(3)
+                                .font(.body)
                         }
-                        .allowsHitTesting(false)
-
-                        TextField("Add a note…",
-                                  text: Binding(get: { sub.notes }, set: { sub.notes = $0 }),
-                                  axis: .vertical)
-                            .lineLimit(3)
-                            .font(.body)
+                        .frame(height: 84) // 3 rows × 28 pt
+                    } header: {
+                        Text("Notes")
                     }
-                    .frame(height: 84) // 3 rows × 28 pt
-                } header: {
-                    Text("Notes")
+
+                    // MARK: – Supplemental Services
+                    SubServicesSection(
+                        sub: sub,
+                        onAdd: {
+                            subDraft = SubService()
+                            subDraftIndex = nil
+                            showSubServiceHUD = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        },
+                        onEdit: { idx, service in
+                            subDraft = service
+                            subDraftIndex = idx
+                            showSubServiceHUD = true
+                        }
+                    )
+
+                    // MARK: – Linked Emails
+                    LinkedEmailsSection(
+                        sub: sub,
+                        onAdd: {
+                            emailDraft = LinkedEmail()
+                            emailDraftIndex = nil
+                            showEmailHUD = true
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        },
+                        onEdit: { idx, email in
+                            emailDraft = email
+                            emailDraftIndex = idx
+                            showEmailHUD = true
+                        }
+                    )
                 }
-
-                // MARK: – Supplemental Services
-                SubServicesSection(
-                    sub: sub,
-                    onAdd: {
-                        subDraft = SubService()
-                        subDraftIndex = nil
-                        showSubServiceHUD = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    },
-                    onEdit: { idx, service in
-                        subDraft = service
-                        subDraftIndex = idx
-                        showSubServiceHUD = true
-                    }
-                )
-
-                // MARK: – Linked Emails
-                LinkedEmailsSection(
-                    sub: sub,
-                    onAdd: {
-                        emailDraft = LinkedEmail()
-                        emailDraftIndex = nil
-                        showEmailHUD = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    },
-                    onEdit: { idx, email in
-                        emailDraft = email
-                        emailDraftIndex = idx
-                        showEmailHUD = true
-                    }
-                )
 
                 // MARK: – Danger Zone
                 if !isNew {

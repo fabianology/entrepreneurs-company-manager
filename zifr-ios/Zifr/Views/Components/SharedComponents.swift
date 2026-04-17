@@ -9,10 +9,10 @@ struct ZifrField: View {
     var keyboardType: UIKeyboardType = .default
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .bold)) // also made label slightly smaller and bolder for compact look
                     .foregroundStyle(Color.white.opacity(0.5))
             }
             Group {
@@ -26,11 +26,11 @@ struct ZifrField: View {
             .autocorrectionDisabled()
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
     }
 }

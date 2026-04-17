@@ -178,6 +178,7 @@ struct SubscriptionCardView: View {
                                 .textCase(.uppercase)
                                 .tracking(0.3)
                                 .foregroundStyle(Color.zifrGreen)
+                            Spacer()
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 12)
