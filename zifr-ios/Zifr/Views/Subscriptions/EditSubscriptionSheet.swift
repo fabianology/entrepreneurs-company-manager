@@ -13,6 +13,7 @@ struct EditSubscriptionSheet: View {
 
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
+    @State private var showSecurity = false
 
     // Sub-service HUD state — lifted here to avoid nested-sheet dismissal bug
     @State private var showSubServiceHUD = false
@@ -183,11 +184,14 @@ struct EditSubscriptionSheet: View {
                                 }
                             }
                         }
+                        // Thin divider
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(height: 1)
+                            .padding(.top, 4)
                     }
                     .padding(.vertical, 4)
-                } header: {
-                    SectionHeader(title: "Service Identity").padding(.bottom, 8)
-                }
+                } header: { EmptyView() }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
@@ -361,9 +365,7 @@ struct EditSubscriptionSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
                         .padding(.vertical, 4)
-                    } header: {
-                        SectionHeader(title: "Billing").padding(.bottom, 8)
-                    }
+                    } header: { EmptyView() }
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                     .listRowSeparator(.hidden)
@@ -373,50 +375,119 @@ struct EditSubscriptionSheet: View {
 
                 if detailLevel == "Detailed" {
                     // MARK: – Security & Recovery
-                    Section {
-                        Picker("Two-Factor Auth", selection: Binding(get: { sub.twoFactorAuth }, set: { sub.twoFactorAuth = $0 })) {
-                            ForEach(twoFAOptions, id: \.self) { opt in
-                                Text(opt).tag(opt)
+                    // Reveal button — shown only when section is hidden
+                    if !showSecurity {
+                        Section {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) { showSecurity = true }
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "lock.shield")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color.white.opacity(0.35))
+                                    Text("ADD SECURITY INFO")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.35))
+                                    Spacer()
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.25))
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(height: 36)
+                                .background(Color.white.opacity(0.04))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        } header: { EmptyView() }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                        .listRowSeparator(.hidden)
+                    }
+
+                    if showSecurity {
+                        Section {
+                        VStack(spacing: 0) {
+                            // Tappable collapse row
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) { showSecurity = false }
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                HStack {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.07))
+                                        .frame(height: 1)
+                                    Text("SECURITY")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.25))
+                                        .fixedSize()
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.2))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.bottom, 8)
+
+                            HStack(spacing: 12) {
+                                // 2FA Picker card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("2FA")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    Picker("", selection: Binding(get: { sub.twoFactorAuth }, set: { sub.twoFactorAuth = $0 })) {
+                                        ForEach(twoFAOptions, id: \.self) { opt in
+                                            Text(opt).tag(opt)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .padding(.leading, 6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#111111"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                }
+
+                                // Recovery TextField card
+                                ZifrField(
+                                    label: "RECOVERY",
+                                    placeholder: "Phone, email…",
+                                    text: Binding(get: { sub.recoveryMethod }, set: { sub.recoveryMethod = $0 })
+                                )
+                                .autocorrectionDisabled()
                             }
                         }
-                        .pickerStyle(.menu)
-                        LabeledContent("Recovery") {
-                            TextField("Phone, email…", text: Binding(get: { sub.recoveryMethod }, set: { sub.recoveryMethod = $0 }))
-                                .multilineTextAlignment(.trailing)
-                                .autocorrectionDisabled()
-                        }
-                    } header: {
-                        Text("Security & Recovery")
+                        } header: { EmptyView() }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                        .listRowSeparator(.hidden)
                     }
 
                     // MARK: – Notes
                     Section {
-                        ZStack(alignment: .topLeading) {
-                            // 3 ruled lines, each at 90 % of the row width
-                            Canvas { ctx, size in
-                                let rowH = size.height / 3
-                                for i in 1...3 {
-                                    let y = rowH * CGFloat(i) - 0.5
-                                    var path = Path()
-                                    path.move(to: CGPoint(x: size.width * 0.05, y: y))
-                                    path.addLine(to: CGPoint(x: size.width * 0.95, y: y))
-                                    ctx.stroke(path,
-                                               with: .color(.secondary.opacity(0.25)),
-                                               lineWidth: 0.5)
-                                }
-                            }
-                            .allowsHitTesting(false)
-
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("NOTES")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
                             TextField("Add a note…",
                                       text: Binding(get: { sub.notes }, set: { sub.notes = $0 }),
                                       axis: .vertical)
-                                .lineLimit(3)
-                                .font(.body)
+                                .lineLimit(3...6)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
-                        .frame(height: 84) // 3 rows × 28 pt
-                    } header: {
-                        Text("Notes")
-                    }
+                    } header: { EmptyView() }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
+                    .listRowSeparator(.hidden)
 
                     // MARK: – Supplemental Services
                     SubServicesSection(
@@ -469,7 +540,13 @@ struct EditSubscriptionSheet: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            .onAppear { initialFingerprint = currentFingerprint }
+            .listSectionSpacing(0)
+            .onAppear {
+                initialFingerprint = currentFingerprint
+                if sub.twoFactorAuth != "None" || !sub.recoveryMethod.isEmpty {
+                    showSecurity = true
+                }
+            }
             .navigationTitle(sub.name.isEmpty ? "New Service" : sub.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
