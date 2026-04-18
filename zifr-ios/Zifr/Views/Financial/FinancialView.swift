@@ -925,9 +925,8 @@ struct InstitutionAccountsSection: View {
 
     var body: some View {
         Section {
-            VStack(spacing: 12) {
-                Button { onAdd() } label: {
-                    HStack {
+            Button { onAdd() } label: {
+                HStack {
                         Spacer()
                         Text("🏦  Add Account")
                             .font(.body.weight(.semibold))
@@ -986,11 +985,11 @@ struct InstitutionAccountsSection: View {
                                 institution.accounts = accs
                             }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .tint(.red)
                     }
                 }
-            }
         } header: { EmptyView() }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
@@ -1007,9 +1006,8 @@ struct InstitutionCardsSection: View {
 
     var body: some View {
         Section {
-            VStack(spacing: 12) {
-                Button { onAdd() } label: {
-                    HStack {
+            Button { onAdd() } label: {
+                HStack {
                         Spacer()
                         Text("💳  Add Card")
                             .font(.body.weight(.semibold))
@@ -1071,11 +1069,11 @@ struct InstitutionCardsSection: View {
                         Button(role: .destructive) {
                             withAnimation { onDelete(card) }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .tint(.red)
                     }
                 }
-            }
         } header: { EmptyView() }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
@@ -1092,9 +1090,8 @@ struct InstitutionLoansSection: View {
 
     var body: some View {
         Section {
-            VStack(spacing: 12) {
-                Button { onAdd() } label: {
-                    HStack {
+            Button { onAdd() } label: {
+                HStack {
                         Spacer()
                         Text("💸  Add Loan")
                             .font(.body.weight(.semibold))
@@ -1147,11 +1144,11 @@ struct InstitutionLoansSection: View {
                         Button(role: .destructive) {
                             withAnimation { onDelete(loan) }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .tint(.red)
                     }
                 }
-            }
         } header: { EmptyView() }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))

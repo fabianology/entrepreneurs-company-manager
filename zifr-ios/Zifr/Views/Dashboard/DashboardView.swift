@@ -82,7 +82,7 @@ struct DashboardView: View {
                         Button(role: .destructive) {
                             companyToDelete = company
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
                         .tint(.red)
                     }

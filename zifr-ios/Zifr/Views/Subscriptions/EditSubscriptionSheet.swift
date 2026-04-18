@@ -683,10 +683,8 @@ struct SubServicesSection: View {
 
     var body: some View {
         Section {
-            VStack(spacing: 12) {
-                // Add button
-                Button { onAdd() } label: {
-                    HStack {
+            Button { onAdd() } label: {
+                HStack {
                         Spacer()
                         Text("💾  Add Supplemental Service")
                             .font(.body.weight(.semibold))
@@ -752,11 +750,11 @@ struct SubServicesSection: View {
                                 sub.subServices = services
                             }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .tint(.red)
                     }
                 }
-            }
         } header: { EmptyView() }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
@@ -944,10 +942,8 @@ struct LinkedEmailsSection: View {
 
     var body: some View {
         Section {
-            VStack(spacing: 12) {
-                // Add button
-                Button { onAdd() } label: {
-                    HStack {
+            Button { onAdd() } label: {
+                HStack {
                         Spacer()
                         Text("📨  Add Linked Email")
                             .font(.body.weight(.semibold))
@@ -1004,11 +1000,11 @@ struct LinkedEmailsSection: View {
                                 sub.linkedEmails = emails
                             }
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .tint(.red)
                     }
                 }
-            }
         } header: { EmptyView() }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
