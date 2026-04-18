@@ -5,6 +5,7 @@ import SwiftUI
 struct EditSubscriptionSheet: View {
     @Bindable var sub: Subscription
     let institutions: [Institution]
+    let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     let isNew: Bool
 
@@ -25,20 +26,32 @@ struct EditSubscriptionSheet: View {
     @State private var emailDraft = LinkedEmail()
     @State private var emailDraftIndex: Int? = nil
 
+    @State private var hasOpenedHUD = false
+    @State private var showPaymentPicker = false
+
     // User preference for form density
     @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
 
-    // Dirty-state tracking — fingerprint of initial values captured on appear
-    @State private var initialFingerprint = ""
+    struct Snapshot: Equatable {
+        var name, website, pricingModel, status, billingCycle, nextRenewal, paymentMethod, renew, loginId, password, twoFactorAuth, recoveryMethod, notes: String
+        var cost: Double
+    }
+    
+    @State private var snapshot: Snapshot?
 
-    private var currentFingerprint: String {
-        "\(sub.name)|\(sub.website)|\(sub.pricingModel)|\(sub.status)|\(sub.cost)|" +
-        "\(sub.billingCycle)|\(sub.nextRenewal)|\(sub.paymentMethod)|\(sub.renew)|" +
-        "\(sub.loginId)|\(sub.password)|\(sub.twoFactorAuth)|\(sub.recoveryMethod)|\(sub.notes)"
+    private var currentSnapshot: Snapshot {
+        Snapshot(
+            name: sub.name, website: sub.website, pricingModel: sub.pricingModel, status: sub.status,
+            billingCycle: sub.billingCycle, nextRenewal: sub.nextRenewal, paymentMethod: sub.paymentMethod,
+            renew: sub.renew, loginId: sub.loginId, password: sub.password,
+            twoFactorAuth: sub.twoFactorAuth, recoveryMethod: sub.recoveryMethod, notes: sub.notes,
+            cost: sub.cost
+        )
     }
 
     private var isDirty: Bool {
-        isNew || currentFingerprint != initialFingerprint
+        guard let snap = snapshot else { return isNew && !sub.name.isEmpty }
+        return snap != currentSnapshot
     }
 
     // Flat list of payable accounts from all passed institutions
@@ -331,36 +344,26 @@ struct EditSubscriptionSheet: View {
                                         Text("PAID FROM")
                                             .font(.system(size: 11, weight: .bold))
                                             .foregroundStyle(Color.white.opacity(0.5))
-                                        if payableAccounts.isEmpty {
-                                            TextField("Card or account", text: Binding(
-                                                get: { sub.paymentMethod },
-                                                set: { sub.paymentMethod = $0 }
-                                            ))
-                                            .autocorrectionDisabled()
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(.white)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 12)
-                                            .background(Color(hex: "#111111"))
-                                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                                        } else {
-                                            Picker("", selection: Binding(
-                                                get: { sub.paymentMethod },
-                                                set: { sub.paymentMethod = $0 }
-                                            )) {
-                                                Text("None").tag("")
-                                                ForEach(payableAccounts) { account in
-                                                    Text(account.name.isEmpty ? account.type : account.name)
-                                                        .tag(account.name.isEmpty ? account.type : account.name)
-                                                }
+                                        
+                                        Button {
+                                            showPaymentPicker = true
+                                        } label: {
+                                            HStack {
+                                                Text(sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod)
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundStyle(sub.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
+                                                    .lineLimit(1)
+                                                Spacer(minLength: 8)
+                                                Image(systemName: "chevron.right")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundStyle(Color.white.opacity(0.3))
                                             }
-                                            .labelsHidden()
-                                            .frame(maxWidth: .infinity, alignment: .leading)
                                             .padding(.horizontal, 16)
-                                            .padding(.vertical, 10)
+                                            .frame(height: 44)
                                             .background(Color(hex: "#111111"))
                                             .clipShape(RoundedRectangle(cornerRadius: 14))
                                         }
+                                        .buttonStyle(.borderless)
                                     }
                                 }
                             }
@@ -505,12 +508,14 @@ struct EditSubscriptionSheet: View {
                         onAdd: {
                             subDraft = SubService()
                             subDraftIndex = nil
+                            hasOpenedHUD = true
                             showSubServiceHUD = true
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         },
                         onEdit: { idx, service in
                             subDraft = service
                             subDraftIndex = idx
+                            hasOpenedHUD = true
                             showSubServiceHUD = true
                         }
                     )
@@ -521,12 +526,14 @@ struct EditSubscriptionSheet: View {
                         onAdd: {
                             emailDraft = LinkedEmail()
                             emailDraftIndex = nil
+                            hasOpenedHUD = true
                             showEmailHUD = true
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         },
                         onEdit: { idx, email in
                             emailDraft = email
                             emailDraftIndex = idx
+                            hasOpenedHUD = true
                             showEmailHUD = true
                         }
                     )
@@ -550,19 +557,52 @@ struct EditSubscriptionSheet: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
             .onAppear {
-                initialFingerprint = currentFingerprint
+                snapshot = currentSnapshot
                 if sub.twoFactorAuth != "None" || !sub.recoveryMethod.isEmpty {
                     showSecurity = true
                 }
             }
             .navigationTitle(sub.name.isEmpty ? "New Service" : sub.name)
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(isPresented: $showPaymentPicker) {
+                PaymentMethodPickerView(
+                    currentMethod: sub.paymentMethod,
+                    institutions: institutions,
+                    cards: cards,
+                    onSelect: { sub.paymentMethod = $0 }
+                )
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        if isNew { vm.deleteSub(sub, context: context) }
+                    Button(hasOpenedHUD ? "Close" : "Cancel") {
+                        if hasOpenedHUD {
+                            // If user opened a HUD, they might have added something, so do not delete or revert.
+                            dismiss()
+                            return
+                        }
+                        
+                        if isNew { 
+                            vm.deleteSub(sub, context: context) 
+                        } else if let snap = snapshot {
+                            sub.name = snap.name
+                            sub.website = snap.website
+                            sub.pricingModel = snap.pricingModel
+                            sub.status = snap.status
+                            sub.billingCycle = snap.billingCycle
+                            sub.nextRenewal = snap.nextRenewal
+                            sub.paymentMethod = snap.paymentMethod
+                            sub.renew = snap.renew
+                            sub.loginId = snap.loginId
+                            sub.password = snap.password
+                            sub.twoFactorAuth = snap.twoFactorAuth
+                            sub.recoveryMethod = snap.recoveryMethod
+                            sub.notes = snap.notes
+                            sub.cost = snap.cost
+                        }
                         dismiss()
                     }
                 }
@@ -650,11 +690,11 @@ struct SubServicesSection: View {
                         Spacer()
                         Text("💾  Add Supplemental Service")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#F7F6F2"))
+                    .background(Color(hex: "#222E2F"))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -911,11 +951,11 @@ struct LinkedEmailsSection: View {
                         Spacer()
                         Text("📨  Add Linked Email")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#F7F6F2"))
+                    .background(Color(hex: "#222E2F"))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -1092,5 +1132,271 @@ struct LinkedEmailHUD: View {
             }
             .onAppear { initialDraft = draft }
         }
+    }
+}
+
+// MARK: - Payment Method Picker View
+
+struct PaymentMethodPickerView: View {
+    let currentMethod: String
+    let institutions: [Institution]
+    let cards: [FinancialCard]
+    let onSelect: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var searchText = ""
+    @AppStorage("userCustomPaymentMethods") private var storedCustomMethods: String = ""
+
+    struct AccountDisplay: Identifiable {
+        let id = UUID()
+        let instName: String
+        let account: InstitutionAccount
+    }
+
+    var accountDisplays: [AccountDisplay] {
+        institutions.flatMap { inst in
+            inst.accounts.map { AccountDisplay(instName: inst.name, account: $0) }
+        }
+    }
+
+    var filteredAccounts: [AccountDisplay] {
+        if searchText.isEmpty { return accountDisplays }
+        return accountDisplays.filter { ($0.account.name + $0.account.type + $0.account.last4 + $0.instName).localizedCaseInsensitiveContains(searchText) }
+    }
+
+    var filteredCards: [FinancialCard] {
+        if searchText.isEmpty { return cards }
+        return cards.filter { ($0.name + $0.type + $0.last4 + $0.institutionName).localizedCaseInsensitiveContains(searchText) }
+    }
+    
+    var allCustomMethods: [String] {
+        let stored = storedCustomMethods.split(separator: ",").map(String.init)
+        let predefinedAccounts = Set(accountDisplays.map { $0.account.name.isEmpty ? $0.account.type : $0.account.name })
+        let predefinedCards = Set(cards.map(\.name))
+        let allPredefined = predefinedAccounts.union(predefinedCards)
+        
+        return Array(Set(stored).subtracting(allPredefined)).sorted()
+    }
+    
+    var filteredCustomMethods: [String] {
+        if searchText.isEmpty { return allCustomMethods }
+        return allCustomMethods.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    var exactMatchExists: Bool {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if q.isEmpty { return true }
+        if accountDisplays.contains(where: { ($0.account.name.isEmpty ? $0.account.type : $0.account.name).lowercased() == q }) { return true }
+        if cards.contains(where: { $0.name.lowercased() == q }) { return true }
+        if allCustomMethods.contains(where: { $0.lowercased() == q }) { return true }
+        return false
+    }
+
+    private func selectCustom(_ method: String) {
+        if !method.isEmpty {
+            var methods = storedCustomMethods.split(separator: ",").map(String.init)
+            if !methods.contains(method) {
+                methods.append(method)
+                storedCustomMethods = methods.joined(separator: ",")
+            }
+        }
+        onSelect(method)
+        dismiss()
+    }
+
+    private func selectStandard(_ method: String) {
+        onSelect(method)
+        dismiss()
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    selectStandard("")
+                } label: {
+                    HStack {
+                        Text("None")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        Spacer()
+                        if currentMethod.isEmpty {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.zifrGreen)
+                        }
+                    }
+                }
+                .listRowBackground(Color(hex: "#111111"))
+            }
+
+            if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !exactMatchExists {
+                Section {
+                    Button {
+                        selectCustom(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+                    } label: {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color(hex: "#2070BD").opacity(0.15))
+                                    .frame(width: 32, height: 32)
+                                Image(systemName: "plus")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(Color(hex: "#2070BD"))
+                            }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Use \"\(searchText)\"")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Text("Add as custom entry")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                            }
+                        }
+                    }
+                    .listRowBackground(Color(hex: "#111111"))
+                }
+            }
+            
+            if !filteredCustomMethods.isEmpty {
+                Section("Custom Entries") {
+                    ForEach(filteredCustomMethods, id: \.self) { customMethod in
+                        Button {
+                            selectCustom(customMethod)
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.white.opacity(0.05))
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: "text.quote")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                Text(customMethod)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                if currentMethod == customMethod {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.zifrGreen)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color(hex: "#111111"))
+                    }
+                }
+            }
+            
+            if !filteredAccounts.isEmpty {
+                Section("Bank Accounts") {
+                    ForEach(filteredAccounts) { display in
+                        let acc = display.account
+                        let name = acc.name.isEmpty ? acc.type : acc.name
+                        Button {
+                            selectStandard(name)
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.white.opacity(0.05))
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: "building.columns.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text(name)
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundStyle(.white)
+                                        if !acc.last4.isEmpty {
+                                            Text("•• \(acc.last4)")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.5))
+                                        }
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text(display.instName)
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        Text("•")
+                                            .foregroundStyle(Color.white.opacity(0.2))
+                                        Text(acc.type)
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .font(.system(size: 12))
+                                }
+                                Spacer()
+                                if currentMethod == name {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.zifrGreen)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color(hex: "#111111"))
+                    }
+                }
+            }
+            
+            if !filteredCards.isEmpty {
+                Section("Cards") {
+                    ForEach(filteredCards) { card in
+                        Button {
+                            selectStandard(card.name)
+                        } label: {
+                            HStack(spacing: 12) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color.white.opacity(0.05))
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: "creditcard.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(spacing: 6) {
+                                        Text(card.name)
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundStyle(.white)
+                                        if !card.last4.isEmpty {
+                                            Text("•• \(card.last4)")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.5))
+                                        }
+                                    }
+                                    HStack(spacing: 4) {
+                                        Text(card.institutionName)
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        Text("•")
+                                            .foregroundStyle(Color.white.opacity(0.2))
+                                        Text(card.type)
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        Text("•")
+                                            .foregroundStyle(Color.white.opacity(0.2))
+                                        Text(card.cardHolderType)
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .font(.system(size: 12))
+                                }
+                                Spacer()
+                                if currentMethod == card.name {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.zifrGreen)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color(hex: "#111111"))
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color(hex: "#171717"))
+        .navigationTitle("Paid From")
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search or enter custom")
     }
 }

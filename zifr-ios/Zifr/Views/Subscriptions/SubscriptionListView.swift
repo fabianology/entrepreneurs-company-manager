@@ -4,11 +4,14 @@ struct SubscriptionListView: View {
     let company: Company
     let subscriptions: [Subscription]
     let institutions: [Institution]
+    let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     @Environment(\.modelContext) private var context
 
     @State private var editingSub: Subscription? = nil
     @State private var newSub: Subscription? = nil
+
+
 
     var body: some View {
         ScrollView {
@@ -23,15 +26,15 @@ struct SubscriptionListView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
                             Text("SERVICE")
                                 .font(.system(size: 12, weight: .heavy))
                                 .tracking(1)
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
-                        .background(Color.white)
+                        .background(Color(hex: "#222E2F"))
                         .clipShape(Capsule())
                     }
                 }
@@ -52,10 +55,10 @@ struct SubscriptionListView: View {
         }
         .scrollIndicators(.hidden)
         .sheet(item: $editingSub) { sub in
-            EditSubscriptionSheet(sub: sub, institutions: institutions, vm: vm, isNew: false)
+            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
         }
         .sheet(item: $newSub) { sub in
-            EditSubscriptionSheet(sub: sub, institutions: institutions, vm: vm, isNew: true)
+            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
         }
     }
 
@@ -75,7 +78,7 @@ struct SubscriptionListView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)
-            .background(Color(hex: "#1C1C1E").opacity(0.5))
+            .background(Color(hex: "#171717").opacity(0.5))
             .clipShape(RoundedRectangle(cornerRadius: 32))
             .overlay(
                 RoundedRectangle(cornerRadius: 32)
@@ -352,8 +355,8 @@ struct SubscriptionCardView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        // ── Card container: #1C1C1E + border 5% ─────────────────────────
-        .background(Color(hex: "#1C1C1E"))
+        // ── Card container: #171717 + border 5% ─────────────────────────
+        .background(Color(hex: "#171717"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
             RoundedRectangle(cornerRadius: 24)

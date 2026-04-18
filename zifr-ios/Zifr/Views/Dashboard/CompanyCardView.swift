@@ -60,9 +60,9 @@ struct CompanyCardView: View {
 
                 // Icon shortcuts (right) — exact CiFr: blue/green/amber
                 HStack(spacing: 0) {
-                    shortcutBtn(icon: "square.3.layers.3d", color: Color(hex: "#60A5FA"), action: onViewSubscriptions)
-                    shortcutBtn(icon: "creditcard", color: Color(hex: "#22c55e"), action: onViewFinancials)
-                    shortcutBtn(icon: "doc.text", color: Color(hex: "#FBBF24"), action: onViewDocuments)
+                    shortcutBtn(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), action: onViewSubscriptions)
+                    shortcutBtn(icon: "creditcard", color: Color(hex: "#1A7077"), action: onViewFinancials)
+                    shortcutBtn(icon: "doc.text", color: Color(hex: "#918457"), action: onViewDocuments)
                 }
                 .background(Color.black.opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -79,7 +79,7 @@ struct CompanyCardView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 24)
-                .fill(Color(hex: "#1C1C1E"))
+                .fill(Color(hex: "#171717"))
                 .overlay(
                     RoundedRectangle(cornerRadius: 24)
                         .stroke(Color.white.opacity(0.05), lineWidth: 1)

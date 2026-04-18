@@ -106,8 +106,8 @@ struct EditCompanySheet: View {
                                             .font(.system(size: 12, weight: .bold))
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(structure == s ? Color.white : Color.white.opacity(0.06))
-                                            .foregroundStyle(structure == s ? Color.black : Color.white.opacity(0.6))
+                                            .background(structure == s ? Color(hex: "#222E2F") : Color.white.opacity(0.06))
+                                            .foregroundStyle(structure == s ? Color(hex: "#A2A2A2") : Color.white.opacity(0.6))
                                             .clipShape(Capsule())
                                     }
                                 }
@@ -151,13 +151,13 @@ struct EditCompanySheet: View {
                                 .padding(.leading, 4)
                             
                             HStack(spacing: 12) {
-                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#60A5FA"), text: "Subscriptions") {
+                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), text: "Subscriptions") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .subscriptions; dismiss() }
                                 }
-                                navButton(icon: "creditcard", color: Color(hex: "#22c55e"), text: "Financials") {
+                                navButton(icon: "creditcard", color: Color(hex: "#1A7077"), text: "Financials") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .financial; dismiss() }
                                 }
-                                navButton(icon: "doc.text", color: Color(hex: "#FBBF24"), text: "Docs") {
+                                navButton(icon: "doc.text", color: Color(hex: "#918457"), text: "Docs") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .documents; dismiss() }
                                 }
                             }
@@ -308,7 +308,7 @@ struct EditCompanySheet: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color(hex: "#1C1C1E"))
+            .background(Color(hex: "#171717"))
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)

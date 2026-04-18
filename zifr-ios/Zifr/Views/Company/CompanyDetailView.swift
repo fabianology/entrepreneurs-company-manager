@@ -44,7 +44,7 @@ struct CompanyDetailView: View {
             Group {
                 switch vm.activeTab {
                 case .subscriptions:
-                    SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, vm: vm)
+                    SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
                 case .financial:
                     FinancialView(company: company, cards: cards, institutions: institutions, loans: loans, vm: vm)
                 case .documents:
@@ -266,9 +266,9 @@ struct CompanyDetailView: View {
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
         switch tab {
-        case .subscriptions: return Color(hex: "#60A5FA")
-        case .financial:     return Color(hex: "#22c55e")
-        case .documents:     return Color(hex: "#FBBF24")
+        case .subscriptions: return Color(hex: "#2070BD")
+        case .financial:     return Color(hex: "#1A7077")
+        case .documents:     return Color(hex: "#918457")
         }
     }
 }

@@ -28,15 +28,15 @@ struct DocumentListView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "plus")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
                             Text("DOCUMENT")
                                 .font(.system(size: 12, weight: .heavy))
                                 .tracking(1)
-                                .foregroundStyle(.black)
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
-                        .background(Color.white)
+                        .background(Color(hex: "#222E2F"))
                         .clipShape(Capsule())
                     }
                 }
@@ -168,6 +168,21 @@ struct EditDocumentSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
+    
+    struct Snapshot: Equatable {
+        var name, type, url, uploadDate, notes: String
+    }
+    
+    @State private var snapshot: Snapshot?
+
+    private var currentSnapshot: Snapshot {
+        Snapshot(name: doc.name, type: doc.type, url: doc.url, uploadDate: doc.uploadDate, notes: doc.notes)
+    }
+
+    private var isDirty: Bool {
+        guard let snap = snapshot else { return isNew && !doc.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        return snap != currentSnapshot
+    }
 
     var body: some View {
         NavigationStack {
@@ -210,17 +225,32 @@ struct EditDocumentSheet: View {
                 }
                 .padding(20).padding(.bottom, 40)
             }
-            .background(Color(hex: "#1C1C1E"))
+            .background(Color(hex: "#171717"))
             .navigationTitle(isNew ? "New Document" : "Edit Document")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                snapshot = currentSnapshot
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { if isNew { vm.deleteDoc(doc, context: context) }; dismiss() }
-                        .foregroundStyle(Color.white.opacity(0.5))
+                    Button("Cancel") { 
+                        if isNew { 
+                            vm.deleteDoc(doc, context: context) 
+                        } else if let snap = snapshot {
+                            doc.name = snap.name
+                            doc.type = snap.type
+                            doc.url = snap.url
+                            doc.uploadDate = snap.uploadDate
+                            doc.notes = snap.notes
+                        }
+                        dismiss() 
+                    }
+                    .foregroundStyle(Color.white.opacity(0.5))
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { vm.saveDoc(doc, context: context); dismiss() }
-                        .font(.system(size: 15, weight: .black)).foregroundStyle(.white)
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundStyle(isDirty ? Color.green : .white)
                 }
             }
             .interactiveDismissDisabled(isNew)

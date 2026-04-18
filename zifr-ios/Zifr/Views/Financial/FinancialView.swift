@@ -33,12 +33,12 @@ struct FinancialView: View {
                         newInst = vm.addInstitution(context: context, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.black.opacity(0.5))
-                            Text("Institution").font(.system(size: 13, weight: .semibold)).foregroundStyle(.black)
+                            Image(systemName: "plus").font(.system(size: 14, weight: .bold)).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("Institution").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color(hex: "#A2A2A2"))
                         }
                         .padding(.horizontal, 18)
                         .frame(height: 36)
-                        .background(Color.white)
+                        .background(Color(hex: "#222E2F"))
                         .clipShape(Capsule())
                     }
                 }
@@ -60,7 +60,7 @@ struct FinancialView: View {
                                     .foregroundStyle(Color.white.opacity(0.5))
                             }
                             .frame(width: 300, height: 200)
-                            .background(Color(hex: "#1C1C1E").opacity(0.5))
+                            .background(Color(hex: "#171717").opacity(0.5))
                             .clipShape(RoundedRectangle(cornerRadius: 28))
                             .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [6])))
                         }
@@ -120,7 +120,7 @@ struct FinancialView: View {
             }
             .padding(.horizontal, 18)
             .frame(height: 36)
-            .background(Color(hex: "#1C1C1E"))
+            .background(Color(hex: "#171717"))
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
@@ -387,7 +387,7 @@ struct InstitutionCardView: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .background(Color(hex: "#1C1C1E"))
+        .background(Color(hex: "#171717"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
     }
@@ -658,6 +658,20 @@ struct EditInstitutionSheet: View {
 
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
+    
+    struct Snapshot: Equatable {
+        var name, loginUrl, username, email, password: String
+    }
+    @State private var snapshot: Snapshot?
+
+    private var currentSnapshot: Snapshot {
+        Snapshot(name: institution.name, loginUrl: institution.loginUrl, username: institution.username, email: institution.email, password: institution.password)
+    }
+
+    private var isDirty: Bool {
+        guard let snap = snapshot else { return isNew && !institution.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        return snap != currentSnapshot
+    }
 
     private var instCards: [FinancialCard] {
         cards.filter { $0.institutionName.lowercased() == institution.name.lowercased() && !institution.name.isEmpty }
@@ -675,6 +689,8 @@ struct EditInstitutionSheet: View {
 
     @State private var showLoanHUD = false
     @State private var loanDraft: Loan? = nil
+
+    @State private var hasOpenedHUD = false
 
     var body: some View {
         NavigationStack {
@@ -748,12 +764,14 @@ struct EditInstitutionSheet: View {
                     onAdd: {
                         accountDraft = InstitutionAccount()
                         accountDraftIndex = nil
+                        hasOpenedHUD = true
                         showAccountHUD = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     },
                     onEdit: { idx, acc in
                         accountDraft = acc
                         accountDraftIndex = idx
+                        hasOpenedHUD = true
                         showAccountHUD = true
                     }
                 )
@@ -764,11 +782,13 @@ struct EditInstitutionSheet: View {
                     onAdd: {
                         cardDraft = vm.addCard(context: context, companyId: institution.companyId)
                         cardDraft?.institutionName = institution.name 
+                        hasOpenedHUD = true
                         showCardHUD = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     },
                     onEdit: { card in
                         cardDraft = card
+                        hasOpenedHUD = true
                         showCardHUD = true
                     },
                     onDelete: { card in
@@ -782,11 +802,13 @@ struct EditInstitutionSheet: View {
                     onAdd: {
                         loanDraft = vm.addLoan(context: context, companyId: institution.companyId)
                         loanDraft?.lender = institution.name 
+                        hasOpenedHUD = true
                         showLoanHUD = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     },
                     onEdit: { loan in
                         loanDraft = loan
+                        hasOpenedHUD = true
                         showLoanHUD = true
                     },
                     onDelete: { loan in
@@ -812,13 +834,31 @@ struct EditInstitutionSheet: View {
 
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
+            .onAppear {
+                snapshot = currentSnapshot
+            }
             .navigationTitle(institution.name.isEmpty ? "New Bank" : institution.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        if isNew { vm.deleteInstitution(institution, context: context) }
+                    Button(hasOpenedHUD ? "Close" : "Cancel") {
+                        if hasOpenedHUD {
+                            dismiss()
+                            return
+                        }
+                        
+                        if isNew { 
+                            vm.deleteInstitution(institution, context: context) 
+                        } else if let snap = snapshot {
+                            institution.name = snap.name
+                            institution.loginUrl = snap.loginUrl
+                            institution.username = snap.username
+                            institution.email = snap.email
+                            institution.password = snap.password
+                        }
                         dismiss()
                     }
                 }
@@ -828,6 +868,7 @@ struct EditInstitutionSheet: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .tint(isDirty ? .green : nil)
                 }
             }
             .confirmationDialog(
@@ -890,11 +931,11 @@ struct InstitutionAccountsSection: View {
                         Spacer()
                         Text("🏦  Add Account")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#F7F6F2"))
+                    .background(Color(hex: "#222E2F"))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -972,11 +1013,11 @@ struct InstitutionCardsSection: View {
                         Spacer()
                         Text("💳  Add Card")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#F7F6F2"))
+                    .background(Color(hex: "#222E2F"))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -1057,11 +1098,11 @@ struct InstitutionLoansSection: View {
                         Spacer()
                         Text("💸  Add Loan")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#1A1A1A"))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#F7F6F2"))
+                    .background(Color(hex: "#222E2F"))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -1124,6 +1165,16 @@ struct InstitutionAccountHUD: View {
     let isNew: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
+    
+    @State private var initialDraft: InstitutionAccount? = nil
+    
+    private var isDirty: Bool {
+        guard let initial = initialDraft else { return isNew && !draft.name.isEmpty }
+        return draft.name != initial.name ||
+               draft.last4 != initial.last4 ||
+               draft.type != initial.type ||
+               draft.balance != initial.balance
+    }
 
     var body: some View {
         NavigationStack {
@@ -1191,16 +1242,23 @@ struct InstitutionAccountHUD: View {
                 .listRowSeparator(.hidden)
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
             .navigationTitle(isNew ? "Add Account" : "Edit Account")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                initialDraft = draft
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save", action: onSave)
+                    Button(isNew ? "Add" : "Save", action: onSave)
                         .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
+                        .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
@@ -1215,6 +1273,21 @@ struct EditCardSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
+    
+    struct Snapshot: Equatable {
+        var name, last4, type, autopay, cardHolder, cardHolderType, status, expiry: String
+        var balance, limit, moPayment: Double
+    }
+    @State private var snapshot: Snapshot?
+
+    private var currentSnapshot: Snapshot {
+        Snapshot(name: card.name, last4: card.last4, type: card.type, autopay: card.autopay, cardHolder: card.cardHolder, cardHolderType: card.cardHolderType, status: card.status, expiry: card.expiry, balance: card.balance, limit: card.limit, moPayment: card.moPayment)
+    }
+
+    private var isDirty: Bool {
+        guard let snap = snapshot else { return isNew && !card.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        return snap != currentSnapshot
+    }
 
     var body: some View {
         NavigationStack {
@@ -1319,13 +1392,32 @@ struct EditCardSheet: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
+            .onAppear {
+                snapshot = currentSnapshot
+            }
             .navigationTitle(isNew ? "New Card" : card.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if isNew { vm.deleteCard(card, context: context) }
+                        if isNew { 
+                            vm.deleteCard(card, context: context) 
+                        } else if let snap = snapshot {
+                            card.name = snap.name
+                            card.last4 = snap.last4
+                            card.type = snap.type
+                            card.autopay = snap.autopay
+                            card.cardHolder = snap.cardHolder
+                            card.cardHolderType = snap.cardHolderType
+                            card.status = snap.status
+                            card.expiry = snap.expiry
+                            card.balance = snap.balance
+                            card.limit = snap.limit
+                            card.moPayment = snap.moPayment
+                        }
                         dismiss()
                     }
                 }
@@ -1335,6 +1427,7 @@ struct EditCardSheet: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .tint(isDirty ? .green : nil)
                 }
             }
             .confirmationDialog("Delete Card?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
@@ -1399,6 +1492,21 @@ struct EditLoanSheet: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
+    
+    struct Snapshot: Equatable {
+        var name, lender, term, startDate, role, status: String
+        var principalAmount, remainingBalance, monthlyPayment, interestRate: Double
+    }
+    @State private var snapshot: Snapshot?
+
+    private var currentSnapshot: Snapshot {
+        Snapshot(name: loan.name, lender: loan.lender, term: loan.term, startDate: loan.startDate, role: loan.role, status: loan.status, principalAmount: loan.principalAmount, remainingBalance: loan.remainingBalance, monthlyPayment: loan.monthlyPayment, interestRate: loan.interestRate)
+    }
+
+    private var isDirty: Bool {
+        guard let snap = snapshot else { return isNew && !loan.name.trimmingCharacters(in: .whitespaces).isEmpty }
+        return snap != currentSnapshot
+    }
 
     var body: some View {
         NavigationStack {
@@ -1472,13 +1580,31 @@ struct EditLoanSheet: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
+            .onAppear {
+                snapshot = currentSnapshot
+            }
             .navigationTitle(isNew ? "New Loan" : loan.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if isNew { vm.deleteLoan(loan, context: context) }
+                        if isNew { 
+                            vm.deleteLoan(loan, context: context) 
+                        } else if let snap = snapshot {
+                            loan.name = snap.name
+                            loan.lender = snap.lender
+                            loan.term = snap.term
+                            loan.startDate = snap.startDate
+                            loan.role = snap.role
+                            loan.status = snap.status
+                            loan.principalAmount = snap.principalAmount
+                            loan.remainingBalance = snap.remainingBalance
+                            loan.monthlyPayment = snap.monthlyPayment
+                            loan.interestRate = snap.interestRate
+                        }
                         dismiss()
                     }
                 }
@@ -1488,6 +1614,7 @@ struct EditLoanSheet: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .tint(isDirty ? .green : nil)
                 }
             }
             .confirmationDialog("Delete Loan?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
