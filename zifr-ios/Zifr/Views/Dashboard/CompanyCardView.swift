@@ -59,18 +59,20 @@ struct CompanyCardView: View {
                 Spacer()
 
                 // Icon shortcuts (right) — exact CiFr: blue/green/amber
-                HStack(spacing: 0) {
+                HStack(spacing: 4) {
                     shortcutBtn(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), action: onViewSubscriptions)
                     shortcutBtn(icon: "creditcard", color: Color(hex: "#1A7077"), action: onViewFinancials)
                     shortcutBtn(icon: "doc.text", color: Color(hex: "#918457"), action: onViewDocuments)
                 }
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
                 .background(Color.black.opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 10)
             .overlay(alignment: .top) {
                 Rectangle()
                     .fill(Color.white.opacity(0.05))
@@ -108,9 +110,9 @@ struct CompanyCardView: View {
             action()
         }) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .regular))
+                .font(.system(size: 24, weight: .regular))
                 .foregroundStyle(color)
-                .frame(width: 44, height: 44)
+                .frame(width: 48, height: 48)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
