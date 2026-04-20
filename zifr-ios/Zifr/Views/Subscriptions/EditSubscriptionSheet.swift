@@ -103,18 +103,152 @@ struct EditSubscriptionSheet: View {
             get: {
                 switch detailLevel {
                 case "Essentials": return 0.0
-                case "Less Detail": return 1.0
-                default: return 2.0
+                default: return 1.0
                 }
             },
             set: { val in
-                let newState = val < 0.5 ? "Essentials" : (val < 1.5 ? "Less Detail" : "Detailed")
+                let newState = val < 0.5 ? "Essentials" : "Detailed"
                 if newState != detailLevel {
                     UISelectionFeedbackGenerator().selectionChanged()
                     detailLevel = newState
                 }
             }
         )
+    }
+
+
+
+
+    private var costCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("COST")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            HStack(spacing: 4) {
+                Text("$")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                DoubleField(placeholder: "0.00", value: Binding(
+                    get: { sub.cost },
+                    set: { (val: Double) in sub.cost = val }
+                ))
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 44)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+    }
+
+    private var autoPayCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("AUTO PAY")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            HStack {
+                Text(autoPayBinding.wrappedValue ? "Enabled" : "Manual")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.white)
+                Spacer()
+                Toggle("", isOn: autoPayBinding)
+                    .labelsHidden()
+                    .tint(.green)
+                    .scaleEffect(0.8)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+    }
+
+    private var billingCycleCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("BILLING CYCLE")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            Picker("Cycle", selection: Binding(
+                get: { sub.billingCycle },
+                set: { (newCycle: String) in
+                    if newCycle != sub.billingCycle {
+                        sub.nextRenewal = newCycle == "Monthly" ? "1" : ""
+                    }
+                    sub.billingCycle = newCycle
+                }
+            )) {
+                Text("Monthly").tag("Monthly")
+                Text("Yearly").tag("Yearly")
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+
+    @ViewBuilder
+    private var renewalCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("RENEWS ON")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            if sub.billingCycle == "Monthly" {
+                Picker("", selection: dayBinding) {
+                    ForEach(1...31, id: \.self) { day in
+                        Text(ordinal(day)).tag(day)
+                }
+                }
+                .labelsHidden()
+                .padding(.leading, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 44)
+                .background(Color(hex: "#111111"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            } else {
+                DatePicker("", selection: renewalDateBinding, displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                    .padding(.leading, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(height: 44)
+                    .background(Color(hex: "#111111"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+        }
+    }
+
+    private var paidFromCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("PAID FROM")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            
+            Button {
+                showPaymentPicker = true
+            } label: {
+                HStack {
+                    Text(sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(sub.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .background(Color(hex: "#111111"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+            .buttonStyle(.borderless)
+        }
     }
 
     var body: some View {
@@ -129,18 +263,23 @@ struct EditSubscriptionSheet: View {
                     }
                     .pickerStyle(.segmented)
                     
-                    Slider(value: detailSliderBinding, in: 0...2, step: 1) {
+                    Slider(value: detailSliderBinding, in: 0...1, step: 1) {
                         Text("Detail Level")
                     } minimumValueLabel: {
-                        Image(systemName: "line.3.horizontal.decrease")
-                            .foregroundStyle(Color.white.opacity(0.3))
-                            .font(.system(size: 13, weight: .bold))
+                        Text("ESSENTIALS")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.2)) // Darker font
                     } maximumValueLabel: {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(Color.white.opacity(0.3))
-                            .font(.system(size: 13, weight: .bold))
+                        Text("ALL DATA")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.2)) // Darker font
                     }
-                    .tint(.black)
+                    .onAppear {
+                        // Liquid glass effect for thumb
+                        UISlider.appearance().thumbTintColor = UIColor(white: 1.0, alpha: 0.15)
+                        UISlider.appearance().minimumTrackTintColor = .black
+                        UISlider.appearance().maximumTrackTintColor = .black
+                    }
                 }
                 .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                 .listRowBackground(Color.clear)
@@ -148,14 +287,13 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Identity
                 Section {
                      VStack(spacing: 16) {
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "SERVICE NAME",
-                                placeholder: "e.g. Shopify",
-                                text: Binding(get: { sub.name }, set: { sub.name = $0 })
-                            )
-                            
-                            if detailLevel != "Essentials" {
+                        if detailLevel != "Essentials" {
+                            HStack(spacing: 12) {
+                                ZifrField(
+                                    label: "SERVICE NAME",
+                                    placeholder: "e.g. Shopify",
+                                    text: Binding(get: { sub.name }, set: { sub.name = $0 })
+                                )
                                 ZifrField(
                                     label: "WEBSITE",
                                     placeholder: "shopify.com",
@@ -166,217 +304,105 @@ struct EditSubscriptionSheet: View {
                             }
                         }
                         
-                        if detailLevel != "Essentials" {
-                            HStack(spacing: 12) {
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "LOGIN ID",
+                                placeholder: "username or email",
+                                text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 })
+                            )
+                            .textInputAutocapitalization(.never)
+                            
+                            ZStack(alignment: .bottomTrailing) {
                                 ZifrField(
-                                    label: "LOGIN ID",
-                                    placeholder: "username or email",
-                                    text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 })
+                                    label: "PASSWORD",
+                                    placeholder: "••••••••",
+                                    text: Binding(get: { sub.password }, set: { sub.password = $0 }),
+                                    isSecure: !showPassword
                                 )
                                 .textInputAutocapitalization(.never)
                                 
-                                ZStack(alignment: .bottomTrailing) {
-                                    ZifrField(
-                                        label: "PASSWORD",
-                                        placeholder: "••••••••",
-                                        text: Binding(get: { sub.password }, set: { sub.password = $0 }),
-                                        isSecure: !showPassword
-                                    )
-                                    .textInputAutocapitalization(.never)
-                                    
-                                    Button {
-                                        showPassword.toggle()
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    } label: {
-                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                            .padding()
-                                    }
-                                    .padding(.bottom, 2)
+                                Button {
+                                    showPassword.toggle()
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                } label: {
+                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                        .padding()
                                 }
+                                .padding(.bottom, 2)
                             }
                         }
 
                         // Status — inline single row (below login)
-                        HStack(spacing: 12) {
-                            Text("STATUS")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            StatusDot(isGreen: sub.status == "Active")
-                            Text(sub.status == "Active" ? "Active" : "Paused")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
-                            Spacer()
-                            Toggle("", isOn: Binding(
-                                get: { sub.status == "Active" },
-                                set: { sub.status = $0 ? "Active" : "Paused" }
-                            ))
-                            .labelsHidden()
-                            .tint(.green)
-                            .scaleEffect(0.8)
+                        if detailLevel != "Essentials" {
+                            HStack(spacing: 12) {
+                                Text("STATUS")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                StatusDot(isGreen: sub.status == "Active")
+                                Text(sub.status == "Active" ? "Active" : "Paused")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Toggle("", isOn: Binding(
+                                    get: { sub.status == "Active" },
+                                    set: { sub.status = $0 ? "Active" : "Paused" }
+                                ))
+                                .labelsHidden()
+                                .tint(.green)
+                                .scaleEffect(0.8)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                        // Thin divider
-                        Rectangle()
-                            .fill(Color.white.opacity(0.07))
-                            .frame(height: 1)
-                            .padding(.top, 4)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, detailLevel == "Essentials" ? 2 : 4)
                 } header: { EmptyView() }
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 4 : 8, leading: 20, bottom: detailLevel == "Essentials" ? 4 : 8, trailing: 20))
                 .listRowSeparator(.hidden)
 
                 // MARK: – Billing (Paid only)
                 if !sub.isFree {
                     Section {
-                        VStack(spacing: 16) {
-
-                            // Row 1: Cost + Auto Pay
-                            HStack(spacing: 12) {
-                                // Cost card
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("COST")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    HStack(spacing: 4) {
-                                        Text("$")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                        DoubleField(placeholder: "0.00", value: Binding(
-                                            get: { sub.cost },
-                                            set: { sub.cost = $0 }
-                                        ))
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .frame(height: 44)
-                                    .background(Color(hex: "#111111"))
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                                }
-
-                                // Auto Pay card
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("AUTO PAY")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    HStack {
-                                        Text(autoPayBinding.wrappedValue ? "Enabled" : "Manual")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(autoPayBinding.wrappedValue ? Color.green : Color.white)
-                                        Spacer()
-                                        Toggle("", isOn: autoPayBinding)
-                                            .labelsHidden()
-                                            .tint(.green)
-                                            .scaleEffect(0.8)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .background(Color(hex: "#111111"))
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                                }
-                            }
-
-                            // Row 2: Billing Cycle — styled segmented control card
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("BILLING CYCLE")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                Picker("Cycle", selection: Binding(
-                                    get: { sub.billingCycle },
-                                    set: { newCycle in
-                                        if newCycle != sub.billingCycle {
-                                            sub.nextRenewal = newCycle == "Monthly" ? "1" : ""
-                                        }
-                                        sub.billingCycle = newCycle
-                                    }
-                                )) {
-                                    Text("Monthly").tag("Monthly")
-                                    Text("Yearly").tag("Yearly")
-                                }
-                                .pickerStyle(.segmented)
-                            }
-
-                            // Row 3: Renewal + Paid From (detail levels only)
-                            if detailLevel != "Essentials" {
-                                HStack(spacing: 12) {
-                                    // Renewal card
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("RENEWS ON")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                        if sub.billingCycle == "Monthly" {
-                                            Picker("", selection: dayBinding) {
-                                                ForEach(1...31, id: \.self) { day in
-                                                    Text(ordinal(day)).tag(day)
-                                                }
-                                            }
-                                            .labelsHidden()
-                                            .padding(.leading, 6)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .frame(height: 44)
-                                            .background(Color(hex: "#111111"))
-                                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                                        } else {
-                                            DatePicker("", selection: renewalDateBinding, displayedComponents: .date)
-                                                .labelsHidden()
-                                                .datePickerStyle(.compact)
-                                                .padding(.leading, 10)
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                                .frame(height: 44)
-                                                .background(Color(hex: "#111111"))
-                                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                        }
-                                    }
-
-                                    // Paid From card
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("PAID FROM")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                        
-                                        Button {
-                                            showPaymentPicker = true
-                                        } label: {
-                                            HStack {
-                                                Text(sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod)
-                                                    .font(.system(size: 14, weight: .bold))
-                                                    .foregroundStyle(sub.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
-                                                    .lineLimit(1)
-                                                Spacer(minLength: 8)
-                                                Image(systemName: "chevron.right")
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundStyle(Color.white.opacity(0.3))
-                                            }
-                                            .padding(.horizontal, 16)
-                                            .frame(height: 44)
-                                            .background(Color(hex: "#111111"))
-                                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                                        }
-                                        .buttonStyle(.borderless)
-                                    }
-                                }
-                            }
-
-                        }
-                        .padding(.vertical, 4)
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(height: 1)
                     } header: { EmptyView() }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 2.5 : 5, leading: 20, bottom: detailLevel == "Essentials" ? 2.5 : 5, trailing: 20))
+                    .listRowSeparator(.hidden)
+                    Section {
+                        VStack(spacing: detailLevel == "Essentials" ? 8 : 16) {
+                            if detailLevel == "Essentials" {
+                                HStack(spacing: 12) {
+                                    costCard
+                                    paidFromCard
+                                }
+                            } else {
+                                HStack(spacing: 12) {
+                                    costCard
+                                    autoPayCard
+                                }
+                                billingCycleCard
+                                HStack(spacing: 12) {
+                                    renewalCard
+                                    paidFromCard
+                                }
+                            }
+                        }
+                        .padding(.vertical, detailLevel == "Essentials" ? 2 : 4)
+                    } header: { EmptyView() }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 4 : 8, leading: 20, bottom: detailLevel == "Essentials" ? 4 : 8, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
 
-                if detailLevel == "Detailed" {
                     // MARK: – Notes (before Security)
                     Section {
                         VStack(alignment: .leading, spacing: 4) {
@@ -397,7 +423,17 @@ struct EditSubscriptionSheet: View {
                         }
                     } header: { EmptyView() }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 8, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 2 : 4, leading: 20, bottom: detailLevel == "Essentials" ? 4 : 8, trailing: 20))
+                    .listRowSeparator(.hidden)
+
+                if detailLevel == "Detailed" {
+                    Section {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(height: 1)
+                    } header: { EmptyView() }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 2.5, leading: 20, bottom: 2.5, trailing: 20))
                     .listRowSeparator(.hidden)
 
                     // MARK: – Security & Recovery (below Notes)
@@ -429,7 +465,7 @@ struct EditSubscriptionSheet: View {
                             .buttonStyle(.plain)
                         } header: { EmptyView() }
                         .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
                         .listRowSeparator(.hidden)
                     }
 
@@ -488,9 +524,10 @@ struct EditSubscriptionSheet: View {
                         }
                         } header: { EmptyView() }
                         .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                        .listRowInsets(EdgeInsets(top: 2.5, leading: 20, bottom: 2.5, trailing: 20))
                         .listRowSeparator(.hidden)
                     }
+                } // End of detailLevel == "Detailed"
 
                     // MARK: – Supplemental Services
                     // Thin divider above SubServices
@@ -500,7 +537,7 @@ struct EditSubscriptionSheet: View {
                             .frame(height: 1)
                     } header: { EmptyView() }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 2.5, leading: 20, bottom: 2.5, trailing: 20))
                     .listRowSeparator(.hidden)
 
                     SubServicesSection(
@@ -521,6 +558,15 @@ struct EditSubscriptionSheet: View {
                     )
 
                     // MARK: – Linked Emails
+                    Section {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.07))
+                            .frame(height: 1)
+                    } header: { EmptyView() }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                    .listRowSeparator(.hidden)
+
                     LinkedEmailsSection(
                         sub: sub,
                         onAdd: {
@@ -537,7 +583,6 @@ struct EditSubscriptionSheet: View {
                             showEmailHUD = true
                         }
                     )
-                }
 
                 // MARK: – Danger Zone
                 if !isNew {
@@ -677,25 +722,30 @@ struct EditSubscriptionSheet: View {
 // MARK: – Supplemental Services Section
 
 struct SubServicesSection: View {
+    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
     @Bindable var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, SubService) -> Void
 
+
+
     var body: some View {
         Section {
-            Button { onAdd() } label: {
-                HStack {
-                        Spacer()
-                        Text("💾  Add Supplemental Service")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Spacer()
-                    }
-                    .frame(height: 40)
-                    .background(Color(hex: "#222E2F"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            if detailLevel != "Essentials" {
+                Button { onAdd() } label: {
+                    HStack {
+                            Spacer()
+                            Text("💾  Add Supplemental Service")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                            Spacer()
+                        }
+                        .frame(height: 40)
+                        .background(Color(hex: "#222E2F"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+            }
 
                 ForEach(sub.subServices.indices, id: \.self) { i in
                     let ss = sub.subServices[i]
@@ -718,7 +768,7 @@ struct SubServicesSection: View {
                                     Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
                                     Text(ss.autoPay == .auto ? "Auto" : "Manual")
                                         .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(ss.autoPay == .auto ? Color.green.opacity(0.8) : Color.white.opacity(0.3))
+                                        .foregroundStyle(Color.white.opacity(ss.autoPay == .auto ? 0.8 : 0.3))
                                 }
                             }
                             Spacer()
@@ -782,6 +832,8 @@ struct SubServiceHUD: View {
                draft.status != initial.status ||
                draft.purpose != initial.purpose
     }
+
+
 
     var body: some View {
         NavigationStack {
@@ -871,7 +923,7 @@ struct SubServiceHUD: View {
                             HStack {
                                 Text(draft.autoPay == .auto ? "Enabled" : "Manual")
                                     .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(draft.autoPay == .auto ? Color.green : Color.white)
+                                    .foregroundStyle(Color.white)
                                 Spacer()
                                 Toggle("", isOn: Binding(
                                     get: { draft.autoPay == .auto },
@@ -936,25 +988,30 @@ struct SubServiceHUD: View {
 // MARK: – Linked Emails Section
 
 struct LinkedEmailsSection: View {
+    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
     @Bindable var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, LinkedEmail) -> Void
 
+
+
     var body: some View {
         Section {
-            Button { onAdd() } label: {
-                HStack {
-                        Spacer()
-                        Text("📨  Add Linked Email")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Spacer()
-                    }
-                    .frame(height: 40)
-                    .background(Color(hex: "#222E2F"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            if detailLevel != "Essentials" {
+                Button { onAdd() } label: {
+                    HStack {
+                            Spacer()
+                            Text("📨  Add Linked Email")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                            Spacer()
+                        }
+                        .frame(height: 40)
+                        .background(Color(hex: "#222E2F"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+            }
 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in
                     let em = sub.linkedEmails[i]
@@ -1038,6 +1095,8 @@ struct LinkedEmailHUD: View {
             set: { draft.notes = $0.components(separatedBy: "\n").filter { !$0.isEmpty } }
         )
     }
+
+
 
     var body: some View {
         NavigationStack {
@@ -1204,6 +1263,8 @@ struct PaymentMethodPickerView: View {
         onSelect(method)
         dismiss()
     }
+
+
 
     var body: some View {
         List {

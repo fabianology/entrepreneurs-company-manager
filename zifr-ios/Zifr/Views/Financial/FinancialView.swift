@@ -776,6 +776,15 @@ struct EditInstitutionSheet: View {
                     }
                 )
 
+                Section {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.07))
+                        .frame(height: 1)
+                } header: { EmptyView() }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                .listRowSeparator(.hidden)
+
                 // MARK: - Cards Section
                 InstitutionCardsSection(
                     cards: instCards,
@@ -795,6 +804,15 @@ struct EditInstitutionSheet: View {
                         vm.deleteCard(card, context: context)
                     }
                 )
+
+                Section {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.07))
+                        .frame(height: 1)
+                } header: { EmptyView() }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                .listRowSeparator(.hidden)
 
                 // MARK: - Loans Section
                 InstitutionLoansSection(
