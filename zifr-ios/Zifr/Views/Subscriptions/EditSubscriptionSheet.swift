@@ -168,6 +168,34 @@ struct EditSubscriptionSheet: View {
         }
     }
 
+    private var statusCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("STATUS")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            HStack {
+                StatusDot(isGreen: sub.status == "Active")
+                Text(sub.status == "Active" ? "Active" : "Paused")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { sub.status == "Active" },
+                    set: { sub.status = $0 ? "Active" : "Paused" }
+                ))
+                .labelsHidden()
+                .tint(.green)
+                .scaleEffect(0.8)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+    }
+
     private var billingCycleCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("BILLING CYCLE")
@@ -334,32 +362,6 @@ struct EditSubscriptionSheet: View {
                             }
                         }
 
-                        // Status — inline single row (below login)
-                        if detailLevel != "Essentials" {
-                            HStack(spacing: 12) {
-                                Text("STATUS")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                StatusDot(isGreen: sub.status == "Active")
-                                Text(sub.status == "Active" ? "Active" : "Paused")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                Toggle("", isOn: Binding(
-                                    get: { sub.status == "Active" },
-                                    set: { sub.status = $0 ? "Active" : "Paused" }
-                                ))
-                                .labelsHidden()
-                                .tint(.green)
-                                .scaleEffect(0.8)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-
                     }
                     .padding(.vertical, detailLevel == "Essentials" ? 2 : 4)
                 } header: { EmptyView() }
@@ -369,14 +371,16 @@ struct EditSubscriptionSheet: View {
 
                 // MARK: – Billing (Paid only)
                 if !sub.isFree {
-                    Section {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.07))
-                            .frame(height: 1)
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 2.5 : 5, leading: 20, bottom: detailLevel == "Essentials" ? 2.5 : 5, trailing: 20))
-                    .listRowSeparator(.hidden)
+                    if detailLevel != "Essentials" {
+                        Section {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.07))
+                                .frame(height: 1)
+                        } header: { EmptyView() }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                        .listRowSeparator(.hidden)
+                    }
                     Section {
                         VStack(spacing: detailLevel == "Essentials" ? 8 : 16) {
                             if detailLevel == "Essentials" {
@@ -392,8 +396,9 @@ struct EditSubscriptionSheet: View {
                                 billingCycleCard
                                 HStack(spacing: 12) {
                                     renewalCard
-                                    paidFromCard
+                                    statusCard
                                 }
+                                paidFromCard
                             }
                         }
                         .padding(.vertical, detailLevel == "Essentials" ? 2 : 4)
@@ -1202,6 +1207,10 @@ struct PaymentMethodPickerView: View {
     @State private var searchText = ""
     @AppStorage("userCustomPaymentMethods") private var storedCustomMethods: String = ""
 
+    @State private var itemToEdit: String? = nil
+    @State private var editedItemName: String = ""
+    @State private var showEditAlert = false
+
     struct AccountDisplay: Identifiable {
         let id = UUID()
         let instName: String
@@ -1264,7 +1273,34 @@ struct PaymentMethodPickerView: View {
         dismiss()
     }
 
+    private func deleteCustom(_ method: String) {
+        var methods = storedCustomMethods.split(separator: ",").map(String.init)
+        if let idx = methods.firstIndex(of: method) {
+            methods.remove(at: idx)
+            storedCustomMethods = methods.joined(separator: ",")
+            if currentMethod == method {
+                onSelect("")
+            }
+        }
+    }
 
+    private func updateCustom(oldName: String, newName: String) {
+        let trimmedNewName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedNewName.isEmpty, trimmedNewName != oldName else { return }
+
+        var methods = storedCustomMethods.split(separator: ",").map(String.init)
+        if let idx = methods.firstIndex(of: oldName) {
+            if !methods.contains(trimmedNewName) {
+                methods[idx] = trimmedNewName
+            } else {
+                methods.remove(at: idx)
+            }
+            storedCustomMethods = methods.joined(separator: ",")
+            if currentMethod == oldName {
+                onSelect(trimmedNewName)
+            }
+        }
+    }
 
     var body: some View {
         List {
@@ -1342,6 +1378,26 @@ struct PaymentMethodPickerView: View {
                             }
                         }
                         .listRowBackground(Color(hex: "#111111"))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                deleteCustom(customMethod)
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .tint(.red)
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                itemToEdit = customMethod
+                                editedItemName = customMethod
+                                showEditAlert = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                Image(systemName: "pencil")
+                            }
+                            .tint(.blue)
+                        }
                     }
                 }
             }
@@ -1455,5 +1511,17 @@ struct PaymentMethodPickerView: View {
         .navigationTitle("Paid From")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search or enter custom")
+        .alert("Edit Custom Entry", isPresented: $showEditAlert) {
+            TextField("Entry Name", text: $editedItemName)
+            Button("Cancel", role: .cancel) {
+                itemToEdit = nil
+            }
+            Button("Save") {
+                if let oldName = itemToEdit {
+                    updateCustom(oldName: oldName, newName: editedItemName)
+                }
+                itemToEdit = nil
+            }
+        }
     }
 }

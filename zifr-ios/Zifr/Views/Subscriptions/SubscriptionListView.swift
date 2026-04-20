@@ -209,15 +209,15 @@ struct SubscriptionCardView: View {
             }
             .buttonStyle(.plain)
 
-            // ── More Details accordion ───────────────────────────────────
+            // ── Billing Details accordion ───────────────────────────────────
             if !sub.isFree {
                 accordionDivider()
-                accordionToggle(label: expanded ? "Less Details" : "More Details", expanded: expanded) {
+                accordionToggle(label: expanded ? "Hide Billing" : "Billing Details", expanded: expanded) {
                     withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }
                 if expanded {
-                    LazyVStack(spacing: 12) {
+                    VStack(spacing: 12) {
                         HStack(spacing: 16) {
                             detailCell(label: "Paid From", value: sub.paymentMethod.isEmpty ? "—" : sub.paymentMethod)
                             detailCell(label: "Due On", value: sub.nextRenewal.isEmpty ? "—" : sub.nextRenewal)
@@ -228,7 +228,7 @@ struct SubscriptionCardView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .clipped()
                 }
             }
 
@@ -284,7 +284,7 @@ struct SubscriptionCardView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .clipped()
             }
 
             // ── Linked Emails accordion ──────────────────────────────────
@@ -352,7 +352,7 @@ struct SubscriptionCardView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .clipped()
             }
         }
         // ── Card container: #171717 + border 5% ─────────────────────────

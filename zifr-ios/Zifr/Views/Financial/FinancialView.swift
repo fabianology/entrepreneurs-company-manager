@@ -355,13 +355,14 @@ struct InstitutionCardView: View {
 
             // ── Accordion ──────────────────────────────────────────────────
             accordionDivider()
-            accordionToggle(label: expanded ? "Less Details" : "More Details", count: institution.accounts.count + loanCount, expanded: expanded) {
+            accordionToggle(label: expanded ? "Hide Accounts" : "Account Details", count: institution.accounts.count + loanCount, expanded: expanded) {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }
+            .zIndex(1)
             
             if expanded {
-                LazyVStack(spacing: 12) {
+                VStack(spacing: 12) {
                     ForEach(institution.accounts) { acc in
                         HStack(spacing: 10) {
                             Circle()
@@ -384,7 +385,7 @@ struct InstitutionCardView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .clipped()
             }
         }
         .background(Color(hex: "#171717"))
