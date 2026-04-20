@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // MARK: - Edit Subscription Sheet
 
@@ -1072,6 +1073,132 @@ struct SubServiceHUD: View {
     }
 }
 
+// MARK: – Linked Email Helpers
+
+struct UsedInEmailService: Hashable {
+    let name: String
+    let role: Role
+    enum Role { case primary, linked }
+}
+
+struct LinkedEmailCardView: View {
+    let em: LinkedEmail
+    let allSubscriptions: [Subscription]
+    let onEdit: () -> Void
+
+    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
+
+    private var computedServices: [UsedInEmailService] {
+        let normalizedEmail = em.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEmail.isEmpty else { return [] }
+
+        var results: [UsedInEmailService] = []
+        var seen = Set<String>()
+
+        for sub in allSubscriptions {
+            let isPrimary = sub.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail
+            let isLinked = sub.linkedEmails.contains { $0.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }
+            
+            let sName = sub.name.isEmpty ? "Unnamed Service" : sub.name
+            
+            if isPrimary || isLinked {
+                if !seen.contains(sName) {
+                    results.append(UsedInEmailService(name: sName, role: isPrimary ? .primary : .linked))
+                    seen.insert(sName)
+                }
+            }
+        }
+        return results
+    }
+
+    private var legacyTags: [String] {
+        let computed = computedServices
+        return em.usedIn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { tag in 
+                !tag.isEmpty && !computed.contains { $0.name.lowercased() == tag.lowercased() }
+            }
+    }
+
+    var body: some View {
+        Button { onEdit() } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(em.email.isEmpty ? "No address" : em.email)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    
+                    HStack(spacing: 6) {
+                        if !em.provider.isEmpty {
+                            Text(em.provider)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                            Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                        }
+                        if !em.usedFor.isEmpty {
+                            Text(em.usedFor)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                        }
+                    }
+
+                    if !computedServices.isEmpty || !legacyTags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(computedServices, id: \.self) { svc in
+                                    HStack(spacing: 4) {
+                                        Text(svc.role == .primary ? "🔑" : "🔗")
+                                            .font(.system(size: 9))
+                                        Text("\(svc.name)\(svc.role == .primary ? " (Login)" : "")")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .textCase(.uppercase)
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 4)
+                                    .background {
+                                        if svc.role == .primary {
+                                            Color.green.opacity(0.15)
+                                        } else {
+                                            Color.blue.opacity(0.15)
+                                        }
+                                    }
+                                    .foregroundStyle(svc.role == .primary ? Color.green : Color.blue)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(svc.role == .primary ? Color.green.opacity(0.2) : Color.blue.opacity(0.2), lineWidth: 1))
+                                }
+                                
+                                ForEach(legacyTags, id: \.self) { tag in
+                                    Text(tag)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .textCase(.uppercase)
+                                        .tracking(0.5)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                        .background(Color.white.opacity(0.05))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.2))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: – Linked Emails Section
 
 struct LinkedEmailsSection: View {
@@ -1079,6 +1206,8 @@ struct LinkedEmailsSection: View {
     @Bindable var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, LinkedEmail) -> Void
+
+    @Query private var allSubscriptions: [Subscription]
 
 
 
@@ -1102,40 +1231,7 @@ struct LinkedEmailsSection: View {
 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in
                     let em = sub.linkedEmails[i]
-                    Button { onEdit(i, em) } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(em.email.isEmpty ? "No address" : em.email)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                HStack(spacing: 6) {
-                                    if !em.provider.isEmpty {
-                                        Text(em.provider)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.45))
-                                        Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
-                                    }
-                                    if !em.usedFor.isEmpty {
-                                        Text(em.usedFor)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.45))
-                                    }
-                                }
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.2))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
+                    LinkedEmailCardView(em: em, allSubscriptions: allSubscriptions, onEdit: { onEdit(i, em) })
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button(role: .destructive) {
                             withAnimation {
@@ -1166,6 +1262,44 @@ struct LinkedEmailHUD: View {
     var onDelete: (() -> Void)? = nil
 
     @State private var initialDraft: LinkedEmail? = nil
+    @Query private var allSubscriptions: [Subscription]
+
+    struct UsedInService: Hashable {
+        let name: String
+        let role: Role
+        enum Role { case primary, linked }
+    }
+
+    private var computedServices: [UsedInService] {
+        let normalizedEmail = draft.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEmail.isEmpty else { return [] }
+
+        var results: [UsedInService] = []
+        var seen = Set<String>()
+
+        for sub in allSubscriptions {
+            let isPrimary = sub.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail
+            let isLinked = sub.linkedEmails.contains { $0.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }
+            
+            let sName = sub.name.isEmpty ? "Unnamed Service" : sub.name
+            
+            if isPrimary || isLinked {
+                if !seen.contains(sName) {
+                    results.append(UsedInService(name: sName, role: isPrimary ? .primary : .linked))
+                    seen.insert(sName)
+                }
+            }
+        }
+        return results
+    }
+
+    private var legacyTags: [String] {
+        let computed = computedServices
+        return draft.usedIn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { tag in 
+                !tag.isEmpty && !computed.contains { $0.name.lowercased() == tag.lowercased() }
+            }
+    }
 
     private var isDirty: Bool {
         guard let initial = initialDraft else { return isNew && !draft.email.isEmpty }
@@ -1184,6 +1318,72 @@ struct LinkedEmailHUD: View {
         )
     }
 
+    private var usedInCard: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("USED IN")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            
+            if computedServices.isEmpty && legacyTags.isEmpty {
+                HStack {
+                    Text("Auto-generates when linked to services...")
+                        .font(.system(size: 11, weight: .medium, design: .serif).italic())
+                        .foregroundStyle(Color.white.opacity(0.3))
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 44)
+                .background(Color(hex: "#111111"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(computedServices, id: \.self) { svc in
+                            HStack(spacing: 4) {
+                                Text(svc.role == .primary ? "🔑" : "🔗")
+                                    .font(.system(size: 10))
+                                Text("\(svc.name)\(svc.role == .primary ? " (Login)" : "")")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .textCase(.uppercase)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background {
+                                if svc.role == .primary {
+                                    Color.green.opacity(0.15)
+                                } else {
+                                    Color.blue.opacity(0.15)
+                                }
+                            }
+                            .foregroundStyle(svc.role == .primary ? Color.green : Color.blue)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(svc.role == .primary ? Color.green.opacity(0.2) : Color.blue.opacity(0.2), lineWidth: 1))
+                        }
+                        
+                        ForEach(legacyTags, id: \.self) { tag in
+                            Text(tag)
+                                .font(.system(size: 10, weight: .bold))
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.05))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 44)
+                .background(Color(hex: "#111111"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+        }
+    }
 
 
     var body: some View {
@@ -1227,15 +1427,10 @@ struct LinkedEmailHUD: View {
                         )
                         .autocorrectionDisabled()
 
-                        // Row 4: Used In (full width)
-                        ZifrField(
-                            label: "USED IN",
-                            placeholder: "Tag…",
-                            text: $draft.usedIn
-                        )
-                        .autocorrectionDisabled()
+                        // Row 4: Used In (Auto-computed)
+                        usedInCard
 
-                        // Row 4: Notes (full width)
+                        // Row 5: Notes (full width)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("NOTES")
                                 .font(.system(size: 11, weight: .bold))

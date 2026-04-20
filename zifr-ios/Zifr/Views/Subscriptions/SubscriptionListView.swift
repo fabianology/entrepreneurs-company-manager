@@ -45,7 +45,7 @@ struct SubscriptionListView: View {
                     emptyState
                 } else {
                     ForEach(subscriptions) { sub in
-                        SubscriptionCardView(sub: sub, institutions: institutions, cards: cards, onEdit: { editingSub = sub })
+                        SubscriptionCardView(sub: sub, allSubscriptions: subscriptions, institutions: institutions, cards: cards, onEdit: { editingSub = sub })
                             .padding(.horizontal, 20)
                             .padding(.bottom, 16)
                     }
@@ -94,6 +94,7 @@ struct SubscriptionListView: View {
 
 struct SubscriptionCardView: View {
     @Bindable var sub: Subscription
+    let allSubscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onEdit: () -> Void
@@ -282,13 +283,19 @@ struct SubscriptionCardView: View {
                                         .foregroundStyle(.white)
                                     
                                     HStack(spacing: 6) {
-                                        Text(ss.status == .active ? "Active" : "Paused")
+                                        Circle()
+                                            .fill(ss.status == .active ? Color.zifrGreen : Color.red)
+                                            .frame(width: 6, height: 6)
+                                        
+                                        statusPipe()
+                                        
+                                        Text(ss.paymentMethod.isEmpty ? "No Card" : ss.paymentMethod)
                                             .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(ss.status == .active ? Color.zifrGreen : Color.red)
+                                            .foregroundStyle(Color.white.opacity(0.6))
+
+                                        statusPipe()
                                         
-                                        Text("·").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
-                                        
-                                        Text(ss.autoPay == .auto ? "Auto Renew" : "Manual")
+                                        Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.6))
                                     }
@@ -303,7 +310,11 @@ struct SubscriptionCardView: View {
                                         .foregroundStyle(Color.white.opacity(0.5))
                                 }
                             }
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
@@ -352,46 +363,34 @@ struct SubscriptionCardView: View {
                         } label: {
                             HStack(alignment: .top) {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    // Email + tag pill inline
-                                    HStack(spacing: 8) {
-                                        Text(email.email.isEmpty ? "No Address" : email.email)
-                                            .font(.system(size: 15, weight: .medium))
-                                            .foregroundStyle(.white)
-                                            .lineLimit(1)
-                                        
-                                        if !email.usedIn.isEmpty {
-                                            Text(email.usedIn.uppercased())
-                                                .font(.system(size: 11, weight: .bold))
-                                                .foregroundStyle(Color.white.opacity(0.8))
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
-                                                .background(Color.white.opacity(0.12))
-                                                .clipShape(Capsule())
-                                        }
-                                    }
+                                    // Email
+                                    Text(email.email.isEmpty ? "No Address" : email.email)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+                                    
+                                    dynamicLabels(for: email)
+
                                     // Role row
                                     HStack(spacing: 6) {
-                                        Text("Role")
+                                        Text("Use")
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.5))
                                         
-                                        Text("·").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
+                                        statusPipe()
                                         
                                         Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
                                             .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(.white)
-                                    }
-                                    // Notes (only if present)
-                                    if !email.notes.isEmpty {
-                                        Text("Notes: \(email.notes.joined(separator: " · "))")
-                                            .font(.system(size: 13, weight: .regular))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                            .lineLimit(2)
+                                            .foregroundStyle(Color.white.opacity(0.6))
                                     }
                                 }
                                 Spacer()
                             }
-                            .padding(.vertical, 4)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
@@ -601,5 +600,35 @@ struct SubscriptionCardView: View {
                 .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func dynamicLabels(for email: LinkedEmail) -> some View {
+        let normalizedEmail = email.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalizedEmail.isEmpty {
+            let computedServices: [UsedInEmailService] = allSubscriptions.compactMap { s in
+                if s.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail {
+                    return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .primary)
+                } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }) {
+                    return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .linked)
+                }
+                return nil
+            }
+            let legacyTags: [String] = email.usedIn.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { tag in 
+                    !tag.isEmpty && !computedServices.contains { $0.name.lowercased() == tag.lowercased() }
+                }
+                
+            let allTextTags = computedServices.map { svc in
+                "\(svc.role == .primary ? "🔑 " : "🔗 ")\(svc.name)"
+            } + legacyTags
+                
+            if !allTextTags.isEmpty {
+                Text(allTextTags.joined(separator: " · "))
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .lineLimit(2)
+            }
+        }
     }
 }
