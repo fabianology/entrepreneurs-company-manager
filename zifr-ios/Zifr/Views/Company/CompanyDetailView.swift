@@ -204,21 +204,21 @@ struct CompanyDetailView: View {
     private var metricSubLine: some View {
         switch vm.activeTab {
         case .subscriptions:
-            // 💵🔥 mo. $X (n) | yr. $X (n) — mirrors CiFr
-            let monthlyActive = subscriptions.filter { $0.status == "Active" && $0.billingCycle == "Monthly" }
-            let yearlyActive = subscriptions.filter { $0.status == "Active" && $0.billingCycle == "Yearly" }
-            let moTotal = monthlyActive.reduce(0.0) { $0 + $1.cost } + yearlyActive.reduce(0.0) { $0 + $1.cost / 12 }
-            let yrTotal = monthlyActive.reduce(0.0) { $0 + $1.cost * 12 } + yearlyActive.reduce(0.0) { $0 + $1.cost }
+            let active = subscriptions.filter { $0.status == "Active" }
+            let moTotal = active.reduce(0.0) { $0 + $1.monthlyTotal }
+            let yrTotal = active.reduce(0.0) { $0 + $1.yearlyTotal }
+            let moCount = active.filter { $0.billingCycle == "Monthly" }.count
+            let yrCount = active.filter { $0.billingCycle == "Yearly" }.count
 
             HStack(spacing: 4) {
                 Text("💵🔥 ")
                     .font(.system(size: 17))
-                metricPair(label: "mo.", value: moTotal, count: monthlyActive.count)
+                metricPair(label: "mo.", value: moTotal, count: moCount)
                 Divider()
                     .frame(width: 1, height: 12)
                     .background(Color.white.opacity(0.1))
                     .padding(.horizontal, 10)
-                metricPair(label: "yr.", value: yrTotal, count: yearlyActive.count)
+                metricPair(label: "yr.", value: yrTotal, count: yrCount)
             }
 
         case .financial:

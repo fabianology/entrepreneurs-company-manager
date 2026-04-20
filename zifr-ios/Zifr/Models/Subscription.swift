@@ -6,6 +6,7 @@ import SwiftData
 struct SubService: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var name: String = ""
+    var paymentMethod: String = ""
     var cost: Double = 0
     var billingCycle: BillingCycle = .monthly
     var purpose: String = ""

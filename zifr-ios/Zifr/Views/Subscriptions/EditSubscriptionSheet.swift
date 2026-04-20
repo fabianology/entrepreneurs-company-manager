@@ -684,6 +684,8 @@ struct EditSubscriptionSheet: View {
                 SubServiceHUD(
                     draft: $subDraft,
                     isNew: subDraftIndex == nil,
+                    institutions: institutions,
+                    cards: cards,
                     onSave: {
                         var services = sub.subServices
                         if let idx = subDraftIndex {
@@ -694,7 +696,11 @@ struct EditSubscriptionSheet: View {
                         sub.subServices = services
                         showSubServiceHUD = false
                     },
-                    onCancel: { showSubServiceHUD = false }
+                    onCancel: { showSubServiceHUD = false },
+                    onDelete: {
+                        if let idx = subDraftIndex { sub.subServices.remove(at: idx) }
+                        showSubServiceHUD = false
+                    }
                 )
                 .presentationDetents([.height(420)])
                 .presentationDragIndicator(.visible)
@@ -714,7 +720,11 @@ struct EditSubscriptionSheet: View {
                         sub.linkedEmails = emails
                         showEmailHUD = false
                     },
-                    onCancel: { showEmailHUD = false }
+                    onCancel: { showEmailHUD = false },
+                    onDelete: {
+                        if let idx = emailDraftIndex { sub.linkedEmails.remove(at: idx) }
+                        showEmailHUD = false
+                    }
                 )
                 .presentationDetents([.height(500)])
                 .presentationDragIndicator(.visible)
@@ -823,14 +833,19 @@ struct SubServicesSection: View {
 struct SubServiceHUD: View {
     @Binding var draft: SubService
     let isNew: Bool
+    let institutions: [Institution]
+    let cards: [FinancialCard]
     let onSave: () -> Void
     let onCancel: () -> Void
+    var onDelete: (() -> Void)? = nil
 
     @State private var initialDraft: SubService? = nil
+    @State private var showPaymentPicker = false
 
     private var isDirty: Bool {
         guard let initial = initialDraft else { return isNew && !draft.name.isEmpty }
         return draft.name != initial.name ||
+               draft.paymentMethod != initial.paymentMethod ||
                draft.cost != initial.cost ||
                draft.billingCycle != initial.billingCycle ||
                draft.autoPay != initial.autoPay ||
@@ -846,7 +861,7 @@ struct SubServiceHUD: View {
                 Section {
                     VStack(spacing: 12) {
 
-                        // Row 1: Name + Status
+                        // Row 1: Name + Paid From
                         HStack(spacing: 12) {
                             ZifrField(
                                 label: "NAME",
@@ -855,31 +870,32 @@ struct SubServiceHUD: View {
                             )
                             .autocorrectionDisabled()
 
-                            // Status card
+                            // Paid From card
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("STATUS")
+                                Text("PAID FROM")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(Color.white.opacity(0.5))
-                                HStack {
-                                    StatusDot(isGreen: draft.status == .active)
-                                    Text(draft.status == .active ? "Active" : "Paused")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                    Spacer()
-                                    Toggle("", isOn: Binding(
-                                        get: { draft.status == .active },
-                                        set: { draft.status = $0 ? .active : .paused }
-                                    ))
-                                    .labelsHidden()
-                                    .tint(.green)
-                                    .scaleEffect(0.8)
+                                
+                                Button {
+                                    showPaymentPicker = true
+                                } label: {
+                                    HStack {
+                                        Text(draft.paymentMethod.isEmpty ? "None" : draft.paymentMethod)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
+                                            .lineLimit(1)
+                                        Spacer(minLength: 8)
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.3))
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#111111"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                                 }
-                                .padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color(hex: "#111111"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .buttonStyle(.plain)
                             }
                         }
 
@@ -920,30 +936,60 @@ struct SubServiceHUD: View {
                             }
                         }
 
-                        // Row 3: Auto Pay card (full width)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("AUTO PAY")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            HStack {
-                                Text(draft.autoPay == .auto ? "Enabled" : "Manual")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(Color.white)
-                                Spacer()
-                                Toggle("", isOn: Binding(
-                                    get: { draft.autoPay == .auto },
-                                    set: { draft.autoPay = $0 ? .auto : .manual }
-                                ))
-                                .labelsHidden()
-                                .tint(.green)
-                                .scaleEffect(0.8)
+                        // Row 3: Auto Pay + Status
+                        HStack(spacing: 12) {
+                            // Auto Pay card
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("AUTO PAY")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                HStack {
+                                    Text(draft.autoPay == .auto ? "Enabled" : "Manual")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.white)
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: { draft.autoPay == .auto },
+                                        set: { draft.autoPay = $0 ? .auto : .manual }
+                                    ))
+                                    .labelsHidden()
+                                    .tint(.green)
+                                    .scaleEffect(0.8)
+                                }
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                             }
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+
+                            // Status card
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("STATUS")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                HStack {
+                                    StatusDot(isGreen: draft.status == .active)
+                                    Text(draft.status == .active ? "Active" : "Paused")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: { draft.status == .active },
+                                        set: { draft.status = $0 ? .active : .paused }
+                                    ))
+                                    .labelsHidden()
+                                    .tint(.green)
+                                    .scaleEffect(0.8)
+                                }
+                                .padding(.horizontal, 12)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            }
                         }
 
                         // Row 4: Purpose (full width)
@@ -970,6 +1016,31 @@ struct SubServiceHUD: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
+
+                if !isNew {
+                    Section {
+                        Button(role: .destructive) {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            onDelete?()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "trash")
+                                Text("Delete Service")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.red)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
+                    .listRowSeparator(.hidden)
+                }
             }
             .listSectionSpacing(0)
             .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
@@ -986,6 +1057,17 @@ struct SubServiceHUD: View {
                 }
             }
             .onAppear { initialDraft = draft }
+            .sheet(isPresented: $showPaymentPicker) {
+                PaymentMethodPickerView(
+                    currentMethod: draft.paymentMethod,
+                    institutions: institutions,
+                    cards: cards,
+                    onSelect: { draft.paymentMethod = $0 }
+                )
+                .presentationDetents([.height(550)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
         }
     }
 }
@@ -1081,6 +1163,7 @@ struct LinkedEmailHUD: View {
     let isNew: Bool
     let onSave: () -> Void
     let onCancel: () -> Void
+    var onDelete: (() -> Void)? = nil
 
     @State private var initialDraft: LinkedEmail? = nil
 
@@ -1119,7 +1202,7 @@ struct LinkedEmailHUD: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
-                        // Row 2: Provider + Used For
+                        // Row 2: Provider + Access Method
                         HStack(spacing: 12) {
                             ZifrField(
                                 label: "PROVIDER",
@@ -1129,29 +1212,28 @@ struct LinkedEmailHUD: View {
                             .autocorrectionDisabled()
 
                             ZifrField(
-                                label: "USED FOR",
-                                placeholder: "Billing, Admin…",
-                                text: $draft.usedFor
-                            )
-                            .autocorrectionDisabled()
-                        }
-
-                        // Row 3: Access Method + Used In
-                        HStack(spacing: 12) {
-                            ZifrField(
                                 label: "ACCESS METHOD",
                                 placeholder: "Google SSO, Password…",
                                 text: $draft.accessMethod
                             )
                             .autocorrectionDisabled()
-
-                            ZifrField(
-                                label: "USED IN",
-                                placeholder: "Tag…",
-                                text: $draft.usedIn
-                            )
-                            .autocorrectionDisabled()
                         }
+
+                        // Row 3: Used For (full width)
+                        ZifrField(
+                            label: "USED FOR",
+                            placeholder: "Billing, Admin…",
+                            text: $draft.usedFor
+                        )
+                        .autocorrectionDisabled()
+
+                        // Row 4: Used In (full width)
+                        ZifrField(
+                            label: "USED IN",
+                            placeholder: "Tag…",
+                            text: $draft.usedIn
+                        )
+                        .autocorrectionDisabled()
 
                         // Row 4: Notes (full width)
                         VStack(alignment: .leading, spacing: 4) {
@@ -1175,6 +1257,31 @@ struct LinkedEmailHUD: View {
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
+
+                if !isNew {
+                    Section {
+                        Button(role: .destructive) {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            onDelete?()
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "trash")
+                                Text("Delete Email")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.red)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
+                    .listRowSeparator(.hidden)
+                }
             }
             .listSectionSpacing(0)
             .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)

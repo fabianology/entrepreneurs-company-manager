@@ -45,7 +45,7 @@ struct SubscriptionListView: View {
                     emptyState
                 } else {
                     ForEach(subscriptions) { sub in
-                        SubscriptionCardView(sub: sub, onEdit: { editingSub = sub })
+                        SubscriptionCardView(sub: sub, institutions: institutions, cards: cards, onEdit: { editingSub = sub })
                             .padding(.horizontal, 20)
                             .padding(.bottom, 16)
                     }
@@ -94,6 +94,8 @@ struct SubscriptionListView: View {
 
 struct SubscriptionCardView: View {
     @Bindable var sub: Subscription
+    let institutions: [Institution]
+    let cards: [FinancialCard]
     let onEdit: () -> Void
 
     @State private var expanded = false
@@ -124,6 +126,30 @@ struct SubscriptionCardView: View {
     }
     var secondaryLabel: String { sub.billingCycle == "Monthly" ? "recur/yr." : "recur/mo." }
     var totalAnnual: Double { (sub.monthlyTotal * 12) + sub.yearlyTotal }
+
+    var formattedDueOn: String {
+        guard !sub.nextRenewal.isEmpty else { return "—" }
+        func ordinal(_ n: Int) -> String {
+            let tens = (n % 100) / 10
+            if tens == 1 { return "\(n)th" }
+            switch n % 10 {
+            case 1: return "\(n)st"
+            case 2: return "\(n)nd"
+            case 3: return "\(n)rd"
+            default: return "\(n)th"
+            }
+        }
+        if sub.billingCycle == "Monthly" {
+            if let day = Int(sub.nextRenewal) { return "\(ordinal(day)) of every month" }
+            return sub.nextRenewal + " of every month"
+        } else {
+            let parts = sub.nextRenewal.split(separator: " ")
+            if parts.count == 2, let day = Int(parts[1]) {
+                return "\(parts[0]) \(ordinal(day)) every year"
+            }
+            return sub.nextRenewal + " every year"
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -220,7 +246,7 @@ struct SubscriptionCardView: View {
                     VStack(spacing: 12) {
                         HStack(spacing: 16) {
                             detailCell(label: "Paid From", value: sub.paymentMethod.isEmpty ? "—" : sub.paymentMethod)
-                            detailCell(label: "Due On", value: sub.nextRenewal.isEmpty ? "—" : sub.nextRenewal)
+                            detailCell(label: "Due On", value: formattedDueOn)
                         }
                         if !sub.notes.isEmpty {
                             detailCell(label: "Notes", value: sub.notes)
@@ -262,7 +288,7 @@ struct SubscriptionCardView: View {
                                         
                                         Text("·").font(.system(size: 13, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
                                         
-                                        Text(ss.billingCycle == .monthly ? "Auto Pay" : "Manual")
+                                        Text(ss.autoPay == .auto ? "Auto Renew" : "Manual")
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.6))
                                     }
@@ -281,6 +307,26 @@ struct SubscriptionCardView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    
+                    Button {
+                        subDraft = SubService()
+                        subDraftIndex = nil
+                        isNewSubService = true
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        showSubServiceHUD = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                            Text("Add Service").font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, sub.subServices.isEmpty ? 0 : 4)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
@@ -349,6 +395,26 @@ struct SubscriptionCardView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    
+                    Button {
+                        emailDraft = LinkedEmail()
+                        emailDraftIndex = nil
+                        isNewEmail = true
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        showEmailHUD = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                            Text("Add Email").font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundStyle(Color.white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 36)
+                        .background(Color.white.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, sub.linkedEmails.isEmpty ? 0 : 4)
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
@@ -367,6 +433,8 @@ struct SubscriptionCardView: View {
             SubServiceHUD(
                 draft: $subDraft,
                 isNew: isNewSubService,
+                institutions: institutions,
+                cards: cards,
                 onSave: {
                     var services = sub.subServices
                     if let idx = subDraftIndex {
@@ -377,7 +445,11 @@ struct SubscriptionCardView: View {
                     sub.subServices = services
                     showSubServiceHUD = false
                 },
-                onCancel: { showSubServiceHUD = false }
+                onCancel: { showSubServiceHUD = false },
+                onDelete: {
+                    if let idx = subDraftIndex { sub.subServices.remove(at: idx) }
+                    showSubServiceHUD = false
+                }
             )
             .presentationDetents([.height(420)])
             .presentationDragIndicator(.visible)
@@ -398,7 +470,11 @@ struct SubscriptionCardView: View {
                     sub.linkedEmails = emails
                     showEmailHUD = false
                 },
-                onCancel: { showEmailHUD = false }
+                onCancel: { showEmailHUD = false },
+                onDelete: {
+                    if let idx = emailDraftIndex { sub.linkedEmails.remove(at: idx) }
+                    showEmailHUD = false
+                }
             )
             .presentationDetents([.height(500)])
             .presentationDragIndicator(.visible)

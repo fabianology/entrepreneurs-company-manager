@@ -49,3 +49,31 @@ This document summarizes the core SwiftUI architectural lessons and specialized 
       UISlider.appearance().maximumTrackTintColor = .black
   }
   ```
+
+## 10. Native iOS Accordion Animation & the Ghosting Overlap Bug
+- **The Issue**: When building dynamically expanding accordions vertically inside standard layout blocks rather than nested native iOS lists, binding explicit size-change transition logic like `.transition(.opacity.combined(with: .move(edge: .top)))` interacts unpredictably with the parent view's mask during swift structural updates, frequently causing the newly revealed "expanding" view to temporarily bleed outward locally or wash ghostly textures atop the header button during animation interpolation.
+- **The Native Solution**: SwiftUI calculates organic geometry box growth natively. Never explicitly try to manually transition the drop-down. Instead:
+  1. Strip the custom `.transition`.
+  2. Embed `.zIndex(1)` strictly on the main accordion header button so it permanently pins to the highest layout layer.
+  3. Swap from pop-in `LazyVStack` logic to a standard `.clipped()` pre-calculating `VStack`.
+  This allows SwiftUI's internal dynamic size-change layout engine to push the sibling content flawlessly from *behind* the pinned button, completely rectifying any graphical overlays without resorting to unwieldy manual animation bindings!
+
+## 11. Functional Inline Action Densities
+- Implementing dynamic Action buttons inline beneath repeating components (like a `+ Add Service` list bumper) requires visual subtlety to avoid dragging visual hierarchy.
+- **Micro-density**: Sticking strictly to a low-profile density (`.frame(height: 36)`) and using flat, highly washed-out transparent materials (like `.background(Color.white.opacity(0.04))`) removes the need for abrasive outlined strokes while keeping touch interaction accessible natively inline.
+
+## 12. Smart Data-bound Text Output (Ordinal Computation)
+- **Problem**: Mapping disparate storage strings or integers raw into UI labels creates a rough and detached aesthetic (e.g. Due On: "14").
+- **Fix**: Embedding highly efficient helper parsing functions inside computed `var` strings within the `View` directly. We utilized `(n % 100)` evaluations inside an inline `switch` case to map numeric integers into authentic English String formatting (e.g. converting `14` dynamically into `14th of every month`), instantly bridging backend models into a native, high-end semantic label output without needing rigid external models.
+
+## 13. Dynamic Native Inline Deletion in HUDs
+- **Problem**: Traditional SwiftUI deletion relies on swipe-actions embedded strictly inside List components. For isolated HUD overlays editing granular items, users lack an intuitive structural path for absolute removal.
+- **Fix**: Binding destructive actions cleanly inline. Appending a native, low-density `.destructive` button immediately beneath Form grids and strictly plumbing a custom `onDelete: (() -> Void)?` backward to the call-site allows the parent construct to dynamically `remove(at: index)` and instantly collapse the HUD in a single fluid evaluation without forcing users to back-out and swipe mechanically on the trailing edge.
+
+## 14. Cascading UI Models for Isolated Reusable Pickers
+- **The Issue**: To maximize architectural density, complex interactive layers (like `PaymentMethodPickerView`) are commonly moved into separate components. However, failing to pipeline parent environmental arrays (`institutions`, `cards`) sequentially down the View tree crashes compilation when those sub-views attempt to instantiate the picker.
+- **The Native Solution**: Explicitly drilling dependencies hierarchically ensures type-safety and flawless runtime bindings logic without cluttering `@Environment` globals unnecessarily. By cleanly mapping `institutions: [Institution]` and `cards: [FinancialCard]` completely through the middle layout structs (`SubscriptionCardView` -> `SubServiceHUD`), the heavy isolated picker elements bind instantly with the primary dataset while remaining fully distinct functional layouts.
+
+## 15. Aggregation via Model Computed Properties 
+- **The Math Bleed**: Structuring financial aggregations (like "monthly cost headers") manually utilizing generic view wrappers (`$0.cost * 12`) breaks data integrity whenever underlying logic expands (such as introducing dynamically paid supplemental services alongside root charges).
+- **The Architecture Fix**: Never aggregate raw baseline properties in the view hierarchy. By completely offloading the aggregation formulas strictly onto the primary model entity object (e.g., `let yrTotal = active.reduce(0.0) { $0 + $1.yearlyTotal }`), the UI instantly accounts for complex tiered subscriptions, supplements, and cadence branches securely out-of-sight in native business logic.
