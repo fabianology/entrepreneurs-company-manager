@@ -85,6 +85,26 @@ struct DashboardView: View {
                             Image(systemName: "trash")
                         }
                         .tint(.red)
+                        .confirmationDialog(
+                            "Delete Company",
+                            isPresented: Binding(
+                                get: { companyToDelete == company },
+                                set: { if !$0 && companyToDelete == company { companyToDelete = nil } }
+                            ),
+                            titleVisibility: .visible
+                        ) {
+                            Button("Delete \(company.name)", role: .destructive) {
+                                withAnimation {
+                                    vm.deleteCompany(company, context: context)
+                                }
+                                companyToDelete = nil
+                            }
+                            Button("Cancel", role: .cancel) {
+                                companyToDelete = nil
+                            }
+                        } message: {
+                            Text("This will permanently delete this company and all associated data. This action cannot be undone.")
+                        }
                     }
                 }
 
@@ -132,32 +152,6 @@ struct DashboardView: View {
                     vm: vm, companies: companies, subscriptions: subscriptions,
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
-            }
-            .confirmationDialog(
-                "Delete Company",
-                isPresented: Binding(
-                    get: { companyToDelete != nil },
-                    set: { isPresented in
-                        if !isPresented { companyToDelete = nil }
-                    }
-                ),
-                titleVisibility: .visible
-            ) {
-                if let companyName = companyToDelete?.name {
-                    Button("Delete \(companyName)", role: .destructive) {
-                        if let company = companyToDelete {
-                            withAnimation {
-                                vm.deleteCompany(company, context: context)
-                            }
-                            companyToDelete = nil
-                        }
-                    }
-                }
-                Button("Cancel", role: .cancel) {
-                    companyToDelete = nil
-                }
-            } message: {
-                Text("This will permanently delete this company and all associated data. This action cannot be undone.")
             }
             .overlay(alignment: .bottom) {
                 Button {

@@ -27,7 +27,7 @@ struct EditSubscriptionSheet: View {
     @State private var emailDraft = LinkedEmail()
     @State private var emailDraftIndex: Int? = nil
 
-    @State private var hasOpenedHUD = false
+
     @State private var showPaymentPicker = false
 
     // User preference for form density
@@ -337,9 +337,9 @@ struct EditSubscriptionSheet: View {
                             ZifrField(
                                 label: "LOGIN ID",
                                 placeholder: "username or email",
-                                text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 })
+                                text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 }),
+                                keyboardType: .emailAddress
                             )
-                            .textInputAutocapitalization(.never)
                             
                             ZStack(alignment: .bottomTrailing) {
                                 ZifrField(
@@ -551,14 +551,12 @@ struct EditSubscriptionSheet: View {
                         onAdd: {
                             subDraft = SubService()
                             subDraftIndex = nil
-                            hasOpenedHUD = true
                             showSubServiceHUD = true
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         },
                         onEdit: { idx, service in
                             subDraft = service
                             subDraftIndex = idx
-                            hasOpenedHUD = true
                             showSubServiceHUD = true
                         }
                     )
@@ -578,14 +576,12 @@ struct EditSubscriptionSheet: View {
                         onAdd: {
                             emailDraft = LinkedEmail()
                             emailDraftIndex = nil
-                            hasOpenedHUD = true
                             showEmailHUD = true
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         },
                         onEdit: { idx, email in
                             emailDraft = email
                             emailDraftIndex = idx
-                            hasOpenedHUD = true
                             showEmailHUD = true
                         }
                     )
@@ -599,12 +595,34 @@ struct EditSubscriptionSheet: View {
                         } label: {
                             HStack {
                                 Spacer()
+                                Image(systemName: "trash")
                                 Text("Delete \(sub.name.isEmpty ? "Service" : sub.name)")
-                                    .fontWeight(.semibold)
                                 Spacer()
                             }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.red)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                        .confirmationDialog(
+                            "Delete \"\(sub.name.isEmpty ? "this service" : sub.name)\"?",
+                            isPresented: $showDeleteConfirm,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Delete Service", role: .destructive) {
+                                vm.deleteSub(sub, context: context)
+                                dismiss()
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This will permanently delete this service and all associated data. This action cannot be undone.")
                         }
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
+                    .listRowSeparator(.hidden)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -629,13 +647,7 @@ struct EditSubscriptionSheet: View {
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(hasOpenedHUD ? "Close" : "Cancel") {
-                        if hasOpenedHUD {
-                            // If user opened a HUD, they might have added something, so do not delete or revert.
-                            dismiss()
-                            return
-                        }
-                        
+                    Button("Cancel") {
                         if isNew { 
                             vm.deleteSub(sub, context: context) 
                         } else if let snap = snapshot {
@@ -666,19 +678,6 @@ struct EditSubscriptionSheet: View {
                     .tint(isDirty ? .green : nil)
                     .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
-            }
-            .confirmationDialog(
-                "Delete \"\(sub.name.isEmpty ? "this service" : sub.name)\"?",
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Delete Service", role: .destructive) {
-                    vm.deleteSub(sub, context: context)
-                    dismiss()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will permanently delete this service and all associated data. This action cannot be undone.")
             }
             .interactiveDismissDisabled(isNew)
             .sheet(isPresented: $showSubServiceHUD) {
@@ -1396,11 +1395,9 @@ struct LinkedEmailHUD: View {
                         ZifrField(
                             label: "EMAIL ADDRESS",
                             placeholder: "name@example.com",
-                            text: $draft.email
+                            text: $draft.email,
+                            keyboardType: .emailAddress
                         )
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
 
                         // Row 2: Provider + Access Method
                         HStack(spacing: 12) {

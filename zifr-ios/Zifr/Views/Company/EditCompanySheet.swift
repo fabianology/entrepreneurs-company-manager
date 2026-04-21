@@ -61,8 +61,7 @@ struct EditCompanySheet: View {
                     // Website Row
                     HStack(spacing: 16) {
                         formSection {
-                            ZifrField(label: "Website", placeholder: "acme.com", text: $website)
-                                .keyboardType(.URL)
+                            ZifrField(label: "Website", placeholder: "acme.com", text: $website, keyboardType: .URL)
                         }
                         
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {

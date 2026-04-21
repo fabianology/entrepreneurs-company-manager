@@ -23,6 +23,7 @@ struct ZifrField: View {
                         .keyboardType(keyboardType)
                 }
             }
+            .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
             .autocorrectionDisabled()
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(.white)

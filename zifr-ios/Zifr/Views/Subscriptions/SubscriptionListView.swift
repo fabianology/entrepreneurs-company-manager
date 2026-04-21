@@ -369,20 +369,18 @@ struct SubscriptionCardView: View {
                                         .foregroundStyle(.white)
                                         .lineLimit(1)
 
+                                    dynamicLabels(for: email)
+
                                     // Role row
                                     HStack(spacing: 6) {
-                                        Text("Use")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                        
-                                        statusPipe()
+                                        Text("USED FOR:")
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
                                         
                                         Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.6))
                                     }
-                                    
-                                    dynamicLabels(for: email)
                                 }
                                 Spacer()
                             }
@@ -624,10 +622,21 @@ struct SubscriptionCardView: View {
             } + legacyTags
                 
             if !allTextTags.isEmpty {
-                Text(allTextTags.joined(separator: " | "))
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color(hex: "#545454"))
-                    .lineLimit(2)
+                HStack(spacing: 4) {
+                    Text("LINKED TO:")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .textCase(.uppercase)
+                    
+                    Image(systemName: "link")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#545454"))
+                    
+                    Text(allTextTags.joined(separator: " | "))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color(hex: "#545454"))
+                        .lineLimit(2)
+                }
             }
         }
     }

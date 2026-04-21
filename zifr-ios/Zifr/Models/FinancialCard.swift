@@ -22,6 +22,7 @@ final class FinancialCard {
     var balance: Double = 0.0
     var moPayment: Double = 0.0
     var cardHolderType: String = "Mine"
+    var notes: String = ""
 
     init(
         id: String = UUID().uuidString,
@@ -31,8 +32,8 @@ final class FinancialCard {
         password: String = "",
         institutionName: String = "",
         cardHolder: String = "",
-        last4: String = "0000",
-        expiry: String = "12/99",
+        last4: String = "",
+        expiry: String = "",
         network: String = "Visa",
         type: String = "Credit",
         status: String = "Active",
@@ -42,7 +43,8 @@ final class FinancialCard {
         autopay: String = "N/A",
         balance: Double = 0,
         moPayment: Double = 0,
-        cardHolderType: String = "Mine"
+        cardHolderType: String = "Mine",
+        notes: String = ""
     ) {
         self.id = id
         self.companyId = companyId
@@ -63,6 +65,7 @@ final class FinancialCard {
         self.balance = balance
         self.moPayment = moPayment
         self.cardHolderType = cardHolderType
+        self.notes = notes
     }
 
     static let networks = ["Visa", "Mastercard", "Amex", "Discover", "Other"]

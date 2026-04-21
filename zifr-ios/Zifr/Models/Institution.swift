@@ -5,7 +5,7 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var name: String = ""
     var type: String = "Checking"
-    var last4: String = "0000"
+    var last4: String = ""
     var balance: Double = 0
     var currency: String = "USD"
     var cardHolder: String = ""
@@ -43,7 +43,7 @@ final class Institution {
     init(
         id: String = UUID().uuidString,
         companyId: String,
-        name: String = "New Bank",
+        name: String = "",
         loginUrl: String = "",
         username: String = "",
         email: String = "",

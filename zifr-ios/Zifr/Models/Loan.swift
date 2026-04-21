@@ -27,7 +27,7 @@ final class Loan {
         companyId: String,
         role: String = "Lendee",
         lender: String = "",
-        name: String = "New Loan",
+        name: String = "",
         principalAmount: Double = 0,
         remainingBalance: Double = 0,
         interestType: String = "Percentage",

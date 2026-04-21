@@ -93,6 +93,21 @@ final class AppViewModel {
     }
 
     func deleteInstitution(_ inst: Institution, context: ModelContext) {
+        let instName = inst.name
+        let instCompanyId = inst.companyId
+        
+        if let allCards = try? context.fetch(FetchDescriptor<FinancialCard>()) {
+            for c in allCards where c.companyId == instCompanyId && c.institutionName == instName {
+                context.delete(c)
+            }
+        }
+        
+        if let allLoans = try? context.fetch(FetchDescriptor<Loan>()) {
+            for l in allLoans where l.companyId == instCompanyId && l.lender == instName {
+                context.delete(l)
+            }
+        }
+        
         context.delete(inst)
         try? context.save()
     }

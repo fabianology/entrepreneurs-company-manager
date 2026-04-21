@@ -195,7 +195,7 @@ struct EditDocumentSheet: View {
                             ForEach(CompanyDocument.types, id: \.self) { Text($0).tag($0) }
                         }.pickerStyle(.segmented)
                     }
-                    ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url }, set: { doc.url = $0 })).keyboardType(.URL)
+                    ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url }, set: { doc.url = $0 }), keyboardType: .URL)
                     ZifrField(label: "Upload Date", placeholder: "April 15, 2026", text: Binding(get: { doc.uploadDate }, set: { doc.uploadDate = $0 }))
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Notes").zifrLabel()
