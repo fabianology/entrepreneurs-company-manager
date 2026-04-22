@@ -77,6 +77,7 @@ final class AppViewModel {
     }
 
     func deleteCard(_ card: FinancialCard, context: ModelContext) {
+        cleanUpCustomPaymentMethod(name: card.name)
         context.delete(card)
         try? context.save()
     }
@@ -96,8 +97,14 @@ final class AppViewModel {
         let instName = inst.name
         let instCompanyId = inst.companyId
         
+        // Clean up accounts and cards from custom methods
+        for acc in inst.accounts {
+            cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
+        }
+        
         if let allCards = try? context.fetch(FetchDescriptor<FinancialCard>()) {
             for c in allCards where c.companyId == instCompanyId && c.institutionName == instName {
+                cleanUpCustomPaymentMethod(name: c.name)
                 context.delete(c)
             }
         }
@@ -110,6 +117,17 @@ final class AppViewModel {
         
         context.delete(inst)
         try? context.save()
+    }
+    
+    func cleanUpCustomPaymentMethod(name: String) {
+        guard !name.isEmpty else { return }
+        let key = "userCustomPaymentMethods"
+        let stored = UserDefaults.standard.string(forKey: key) ?? ""
+        var methods = stored.split(separator: ",").map(String.init)
+        if let idx = methods.firstIndex(where: { $0.lowercased() == name.lowercased() }) {
+            methods.remove(at: idx)
+            UserDefaults.standard.set(methods.joined(separator: ","), forKey: key)
+        }
     }
 
     // MARK: - CRUD: Loans

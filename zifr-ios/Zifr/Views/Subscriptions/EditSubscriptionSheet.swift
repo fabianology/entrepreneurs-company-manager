@@ -756,7 +756,7 @@ struct SubServicesSection: View {
                             Spacer()
                         }
                         .frame(height: 40)
-                        .background(Color(hex: "#222E2F"))
+                        .background(Color(hex: "#223E5A"))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -1222,7 +1222,7 @@ struct LinkedEmailsSection: View {
                             Spacer()
                         }
                         .frame(height: 40)
-                        .background(Color(hex: "#222E2F"))
+                        .background(Color(hex: "#223E5A"))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
@@ -1602,7 +1602,30 @@ struct PaymentMethodPickerView: View {
     }
 
     var body: some View {
-        List {
+        VStack(spacing: 0) {
+            // Search bar
+            HStack(spacing: 12) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                TextField("Search or enter custom", text: $searchText)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .autocorrectionDisabled()
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .liquidGlass(cornerRadius: 14)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+
+            List {
             Section {
                 Button {
                     selectStandard("")
@@ -1804,12 +1827,12 @@ struct PaymentMethodPickerView: View {
                     }
                 }
             }
+            }
+            .scrollContentBackground(.hidden)
         }
-        .scrollContentBackground(.hidden)
         .background(Color(hex: "#171717"))
         .navigationTitle("Paid From")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search or enter custom")
         .alert("Edit Custom Entry", isPresented: $showEditAlert) {
             TextField("Entry Name", text: $editedItemName)
             Button("Cancel", role: .cancel) {

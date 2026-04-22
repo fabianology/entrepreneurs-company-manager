@@ -105,7 +105,7 @@ struct EditCompanySheet: View {
                                             .font(.system(size: 12, weight: .bold))
                                             .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(structure == s ? Color(hex: "#222E2F") : Color.white.opacity(0.06))
+                                            .background(structure == s ? Color(hex: "#223E5A") : Color.white.opacity(0.06))
                                             .foregroundStyle(structure == s ? Color(hex: "#A2A2A2") : Color.white.opacity(0.6))
                                             .clipShape(Capsule())
                                     }

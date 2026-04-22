@@ -36,7 +36,7 @@ struct DocumentListView: View {
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
-                        .background(Color(hex: "#222E2F"))
+                        .background(Color(hex: "#223E5A"))
                         .clipShape(Capsule())
                     }
                 }
