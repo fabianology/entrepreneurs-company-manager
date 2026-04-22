@@ -53,6 +53,8 @@ final class Subscription {
     var notes: String
     var pricingModel: String
     var lastUpdated: Date
+    var showSubServicesTab: Bool = true
+    var showLinkedEmailsTab: Bool = true
 
     init(
         id: String = UUID().uuidString,
@@ -74,7 +76,9 @@ final class Subscription {
         recoveryMethod: String = "",
         notes: String = "",
         pricingModel: String = "paid",
-        lastUpdated: Date = Date()
+        lastUpdated: Date = Date(),
+        showSubServicesTab: Bool = true,
+        showLinkedEmailsTab: Bool = true
     ) {
         self.id = id
         self.companyId = companyId
@@ -96,6 +100,8 @@ final class Subscription {
         self.notes = notes
         self.pricingModel = pricingModel
         self.lastUpdated = lastUpdated
+        self.showSubServicesTab = showSubServicesTab
+        self.showLinkedEmailsTab = showLinkedEmailsTab
     }
 
     var subServices: [SubService] {

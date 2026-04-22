@@ -36,6 +36,8 @@ struct EditSubscriptionSheet: View {
     struct Snapshot: Equatable {
         var name, website, pricingModel, status, billingCycle, nextRenewal, paymentMethod, renew, loginId, password, twoFactorAuth, recoveryMethod, notes: String
         var cost: Double
+        var showSubServicesTab: Bool
+        var showLinkedEmailsTab: Bool
     }
     
     @State private var snapshot: Snapshot?
@@ -46,7 +48,7 @@ struct EditSubscriptionSheet: View {
             billingCycle: sub.billingCycle, nextRenewal: sub.nextRenewal, paymentMethod: sub.paymentMethod,
             renew: sub.renew, loginId: sub.loginId, password: sub.password,
             twoFactorAuth: sub.twoFactorAuth, recoveryMethod: sub.recoveryMethod, notes: sub.notes,
-            cost: sub.cost
+            cost: sub.cost, showSubServicesTab: sub.showSubServicesTab, showLinkedEmailsTab: sub.showLinkedEmailsTab
         )
     }
 
@@ -333,34 +335,38 @@ struct EditSubscriptionSheet: View {
                             }
                         }
                         
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "LOGIN ID",
-                                placeholder: "username or email",
-                                text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 }),
-                                keyboardType: .emailAddress
-                            )
-                            
-                            ZStack(alignment: .bottomTrailing) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) {
                                 ZifrField(
-                                    label: "PASSWORD",
-                                    placeholder: "••••••••",
-                                    text: Binding(get: { sub.password }, set: { sub.password = $0 }),
-                                    isSecure: !showPassword
+                                    label: "LOGIN ID",
+                                    placeholder: "username or email",
+                                    text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 }),
+                                    keyboardType: .emailAddress
                                 )
-                                .textInputAutocapitalization(.never)
                                 
-                                Button {
-                                    showPassword.toggle()
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                        .padding()
+                                ZStack(alignment: .bottomTrailing) {
+                                    ZifrField(
+                                        label: "PASSWORD",
+                                        placeholder: "••••••••",
+                                        text: Binding(get: { sub.password }, set: { sub.password = $0 }),
+                                        isSecure: !showPassword
+                                    )
+                                    .textInputAutocapitalization(.never)
+                                    
+                                    Button {
+                                        showPassword.toggle()
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    } label: {
+                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                            .padding()
+                                    }
+                                    .padding(.bottom, 2)
                                 }
-                                .padding(.bottom, 2)
                             }
+                            
+                            DynamicLoginLabelView(loginId: sub.loginId, ignoreSubscriptionId: sub.id)
                         }
 
                     }
@@ -665,6 +671,8 @@ struct EditSubscriptionSheet: View {
                             sub.recoveryMethod = snap.recoveryMethod
                             sub.notes = snap.notes
                             sub.cost = snap.cost
+                            sub.showSubServicesTab = snap.showSubServicesTab
+                            sub.showLinkedEmailsTab = snap.showLinkedEmailsTab
                         }
                         dismiss()
                     }
@@ -747,19 +755,26 @@ struct SubServicesSection: View {
     var body: some View {
         Section {
             if detailLevel != "Essentials" {
-                Button { onAdd() } label: {
-                    HStack {
-                            Spacer()
-                            Text("💾  Add Supplemental Service")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Spacer()
-                        }
-                        .frame(height: 40)
-                        .background(Color(hex: "#223E5A"))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                HStack(spacing: 12) {
+                    Toggle("", isOn: $sub.showSubServicesTab)
+                        .labelsHidden()
+                        .tint(.green)
+                        .scaleEffect(0.7)
+
+                    Button { onAdd() } label: {
+                        HStack {
+                                Spacer()
+                                Text("💾  Add Supplemental Service")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                                Spacer()
+                            }
+                            .frame(height: 40)
+                            .background(Color(hex: "#223E5A"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
                 ForEach(sub.subServices.indices, id: \.self) { i in
@@ -1213,19 +1228,26 @@ struct LinkedEmailsSection: View {
     var body: some View {
         Section {
             if detailLevel != "Essentials" {
-                Button { onAdd() } label: {
-                    HStack {
-                            Spacer()
-                            Text("📨  Add Linked Email")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Spacer()
-                        }
-                        .frame(height: 40)
-                        .background(Color(hex: "#223E5A"))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                HStack(spacing: 12) {
+                    Toggle("", isOn: $sub.showLinkedEmailsTab)
+                        .labelsHidden()
+                        .tint(.green)
+                        .scaleEffect(0.7)
+
+                    Button { onAdd() } label: {
+                        HStack {
+                                Spacer()
+                                Text("📨  Add Linked Email")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                                Spacer()
+                            }
+                            .frame(height: 40)
+                            .background(Color(hex: "#223E5A"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in

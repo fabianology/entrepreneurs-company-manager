@@ -36,6 +36,7 @@ final class Loan {
     var maturityDate: Date?
     var paidOffDate: Date?
     var status: String
+    var notes: String
     @Relationship(deleteRule: .cascade) var payments: [LoanPayment]
 
     init(
@@ -57,6 +58,7 @@ final class Loan {
         maturityDate: Date? = nil,
         paidOffDate: Date? = nil,
         status: String = "Active",
+        notes: String = "",
         payments: [LoanPayment] = []
     ) {
         self.id = id
@@ -77,6 +79,7 @@ final class Loan {
         self.maturityDate = maturityDate
         self.paidOffDate = paidOffDate
         self.status = status
+        self.notes = notes
         self.payments = payments
     }
 

@@ -363,20 +363,25 @@ struct InstitutionCardView: View {
                     .padding(.bottom, 12)
 
                     // ── Credentials (tap-to-copy) ────
-                    HStack(spacing: 12) {
-                        copyableCredential(
-                            id: institution.id,
-                            label: "Login ID",
-                            value: institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username,
-                            field: "login"
-                        )
-                        copyableCredential(
-                            id: institution.id,
-                            label: "Password",
-                            value: institution.password,
-                            field: "password",
-                            isPassword: true
-                        )
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            copyableCredential(
+                                id: institution.id,
+                                label: "Login ID",
+                                value: institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username,
+                                field: "login"
+                            )
+                            copyableCredential(
+                                id: institution.id,
+                                label: "Password",
+                                value: institution.password,
+                                field: "password",
+                                isPassword: true
+                            )
+                        }
+                        
+                        let loginValue = institution.username.isEmpty ? institution.email : institution.username
+                        DynamicLoginLabelView(loginId: loginValue)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -820,34 +825,39 @@ struct EditInstitutionSheet: View {
                             .textInputAutocapitalization(.never)
                         }
 
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "LOGIN ID",
-                                placeholder: "username",
-                                text: Binding(get: { institution.username.isEmpty ? institution.email : institution.username }, set: { institution.username = $0 }),
-                                keyboardType: .emailAddress
-                            )
-
-                            ZStack(alignment: .bottomTrailing) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) {
                                 ZifrField(
-                                    label: "PASSWORD",
-                                    placeholder: "••••••••",
-                                    text: Binding(get: { institution.password }, set: { institution.password = $0 }),
-                                    isSecure: !showPassword
+                                    label: "LOGIN ID",
+                                    placeholder: "username",
+                                    text: Binding(get: { institution.username.isEmpty ? institution.email : institution.username }, set: { institution.username = $0 }),
+                                    keyboardType: .emailAddress
                                 )
-                                .textInputAutocapitalization(.never)
 
-                                Button {
-                                    showPassword.toggle()
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                        .padding()
+                                ZStack(alignment: .bottomTrailing) {
+                                    ZifrField(
+                                        label: "PASSWORD",
+                                        placeholder: "••••••••",
+                                        text: Binding(get: { institution.password }, set: { institution.password = $0 }),
+                                        isSecure: !showPassword
+                                    )
+                                    .textInputAutocapitalization(.never)
+
+                                    Button {
+                                        showPassword.toggle()
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    } label: {
+                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                            .padding()
+                                    }
+                                    .padding(.bottom, 2)
                                 }
-                                .padding(.bottom, 2)
                             }
+                            
+                            let loginValue = institution.username.isEmpty ? institution.email : institution.username
+                            DynamicLoginLabelView(loginId: loginValue)
                         }
                     }
                     .padding(.vertical, 4)
@@ -1472,14 +1482,14 @@ struct EditCardSheet: View {
     }
     
     struct Snapshot: Equatable {
-        var name, last4, type, autopay, cardHolder, cardHolderType, expiry, notes: String
+        var name, last4, network, type, autopay, cardHolder, cardHolderType, expiry, notes: String
         var balance, limit, moPayment, apr, promoApr: Double
         var promoEnds: Date
     }
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: card.name, last4: card.last4, type: card.type, autopay: card.autopay, cardHolder: card.cardHolder, cardHolderType: card.cardHolderType, expiry: card.expiry, notes: card.notes, balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds)
+        Snapshot(name: card.name, last4: card.last4, network: card.network, type: card.type, autopay: card.autopay, cardHolder: card.cardHolder, cardHolderType: card.cardHolderType, expiry: card.expiry, notes: card.notes, balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds)
     }
 
     private var isDirty: Bool {
@@ -1490,19 +1500,20 @@ struct EditCardSheet: View {
     @ViewBuilder private var row1: some View {
         HStack(spacing: 12) {
             ZifrField(label: "CARD NICKNAME", placeholder: "e.g. Sapphire", text: Binding(get: { card.name }, set: { card.name = $0 }))
+            ZifrField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
+        }
+    }
+
+    @ViewBuilder private var row2: some View {
+        HStack(spacing: 12) {
             ZifrField(label: "LAST 4", placeholder: "****", text: Binding(get: { card.last4 }, set: { card.last4 = $0 }), keyboardType: .numberPad)
                 .onChange(of: card.last4) { old, new in
                     let filtered = new.filter { $0.isNumber }
                     let truncated = String(filtered.prefix(4))
                     if card.last4 != truncated { card.last4 = truncated }
                 }
-        }
-    }
-
-    @ViewBuilder private var row2: some View {
-        HStack(spacing: 12) {
-            ZifrField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
             cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
+            cardPicker(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
         }
     }
 
@@ -1707,8 +1718,10 @@ struct EditCardSheet: View {
                     VStack(spacing: 12) {
                         row1
                         row2
-                        row3
-                        row4
+                        if card.type.lowercased() != "debit" {
+                            row3
+                            row4
+                        }
                         row5
                         paysForRow
                     }
@@ -1880,6 +1893,7 @@ struct EditCardSheet: View {
                         } else if let snap = snapshot {
                             card.name = snap.name
                             card.last4 = snap.last4
+                            card.network = snap.network
                             card.type = snap.type
                             card.autopay = snap.autopay
                             card.cardHolder = snap.cardHolder
@@ -2011,7 +2025,7 @@ struct EditLoanSheet: View {
     @State private var showDeleteConfirm = false
     
     struct Snapshot: Equatable {
-        var name, lender, term, role, status, interestType, scheduleFrequency: String
+        var name, lender, term, role, status, interestType, scheduleFrequency, notes: String
         var principalAmount, remainingBalance, monthlyPayment, interestRate: Double
         var termYears, termMonths: Int
         var startDate: Date
@@ -2019,6 +2033,7 @@ struct EditLoanSheet: View {
     }
     @State private var snapshot: Snapshot?
     @State private var showAmortizationTable = false
+    @State private var isAutoUpdating = false
 
     private var currentSnapshot: Snapshot {
         Snapshot(
@@ -2029,6 +2044,7 @@ struct EditLoanSheet: View {
             status: loan.status,
             interestType: loan.interestType,
             scheduleFrequency: loan.scheduleFrequency,
+            notes: loan.notes,
             principalAmount: loan.principalAmount,
             remainingBalance: loan.remainingBalance,
             monthlyPayment: loan.monthlyPayment,
@@ -2124,6 +2140,7 @@ struct EditLoanSheet: View {
                             loan.startDate = snap.startDate
                             loan.maturityDate = snap.maturityDate
                             loan.paidOffDate = snap.paidOffDate
+                            loan.notes = snap.notes
                         }
                         dismiss()
                     }
@@ -2450,6 +2467,7 @@ struct EditLoanSheet: View {
                                 ForEach(0...30, id: \.self) { year in Text("\(year) \(year == 1 ? "Year" : "Years")").tag(year) }
                             }
                             .labelsHidden().tint(.white).frame(maxWidth: .infinity)
+                            .onChange(of: loan.termYears) { _, _ in updateMaturityDate() }
                             
                             Divider().background(Color.white.opacity(0.1)).padding(.vertical, 8)
                             
@@ -2457,6 +2475,7 @@ struct EditLoanSheet: View {
                                 ForEach(0...11, id: \.self) { month in Text("\(month) \(month == 1 ? "Month" : "Months")").tag(month) }
                             }
                             .labelsHidden().tint(.white).frame(maxWidth: .infinity)
+                            .onChange(of: loan.termMonths) { _, _ in updateMaturityDate() }
                         }
                         .frame(height: 44)
                         .background(Color(hex: "#111111"))
@@ -2481,6 +2500,7 @@ struct EditLoanSheet: View {
             
             HStack(spacing: 12) {
                 datePicker(label: "START DATE", selection: $loan.startDate)
+                    .onChange(of: loan.startDate) { _, _ in updateMaturityDate() }
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("MATURITY")
@@ -2493,6 +2513,7 @@ struct EditLoanSheet: View {
                             .datePickerStyle(.compact)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .frame(height: 44)
+                            .onChange(of: loan.maturityDate) { _, _ in updateTerm() }
                     } else {
                         Button {
                             loan.maturityDate = Date()
@@ -2506,6 +2527,23 @@ struct EditLoanSheet: View {
                     }
                 }
             }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("LOAN SUMMARY")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .padding(.leading, 6)
+                
+                TextField("Add notes...", text: Binding(get: { loan.notes }, set: { loan.notes = $0 }), axis: .vertical)
+                    .lineLimit(3...6)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    .padding(12)
+                    .background(Color(hex: "#111111"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+            .padding(.top, 4)
         }
         .padding(16)
         .background(Color.white.opacity(0.03))
@@ -2609,5 +2647,32 @@ struct EditLoanSheet: View {
         .background(Color.white.opacity(0.03))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.05), lineWidth: 1))
+    }
+    
+    private func updateMaturityDate() {
+        if isAutoUpdating { return }
+        var dateComponent = DateComponents()
+        dateComponent.year = loan.termYears
+        dateComponent.month = loan.termMonths
+        if let newDate = Calendar.current.date(byAdding: dateComponent, to: loan.startDate) {
+            if let current = loan.maturityDate, Calendar.current.isDate(current, inSameDayAs: newDate) { return }
+            isAutoUpdating = true
+            loan.maturityDate = newDate
+            DispatchQueue.main.async { isAutoUpdating = false }
+        }
+    }
+
+    private func updateTerm() {
+        if isAutoUpdating { return }
+        guard let maturity = loan.maturityDate else { return }
+        let components = Calendar.current.dateComponents([.year, .month], from: loan.startDate, to: maturity)
+        let y = min(max(components.year ?? 0, 0), 30)
+        let m = min(max(components.month ?? 0, 0), 11)
+        if loan.termYears == y && loan.termMonths == m { return }
+        
+        isAutoUpdating = true
+        loan.termYears = y
+        loan.termMonths = m
+        DispatchQueue.main.async { isAutoUpdating = false }
     }
 }

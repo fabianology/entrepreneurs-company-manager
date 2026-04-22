@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct SubscriptionListView: View {
     let company: Company
@@ -212,12 +213,6 @@ struct SubscriptionCardView: View {
                                 .textCase(.uppercase)
                                 .tracking(0.3)
                                 .foregroundStyle(Color.zifrGreen)
-                            statusPipe()
-                            Text(sub.status)
-                                .font(.system(size: 11, weight: .semibold))
-                                .textCase(.uppercase)
-                                .tracking(0.3)
-                                .foregroundStyle(Color.zifrGreen)
                             Spacer()
                         }
                         .padding(.horizontal, 24)
@@ -225,9 +220,13 @@ struct SubscriptionCardView: View {
                     }
 
                     // Credentials row — tap-to-copy
-                    HStack(spacing: 12) {
-                        copyableCredential(id: sub.id, label: "Login ID", value: sub.loginId, field: "login")
-                        copyableCredential(id: sub.id, label: "Password", value: sub.password, field: "password", isPassword: true)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            copyableCredential(id: sub.id, label: "Login ID", value: sub.loginId, field: "login")
+                            copyableCredential(id: sub.id, label: "Password", value: sub.password, field: "password", isPassword: true)
+                        }
+                        
+                        DynamicLoginLabelView(loginId: sub.loginId, ignoreSubscriptionId: sub.id)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -260,7 +259,8 @@ struct SubscriptionCardView: View {
             }
 
             // ── Supplemental Services accordion ─────────────────────────
-            accordionDivider()
+            if sub.showSubServicesTab {
+                accordionDivider()
             accordionToggle(label: "Supplemental Services", count: sub.subServices.count, expanded: showSubServices) {
                 withAnimation(.easeInOut(duration: 0.2)) { showSubServices.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -343,9 +343,11 @@ struct SubscriptionCardView: View {
                 .padding(.bottom, 24)
                 .clipped()
             }
+            }
 
             // ── Linked Emails accordion ──────────────────────────────────
-            accordionDivider()
+            if sub.showLinkedEmailsTab {
+                accordionDivider()
             accordionToggle(label: "Linked Emails", count: sub.linkedEmails.count, expanded: showLinkedEmails) {
                 withAnimation(.easeInOut(duration: 0.2)) { showLinkedEmails.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -416,6 +418,7 @@ struct SubscriptionCardView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
                 .clipped()
+            }
             }
         }
         // ── Card container: #171717 + border 5% ─────────────────────────
@@ -637,6 +640,50 @@ struct SubscriptionCardView: View {
                         .foregroundStyle(Color(hex: "#545454"))
                         .lineLimit(2)
                 }
+            }
+        }
+    }
+}
+
+struct DynamicLoginLabelView: View {
+    let loginId: String
+    var ignoreSubscriptionId: String? = nil
+    
+    @Query private var allSubscriptions: [Subscription]
+    
+    var body: some View {
+        let normalizedEmail = loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalizedEmail.isEmpty && normalizedEmail.contains("@") {
+            let computedServices: [UsedInEmailService] = allSubscriptions.compactMap { s in
+                if let ignoreId = ignoreSubscriptionId, s.id == ignoreId { return nil }
+                
+                if s.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail {
+                    return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .primary)
+                } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }) {
+                    return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .linked)
+                }
+                return nil
+            }
+            
+            let allTextTags = computedServices.map { $0.name }
+            
+            if !allTextTags.isEmpty {
+                HStack(spacing: 4) {
+                    Text("LOGIN USED IN:")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .textCase(.uppercase)
+                    
+                    Image(systemName: "link")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#545454"))
+                    
+                    Text(allTextTags.joined(separator: " | "))
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color(hex: "#545454"))
+                        .lineLimit(2)
+                }
+                .padding(.top, 2)
             }
         }
     }
