@@ -2056,6 +2056,7 @@ struct EditLoanSheet: View {
                     
                     VStack(spacing: 12) {
                         loanPrincipalSection()
+                        loanPaymentsLedgerSection()
                     }
                     .padding(.horizontal, 20)
                 .listRowBackground(Color.clear)
@@ -2435,13 +2436,41 @@ struct EditLoanSheet: View {
                 )
             }
             
-            HStack(spacing: 12) {
-                moneyField(label: "PRINCIPAL", value: $loan.principalAmount)
-                
-                if loan.role == "Lender" {
+            GeometryReader { geo in
+                HStack(spacing: 12) {
+                    moneyField(label: "PRINCIPAL", value: $loan.principalAmount)
+                        .frame(width: geo.size.width * 0.3 - 6)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("LOAN TERM")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        HStack(spacing: 0) {
+                            Picker("Years", selection: $loan.termYears) {
+                                ForEach(0...30, id: \.self) { year in Text("\(year) \(year == 1 ? "Year" : "Years")").tag(year) }
+                            }
+                            .labelsHidden().tint(.white).frame(maxWidth: .infinity)
+                            
+                            Divider().background(Color.white.opacity(0.1)).padding(.vertical, 8)
+                            
+                            Picker("Months", selection: $loan.termMonths) {
+                                ForEach(0...11, id: \.self) { month in Text("\(month) \(month == 1 ? "Month" : "Months")").tag(month) }
+                            }
+                            .labelsHidden().tint(.white).frame(maxWidth: .infinity)
+                        }
+                        .frame(height: 44)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    }
+                    .frame(width: geo.size.width * 0.7 - 6)
+                }
+            }
+            .frame(height: 64)
+            
+            if loan.role == "Lender" {
+                HStack(spacing: 12) {
                     loanPicker(label: "INTEREST TYPE", sel: $loan.interestType, opts: Loan.interestTypes)
-                } else {
-                    datePicker(label: "PAID OFF DATE", selection: Binding(get: { loan.paidOffDate ?? Date() }, set: { loan.paidOffDate = $0 }))
                 }
             }
             
@@ -2477,41 +2506,104 @@ struct EditLoanSheet: View {
                     }
                 }
             }
-            
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LOAN TERM")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.5))
-                    HStack(spacing: 0) {
-                        Picker("Years", selection: $loan.termYears) {
-                            ForEach(0...30, id: \.self) { year in
-                                Text("\(year) Yrs").tag(year)
-                            }
-                        }
-                        .labelsHidden()
-                        .tint(.white)
-                        .frame(maxWidth: .infinity)
-                        
-                        Divider()
-                            .background(Color.white.opacity(0.1))
-                            .padding(.vertical, 8)
-                        
-                        Picker("Months", selection: $loan.termMonths) {
-                            ForEach(0...11, id: \.self) { month in
-                                Text("\(month) Mos").tag(month)
-                            }
-                        }
-                        .labelsHidden()
-                        .tint(.white)
-                        .frame(maxWidth: .infinity)
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.05), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private func loanPaymentsLedgerSection() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("PAYMENT LEDGER")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .tracking(1)
+                
+                Spacer()
+                
+                Button {
+                    withAnimation {
+                        let pmt = LoanPayment()
+                        loan.payments.append(pmt)
                     }
-                    .frame(height: 44)
-                    .background(Color(hex: "#111111"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.zifrGold)
+                        .padding(6)
+                        .background(Color.zifrGold.opacity(0.1))
+                        .clipShape(Circle())
                 }
             }
+            
+            VStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    Text("DATE")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("AMOUNT")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Text("FROM")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    Text("TOTAL")
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.4))
+                .textCase(.uppercase)
+                .tracking(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(hex: "#1C1C1E"))
+                
+                Divider().background(Color.white.opacity(0.05))
+                
+                if loan.payments.isEmpty {
+                    Text("No payments recorded yet.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                        .padding(.vertical, 20)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    ForEach($loan.payments) { $payment in
+                        HStack(spacing: 4) {
+                            DatePicker("", selection: $payment.date, displayedComponents: .date)
+                                .labelsHidden()
+                                .datePickerStyle(.compact)
+                                .scaleEffect(0.75, anchor: .leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            TextField("0.00", value: $payment.amount, format: .currency(code: "USD"))
+                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.trailing)
+                                .keyboardType(.decimalPad)
+                                .frame(maxWidth: .infinity)
+                            
+                            TextField("Source", text: $payment.source)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.trailing)
+                                .frame(maxWidth: .infinity)
+                            
+                            Text(payment.amount.currencyString)
+                                .font(.system(size: 11, weight: .black, design: .monospaced))
+                                .foregroundStyle(Color.zifrGold)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        
+                        if payment.id != loan.payments.last?.id {
+                            Divider().background(Color.white.opacity(0.05))
+                        }
+                    }
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
         }
         .padding(16)
         .background(Color.white.opacity(0.03))

@@ -2,6 +2,21 @@ import Foundation
 import SwiftData
 
 @Model
+final class LoanPayment: Identifiable {
+    var id: String
+    var date: Date
+    var amount: Double
+    var source: String
+    
+    init(id: String = UUID().uuidString, date: Date = Date(), amount: Double = 0, source: String = "") {
+        self.id = id
+        self.date = date
+        self.amount = amount
+        self.source = source
+    }
+}
+
+@Model
 final class Loan {
     var id: String
     var companyId: String
@@ -21,6 +36,7 @@ final class Loan {
     var maturityDate: Date?
     var paidOffDate: Date?
     var status: String
+    @Relationship(deleteRule: .cascade) var payments: [LoanPayment]
 
     init(
         id: String = UUID().uuidString,
@@ -40,7 +56,8 @@ final class Loan {
         startDate: Date = Date(),
         maturityDate: Date? = nil,
         paidOffDate: Date? = nil,
-        status: String = "Active"
+        status: String = "Active",
+        payments: [LoanPayment] = []
     ) {
         self.id = id
         self.companyId = companyId
@@ -60,6 +77,7 @@ final class Loan {
         self.maturityDate = maturityDate
         self.paidOffDate = paidOffDate
         self.status = status
+        self.payments = payments
     }
 
     var progressPercent: Double {
