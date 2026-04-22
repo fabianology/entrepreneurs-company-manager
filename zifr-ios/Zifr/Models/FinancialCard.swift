@@ -21,6 +21,9 @@ final class FinancialCard {
     var autopay: String
     var balance: Double = 0.0
     var moPayment: Double = 0.0
+    var apr: Double = 0.0
+    var promoApr: Double = 0.0
+    var promoEnds: Date = Date()
     var cardHolderType: String = "Mine"
     var notes: String = ""
 
@@ -43,6 +46,9 @@ final class FinancialCard {
         autopay: String = "N/A",
         balance: Double = 0,
         moPayment: Double = 0,
+        apr: Double = 0,
+        promoApr: Double = 0,
+        promoEnds: Date = Date(),
         cardHolderType: String = "Mine",
         notes: String = ""
     ) {
@@ -64,6 +70,9 @@ final class FinancialCard {
         self.autopay = autopay
         self.balance = balance
         self.moPayment = moPayment
+        self.apr = apr
+        self.promoApr = promoApr
+        self.promoEnds = promoEnds
         self.cardHolderType = cardHolderType
         self.notes = notes
     }

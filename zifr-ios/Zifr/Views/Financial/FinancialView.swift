@@ -184,7 +184,10 @@ struct FinancialView: View {
                 totalMonthlyPayment: instLoans.reduce(0) { $0 + $1.monthlyPayment },
                 cardCount: instCards.count,
                 loanCount: instLoans.count,
-                onEdit: { editingInst = inst }
+                loans: instLoans,
+                vm: vm,
+                onEdit: { editingInst = inst },
+                onEditLoan: { editingLoan = $0 }
             )
             .zIndex(20)
         }
@@ -285,10 +288,16 @@ struct InstitutionCardView: View {
     let totalMonthlyPayment: Double
     let cardCount: Int
     let loanCount: Int
+    let loans: [Loan]
+    @Bindable var vm: AppViewModel
     let onEdit: () -> Void
+    let onEditLoan: (Loan) -> Void
     @State private var expanded = false
     @State private var copiedField: String? = nil
     @State private var passwordRevealed = false
+
+    @State private var editingAccount: InstitutionAccount? = nil
+    @State private var accountDraft = InstitutionAccount()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -387,23 +396,70 @@ struct InstitutionCardView: View {
             if expanded {
                 VStack(spacing: 12) {
                     ForEach(institution.accounts) { acc in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(acc.type == "Credit Card" ? Color.orange : (acc.type == "Checking" ? Color.zifrGold : Color.green))
-                                .frame(width: 6, height: 6)
-                            Text(acc.name.isEmpty ? "Account" : acc.name)
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.85))
-                            Text(acc.type)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.35))
-                            Spacer()
-                            if !acc.last4.isEmpty {
-                                Text("••\(acc.last4)")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.zifrGold)
+                        Button {
+                            accountDraft = acc
+                            editingAccount = acc
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(acc.name.isEmpty ? "Account" : acc.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                    
+                                    HStack(spacing: 6) {
+                                        Text(acc.type)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.6))
+                                    }
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text(acc.balance.currencyString)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
                         }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(loans) { loan in
+                        Button {
+                            onEditLoan(loan)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(loan.name.isEmpty ? "Loan" : loan.name)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                    
+                                    HStack(spacing: 6) {
+                                        Text(loan.role)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.6))
+                                    }
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    Text(loan.remainingBalance.currencyString)
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -414,6 +470,32 @@ struct InstitutionCardView: View {
         .background(Color(hex: "#171717"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
+        .sheet(item: $editingAccount) { _ in
+            InstitutionAccountHUD(
+                draft: $accountDraft,
+                isNew: false,
+                onSave: {
+                    if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
+                        var updated = institution.accounts
+                        updated[idx] = accountDraft
+                        institution.accounts = updated
+                    }
+                    editingAccount = nil
+                },
+                onCancel: { editingAccount = nil },
+                onDelete: {
+                    if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
+                        let acc = institution.accounts[idx]
+                        vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
+                        institution.accounts.remove(at: idx)
+                    }
+                    editingAccount = nil
+                }
+            )
+            .presentationDetents([.height(420)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+        }
     }
 
     private func costColumn(value: Double, label: String) -> some View {
@@ -1391,12 +1473,13 @@ struct EditCardSheet: View {
     
     struct Snapshot: Equatable {
         var name, last4, type, autopay, cardHolder, cardHolderType, expiry, notes: String
-        var balance, limit, moPayment: Double
+        var balance, limit, moPayment, apr, promoApr: Double
+        var promoEnds: Date
     }
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: card.name, last4: card.last4, type: card.type, autopay: card.autopay, cardHolder: card.cardHolder, cardHolderType: card.cardHolderType, expiry: card.expiry, notes: card.notes, balance: card.balance, limit: card.limit, moPayment: card.moPayment)
+        Snapshot(name: card.name, last4: card.last4, type: card.type, autopay: card.autopay, cardHolder: card.cardHolder, cardHolderType: card.cardHolderType, expiry: card.expiry, notes: card.notes, balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds)
     }
 
     private var isDirty: Bool {
@@ -1559,53 +1642,60 @@ struct EditCardSheet: View {
 
     @ViewBuilder private var paysForRow: some View {
         let services = paysForServices
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("PAYS FOR")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.5))
                 .padding(.leading, 6)
             
             if services.isEmpty {
-                Text("None")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.4))
+                Text("No linked services")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.3))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
-                    .frame(height: 44)
+                    .frame(height: 50)
                     .background(Color(hex: "#111111"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(Array(services.enumerated()), id: \.offset) { index, svc in
-                            HStack(spacing: 4) {
-                                Text(svc.name)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                if svc.cost > 0 {
-                                    Text("·")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(Color.white.opacity(0.3))
-                                    Text("$\(String(format: "%.2f", svc.cost))")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.6))
-                                }
+                ForEach(Array(services.enumerated()), id: \.offset) { index, svc in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(svc.name)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                            
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(Color.zifrGreen)
+                                    .frame(width: 6, height: 6)
+                                
+                                Text("|")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(Color.white.opacity(0.2))
+                                
+                                Text("Paid with \(card.name)")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                        Spacer()
+                        HStack(alignment: .firstTextBaseline, spacing: 2) {
+                            Text("$\(String(format: "%.0f", svc.cost))")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Text("/mo")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.5))
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(Color(hex: "#111111"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(height: 44)
-                .background(Color(hex: "#111111"))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
             }
         }
     }
@@ -1697,6 +1787,20 @@ struct EditCardSheet: View {
                                     moneyField(label: "MO. PAYMENT", value: Binding(get: { card.moPayment }, set: { card.moPayment = $0 }))
                                     Color.clear.frame(maxWidth: .infinity)
                                 }
+
+                                if card.type == "Credit" {
+                                    HStack(spacing: 12) {
+                                        aprField(label: "APR%", value: $card.apr)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(width: (UIScreen.main.bounds.width - 64) * 0.28)
+                                        
+                                        aprField(label: "PROMO APR%", value: $card.promoApr)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(width: (UIScreen.main.bounds.width - 64) * 0.28)
+                                        
+                                        datePicker(label: "ENDS", selection: $card.promoEnds)
+                                    }
+                                }
                             }
                         }
                     } header: { EmptyView() }
@@ -1785,6 +1889,9 @@ struct EditCardSheet: View {
                             card.balance = snap.balance
                             card.limit = snap.limit
                             card.moPayment = snap.moPayment
+                            card.apr = snap.apr
+                            card.promoApr = snap.promoApr
+                            card.promoEnds = snap.promoEnds
                         }
                         dismiss()
                     }
@@ -1810,6 +1917,42 @@ struct EditCardSheet: View {
                     }
                 }
             }
+        }
+    }
+
+    private func datePicker(label: String, selection: Binding<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            
+            DatePicker("", selection: selection, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 44)
+        }
+    }
+
+    private func aprField(label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            HStack(spacing: 4) {
+                DoubleField(placeholder: "0.00", value: value)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("%")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 44)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
     }
 
@@ -1868,13 +2011,34 @@ struct EditLoanSheet: View {
     @State private var showDeleteConfirm = false
     
     struct Snapshot: Equatable {
-        var name, lender, term, startDate, role, status: String
+        var name, lender, term, role, status, interestType, scheduleFrequency: String
         var principalAmount, remainingBalance, monthlyPayment, interestRate: Double
+        var termYears, termMonths: Int
+        var startDate: Date
+        var maturityDate, paidOffDate: Date?
     }
     @State private var snapshot: Snapshot?
+    @State private var showAmortizationTable = false
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: loan.name, lender: loan.lender, term: loan.term, startDate: loan.startDate, role: loan.role, status: loan.status, principalAmount: loan.principalAmount, remainingBalance: loan.remainingBalance, monthlyPayment: loan.monthlyPayment, interestRate: loan.interestRate)
+        Snapshot(
+            name: loan.name,
+            lender: loan.lender,
+            term: loan.term,
+            role: loan.role,
+            status: loan.status,
+            interestType: loan.interestType,
+            scheduleFrequency: loan.scheduleFrequency,
+            principalAmount: loan.principalAmount,
+            remainingBalance: loan.remainingBalance,
+            monthlyPayment: loan.monthlyPayment,
+            interestRate: loan.interestRate,
+            termYears: loan.termYears,
+            termMonths: loan.termMonths,
+            startDate: loan.startDate,
+            maturityDate: loan.maturityDate,
+            paidOffDate: loan.paidOffDate
+        )
     }
 
     private var isDirty: Bool {
@@ -1884,96 +2048,21 @@ struct EditLoanSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
+            ScrollView {
+                VStack(spacing: 24) {
+                    loanSummarySection()
+                    
+                    loanRoleSection()
+                    
                     VStack(spacing: 12) {
-                        HStack(spacing: 12) {
-                            ZifrField(label: "LOAN NAME", placeholder: "e.g. Startup Loan", text: Binding(get: { loan.name }, set: { loan.name = $0 }))
-                            ZifrField(label: "LENDER", placeholder: "e.g. Chase", text: Binding(get: { loan.lender }, set: { loan.lender = $0 }))
-                        }
-
-                        HStack(spacing: 12) {
-                            moneyField(label: "PRINCIPAL", value: Binding(get: { loan.principalAmount }, set: { loan.principalAmount = $0 }))
-                            moneyField(label: "REMAINING", value: Binding(get: { loan.remainingBalance }, set: { loan.remainingBalance = $0 }))
-                        }
-
-                        HStack(spacing: 12) {
-                            moneyField(label: "MO. PAYMENT", value: Binding(get: { loan.monthlyPayment }, set: { loan.monthlyPayment = $0 }))
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("RATE(%)")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                HStack(spacing: 4) {
-                                    DoubleField(placeholder: "0.00", value: Binding(get: { loan.interestRate }, set: { loan.interestRate = $0 }))
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                    Text("%")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                }
-                                .padding(.horizontal, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(height: 44)
-                                .background(Color(hex: "#111111"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                            }
-                        }
-
-                        HStack(spacing: 12) {
-                            ZifrField(label: "TERM", placeholder: "36 months", text: Binding(get: { loan.term }, set: { loan.term = $0 }))
-                            ZifrField(label: "START DATE", placeholder: "MM/DD/YYYY", text: Binding(get: { loan.startDate }, set: { loan.startDate = $0 }), keyboardType: .numberPad)
-                                .onChange(of: loan.startDate) { old, new in
-                                    var filtered = new.filter { $0.isNumber }
-                                    if old.count == 3 && old.hasSuffix("/") && new.count == 2 {
-                                        filtered = String(filtered.prefix(1))
-                                    } else if old.count == 6 && old.hasSuffix("/") && new.count == 5 {
-                                        filtered = String(filtered.prefix(4))
-                                    }
-                                    
-                                    if filtered.count > 4 {
-                                        filtered.insert("/", at: filtered.index(filtered.startIndex, offsetBy: 2))
-                                        filtered.insert("/", at: filtered.index(filtered.startIndex, offsetBy: 5))
-                                    } else if filtered.count > 2 {
-                                        filtered.insert("/", at: filtered.index(filtered.startIndex, offsetBy: 2))
-                                    }
-                                    
-                                    if filtered.count > 10 {
-                                        filtered = String(filtered.prefix(10))
-                                    }
-                                    if loan.startDate != filtered { loan.startDate = filtered }
-                                }
-                        }
-
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("ROLE")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                VStack(spacing: 0) {
-                                    Spacer()
-                                    Picker("Role", selection: Binding(get: { loan.role }, set: { loan.role = $0 })) {
-                                        Text("Lendee").tag("Lendee")
-                                        Text("Lender").tag("Lender")
-                                    }
-                                    .pickerStyle(.segmented)
-                                    .labelsHidden()
-                                    Spacer()
-                                }
-                                .frame(height: 44)
-                            }
-                            loanPicker(label: "STATUS", sel: Binding(get: { loan.status }, set: { loan.status = $0 }), opts: Loan.statuses)
-                        }
+                        loanPrincipalSection()
                     }
-                    .padding(.vertical, 4)
-                } header: { EmptyView() }
+                    .padding(.horizontal, 20)
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
 
-                if !isNew {
-                    Section {
+                    if !isNew {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                             showDeleteConfirm = true
@@ -1990,6 +2079,9 @@ struct EditLoanSheet: View {
                             .background(Color.white.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .padding(.bottom, 32)
                         .buttonStyle(.plain)
                         .confirmationDialog("Delete Loan?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("Delete Loan", role: .destructive) {
@@ -1999,9 +2091,6 @@ struct EditLoanSheet: View {
                             Button("Cancel", role: .cancel) {}
                         }
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -2021,14 +2110,19 @@ struct EditLoanSheet: View {
                         } else if let snap = snapshot {
                             loan.name = snap.name
                             loan.lender = snap.lender
-                            loan.term = snap.term
-                            loan.startDate = snap.startDate
                             loan.role = snap.role
                             loan.status = snap.status
+                            loan.interestType = snap.interestType
+                            loan.scheduleFrequency = snap.scheduleFrequency
                             loan.principalAmount = snap.principalAmount
                             loan.remainingBalance = snap.remainingBalance
                             loan.monthlyPayment = snap.monthlyPayment
                             loan.interestRate = snap.interestRate
+                            loan.termYears = snap.termYears
+                            loan.termMonths = snap.termMonths
+                            loan.startDate = snap.startDate
+                            loan.maturityDate = snap.maturityDate
+                            loan.paidOffDate = snap.paidOffDate
                         }
                         dismiss()
                     }
@@ -2068,6 +2162,49 @@ struct EditLoanSheet: View {
         .buttonStyle(.borderless)
     }
 
+    private func datePicker(label: String, selection: Binding<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            
+            DatePicker("", selection: selection, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 44)
+        }
+    }
+
+    private func aprField(label: String, value: Binding<Double>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.5))
+            HStack(spacing: 4) {
+                if loan.interestType == "Fixed" {
+                    Text("$")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                DoubleField(placeholder: loan.interestType == "Fixed" ? "0" : "0.00", value: value)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                if loan.interestType != "Fixed" {
+                    Text("%")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: 44)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+    }
+
     private func moneyField(label: String, value: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
@@ -2088,5 +2225,297 @@ struct EditLoanSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
+    }
+
+    @ViewBuilder
+    private func loanSummarySection() -> some View {
+        let amort = loan.amortization
+        VStack(spacing: 20) {
+            // Header Stats
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(loan.name.isEmpty ? "Loan" : loan.name)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(loan.lender.isEmpty ? "Lender Unknown" : loan.lender)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.6))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(loan.principalAmount.currencyString)
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(.white)
+                    Text("PRINCIPAL")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(Color.white.opacity(0.4))
+                }
+            }
+            
+            // Progress Bar
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Principal: \(amort.totalPrincipal.currencyString)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.zifrGold)
+                    Spacer()
+                    Text("\(loan.interestType == "Fixed" ? "Fee" : "Interest"): \(amort.totalInterest.currencyString)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.orange)
+                }
+                
+                GeometryReader { geo in
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.zifrGold)
+                            .frame(width: geo.size.width * (amort.principalPct / 100))
+                        Rectangle()
+                            .fill(Color.orange)
+                    }
+                }
+                .frame(height: 8)
+                .clipShape(Capsule())
+                .background(Color.white.opacity(0.05))
+            }
+            
+            // Stats Grid
+            GeometryReader { geo in
+                HStack(spacing: 0) {
+                    summaryStatColumn(label: "INTEREST", value: amort.totalInterest.currencyString, width: geo.size.width / 3)
+                    summaryStatColumn(label: "TOTAL COST", value: amort.totalCost.currencyString, width: geo.size.width / 3)
+                    summaryStatColumn(label: "MO. PAYMENT", value: amort.monthlyPayment.currencyString, width: geo.size.width / 3)
+                }
+            }
+            .frame(height: 40)
+            
+            if !amort.schedule.isEmpty {
+                VStack(spacing: 12) {
+                    Divider().background(Color.white.opacity(0.05))
+                        .padding(.vertical, 4)
+                        
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showAmortizationTable.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text(showAmortizationTable ? "Hide Schedule" : "Amortization Schedule")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.6))
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.6))
+                                .rotationEffect(.degrees(showAmortizationTable ? 180 : 0))
+                            Spacer()
+                        }
+                        .frame(height: 36)
+                        .background(Color.white.opacity(0.03))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    if showAmortizationTable {
+                        VStack(spacing: 0) {
+                            HStack {
+                                Text(loan.scheduleFrequency == "Weekly" ? "WK" : (loan.scheduleFrequency == "Yearly" ? "YR" : "MO"))
+                                    .frame(width: 30, alignment: .leading)
+                                Text("PMT")
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                Text("PRIN")
+                                    .foregroundStyle(Color.zifrGold)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                Text("INT")
+                                    .foregroundStyle(Color.orange)
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                Text("BAL")
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                            }
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .textCase(.uppercase)
+                            .tracking(1)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(hex: "#1C1C1E"))
+                            
+                            Divider().background(Color.white.opacity(0.05))
+                            
+                            ScrollView {
+                                VStack(spacing: 0) {
+                                    ForEach(amort.schedule) { row in
+                                        HStack {
+                                            Text("\(row.month)")
+                                                .foregroundStyle(Color.white.opacity(0.5))
+                                                .frame(width: 30, alignment: .leading)
+                                            Text("$\(Int(round(row.payment)))")
+                                                .foregroundStyle(Color.white.opacity(0.9))
+                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                            Text("$\(Int(round(row.principal)))")
+                                                .foregroundStyle(Color.zifrGold.opacity(0.8))
+                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                            Text("$\(Int(round(row.interest)))")
+                                                .foregroundStyle(Color.orange.opacity(0.8))
+                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                            Text("$\(Int(round(row.balance)))")
+                                                .foregroundStyle(Color.white)
+                                                .fontWeight(.bold)
+                                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                        }
+                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        
+                                        if row.month != amort.schedule.last?.month {
+                                            Divider().background(Color.white.opacity(0.03))
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxHeight: 250)
+                            .background(Color.black.opacity(0.2))
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .background(Color(hex: "#111111"))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+    }
+
+    private func summaryStatColumn(label: String, value: String, width: CGFloat) -> some View {
+        VStack(alignment: .center, spacing: 4) {
+            Text(label)
+                .font(.system(size: 9, weight: .black))
+                .tracking(1)
+                .foregroundStyle(Color.white.opacity(0.4))
+            Text(value)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+        }
+        .frame(width: width)
+    }
+
+    @ViewBuilder
+    private func loanRoleSection() -> some View {
+        Picker("Role", selection: $loan.role) {
+            ForEach(Loan.roles, id: \.self) { role in
+                Text(role).tag(role)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(height: 44)
+        .padding(.horizontal, 20)
+        .disabled(!isNew)
+    }
+
+
+    @ViewBuilder
+    private func loanPrincipalSection() -> some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                ZifrField(
+                    label: loan.role == "Lender" ? "LENT TO" : "LENDER", 
+                    placeholder: loan.role == "Lender" ? "e.g. Acme Corp" : "e.g. Chase", 
+                    text: $loan.lender
+                )
+                ZifrField(
+                    label: loan.role == "Lender" ? "LOAN NAME" : "LOAN ID", 
+                    placeholder: loan.role == "Lender" ? "e.g. Bridge Loan" : "e.g. Series A", 
+                    text: $loan.name
+                )
+            }
+            
+            HStack(spacing: 12) {
+                moneyField(label: "PRINCIPAL", value: $loan.principalAmount)
+                
+                if loan.role == "Lender" {
+                    loanPicker(label: "INTEREST TYPE", sel: $loan.interestType, opts: Loan.interestTypes)
+                } else {
+                    datePicker(label: "PAID OFF DATE", selection: Binding(get: { loan.paidOffDate ?? Date() }, set: { loan.paidOffDate = $0 }))
+                }
+            }
+            
+            HStack(spacing: 12) {
+                aprField(label: loan.interestType == "Fixed" ? "FIXED FEE" : "YR APR", value: $loan.interestRate)
+                loanPicker(label: "PAYMENT FREQUENCY", sel: $loan.scheduleFrequency, opts: Loan.frequencies)
+            }
+            
+            HStack(spacing: 12) {
+                datePicker(label: "START DATE", selection: $loan.startDate)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("MATURITY")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                    
+                    if let selection = Binding($loan.maturityDate) {
+                        DatePicker("", selection: selection, displayedComponents: .date)
+                            .labelsHidden()
+                            .datePickerStyle(.compact)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                    } else {
+                        Button {
+                            loan.maturityDate = Date()
+                        } label: {
+                            Text("Set Date")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(Color.zifrGold)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                        }
+                    }
+                }
+            }
+            
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("LOAN TERM")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                    HStack(spacing: 0) {
+                        Picker("Years", selection: $loan.termYears) {
+                            ForEach(0...30, id: \.self) { year in
+                                Text("\(year) Yrs").tag(year)
+                            }
+                        }
+                        .labelsHidden()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity)
+                        
+                        Divider()
+                            .background(Color.white.opacity(0.1))
+                            .padding(.vertical, 8)
+                        
+                        Picker("Months", selection: $loan.termMonths) {
+                            ForEach(0...11, id: \.self) { month in
+                                Text("\(month) Mos").tag(month)
+                            }
+                        }
+                        .labelsHidden()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity)
+                    }
+                    .frame(height: 44)
+                    .background(Color(hex: "#111111"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.05), lineWidth: 1))
     }
 }

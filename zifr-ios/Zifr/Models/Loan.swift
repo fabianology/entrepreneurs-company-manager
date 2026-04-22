@@ -17,9 +17,9 @@ final class Loan {
     var termMonths: Int
     var scheduleFrequency: String
     var monthlyPayment: Double
-    var startDate: String
-    var maturityDate: String
-    var paidOffDate: String
+    var startDate: Date
+    var maturityDate: Date?
+    var paidOffDate: Date?
     var status: String
 
     init(
@@ -37,9 +37,9 @@ final class Loan {
         termMonths: Int = 36,
         scheduleFrequency: String = "Monthly",
         monthlyPayment: Double = 0,
-        startDate: String = "",
-        maturityDate: String = "",
-        paidOffDate: String = "",
+        startDate: Date = Date(),
+        maturityDate: Date? = nil,
+        paidOffDate: Date? = nil,
         status: String = "Active"
     ) {
         self.id = id
@@ -65,6 +65,81 @@ final class Loan {
     var progressPercent: Double {
         guard principalAmount > 0 else { return 0 }
         return max(0, min(1, (principalAmount - remainingBalance) / principalAmount))
+    }
+
+    struct AmortizationRow: Identifiable {
+        var id: Int { month }
+        var month: Int
+        var payment: Double
+        var principal: Double
+        var interest: Double
+        var balance: Double
+    }
+
+    struct AmortizationResult {
+        var monthlyPayment: Double
+        var totalPrincipal: Double
+        var totalInterest: Double
+        var totalCost: Double
+        var principalPct: Double
+        var interestPct: Double
+        var schedule: [AmortizationRow] = []
+    }
+
+    var amortization: AmortizationResult {
+        let principal = principalAmount
+        let rate = interestRate
+        let isFixed = interestType == "Fixed"
+        let totalMonths = Double(termYears * 12 + termMonths)
+        
+        if principal <= 0 { 
+            return AmortizationResult(monthlyPayment: 0, totalPrincipal: 0, totalInterest: 0, totalCost: 0, principalPct: 0, interestPct: 0, schedule: []) 
+        }
+        
+        if isFixed {
+            let totalCost = principal + rate
+            let pPct = totalCost > 0 ? (principal / totalCost) * 100 : 0
+            let iPct = totalCost > 0 ? (rate / totalCost) * 100 : 0
+            return AmortizationResult(monthlyPayment: 0, totalPrincipal: principal, totalInterest: rate, totalCost: totalCost, principalPct: pPct, interestPct: iPct, schedule: [])
+        }
+        
+        if totalMonths <= 0 { 
+            return AmortizationResult(monthlyPayment: 0, totalPrincipal: principal, totalInterest: 0, totalCost: principal, principalPct: 100, interestPct: 0, schedule: []) 
+        }
+        
+        let periodsPerYear: Double = scheduleFrequency == "Weekly" ? 52 : (scheduleFrequency == "Yearly" ? 1 : 12)
+        let totalPeriods = scheduleFrequency == "Weekly" ? (totalMonths / 12) * 52 : (scheduleFrequency == "Yearly" ? (totalMonths / 12) : totalMonths)
+        
+        let perPeriodRate = (rate / 100) / periodsPerYear
+        
+        var schedule: [AmortizationRow] = []
+        var balance = principal
+        let pmt: Double
+        
+        if perPeriodRate <= 0 {
+            pmt = principal / totalPeriods
+            for i in 1...max(1, Int(totalPeriods)) {
+                balance -= pmt
+                schedule.append(AmortizationRow(month: i, payment: pmt, principal: pmt, interest: 0, balance: max(0, balance)))
+            }
+            return AmortizationResult(monthlyPayment: pmt, totalPrincipal: principal, totalInterest: 0, totalCost: principal, principalPct: 100, interestPct: 0, schedule: schedule)
+        } else {
+            let compound = pow(1 + perPeriodRate, totalPeriods)
+            pmt = principal * (perPeriodRate * compound) / (compound - 1)
+            let totalCost = pmt * totalPeriods
+            let totalInterest = totalCost - principal
+            let pPct = totalCost > 0 ? (principal / totalCost) * 100 : 0
+            let iPct = totalCost > 0 ? (totalInterest / totalCost) * 100 : 0
+            
+            for i in 1...max(1, Int(totalPeriods)) {
+                let interestForPeriod = balance * perPeriodRate
+                let principalForPeriod = pmt - interestForPeriod
+                balance -= principalForPeriod
+                schedule.append(AmortizationRow(month: i, payment: pmt, principal: principalForPeriod, interest: interestForPeriod, balance: max(0, balance)))
+            }
+            
+            return AmortizationResult(monthlyPayment: pmt, totalPrincipal: principal, totalInterest: totalInterest, totalCost: totalCost, principalPct: pPct, interestPct: iPct, schedule: schedule)
+        }
     }
 
     static let roles = ["Lendee", "Lender"]
