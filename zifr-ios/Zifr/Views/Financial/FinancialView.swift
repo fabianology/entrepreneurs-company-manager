@@ -2034,6 +2034,7 @@ struct EditLoanSheet: View {
     @State private var snapshot: Snapshot?
     @State private var showAmortizationTable = false
     @State private var isAutoUpdating = false
+    @State private var showTermPicker = false
 
     private var currentSnapshot: Snapshot {
         Snapshot(
@@ -2155,6 +2156,34 @@ struct EditLoanSheet: View {
                 }
             }
             .interactiveDismissDisabled(isNew)
+            .sheet(isPresented: $showTermPicker) {
+                NavigationStack {
+                    HStack(spacing: 0) {
+                        Picker("Years", selection: $loan.termYears) {
+                            ForEach(0...30, id: \.self) { year in Text("\(year) \(year == 1 ? "Year" : "Years")").tag(year) }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(maxWidth: .infinity)
+                        .onChange(of: loan.termYears) { _, _ in updateMaturityDate() }
+                        
+                        Picker("Months", selection: $loan.termMonths) {
+                            ForEach(0...11, id: \.self) { month in Text("\(month) \(month == 1 ? "Month" : "Months")").tag(month) }
+                        }
+                        .pickerStyle(.wheel)
+                        .frame(maxWidth: .infinity)
+                        .onChange(of: loan.termMonths) { _, _ in updateMaturityDate() }
+                    }
+                    .navigationTitle("Loan Term")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showTermPicker = false }
+                        }
+                    }
+                }
+                .presentationDetents([.height(260)])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
 
@@ -2456,33 +2485,33 @@ struct EditLoanSheet: View {
             GeometryReader { geo in
                 HStack(spacing: 12) {
                     moneyField(label: "PRINCIPAL", value: $loan.principalAmount)
-                        .frame(width: geo.size.width * 0.3 - 6)
+                        .frame(width: geo.size.width * 0.5 - 6)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("LOAN TERM")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.5))
-                        HStack(spacing: 0) {
-                            Picker("Years", selection: $loan.termYears) {
-                                ForEach(0...30, id: \.self) { year in Text("\(year) \(year == 1 ? "Year" : "Years")").tag(year) }
+                        Button {
+                            showTermPicker = true
+                        } label: {
+                            HStack {
+                                Text("\(loan.termYears) \(loan.termYears == 1 ? "Yr" : "Yrs"), \(loan.termMonths) \(loan.termMonths == 1 ? "Mo" : "Mos")")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
                             }
-                            .labelsHidden().tint(.white).frame(maxWidth: .infinity)
-                            .onChange(of: loan.termYears) { _, _ in updateMaturityDate() }
-                            
-                            Divider().background(Color.white.opacity(0.1)).padding(.vertical, 8)
-                            
-                            Picker("Months", selection: $loan.termMonths) {
-                                ForEach(0...11, id: \.self) { month in Text("\(month) \(month == 1 ? "Month" : "Months")").tag(month) }
-                            }
-                            .labelsHidden().tint(.white).frame(maxWidth: .infinity)
-                            .onChange(of: loan.termMonths) { _, _ in updateMaturityDate() }
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
-                        .frame(height: 44)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     }
-                    .frame(width: geo.size.width * 0.7 - 6)
+                    .frame(width: geo.size.width * 0.5 - 6)
                 }
             }
             .frame(height: 64)
@@ -2552,6 +2581,43 @@ struct EditLoanSheet: View {
     }
 
     @ViewBuilder
+    private func paymentRow(for paymentBinding: Binding<LoanPayment>) -> some View {
+        HStack(spacing: 4) {
+            DatePicker("", selection: paymentBinding.date, displayedComponents: .date)
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .scaleEffect(0.75, anchor: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            TextField("0.00", value: paymentBinding.amount, format: .currency(code: "USD"))
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.trailing)
+                .keyboardType(.decimalPad)
+                .frame(maxWidth: .infinity)
+            
+            TextField("Source", text: paymentBinding.source)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.trailing)
+                .frame(maxWidth: .infinity)
+            
+            Text(paymentBinding.wrappedValue.amount.currencyString)
+                .font(.system(size: 11, weight: .black, design: .monospaced))
+                .foregroundStyle(Color.zifrGold)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .modifier(ZifrSwipeToDeleteModifier {
+            withAnimation {
+                let pid = paymentBinding.wrappedValue.id
+                loan.payments.removeAll(where: { $0.id == pid })
+            }
+        })
+    }
+
+    @ViewBuilder
     private func loanPaymentsLedgerSection() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -2559,22 +2625,6 @@ struct EditLoanSheet: View {
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color.white.opacity(0.5))
                     .tracking(1)
-                
-                Spacer()
-                
-                Button {
-                    withAnimation {
-                        let pmt = LoanPayment()
-                        loan.payments.append(pmt)
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
-                        .padding(6)
-                        .background(Color.zifrGold.opacity(0.1))
-                        .clipShape(Circle())
-                }
             }
             
             VStack(spacing: 0) {
@@ -2605,34 +2655,17 @@ struct EditLoanSheet: View {
                         .padding(.vertical, 20)
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else {
-                    ForEach($loan.payments) { $payment in
-                        HStack(spacing: 4) {
-                            DatePicker("", selection: $payment.date, displayedComponents: .date)
-                                .labelsHidden()
-                                .datePickerStyle(.compact)
-                                .scaleEffect(0.75, anchor: .leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            TextField("0.00", value: $payment.amount, format: .currency(code: "USD"))
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.decimalPad)
-                                .frame(maxWidth: .infinity)
-                            
-                            TextField("Source", text: $payment.source)
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.trailing)
-                                .frame(maxWidth: .infinity)
-                            
-                            Text(payment.amount.currencyString)
-                                .font(.system(size: 11, weight: .black, design: .monospaced))
-                                .foregroundStyle(Color.zifrGold)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                    ForEach(loan.payments) { payment in
+                        let binding = Binding<LoanPayment>(
+                            get: { loan.payments.first(where: { $0.id == payment.id }) ?? payment },
+                            set: { newValue in
+                                if let idx = loan.payments.firstIndex(where: { $0.id == payment.id }) {
+                                    loan.payments[idx] = newValue
+                                }
+                            }
+                        )
+                        
+                        paymentRow(for: binding)
                         
                         if payment.id != loan.payments.last?.id {
                             Divider().background(Color.white.opacity(0.05))
@@ -2642,6 +2675,25 @@ struct EditLoanSheet: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
+            
+            Button {
+                withAnimation {
+                    let pmt = LoanPayment()
+                    loan.payments.append(pmt)
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                    Text("Add Payment").font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(Color.white.opacity(0.5))
+                .frame(maxWidth: .infinity)
+                .frame(height: 36)
+                .background(Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, loan.payments.isEmpty ? 0 : 4)
         }
         .padding(16)
         .background(Color.white.opacity(0.03))
@@ -2674,5 +2726,45 @@ struct EditLoanSheet: View {
         loan.termYears = y
         loan.termMonths = m
         DispatchQueue.main.async { isAutoUpdating = false }
+    }
+}
+
+// MARK: - Custom Swipe to Delete for ScrollView
+struct ZifrSwipeToDeleteModifier: ViewModifier {
+    let action: () -> Void
+    @State private var offset: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        ZStack(alignment: .trailing) {
+            Color.red
+                .overlay(alignment: .trailing) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .padding(.trailing, 20)
+                }
+            
+            content
+                .background(Color(hex: "#111111"))
+                .offset(x: offset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            if value.translation.width < 0 {
+                                offset = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            withAnimation(.spring()) {
+                                if value.translation.width < -80 {
+                                    action()
+                                    offset = 0
+                                } else {
+                                    offset = 0
+                                }
+                            }
+                        }
+                )
+        }
+        .clipped()
     }
 }
