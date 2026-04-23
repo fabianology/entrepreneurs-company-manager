@@ -612,13 +612,13 @@ struct FinancialCardView: View {
                         .fill(Color(hex: card.colorHex))
                         .frame(width: 44, height: 28)
                     Text("••\(card.last4)")
-                        .font(.system(size: 9, weight: .black, design: .monospaced))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(.white)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(card.name.isEmpty ? "Card" : card.name)
-                        .font(.system(size: 14, weight: .black))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(.white)
                     HStack(spacing: 6) {
                         Text(card.type)
@@ -633,7 +633,7 @@ struct FinancialCardView: View {
                         Text("•")
                             .foregroundStyle(Color.white.opacity(0.2))
                         Text(card.expiry.isEmpty ? "—" : card.expiry)
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
                 }
@@ -682,62 +682,73 @@ struct LoanCardView: View {
 
     var body: some View {
         Button(action: onEdit) {
+            let amort = loan.amortization
             VStack(spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(loan.name.isEmpty ? "Loan" : loan.name)
-                            .font(.system(size: 14, weight: .black))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
                         Text(loan.lender.isEmpty ? "—" : loan.lender)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
                     Spacer()
+                    
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(loan.remainingBalance.currencyString)
-                            .font(.system(size: 14, weight: .black, design: .monospaced))
-                            .foregroundStyle(Color.zifrGold)
-                        Text("remaining")
+                        let rateStr = String(format: loan.interestRate.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.2f%%", loan.interestRate)
+                        Text(rateStr)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("rate")
+                            .zifrLabel()
+                    }
+                    .padding(.trailing, 12)
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(amort.totalPrincipal.currencyString)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                        Text("principal")
                             .zifrLabel()
                     }
                 }
 
-                // CiFr-style principal vs interest bar (gold / orange)
-                VStack(spacing: 4) {
-                    HStack {
-                        Text("Principal")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.zifrGold)
-                        Spacer()
-                        Text("Interest")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.orange)
-                    }
+                // Progress Bar
+                VStack(spacing: 8) {
                     GeometryReader { geo in
-                        let principal = loan.principalAmount > 0 ? loan.remainingBalance / loan.principalAmount : 0
-                        let interest = 1.0 - principal
                         HStack(spacing: 0) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.zifrGold)
-                                .frame(width: geo.size.width * principal, height: 5)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.orange)
-                                .frame(width: geo.size.width * interest, height: 5)
+                            Rectangle()
+                                .fill(Color(hex: "#545454"))
+                                .frame(width: geo.size.width * (amort.principalPct / 100))
+                            Rectangle()
+                                .fill(Color(hex: "#742C2D"))
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
-                    .frame(height: 5)
+                    .frame(height: 8)
+                    .clipShape(Capsule())
+                    .background(Color.white.opacity(0.05))
                 }
 
                 HStack {
-                    statBadge(label: "Monthly", value: loan.monthlyPayment.currencyString)
+                    let freqLabel = loan.scheduleFrequency == "Weekly" ? "Wk Pmt" : (loan.scheduleFrequency == "Yearly" ? "Yr Pmt" : "Mo Pmt")
+                    statBadge(label: freqLabel, value: amort.monthlyPayment.currencyString)
                     Spacer()
-                    statBadge(label: "Rate", value: "\(loan.interestRate)%")
+                    statBadge(label: "Interest", value: amort.totalInterest.currencyString)
                     Spacer()
-                    Text(loan.status)
-                        .font(.system(size: 9, weight: .black))
-                        .textCase(.uppercase)
-                        .foregroundStyle(loan.status.statusColor)
+                    statBadge(label: "Total Cost", value: amort.totalCost.currencyString)
+                }
+
+                HStack {
+                    statBadge(label: "Remaining", value: loan.remainingBalance.currencyString)
+                    Spacer()
+                    statBadge(label: "Start", value: loan.startDate.shortDisplay)
+                    Spacer()
+                    if let maturity = loan.maturityDate {
+                        statBadge(label: "Maturity", value: maturity.shortDisplay)
+                    } else {
+                        statBadge(label: "Maturity", value: "—")
+                    }
                 }
             }
             .padding(16)
@@ -750,7 +761,7 @@ struct LoanCardView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label).zifrLabel()
             Text(value)
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white)
         }
     }
@@ -1088,7 +1099,7 @@ struct InstitutionAccountsSection: View {
                     Button { onEdit(i, acc) } label: {
                         HStack(spacing: 12) {
                             Circle()
-                                .fill(acc.type == "Credit Card" ? Color.orange : (acc.type == "Checking" ? Color.zifrGold : Color.green))
+                                .fill(acc.type == "Credit Card" ? Color.orange : (acc.type == "Checking" ? Color.white.opacity(0.6) : Color.green))
                                 .frame(width: 8, height: 8)
                             
                             VStack(alignment: .leading, spacing: 4) {
@@ -1102,7 +1113,7 @@ struct InstitutionAccountsSection: View {
                                     Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
                                     Text("••\(acc.last4)")
                                         .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.zifrGold)
+                                        .foregroundStyle(Color.white.opacity(0.6))
                                 }
                             }
                             Spacer()
@@ -1272,7 +1283,7 @@ struct InstitutionLoansSection: View {
                             Spacer()
                             Text(loan.remainingBalance.currencyString)
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color.zifrGold)
+                                .foregroundStyle(Color.white.opacity(0.6))
                             
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .semibold))
@@ -2302,23 +2313,13 @@ struct EditLoanSheet: View {
             
             // Progress Bar
             VStack(spacing: 8) {
-                HStack {
-                    Text("Principal: \(amort.totalPrincipal.currencyString)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
-                    Spacer()
-                    Text("\(loan.interestType == "Fixed" ? "Fee" : "Interest"): \(amort.totalInterest.currencyString)")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.orange)
-                }
-                
                 GeometryReader { geo in
                     HStack(spacing: 0) {
                         Rectangle()
-                            .fill(Color.zifrGold)
+                            .fill(Color(hex: "#545454"))
                             .frame(width: geo.size.width * (amort.principalPct / 100))
                         Rectangle()
-                            .fill(Color.orange)
+                            .fill(Color(hex: "#742C2D"))
                     }
                 }
                 .frame(height: 8)
@@ -2373,10 +2374,10 @@ struct EditLoanSheet: View {
                                 Text("PMT")
                                     .frame(maxWidth: .infinity, alignment: .trailing)
                                 Text("PRIN")
-                                    .foregroundStyle(Color.zifrGold)
+                                    .foregroundStyle(Color.white.opacity(0.5))
                                     .frame(maxWidth: .infinity, alignment: .trailing)
                                 Text("INT")
-                                    .foregroundStyle(Color.orange)
+                                    .foregroundStyle(Color(hex: "#742C2D"))
                                     .frame(maxWidth: .infinity, alignment: .trailing)
                                 Text("BAL")
                                     .frame(maxWidth: .infinity, alignment: .trailing)
@@ -2402,10 +2403,10 @@ struct EditLoanSheet: View {
                                                 .foregroundStyle(Color.white.opacity(0.9))
                                                 .frame(maxWidth: .infinity, alignment: .trailing)
                                             Text("$\(Int(round(row.principal)))")
-                                                .foregroundStyle(Color.zifrGold.opacity(0.8))
+                                                .foregroundStyle(Color.white.opacity(0.7))
                                                 .frame(maxWidth: .infinity, alignment: .trailing)
                                             Text("$\(Int(round(row.interest)))")
-                                                .foregroundStyle(Color.orange.opacity(0.8))
+                                                .foregroundStyle(Color(hex: "#742C2D"))
                                                 .frame(maxWidth: .infinity, alignment: .trailing)
                                             Text("$\(Int(round(row.balance)))")
                                                 .foregroundStyle(Color.white)
@@ -2471,13 +2472,13 @@ struct EditLoanSheet: View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 ZifrField(
-                    label: loan.role == "Lender" ? "LENT TO" : "LENDER", 
-                    placeholder: loan.role == "Lender" ? "e.g. Acme Corp" : "e.g. Chase", 
+                    label: loan.role == "I'm Lending" ? "LENT TO" : "LENDER", 
+                    placeholder: loan.role == "I'm Lending" ? "e.g. Acme Corp" : "e.g. Chase", 
                     text: $loan.lender
                 )
                 ZifrField(
-                    label: loan.role == "Lender" ? "LOAN NAME" : "LOAN ID", 
-                    placeholder: loan.role == "Lender" ? "e.g. Bridge Loan" : "e.g. Series A", 
+                    label: loan.role == "I'm Lending" ? "LOAN NAME" : "LOAN ID", 
+                    placeholder: loan.role == "I'm Lending" ? "e.g. Bridge Loan" : "e.g. Series A", 
                     text: $loan.name
                 )
             }
@@ -2516,7 +2517,7 @@ struct EditLoanSheet: View {
             }
             .frame(height: 64)
             
-            if loan.role == "Lender" {
+            if loan.role == "I'm Lending" {
                 HStack(spacing: 12) {
                     loanPicker(label: "INTEREST TYPE", sel: $loan.interestType, opts: Loan.interestTypes)
                 }

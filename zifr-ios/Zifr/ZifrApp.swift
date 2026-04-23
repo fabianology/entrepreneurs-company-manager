@@ -32,8 +32,8 @@ struct ZifrApp: App {
 
     init() {
         // MARK: Global UI Styling
-        UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(hex: "#111111")
-        UISegmentedControl.appearance().backgroundColor = UIColor(hex: "#222E2F")
+        UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(hex: "#223E5A")
+        UISegmentedControl.appearance().backgroundColor = UIColor(hex: "#111111")
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white.withAlphaComponent(0.5)], for: .normal)
         let schema = Schema([

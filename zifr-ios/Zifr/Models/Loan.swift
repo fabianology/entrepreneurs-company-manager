@@ -42,7 +42,7 @@ final class Loan {
     init(
         id: String = UUID().uuidString,
         companyId: String,
-        role: String = "Lendee",
+        role: String = "Bank Loan",
         lender: String = "",
         name: String = "",
         principalAmount: Double = 0,
@@ -163,7 +163,7 @@ final class Loan {
         }
     }
 
-    static let roles = ["Lendee", "Lender"]
+    static let roles = ["Bank Loan", "I'm Lending"]
     static let statuses = ["Active", "Paid Off", "Default"]
     static let frequencies = ["Weekly", "Monthly", "Yearly"]
     static let interestTypes = ["Percentage", "Fixed"]
