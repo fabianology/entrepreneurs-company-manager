@@ -176,6 +176,16 @@ struct FinancialView: View {
                             .onLongPressGesture {
                                 editingCard = card
                             }
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 10)
+                                    .onEnded { value in
+                                        if isPopped && value.translation.height < -10 {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            poppedCardId = nil
+                                        }
+                                    },
+                                including: isPopped ? .gesture : .none
+                            )
                     }
             }
             
@@ -222,6 +232,16 @@ struct FinancialView: View {
                         .onLongPressGesture {
                             editingCard = card
                         }
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 10)
+                                .onEnded { value in
+                                    if isPopped && value.translation.height < -10 {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        poppedCardId = nil
+                                    }
+                                },
+                            including: isPopped ? .gesture : .none
+                        )
                 }
             }
             .padding(.top, CGFloat(cards.count) * peekOffset + 8)
@@ -234,6 +254,26 @@ struct FinancialView: View {
 struct FinancialCardVisual: View {
     let card: FinancialCard
     let isPopped: Bool
+    
+    @Query private var subscriptions: [Subscription]
+    
+    private var paysForServices: [(name: String, cost: Double)] {
+        let cardName = card.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cardName.isEmpty else { return [] }
+        var results: [(name: String, cost: Double)] = []
+        for sub in subscriptions {
+            if sub.paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+                results.append((name: sub.name.isEmpty ? "Unnamed Service" : sub.name, cost: sub.cost))
+            }
+            for subSvc in sub.subServices {
+                if subSvc.paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+                    results.append((name: subSvc.name.isEmpty ? "Unnamed Sub-service" : subSvc.name, cost: subSvc.cost))
+                }
+            }
+        }
+        return results
+    }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
@@ -246,25 +286,26 @@ struct FinancialCardVisual: View {
             let secondaryColor = isLight ? Color.black.opacity(0.7) : Color.white.opacity(0.7)
             
             VStack {
-                HStack(alignment: .top) {
-                    Text(card.name.isEmpty ? "Card" : card.name)
-                        .font(.system(size: isPopped ? 16 : 12, weight: .bold))
-                        .foregroundStyle(primaryColor)
+                HStack(alignment: .firstTextBaseline) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(card.name.isEmpty ? "Card" : card.name)
+                            .font(.system(size: isPopped ? 16 : 12, weight: .bold))
+                            .foregroundStyle(primaryColor)
+                        
+                        if !card.last4.isEmpty {
+                            Text("•••• \(card.last4)")
+                                .font(.system(size: isPopped ? 14 : 10, weight: .semibold))
+                                .foregroundStyle(secondaryColor)
+                        }
+                    }
                     Spacer()
-                    Text(card.network)
+                    Text("\(card.network) \(card.type)")
                         .font(.system(size: isPopped ? 16 : 12, weight: .semibold))
                         .foregroundStyle(secondaryColor)
                         .italic()
                 }
                 Spacer()
                 if isPopped {
-                    Text("•••• •••• •••• \(card.last4)")
-                        .font(.system(size: 18, weight: .regular, design: .monospaced))
-                        .foregroundStyle(isLight ? Color.black.opacity(0.85) : Color.white.opacity(0.85))
-                        .tracking(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 12)
-                    
                     HStack {
                         Text(card.cardHolder.isEmpty ? "Name on Card" : card.cardHolder)
                             .font(.system(size: 13, weight: .medium))
@@ -273,6 +314,57 @@ struct FinancialCardVisual: View {
                         Text(card.expiry.isEmpty ? "—" : card.expiry)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
+                    }
+                    
+                    let services = paysForServices
+                    if !card.paidFrom.isEmpty || !services.isEmpty {
+                        Divider()
+                            .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                            .padding(.top, 8)
+                            .padding(.bottom, 4)
+                        
+                        ScrollView(.vertical, showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                if !card.paidFrom.isEmpty {
+                                    HStack {
+                                        Text("PAY FROM")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
+                                        Spacer()
+                                        Text(card.paidFrom)
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(primaryColor)
+                                    }
+                                }
+                                
+                                if !card.paidFrom.isEmpty && !services.isEmpty {
+                                    Divider()
+                                        .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                                }
+                                
+                                if !services.isEmpty {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("PAYS FOR")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
+                                        
+                                        ForEach(Array(services.enumerated()), id: \.offset) { index, svc in
+                                            HStack {
+                                                Text(svc.name)
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .foregroundStyle(primaryColor)
+                                                    .lineLimit(1)
+                                                Spacer()
+                                                Text("$\(String(format: "%.0f", svc.cost))")
+                                                    .font(.system(size: 12, weight: .semibold))
+                                                    .foregroundStyle(primaryColor)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 70)
                     }
                 }
             }
@@ -1064,7 +1156,7 @@ struct EditInstitutionSheet: View {
             .sheet(item: $loanDraft, onDismiss: { 
                 loanDraft = nil 
             }) { ld in
-                EditLoanSheet(loan: ld, vm: vm, isNew: ld.name.isEmpty && ld.monthlyPayment == 0)
+                EditLoanSheet(loan: ld, vm: vm, isNew: ld.name.isEmpty && ld.monthlyPayment == 0, isInstitutionContext: true)
             }
         }
     }
@@ -2034,6 +2126,7 @@ struct EditLoanSheet: View {
     @Bindable var loan: Loan
     @Bindable var vm: AppViewModel
     let isNew: Bool
+    var isInstitutionContext: Bool = false
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
@@ -2458,30 +2551,31 @@ struct EditLoanSheet: View {
 
     @ViewBuilder
     private func loanRoleSection() -> some View {
-        Picker("Role", selection: $loan.role) {
-            ForEach(Loan.roles, id: \.self) { role in
-                Text(role).tag(role)
+        if !isInstitutionContext {
+            Picker("Role", selection: $loan.role) {
+                ForEach(Loan.roles, id: \.self) { role in
+                    Text(role).tag(role)
+                }
             }
+            .pickerStyle(.segmented)
+            .frame(height: 44)
+            .padding(.horizontal, 20)
+            .disabled(!isNew)
         }
-        .pickerStyle(.segmented)
-        .frame(height: 44)
-        .padding(.horizontal, 20)
-        .disabled(!isNew)
     }
-
 
     @ViewBuilder
     private func loanPrincipalSection() -> some View {
         VStack(spacing: 12) {
             HStack(spacing: 12) {
                 ZifrField(
-                    label: loan.role == "I'm Lending" ? "LENT TO" : "LENDER", 
-                    placeholder: loan.role == "I'm Lending" ? "e.g. Acme Corp" : "e.g. Chase", 
+                    label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LENT TO" : "LENDER", 
+                    placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Acme Corp" : "e.g. Chase", 
                     text: $loan.lender
                 )
                 ZifrField(
-                    label: loan.role == "I'm Lending" ? "LOAN NAME" : "LOAN ID", 
-                    placeholder: loan.role == "I'm Lending" ? "e.g. Bridge Loan" : "e.g. Series A", 
+                    label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LOAN NAME" : "LOAN ID", 
+                    placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Bridge Loan" : "e.g. Series A", 
                     text: $loan.name
                 )
             }
