@@ -18,6 +18,12 @@ extension Date {
         f.dateFormat = "MMM d, yyyy"
         return f.string(from: self)
     }
+
+    var numericDisplay: String {
+        let f = DateFormatter()
+        f.dateFormat = "MM/dd/yy"
+        return f.string(from: self)
+    }
 }
 
 extension Double {
