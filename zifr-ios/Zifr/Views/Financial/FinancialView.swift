@@ -128,8 +128,8 @@ struct FinancialView: View {
         .sheet(item: $editingInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false) }
         .sheet(item: $newCard) { c in EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: true) }
         .sheet(item: $editingCard) { c in EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: false) }
-        .sheet(item: $newLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: true) }
-        .sheet(item: $editingLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: false) }
+        .sheet(item: $newLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards) }
+        .sheet(item: $editingLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: false, institutions: institutions, cards: cards) }
     }
     
     private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
@@ -208,7 +208,6 @@ struct FinancialView: View {
     @ViewBuilder
     private func standaloneWalletStack(cards: [FinancialCard]) -> some View {
         let peekOffset: CGFloat = 36
-        let cardH: CGFloat = 110
         let fullCardH: CGFloat = 210
         
         if !cards.isEmpty {
@@ -219,7 +218,7 @@ struct FinancialView: View {
                     let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
                     
                     FinancialCardVisual(card: card, isPopped: isPopped)
-                        .frame(height: isPopped ? fullCardH : cardH)
+                        .frame(height: fullCardH)
                         .scaleEffect(scale)
                         .offset(y: yOffset)
                         .zIndex(isPopped ? 25 : Double(cards.count - index))
@@ -277,11 +276,15 @@ struct FinancialCardVisual: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
-                .fill(Color(hex: card.colorHex))
+                .fill(LinearGradient(
+                    colors: card.cardGradientHex.map { Color(hex: $0) },
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(isPopped ? Color.white.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1))
                 .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
             
-            let isLight = card.colorHex.uppercased() == "#FFFFFF"
+            let isLight = card.cardGradientHex.first?.uppercased() == "#FFFFFF"
             let primaryColor = isLight ? Color.black : Color.white
             let secondaryColor = isLight ? Color.black.opacity(0.7) : Color.white.opacity(0.7)
             
@@ -700,11 +703,15 @@ struct FinancialCardView: View {
             HStack(spacing: 14) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(hex: card.colorHex))
+                        .fill(LinearGradient(
+                            colors: card.cardGradientHex.map { Color(hex: $0) },
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
                         .frame(width: 44, height: 28)
                     Text("••\(card.last4)")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(card.cardGradientHex.first?.uppercased() == "#FFFFFF" ? .black : .white)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -742,26 +749,30 @@ struct FinancialCardView: View {
 }
 
 private extension FinancialCard {
-    var colorHex: String {
+    var cardGradientHex: [String] {
         let inst = institutionName.lowercased()
-        if inst.contains("apple") { return "#FFFFFF" }
-        if inst.contains("chase") { return "#1a3f8f" }
-        if inst.contains("america") || inst.contains("bofa") { return "#8f1a1a" }
-        if inst.contains("wells fargo") { return "#8f1a1a" }
-        if inst.contains("citi") { return "#1a6a8f" }
-        if inst.contains("capital one") { return "#1a1a8f" }
-        if inst.contains("american express") || inst.contains("amex") { return "#1a7a8a" }
-        if inst.contains("discover") { return "#b85000" }
-        if inst.contains("mercury") { return "#1a3a8f" }
-        if inst.contains("stripe") { return "#3a1a8f" }
-        if inst.contains("ramp") { return "#3a7a00" }
+        
+        // Known Institutions
+        if inst.contains("apple") { return ["#FFFFFF", "#F0F0F5"] }
+        if inst.contains("chase") { return ["#113b8a", "#0a2354"] }
+        if inst.contains("america") || inst.contains("bofa") { return ["#E31837", "#9A0000"] }
+        if inst.contains("wells fargo") { return ["#d71e28", "#8a0c13"] }
+        if inst.contains("citi") { return ["#003B70", "#002040"] }
+        if inst.contains("capital one") { return ["#00284f", "#001224"] }
+        if inst.contains("american express") || inst.contains("amex") { return ["#005E9D", "#002D54"] }
+        if inst.contains("discover") { return ["#FF6000", "#A84000"] }
+        if inst.contains("mercury") { return ["#4A5568", "#1A202C"] }
+        if inst.contains("stripe") { return ["#635BFF", "#3E38A3"] }
+        if inst.contains("ramp") { return ["#D0F224", "#9DB814"] }
+        if inst.contains("sofi") { return ["#23B5E8", "#0087B5"] } // Sky Blue to Deep Cyan
 
+        // Fallback to Network
         switch network {
-        case "Visa": return "#1A1F71"
-        case "Mastercard": return "#8B0000"
-        case "Amex": return "#007BC1"
-        case "Discover": return "#FF6600"
-        default: return "#2A2A2E"
+        case "Visa": return ["#101345", "#060824"]
+        case "Mastercard": return ["#5C0000", "#2E0000"]
+        case "Amex": return ["#004B7A", "#00233B"]
+        case "Discover": return ["#B34700", "#662800"]
+        default: return ["#1C1C1E", "#0A0A0C"]
         }
     }
 }
@@ -1156,7 +1167,7 @@ struct EditInstitutionSheet: View {
             .sheet(item: $loanDraft, onDismiss: { 
                 loanDraft = nil 
             }) { ld in
-                EditLoanSheet(loan: ld, vm: vm, isNew: ld.name.isEmpty && ld.monthlyPayment == 0, isInstitutionContext: true)
+                EditLoanSheet(loan: ld, vm: vm, isNew: ld.name.isEmpty && ld.monthlyPayment == 0, institutions: institutions, cards: cards, isInstitutionContext: true)
             }
         }
     }
@@ -1541,6 +1552,126 @@ struct InstitutionAccountHUD: View {
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
                         .disabled(draft.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Loan Payment HUD
+struct LoanPaymentHUD: View {
+    @Bindable var draft: LoanPayment
+    let isNew: Bool
+    let institutions: [Institution]
+    let cards: [FinancialCard]
+    let onSave: () -> Void
+    let onCancel: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    VStack(spacing: 12) {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("AMOUNT")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                HStack(spacing: 4) {
+                                    Text("$")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    DoubleField(placeholder: "0.00", value: $draft.amount)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .background(Color(hex: "#111111"))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("DATE")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                DatePicker("", selection: $draft.date, displayedComponents: .date)
+                                    .labelsHidden()
+                                    .datePickerStyle(.compact)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .padding(.leading, 6)
+                            }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("PAID FROM")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            
+                            HStack {
+                                TextField("e.g. Primary Checking", text: $draft.source)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                
+                                Spacer(minLength: 8)
+                                
+                                Menu {
+                                    Section("Bank Accounts") {
+                                        ForEach(institutions) { inst in
+                                            ForEach(inst.accounts) { acc in
+                                                let methodString = "\(acc.name) ••••\(acc.last4) (\(inst.name))"
+                                                Button(methodString) { draft.source = methodString }
+                                            }
+                                        }
+                                    }
+                                    Section("Credit Cards") {
+                                        ForEach(cards) { card in
+                                            let methodString = "\(card.name) ••••\(card.last4)"
+                                            Button(methodString) { draft.source = methodString }
+                                        }
+                                    }
+                                    Section("Other") {
+                                        Button("None") { draft.source = "" }
+                                    }
+                                } label: {
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .padding(.vertical, 10)
+                                        .padding(.leading, 10)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: { EmptyView() }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowSeparator(.hidden)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#171717"))
+            .listSectionSpacing(0)
+            .navigationTitle(isNew ? "Add Payment" : "Edit Payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isNew ? "Add" : "Save", action: onSave)
+                        .fontWeight(.semibold)
+                        .tint(.green)
                 }
             }
         }
@@ -2126,6 +2257,8 @@ struct EditLoanSheet: View {
     @Bindable var loan: Loan
     @Bindable var vm: AppViewModel
     let isNew: Bool
+    let institutions: [Institution]
+    let cards: [FinancialCard]
     var isInstitutionContext: Bool = false
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -2142,6 +2275,9 @@ struct EditLoanSheet: View {
     @State private var showAmortizationTable = false
     @State private var isAutoUpdating = false
     @State private var showTermPicker = false
+    @State private var showPaymentHUD = false
+    @State private var paymentDraft = LoanPayment()
+    @State private var editingPaymentId: String? = nil
 
     private var currentSnapshot: Snapshot {
         Snapshot(
@@ -2290,6 +2426,30 @@ struct EditLoanSheet: View {
                 }
                 .presentationDetents([.height(260)])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showPaymentHUD) {
+                LoanPaymentHUD(
+                    draft: paymentDraft,
+                    isNew: editingPaymentId == nil,
+                    institutions: institutions,
+                    cards: cards,
+                    onSave: {
+                        if let id = editingPaymentId, let idx = loan.payments.firstIndex(where: { $0.id == id }) {
+                            loan.payments[idx].date = paymentDraft.date
+                            loan.payments[idx].amount = paymentDraft.amount
+                            loan.payments[idx].source = paymentDraft.source
+                        } else {
+                            loan.payments.append(paymentDraft)
+                        }
+                        showPaymentHUD = false
+                        editingPaymentId = nil
+                    },
+                    onCancel: {
+                        showPaymentHUD = false
+                        editingPaymentId = nil
+                    }
+                )
+                .presentationDetents([.height(280)])
             }
         }
     }
@@ -2679,40 +2839,49 @@ struct EditLoanSheet: View {
     }
 
     @ViewBuilder
-    private func paymentRow(for paymentBinding: Binding<LoanPayment>) -> some View {
+    private func paymentRow(index: Int, payment: LoanPayment, cumulativeTotal: Double) -> some View {
         HStack(spacing: 4) {
-            DatePicker("", selection: paymentBinding.date, displayedComponents: .date)
-                .labelsHidden()
-                .datePickerStyle(.compact)
-                .scaleEffect(0.75, anchor: .leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("\(index)")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.3))
+                .frame(width: 16, alignment: .leading)
             
-            TextField("0.00", value: paymentBinding.amount, format: .currency(code: "USD"))
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.trailing)
-                .keyboardType(.decimalPad)
-                .frame(maxWidth: .infinity)
-            
-            TextField("Source", text: paymentBinding.source)
+            Text(payment.date.formatted(date: .abbreviated, time: .omitted))
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.white)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
-            Text(paymentBinding.wrappedValue.amount.currencyString)
+            Text(payment.amount.currencyString)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Text(payment.source.isEmpty ? "None" : payment.source)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(payment.source.isEmpty ? Color.white.opacity(0.4) : .white)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                
+            Text(cumulativeTotal.currencyString)
                 .font(.system(size: 11, weight: .black, design: .monospaced))
                 .foregroundStyle(Color.zifrGold)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .modifier(ZifrSwipeToDeleteModifier {
-            withAnimation {
-                let pid = paymentBinding.wrappedValue.id
-                loan.payments.removeAll(where: { $0.id == pid })
+        .padding(.vertical, 12)
+        .modifier(ZifrSwipeActionsModifier(
+            onEdit: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                editingPaymentId = payment.id
+                paymentDraft = LoanPayment(id: payment.id, date: payment.date, amount: payment.amount, source: payment.source)
+                showPaymentHUD = true
+            },
+            onDelete: {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                withAnimation {
+                    loan.payments.removeAll(where: { $0.id == payment.id })
+                }
             }
-        })
+        ))
     }
 
     @ViewBuilder
@@ -2727,12 +2896,14 @@ struct EditLoanSheet: View {
             
             VStack(spacing: 0) {
                 HStack(spacing: 4) {
+                    Text("#")
+                        .frame(width: 16, alignment: .leading)
                     Text("DATE")
                         .frame(maxWidth: .infinity, alignment: .leading)
                     Text("AMOUNT")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text("FROM")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Text("TOTAL")
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
@@ -2753,19 +2924,12 @@ struct EditLoanSheet: View {
                         .padding(.vertical, 20)
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else {
-                    ForEach(loan.payments) { payment in
-                        let binding = Binding<LoanPayment>(
-                            get: { loan.payments.first(where: { $0.id == payment.id }) ?? payment },
-                            set: { newValue in
-                                if let idx = loan.payments.firstIndex(where: { $0.id == payment.id }) {
-                                    loan.payments[idx] = newValue
-                                }
-                            }
-                        )
+                    let sortedPayments = loan.payments.sorted { $0.date < $1.date }
+                    ForEach(Array(sortedPayments.enumerated()), id: \.element.id) { index, payment in
+                        let cumulativeTotal = sortedPayments[0...index].reduce(0) { $0 + $1.amount }
+                        paymentRow(index: index + 1, payment: payment, cumulativeTotal: cumulativeTotal)
                         
-                        paymentRow(for: binding)
-                        
-                        if payment.id != loan.payments.last?.id {
+                        if payment.id != sortedPayments.last?.id {
                             Divider().background(Color.white.opacity(0.05))
                         }
                     }
@@ -2775,10 +2939,10 @@ struct EditLoanSheet: View {
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
             
             Button {
-                withAnimation {
-                    let pmt = LoanPayment()
-                    loan.payments.append(pmt)
-                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                editingPaymentId = nil
+                paymentDraft = LoanPayment()
+                showPaymentHUD = true
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "plus").font(.system(size: 12, weight: .bold))
@@ -2855,6 +3019,59 @@ struct ZifrSwipeToDeleteModifier: ViewModifier {
                             withAnimation(.spring()) {
                                 if value.translation.width < -80 {
                                     action()
+                                    offset = 0
+                                } else {
+                                    offset = 0
+                                }
+                            }
+                        }
+                )
+        }
+        .clipped()
+    }
+}
+
+// MARK: - Custom Swipe Actions for ScrollView
+struct ZifrSwipeActionsModifier: ViewModifier {
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    @State private var offset: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        ZStack {
+            // Edit Background (Leading)
+            Color.blue
+                .overlay(alignment: .leading) {
+                    Image(systemName: "pencil")
+                        .foregroundColor(.white)
+                        .padding(.leading, 20)
+                }
+                .opacity(offset > 0 ? 1 : 0)
+            
+            // Delete Background (Trailing)
+            Color.red
+                .overlay(alignment: .trailing) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .padding(.trailing, 20)
+                }
+                .opacity(offset < 0 ? 1 : 0)
+            
+            content
+                .background(Color(hex: "#111111"))
+                .offset(x: offset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            offset = value.translation.width
+                        }
+                        .onEnded { value in
+                            withAnimation(.spring()) {
+                                if value.translation.width < -80 {
+                                    onDelete()
+                                    offset = 0
+                                } else if value.translation.width > 80 {
+                                    onEdit()
                                     offset = 0
                                 } else {
                                     offset = 0
