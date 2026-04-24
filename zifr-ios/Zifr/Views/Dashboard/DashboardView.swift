@@ -12,6 +12,7 @@ struct DashboardView: View {
 
     @Bindable var vm: AppViewModel
     @State private var showAddCompany = false
+    @State private var showSharedWithMe = false
     @State private var editingCompany: Company? = nil
     @State private var companyToDelete: Company? = nil
     @State private var path = NavigationPath()
@@ -112,7 +113,11 @@ struct DashboardView: View {
                 .padding(.top, 4)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: hasOrphanedRecords ? 16 : 120, trailing: 20))
+
+                if hasOrphanedRecords {
+                    sharedWithMeRow
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -138,6 +143,9 @@ struct DashboardView: View {
             }
             .navigationDestination(for: Company.self) { company in
                 CompanyDetailView(company: company, vm: vm)
+            }
+            .navigationDestination(isPresented: $showSharedWithMe) {
+                SharedWithMeView(vm: vm)
             }
             .sheet(isPresented: $showAddCompany) {
                 EditCompanySheet(vm: vm, company: nil)
@@ -182,6 +190,55 @@ struct DashboardView: View {
         return companies.filter { $0.name.lowercased().contains(q) || $0.structure.lowercased().contains(q) }
     }
 
+    @ViewBuilder
+    private var sharedWithMeRow: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showSharedWithMe = true
+        } label: {
+            HStack(spacing: 16) {
+                ZStack {
+                    Color(hex: "#3b82f6")
+                    Image(systemName: "tray.full.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 56, height: 56)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Shared with Me")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("Incoming items and inbox")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.2))
+            }
+            .padding(16)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 120, trailing: 20))
+    }
+
+    private var hasOrphanedRecords: Bool {
+        let hasSubs = subscriptions.contains(where: { sub in !companies.contains(where: { $0.id == sub.companyId }) })
+        let hasCards = cards.contains(where: { card in !companies.contains(where: { $0.id == card.companyId }) })
+        let hasInsts = institutions.contains(where: { inst in !companies.contains(where: { $0.id == inst.companyId }) })
+        let hasLoans = loans.contains(where: { loan in !companies.contains(where: { $0.id == loan.companyId }) })
+        let hasDocs = documents.contains(where: { doc in !companies.contains(where: { $0.id == doc.companyId }) })
+        return hasSubs || hasCards || hasInsts || hasLoans || hasDocs
+    }
+
     private var headerSection: some View {
         VStack(spacing: 12) {
             // "CiFr" style — all-lowercase brand name, big & bold, tight tracking
@@ -218,6 +275,265 @@ struct DashboardView: View {
         .padding(.horizontal, 20)
         .task {
             if vm.quote.isEmpty { await vm.loadQuote() }
+        }
+    }
+}
+
+
+// MARK: - Shared With Me View
+import SwiftUI
+import SwiftData
+
+struct SharedWithMeView: View {
+    @Bindable var vm: AppViewModel
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+
+    @Query(sort: \Company.name) private var allCompanies: [Company]
+    @Query private var allSubscriptions: [Subscription]
+    @Query private var allCards: [FinancialCard]
+    @Query private var allInstitutions: [Institution]
+    @Query private var allLoans: [Loan]
+    @Query private var allDocuments: [CompanyDocument]
+
+    var subscriptions: [Subscription] { allSubscriptions.filter { sub in !allCompanies.contains(where: { $0.id == sub.companyId }) } }
+    var cards: [FinancialCard] { allCards.filter { card in !allCompanies.contains(where: { $0.id == card.companyId }) } }
+    var institutions: [Institution] { allInstitutions.filter { inst in !allCompanies.contains(where: { $0.id == inst.companyId }) } }
+    var loans: [Loan] { allLoans.filter { loan in !allCompanies.contains(where: { $0.id == loan.companyId }) } }
+    var documents: [CompanyDocument] { allDocuments.filter { doc in !allCompanies.contains(where: { $0.id == doc.companyId }) } }
+
+    let sharedCompany = Company(id: "shared-with-me", name: "Shared with Me", structure: "Inbox", colorHex: "#3b82f6", website: "")
+
+    @State private var showEditCompany = false
+    @State private var dragOffset: CGFloat = 0
+    @State private var swipeHandled = false
+    
+    @State private var tabBounces: [AppViewModel.CompanyTab: Int] = [:]
+    @State private var searchBounce: Int = 0
+
+    
+    private var currentTabIndex: Int {
+        AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // ── CiFr-style company header ────────────────────────────────
+            companyHeader
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+                
+            // ── Content ──────────────────────────────────────────────────
+            Group {
+                switch vm.activeTab {
+                case .subscriptions:
+                    SubscriptionListView(company: sharedCompany, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
+                case .financial:
+                    FinancialView(company: sharedCompany, cards: cards, institutions: institutions, loans: loans, vm: vm)
+                case .documents:
+                    DocumentListView(company: sharedCompany, documents: documents, vm: vm)
+                }
+            }
+        }
+        .background(Color.black)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showEditCompany) {
+            // Disabled editing for Shared with Me
+        }
+        .safeAreaInset(edge: .bottom) {
+            VStack(spacing: 0) {
+                Divider().background(Color.white.opacity(0.1))
+                HStack {
+                    HStack(spacing: 20) { // Grouping left utilities
+                        // Menu Button
+                        Menu {
+                            Button {
+                                dismiss()
+                            } label: {
+                                Label("Dashboard", systemImage: "square.grid.2x2")
+                            }
+                            Button {
+                                // admin coming soon
+                            } label: {
+                                Label("Settings", systemImage: "gearshape")
+                            }
+                        } label: {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 32, height: 44) // slightly narrower footprint
+                        }
+
+                        // Search Button
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            vm.showSearch = true
+                            searchBounce += 1
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(vm.showSearch ? .primary : .secondary)
+                                .symbolEffect(.bounce, value: searchBounce)
+                                .frame(width: 32, height: 44)
+                        }
+                    }
+
+                    Spacer()
+
+                    // Tab Controls (Pages icons) aligned to the right
+                    HStack(spacing: 28) { // Distributed equally
+                        ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                vm.activeTab = tab
+                                tabBounces[tab, default: 0] += 1
+                            } label: {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                    .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                    .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                    .frame(width: 32, height: 44)
+                            }
+                        }
+                    }
+                    .padding(.trailing, 12)
+                }
+                .padding(.horizontal, 20)
+                .frame(height: 49) // Standard HIG TabBar Height
+            }
+            .background(Color.black)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 20, coordinateSpace: .global)
+                .onChanged { value in
+                    if swipeHandled { return }
+                    
+                    let screenWidth = UIScreen.main.bounds.width
+                    let startX = value.startLocation.x
+                    
+                    let isEdgeSwipe = startX < 120 || startX > screenWidth - 120
+                    if !isEdgeSwipe { return }
+                    
+                    let transX = value.translation.width
+                    let transY = value.translation.height
+                    
+                    if abs(transX) > 50 && abs(transY) < 60 {
+                        swipeHandled = true
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        
+                        if transX > 0 {
+                            // Swipe Left to Right
+                            if vm.activeTab == .financial {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
+                            } else if vm.activeTab == .documents {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            }
+                        } else {
+                            // Swipe Right to Left (Go Forward)
+                            if vm.activeTab == .subscriptions {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            } else if vm.activeTab == .financial {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .documents }
+                            }
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    swipeHandled = false
+                }
+        )
+        .navigationBarBackButtonHidden(true)
+    }
+
+    // MARK: - Company Header (mirrors CiFr's CompanyHeader.tsx)
+    private var companyHeader: some View {
+        HStack(alignment: .center, spacing: 12) {
+            // Logo tile
+            CompanyAvatar(company: sharedCompany, size: 48)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(sharedCompany.name)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+
+                // Dynamic metrics sub-line per tab
+                metricSubLine
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var metricSubLine: some View {
+        switch vm.activeTab {
+        case .subscriptions:
+            let active = subscriptions.filter { $0.status == "Active" }
+            let moTotal = active.reduce(0.0) { $0 + $1.monthlyTotal }
+            let yrTotal = active.reduce(0.0) { $0 + $1.yearlyTotal }
+            let moCount = active.filter { $0.billingCycle == "Monthly" }.count
+            let yrCount = active.filter { $0.billingCycle == "Yearly" }.count
+
+            HStack(spacing: 4) {
+                Text("💵🔥 ")
+                    .font(.system(size: 17))
+                metricPair(label: "mo.", value: moTotal, count: moCount)
+                Divider()
+                    .frame(width: 1, height: 12)
+                    .background(Color.white.opacity(0.1))
+                    .padding(.horizontal, 10)
+                metricPair(label: "yr.", value: yrTotal, count: yrCount)
+            }
+
+        case .financial:
+            HStack(spacing: 18) {
+                emojiCount("🏦", institutions.count)
+                emojiCount("💳", cards.count)
+                emojiCount("📑", loans.count)
+            }
+
+        case .documents:
+            HStack(spacing: 8) {
+                Text("📑")
+                    .font(.system(size: 17))
+                Text("Document Vault")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+        }
+    }
+
+    private func metricPair(label: String, value: Double, count: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
+            Text("$\(String(format: "%.0f", value))")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+            Text("(\(count))")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
+        }
+    }
+
+    private func emojiCount(_ emoji: String, _ n: Int) -> some View {
+        HStack(spacing: 6) {
+            Text(emoji).font(.system(size: 17))
+            Text("(\(n))")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.5))
+        }
+    }
+
+
+
+    private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
+        switch tab {
+        case .subscriptions: return Color(hex: "#2070BD")
+        case .financial:     return Color(hex: "#1A7077")
+        case .documents:     return Color(hex: "#918457")
         }
     }
 }

@@ -37,6 +37,7 @@
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
 		03CAB6D4DDF65D7F0680343C /* Zifr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zifr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0F35D3D91F4D431D42B40709 /* FinancialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialCard.swift; sourceTree = "<group>"; };
+		13B10D882F9B55F300AA707E /* Zifr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zifr.entitlements; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
 		3141954F83AF71011D282471 /* Color+Zifr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Zifr.swift"; sourceTree = "<group>"; };
 		413C5A710215BBAF96C2E51F /* ZifrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZifrApp.swift; sourceTree = "<group>"; };
@@ -175,6 +176,7 @@
 		E5F79FFC0C21D2B1B768324F /* Zifr */ = {
 			isa = PBXGroup;
 			children = (
+				13B10D882F9B55F300AA707E /* Zifr.entitlements */,
 				DCADE3750A4CFA0353D88977 /* Info.plist */,
 				413C5A710215BBAF96C2E51F /* ZifrApp.swift */,
 				A23A166DDC9FE72B93A42FA9 /* Extensions */,
@@ -294,6 +296,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = WYYJ6FGYRP;
 				INFOPLIST_FILE = Zifr/Info.plist;
@@ -311,6 +314,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = WYYJ6FGYRP;
 				INFOPLIST_FILE = Zifr/Info.plist;

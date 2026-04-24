@@ -180,6 +180,28 @@ struct EditCompanySheet: View {
                         }
                         .buttonStyle(.plain)
 
+                        // Share Entity
+                        if isEditing {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                // Placeholder for CloudKit sharing trigger
+                                print("Triggering CloudKit Sharing for \(company?.name ?? "")")
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "person.crop.circle.badge.plus")
+                                    Text("Share Entity")
+                                }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color(hex: "#4f46e5"))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color(hex: "#4f46e5").opacity(0.1))
+                                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 22))
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         // Delete
                         if isEditing {
                             if showDeleteConfirm {

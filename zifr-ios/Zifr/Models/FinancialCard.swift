@@ -3,22 +3,22 @@ import SwiftData
 
 @Model
 final class FinancialCard {
-    var id: String
-    var companyId: String
-    var name: String
-    var login: String
-    var password: String
-    var institutionName: String
-    var cardHolder: String
-    var last4: String
-    var expiry: String
-    var network: String
-    var type: String
-    var status: String
-    var limit: Double
-    var paidFrom: String
-    var paidOn: String
-    var autopay: String
+    var id: String = UUID().uuidString
+    var companyId: String = ""
+    var name: String = ""
+    var login: String = ""
+    var password: String = ""
+    var institutionName: String = ""
+    var cardHolder: String = ""
+    var last4: String = ""
+    var expiry: String = ""
+    var network: String = "Visa"
+    var type: String = "Credit"
+    var status: String = "Active"
+    var limit: Double = 0
+    var paidFrom: String = ""
+    var paidOn: String = ""
+    var autopay: String = "N/A"
     var balance: Double = 0.0
     var moPayment: Double = 0.0
     var apr: Double = 0.0
@@ -26,10 +26,11 @@ final class FinancialCard {
     var promoEnds: Date = Date()
     var cardHolderType: String = "Mine"
     var notes: String = ""
+    var company: Company?
 
     init(
         id: String = UUID().uuidString,
-        companyId: String,
+        companyId: String = "",
         name: String = "",
         login: String = "",
         password: String = "",

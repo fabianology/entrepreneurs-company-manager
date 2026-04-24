@@ -3,11 +3,12 @@ import SwiftData
 
 @Model
 final class LoanPayment: Identifiable {
-    var id: String
-    var date: Date
-    var amount: Double
-    var source: String
-    
+    var id: String = UUID().uuidString
+    var date: Date = Date()
+    var amount: Double = 0
+    var source: String = ""
+    var loan: Loan?
+
     init(id: String = UUID().uuidString, date: Date = Date(), amount: Double = 0, source: String = "") {
         self.id = id
         self.date = date
@@ -18,30 +19,31 @@ final class LoanPayment: Identifiable {
 
 @Model
 final class Loan {
-    var id: String
-    var companyId: String
-    var role: String
-    var lender: String
-    var name: String
-    var principalAmount: Double
-    var remainingBalance: Double
-    var interestType: String
-    var interestRate: Double
-    var term: String
-    var termYears: Int
-    var termMonths: Int
-    var scheduleFrequency: String
-    var monthlyPayment: Double
-    var startDate: Date
-    var maturityDate: Date?
-    var paidOffDate: Date?
-    var status: String
-    var notes: String
-    @Relationship(deleteRule: .cascade) var payments: [LoanPayment]
+    var id: String = UUID().uuidString
+    var companyId: String = ""
+    var role: String = "Bank Loan"
+    var lender: String = ""
+    var name: String = ""
+    var principalAmount: Double = 0
+    var remainingBalance: Double = 0
+    var interestType: String = "Percentage"
+    var interestRate: Double = 0
+    var term: String = "0 months"
+    var termYears: Int = 0
+    var termMonths: Int = 0
+    var scheduleFrequency: String = "Monthly"
+    var monthlyPayment: Double = 0
+    var startDate: Date = Date()
+    var maturityDate: Date? = nil
+    var paidOffDate: Date? = nil
+    var status: String = "Active"
+    var notes: String = ""
+    @Relationship(deleteRule: .cascade, inverse: \LoanPayment.loan) var payments: [LoanPayment]? = []
+    var company: Company?
 
     init(
         id: String = UUID().uuidString,
-        companyId: String,
+        companyId: String = "",
         role: String = "Bank Loan",
         lender: String = "",
         name: String = "",
@@ -59,7 +61,7 @@ final class Loan {
         paidOffDate: Date? = nil,
         status: String = "Active",
         notes: String = "",
-        payments: [LoanPayment] = []
+        payments: [LoanPayment]? = []
     ) {
         self.id = id
         self.companyId = companyId
@@ -112,31 +114,31 @@ final class Loan {
         let rate = interestRate
         let isFixed = interestType == "Fixed"
         let totalMonths = Double(termYears * 12 + termMonths)
-        
-        if principal <= 0 { 
-            return AmortizationResult(monthlyPayment: 0, totalPrincipal: 0, totalInterest: 0, totalCost: 0, principalPct: 0, interestPct: 0, schedule: []) 
+
+        if principal <= 0 {
+            return AmortizationResult(monthlyPayment: 0, totalPrincipal: 0, totalInterest: 0, totalCost: 0, principalPct: 0, interestPct: 0, schedule: [])
         }
-        
+
         if isFixed {
             let totalCost = principal + rate
             let pPct = totalCost > 0 ? (principal / totalCost) * 100 : 0
             let iPct = totalCost > 0 ? (rate / totalCost) * 100 : 0
             return AmortizationResult(monthlyPayment: 0, totalPrincipal: principal, totalInterest: rate, totalCost: totalCost, principalPct: pPct, interestPct: iPct, schedule: [])
         }
-        
-        if totalMonths <= 0 { 
-            return AmortizationResult(monthlyPayment: 0, totalPrincipal: principal, totalInterest: 0, totalCost: principal, principalPct: 100, interestPct: 0, schedule: []) 
+
+        if totalMonths <= 0 {
+            return AmortizationResult(monthlyPayment: 0, totalPrincipal: principal, totalInterest: 0, totalCost: principal, principalPct: 100, interestPct: 0, schedule: [])
         }
-        
+
         let periodsPerYear: Double = scheduleFrequency == "Weekly" ? 52 : (scheduleFrequency == "Yearly" ? 1 : 12)
         let totalPeriods = scheduleFrequency == "Weekly" ? (totalMonths / 12) * 52 : (scheduleFrequency == "Yearly" ? (totalMonths / 12) : totalMonths)
-        
+
         let perPeriodRate = (rate / 100) / periodsPerYear
-        
+
         var schedule: [AmortizationRow] = []
         var balance = principal
         let pmt: Double
-        
+
         if perPeriodRate <= 0 {
             pmt = principal / totalPeriods
             for i in 1...max(1, Int(totalPeriods)) {
@@ -151,14 +153,14 @@ final class Loan {
             let totalInterest = totalCost - principal
             let pPct = totalCost > 0 ? (principal / totalCost) * 100 : 0
             let iPct = totalCost > 0 ? (totalInterest / totalCost) * 100 : 0
-            
+
             for i in 1...max(1, Int(totalPeriods)) {
                 let interestForPeriod = balance * perPeriodRate
                 let principalForPeriod = pmt - interestForPeriod
                 balance -= principalForPeriod
                 schedule.append(AmortizationRow(month: i, payment: pmt, principal: principalForPeriod, interest: interestForPeriod, balance: max(0, balance)))
             }
-            
+
             return AmortizationResult(monthlyPayment: pmt, totalPrincipal: principal, totalInterest: totalInterest, totalCost: totalCost, principalPct: pPct, interestPct: iPct, schedule: schedule)
         }
     }

@@ -3,17 +3,18 @@ import SwiftData
 
 @Model
 final class CompanyDocument {
-    var id: String
-    var companyId: String
-    var name: String
-    var type: String
-    var url: String
-    var uploadDate: String
-    var notes: String
+    var id: String = UUID().uuidString
+    var companyId: String = ""
+    var name: String = "New Document"
+    var type: String = "Other"
+    var url: String = ""
+    var uploadDate: String = ""
+    var notes: String = ""
+    var company: Company?
 
     init(
         id: String = UUID().uuidString,
-        companyId: String,
+        companyId: String = "",
         name: String = "New Document",
         type: String = "Other",
         url: String = "",

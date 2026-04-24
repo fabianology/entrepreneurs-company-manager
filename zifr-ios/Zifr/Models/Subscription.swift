@@ -33,32 +33,33 @@ struct LinkedEmail: Codable, Identifiable, Hashable {
 
 @Model
 final class Subscription {
-    var id: String
-    var companyId: String
-    var name: String
-    var cost: Double
-    var currency: String
-    var billingCycle: String
-    var paymentMethod: String
-    var nextRenewal: String
-    var renew: String
-    var status: String
-    var subServicesData: Data   // JSON encoded [SubService]
-    var linkedEmailsData: Data  // JSON encoded [LinkedEmail]
-    var website: String
-    var loginId: String
-    var password: String
-    var twoFactorAuth: String
-    var recoveryMethod: String
-    var notes: String
-    var pricingModel: String
-    var lastUpdated: Date
+    var id: String = UUID().uuidString
+    var companyId: String = ""
+    var name: String = ""
+    var cost: Double = 0
+    var currency: String = "USD"
+    var billingCycle: String = "Monthly"
+    var paymentMethod: String = ""
+    var nextRenewal: String = ""
+    var renew: String = "Auto"
+    var status: String = "Active"
+    var subServicesData: Data = Data()
+    var linkedEmailsData: Data = Data()
+    var website: String = ""
+    var loginId: String = ""
+    var password: String = ""
+    var twoFactorAuth: String = "None"
+    var recoveryMethod: String = ""
+    var notes: String = ""
+    var pricingModel: String = "paid"
+    var lastUpdated: Date = Date()
     var showSubServicesTab: Bool = true
     var showLinkedEmailsTab: Bool = true
+    var company: Company?
 
     init(
         id: String = UUID().uuidString,
-        companyId: String,
+        companyId: String = "",
         name: String = "",
         cost: Double = 0,
         currency: String = "USD",

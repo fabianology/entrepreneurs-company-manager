@@ -2536,12 +2536,15 @@ struct EditLoanSheet: View {
                     institutions: institutions,
                     cards: cards,
                     onSave: {
-                        if let id = editingPaymentId, let idx = loan.payments.firstIndex(where: { $0.id == id }) {
-                            loan.payments[idx].date = paymentDraft.date
-                            loan.payments[idx].amount = paymentDraft.amount
-                            loan.payments[idx].source = paymentDraft.source
+                        if let id = editingPaymentId, let idx = (loan.payments ?? []).firstIndex(where: { $0.id == id }) {
+                            loan.payments?[idx].date = paymentDraft.date
+                            loan.payments?[idx].amount = paymentDraft.amount
+                            loan.payments?[idx].source = paymentDraft.source
                         } else {
-                            loan.payments.append(paymentDraft)
+                            if loan.payments == nil {
+                                loan.payments = []
+                            }
+                            loan.payments?.append(paymentDraft)
                         }
                         showPaymentHUD = false
                         editingPaymentId = nil
@@ -2980,7 +2983,7 @@ struct EditLoanSheet: View {
             onDelete: {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation {
-                    loan.payments.removeAll(where: { $0.id == payment.id })
+                    loan.payments?.removeAll(where: { $0.id == payment.id })
                 }
             }
         ))
@@ -3019,14 +3022,14 @@ struct EditLoanSheet: View {
                 
                 Divider().background(Color.white.opacity(0.05))
                 
-                if loan.payments.isEmpty {
+                if (loan.payments ?? []).isEmpty {
                     Text("No payments recorded yet.")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.white.opacity(0.3))
                         .padding(.vertical, 20)
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else {
-                    let sortedPayments = loan.payments.sorted { $0.date < $1.date }
+                    let sortedPayments = (loan.payments ?? []).sorted { $0.date < $1.date }
                     ForEach(Array(sortedPayments.enumerated()), id: \.element.id) { index, payment in
                         let cumulativeTotal = sortedPayments[0...index].reduce(0) { $0 + $1.amount }
                         paymentRow(index: index + 1, payment: payment, cumulativeTotal: cumulativeTotal)
@@ -3057,7 +3060,7 @@ struct EditLoanSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .buttonStyle(.plain)
-            .padding(.top, loan.payments.isEmpty ? 0 : 4)
+            .padding(.top, (loan.payments ?? []).isEmpty ? 0 : 4)
         }
         .padding(16)
         .background(Color.white.opacity(0.03))

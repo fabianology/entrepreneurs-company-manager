@@ -36,35 +36,47 @@ struct ZifrApp: App {
         UISegmentedControl.appearance().backgroundColor = UIColor(hex: "#111111")
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white.withAlphaComponent(0.5)], for: .normal)
+
         let schema = Schema([
             Company.self,
             Subscription.self,
             FinancialCard.self,
             Institution.self,
             Loan.self,
+            LoanPayment.self,
             CompanyDocument.self
         ])
 
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        // Try 1: CloudKit Configuration
+        let cloudConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
+        if let c = try? ModelContainer(for: schema, configurations: cloudConfig) {
+            container = c
+            return
+        }
 
-        do {
-            container = try ModelContainer(for: schema, configurations: config)
-        } catch {
-            // Schema mismatch (e.g. new properties added). Wipe the store and start fresh.
-            let storeURL = config.url
-            do {
-                try FileManager.default.removeItem(at: storeURL)
-                // Also remove associated WAL/SHM files
-                let wal = storeURL.appendingPathExtension("wal")
-                let shm = storeURL.appendingPathExtension("shm")
-                try? FileManager.default.removeItem(at: wal)
-                try? FileManager.default.removeItem(at: shm)
-                container = try ModelContainer(for: schema, configurations: config)
-                print("⚠️ SwiftData store was reset due to schema change.")
-            } catch {
-                fatalError("Failed to create ModelContainer even after reset: \(error)")
+        // Try 2: Wipe & Retry CloudKit
+        let fm = FileManager.default
+        if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let files = (try? fm.contentsOfDirectory(at: appSupport, includingPropertiesForKeys: nil)) ?? []
+            for file in files {
+                try? fm.removeItem(at: file)
             }
         }
+
+        if let c = try? ModelContainer(for: schema, configurations: cloudConfig) {
+            container = c
+            return
+        }
+
+        // Try 3: Fallback to Local Configuration
+        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        if let c = try? ModelContainer(for: schema, configurations: localConfig) {
+            container = c
+            return
+        }
+
+        // Fatal Error if all else fails
+        fatalError("Failed to initialize SwiftData ModelContainer.")
     }
 
     var body: some Scene {

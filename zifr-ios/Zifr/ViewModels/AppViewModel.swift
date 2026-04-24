@@ -51,6 +51,9 @@ final class AppViewModel {
     // MARK: - CRUD: Subscriptions
     func addSubscription(context: ModelContext, companyId: String) -> Subscription {
         let sub = Subscription(companyId: companyId)
+        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
+            sub.company = company
+        }
         context.insert(sub)
         return sub
     }
@@ -68,6 +71,9 @@ final class AppViewModel {
     // MARK: - CRUD: Financial Cards
     func addCard(context: ModelContext, companyId: String) -> FinancialCard {
         let card = FinancialCard(companyId: companyId)
+        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
+            card.company = company
+        }
         context.insert(card)
         return card
     }
@@ -85,6 +91,9 @@ final class AppViewModel {
     // MARK: - CRUD: Institutions
     func addInstitution(context: ModelContext, companyId: String) -> Institution {
         let inst = Institution(companyId: companyId)
+        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
+            inst.company = company
+        }
         context.insert(inst)
         return inst
     }
@@ -133,6 +142,9 @@ final class AppViewModel {
     // MARK: - CRUD: Loans
     func addLoan(context: ModelContext, companyId: String) -> Loan {
         let loan = Loan(companyId: companyId)
+        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
+            loan.company = company
+        }
         context.insert(loan)
         return loan
     }
@@ -149,6 +161,9 @@ final class AppViewModel {
     // MARK: - CRUD: Documents
     func addDocument(context: ModelContext, companyId: String) -> CompanyDocument {
         let doc = CompanyDocument(companyId: companyId)
+        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
+            doc.company = company
+        }
         context.insert(doc)
         return doc
     }

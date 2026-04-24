@@ -39,11 +39,10 @@ final class Institution {
     var email: String = ""
     var password: String = ""
     var accountsData: Data = Data()
-    var company: Company?
 
     init(
         id: String = UUID().uuidString,
-        companyId: String = "",
+        companyId: String,
         name: String = "",
         loginUrl: String = "",
         username: String = "",
