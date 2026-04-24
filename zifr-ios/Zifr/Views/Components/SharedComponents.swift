@@ -173,6 +173,8 @@ struct DoubleField: View {
     let placeholder: String
     @Binding var value: Double
     @State private var text: String = ""
+    
+    private let explicitZero: Double = 0.000000001
 
     var body: some View {
         TextField(placeholder, text: $text)
@@ -189,7 +191,8 @@ struct DoubleField: View {
     private func processTextChange(_ newValue: String) {
         let clean = newValue.replacingOccurrences(of: ",", with: ".")
         if let d = Double(clean) {
-            if value != d { value = d }
+            let actualValue = (d == 0 && !clean.isEmpty) ? explicitZero : d
+            if value != actualValue { value = actualValue }
         } else if newValue.isEmpty {
             if value != 0 { value = 0 }
         }
@@ -197,11 +200,17 @@ struct DoubleField: View {
 
     private func syncFromValue() {
         if value == 0 {
-            // Only clear if the text is not an active decimal representing 0 (like "0.")
-            if let currentVal = Double(text.replacingOccurrences(of: ",", with: ".")), currentVal == 0 && text.contains(".") {
+            // True unset 0
+            if !text.isEmpty { text = "" }
+            return
+        }
+        
+        if value == explicitZero {
+            // Already showing some form of 0?
+            if let currentVal = Double(text.replacingOccurrences(of: ",", with: ".")), currentVal == 0 {
                 return
             }
-            if !text.isEmpty { text = "" }
+            text = "0"
             return
         }
         
