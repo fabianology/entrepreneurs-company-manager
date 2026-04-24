@@ -19,8 +19,37 @@ struct DocumentListView: View {
         ScrollView {
             LazyVStack(spacing: 24) {
                 // Add button row
-                HStack {
+                HStack(spacing: 12) {
                     Spacer()
+                    
+                    Menu {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            print("Triggering CloudKit Sharing for All Documents")
+                        } label: {
+                            Label("All Documents", systemImage: "folder.badge.person.crop")
+                        }
+                        
+                        Divider()
+                        
+                        ForEach(documents) { doc in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                print("Triggering CloudKit Sharing for \(doc.name)")
+                            } label: {
+                                Label(doc.name.isEmpty ? "Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.blue)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                    }
+
                     Button { 
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         newDoc = vm.addDocument(context: context, companyId: company.id) 
@@ -206,6 +235,28 @@ struct EditDocumentSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     if !isNew {
+                        // Share Document
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            // Placeholder for CloudKit sharing trigger
+                            print("Triggering CloudKit Sharing for \(doc.name)")
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                Text("Share Document")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#4f46e5"))
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#4f46e5").opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 8)
+
                         if showDelete {
                             HStack(spacing: 20) {
                                 Text("Sure?").font(.system(size: 12, weight: .bold)).foregroundStyle(.red)

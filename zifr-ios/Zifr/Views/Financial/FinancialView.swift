@@ -51,6 +51,62 @@ struct FinancialView: View {
                     }
 
                     Spacer()
+                    
+                    Menu {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            print("Triggering CloudKit Sharing for All Financials")
+                        } label: {
+                            Label("All Financials", systemImage: "folder.badge.person.crop")
+                        }
+                        
+                        Divider()
+                        
+                        if !institutions.isEmpty {
+                            Section("Institutions") {
+                                ForEach(institutions) { inst in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(inst.name)")
+                                    } label: {
+                                        Label(inst.name.isEmpty ? "Institution" : inst.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                            }
+                        }
+                        if !cards.isEmpty {
+                            Section("Cards") {
+                                ForEach(cards) { card in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(card.name)")
+                                    } label: {
+                                        Label(card.name.isEmpty ? "Card" : card.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                            }
+                        }
+                        if !loans.isEmpty {
+                            Section("Loans") {
+                                ForEach(loans) { loan in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(loan.name)")
+                                    } label: {
+                                        Label(loan.name.isEmpty ? "Loan" : loan.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.blue)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                    }
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         newInst = vm.addInstitution(context: context, companyId: company.id)
@@ -1163,6 +1219,29 @@ struct EditInstitutionSheet: View {
 
                 if !isNew {
                     Section {
+                        // Share Institution
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            // Placeholder for CloudKit sharing trigger
+                            print("Triggering CloudKit Sharing for \(institution.name)")
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                Text("Share Institution")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#4f46e5"))
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#4f46e5").opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 8)
+
+                        // Delete Institution
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                             showDeleteConfirm = true
@@ -2185,6 +2264,29 @@ struct EditCardSheet: View {
 
                 if !isNew {
                     Section {
+                        // Share Card
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            // Placeholder for CloudKit sharing trigger
+                            print("Triggering CloudKit Sharing for \(card.name)")
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                Text("Share Card")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#4f46e5"))
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#4f46e5").opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 8)
+
+                        // Delete Card
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                             showDeleteConfirm = true
@@ -2426,6 +2528,30 @@ struct EditLoanSheet: View {
                 .listRowSeparator(.hidden)
 
                     if !isNew {
+                        // Share Loan
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            // Placeholder for CloudKit sharing trigger
+                            print("Triggering CloudKit Sharing for \(loan.name)")
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                Text("Share Loan")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#4f46e5"))
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#4f46e5").opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 8)
+                        .buttonStyle(.plain)
+
+                        // Delete Loan
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                             showDeleteConfirm = true

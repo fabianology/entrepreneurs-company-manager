@@ -18,8 +18,37 @@ struct SubscriptionListView: View {
         ScrollView {
             LazyVStack(spacing: 0) {
                 // Add button row — exact CiFr style
-                HStack {
+                HStack(spacing: 12) {
                     Spacer()
+
+                    Menu {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            print("Triggering CloudKit Sharing for All Subscriptions")
+                        } label: {
+                            Label("All Subscriptions", systemImage: "folder.badge.person.crop")
+                        }
+                        
+                        Divider()
+                        
+                        ForEach(subscriptions) { sub in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                print("Triggering CloudKit Sharing for \(sub.name)")
+                            } label: {
+                                Label(sub.name.isEmpty ? "Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.blue)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                    }
+
                     Button(action: { 
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         newSub = vm.addSubscription(context: context, companyId: company.id) 

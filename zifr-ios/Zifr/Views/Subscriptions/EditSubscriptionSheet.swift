@@ -595,6 +595,29 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Danger Zone
                 if !isNew {
                     Section {
+                        // Share Service
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            // Placeholder for CloudKit sharing trigger
+                            print("Triggering CloudKit Sharing for \(sub.name)")
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                Text("Share Service")
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#4f46e5"))
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#4f46e5").opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.bottom, 8)
+
+                        // Delete Service
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                             showDeleteConfirm = true
