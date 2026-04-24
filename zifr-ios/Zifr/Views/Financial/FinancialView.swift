@@ -40,11 +40,11 @@ struct FinancialView: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text("SOLO CARD/LOAN").font(.system(size: 12, weight: .heavy)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                            Text("SOLO CARD/LOAN").font(.system(size: 9, weight: .heavy)).tracking(0.5).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         }
-                        .padding(.horizontal, 20)
-                        .frame(height: 36)
+                        .padding(.horizontal, 14)
+                        .frame(height: 28)
                         .background(Color(hex: "#171717"))
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
@@ -70,7 +70,7 @@ struct FinancialView: View {
                 .padding(.bottom, 24)
                 
                 // ── Main Wallet Stack ──
-                LazyVStack(spacing: 24) {
+                LazyVStack(spacing: 20) {
                     if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State
                         Button {
@@ -202,7 +202,7 @@ struct FinancialView: View {
             .zIndex(20)
         }
         .padding(.top, instCards.isEmpty ? 0 : CGFloat(instCards.count) * peekOffset + 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
@@ -221,7 +221,7 @@ struct FinancialView: View {
                         .frame(height: fullCardH)
                         .scaleEffect(scale)
                         .offset(y: yOffset)
-                        .zIndex(isPopped ? 25 : Double(cards.count - index))
+                        .zIndex(isPopped ? 150 : Double(cards.count - index))
                         .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isPopped)
                         .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
                         .onTapGesture {
@@ -242,10 +242,71 @@ struct FinancialView: View {
                             including: isPopped ? .gesture : .none
                         )
                 }
+                
+                // Front Leather Sleeve
+                WalletSleeveView()
+                    .zIndex(100)
+                    .allowsHitTesting(false)
             }
-            .padding(.top, CGFloat(cards.count) * peekOffset + 8)
+            .padding(.top, CGFloat(max(0, cards.count - 1)) * peekOffset + 4)
             .padding(.bottom, 16)
         }
+    }
+}
+
+// ── Wallet Sleeve Component ──
+struct AggressiveSleeveShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let radius: CGFloat = 20
+        let topYLeft: CGFloat = 35
+        let topYRight: CGFloat = 0
+        
+        path.move(to: CGPoint(x: 0, y: topYLeft))
+        path.addLine(to: CGPoint(x: rect.width, y: topYRight))
+        path.addLine(to: CGPoint(x: rect.width, y: rect.height - radius))
+        path.addArc(center: CGPoint(x: rect.width - radius, y: rect.height - radius),
+                    radius: radius, startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        path.addLine(to: CGPoint(x: radius, y: rect.height))
+        path.addArc(center: CGPoint(x: radius, y: rect.height - radius),
+                    radius: radius, startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        path.addLine(to: CGPoint(x: 0, y: topYLeft))
+        
+        return path
+    }
+}
+
+struct WalletSleeveView: View {
+    var body: some View {
+        ZStack {
+            // Main Leather Body (Matte Finish)
+            AggressiveSleeveShape()
+                .fill(Color(hex: "#121212"))
+                // Subtle overlay to simulate deep matte leather finish
+                .overlay(
+                    AggressiveSleeveShape()
+                        .fill(Color.black.opacity(0.15))
+                        .blendMode(.multiply)
+                )
+                .shadow(color: .black.opacity(0.6), radius: 10, y: -4)
+            
+            // Premium Stitching
+            AggressiveSleeveShape()
+                .stroke(Color(hex: "#2B3A3B"), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                .padding(6)
+                
+            // Edge highlight
+            AggressiveSleeveShape()
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.1), Color.clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1
+                )
+        }
+        .frame(height: 120)
     }
 }
 
@@ -273,6 +334,12 @@ struct FinancialCardVisual: View {
         return results
     }
 
+    private var promoEndsString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM/dd/yy"
+        return formatter.string(from: card.promoEnds)
+    }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 20)
@@ -288,7 +355,7 @@ struct FinancialCardVisual: View {
             let primaryColor = isLight ? Color.black : Color.white
             let secondaryColor = isLight ? Color.black.opacity(0.7) : Color.white.opacity(0.7)
             
-            VStack {
+            VStack(spacing: 0) {
                 HStack(alignment: .firstTextBaseline) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(card.name.isEmpty ? "Card" : card.name)
@@ -303,77 +370,112 @@ struct FinancialCardVisual: View {
                     }
                     Spacer()
                     Text("\(card.network) \(card.type)")
-                        .font(.system(size: isPopped ? 16 : 12, weight: .semibold))
+                        .font(.system(size: isPopped ? 14 : 12, weight: .semibold))
                         .foregroundStyle(secondaryColor)
                         .italic()
                 }
-                Spacer()
+                
+                Spacer(minLength: 0)
+                
                 if isPopped {
                     HStack {
                         Text(card.cardHolder.isEmpty ? "Name on Card" : card.cardHolder)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
                         Spacer()
                         Text(card.expiry.isEmpty ? "—" : card.expiry)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
                     }
+                    .padding(.bottom, 6)
                     
                     let services = paysForServices
-                    if !card.paidFrom.isEmpty || !services.isEmpty {
+                    let hasFinancials = card.limit > 0 || card.balance > 0 || card.apr > 0 || card.promoApr > 0 || (card.autopay != "N/A" && !card.autopay.isEmpty)
+                    
+                    if hasFinancials || !card.paidFrom.isEmpty || !services.isEmpty {
                         Divider()
                             .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
-                            .padding(.top, 8)
-                            .padding(.bottom, 4)
+                            .padding(.bottom, 6)
                         
-                        ScrollView(.vertical, showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                if !card.paidFrom.isEmpty {
-                                    HStack {
-                                        Text("PAY FROM")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
-                                        Spacer()
-                                        Text(card.paidFrom)
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundStyle(primaryColor)
+                        VStack(alignment: .leading, spacing: 6) {
+                            // --- Financials Grid ---
+                            if hasFinancials {
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 4) {
+                                    if card.balance > 0 { cardMetric(title: "BALANCE", value: "$\(String(format: "%.0f", card.balance))", isLight: isLight, primaryColor: primaryColor) }
+                                    if card.limit > 0 { cardMetric(title: "LIMIT", value: "$\(String(format: "%.0f", card.limit))", isLight: isLight, primaryColor: primaryColor) }
+                                    if card.apr > 0 { cardMetric(title: "APR", value: "\(String(format: "%.1f", card.apr))%", isLight: isLight, primaryColor: primaryColor) }
+                                    if card.promoApr > 0 { 
+                                        cardMetric(title: "PROMO", value: "\(String(format: "%.1f", card.promoApr))%", isLight: isLight, primaryColor: primaryColor) 
+                                        cardMetric(title: "PROMO END", value: promoEndsString, isLight: isLight, primaryColor: primaryColor)
                                     }
+                                    if card.autopay != "N/A" && !card.autopay.isEmpty { cardMetric(title: "AUTO PAY", value: card.autopay, isLight: isLight, primaryColor: primaryColor) }
                                 }
                                 
-                                if !card.paidFrom.isEmpty && !services.isEmpty {
+                                if !card.paidFrom.isEmpty || !services.isEmpty {
                                     Divider()
                                         .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
                                 }
-                                
-                                if !services.isEmpty {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text("PAYS FOR")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
-                                        
-                                        ForEach(Array(services.enumerated()), id: \.offset) { index, svc in
-                                            HStack {
-                                                Text(svc.name)
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundStyle(primaryColor)
-                                                    .lineLimit(1)
-                                                Spacer()
-                                                Text("$\(String(format: "%.0f", svc.cost))")
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundStyle(primaryColor)
-                                            }
+                            }
+                            
+                            if !card.paidFrom.isEmpty {
+                                HStack {
+                                    Text("PAY FROM")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
+                                    Spacer()
+                                    Text(card.paidFrom)
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(primaryColor)
+                                }
+                            }
+                            
+                            if !card.paidFrom.isEmpty && !services.isEmpty {
+                                Divider()
+                                    .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                            }
+                            
+                            if !services.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("PAYS FOR")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
+                                    
+                                    ForEach(Array(services.prefix(2).enumerated()), id: \.offset) { index, svc in
+                                        HStack {
+                                            Text(svc.name)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(primaryColor)
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Text("$\(String(format: "%.0f", svc.cost))")
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(primaryColor)
                                         }
                                     }
                                 }
                             }
                         }
-                        .frame(maxHeight: 70)
                     }
                 }
             }
-            .padding(isPopped ? 24 : 14)
+            .padding(16)
         }
         .contentShape(Rectangle())
+    }
+    
+    @ViewBuilder
+    private func cardMetric(title: String, value: String, isLight: Bool, primaryColor: Color) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(title)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
+            Text(value)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(primaryColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
