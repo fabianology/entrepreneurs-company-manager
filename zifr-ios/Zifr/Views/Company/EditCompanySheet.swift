@@ -53,7 +53,7 @@ struct EditCompanySheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         
                         formSection {
-                            ZifrField(label: "Entity Name", placeholder: "Acme Holdings LLC", text: $name)
+                            ZifrField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name)
                         }
                     }
                     .padding(.top, 8)
@@ -61,7 +61,7 @@ struct EditCompanySheet: View {
                     // Website Row
                     HStack(spacing: 16) {
                         formSection {
-                            ZifrField(label: "Website", placeholder: "acme.com", text: $website, keyboardType: .URL)
+                            ZifrField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL)
                         }
                         
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
@@ -91,34 +91,29 @@ struct EditCompanySheet: View {
 
                     // Structure picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Entity Structure")
-                            .zifrLabel()
+                        Text("ENTITY STRUCTURE")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
                             .padding(.horizontal, 4)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(Company.structures, id: \.self) { s in
-                                    Button {
-                                        structure = s
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    } label: {
-                                        Text(s)
-                                            .font(.system(size: 12, weight: .bold))
-                                            .padding(.horizontal, 14)
-                                            .padding(.vertical, 8)
-                                            .background(structure == s ? Color(hex: "#223E5A") : Color.white.opacity(0.06))
-                                            .foregroundStyle(structure == s ? Color(hex: "#A2A2A2") : Color.white.opacity(0.6))
-                                            .clipShape(Capsule())
-                                    }
-                                }
+                        Picker("", selection: $structure) {
+                            ForEach(Company.structures, id: \.self) { s in
+                                Text(s).tag(s)
                             }
-                            .padding(.horizontal, 4)
                         }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .clipped()
                     }
 
                     // Color picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Identity Color")
-                            .zifrLabel()
+                        Text("IDENTITY COLOR")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
                             .padding(.horizontal, 4)
                         HStack(spacing: 10) {
                             ForEach(Company.brandColors, id: \.self) { hex in
@@ -145,7 +140,7 @@ struct EditCompanySheet: View {
                         // App Navigators
                         VStack(alignment: .leading, spacing: 8) {
                             Text("APP NAVIGATORS")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.5))
                                 .padding(.leading, 4)
                             
@@ -204,40 +199,35 @@ struct EditCompanySheet: View {
 
                         // Delete
                         if isEditing {
-                            if showDeleteConfirm {
-                                HStack(spacing: 20) {
-                                    Text("Delete this entity?")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(.red)
-                                    Button("Yes, Delete") {
-                                        if let company { vm.deleteCompany(company, context: context) }
-                                        dismiss()
-                                    }
-                                    .font(.system(size: 12, weight: .black))
-                                    .foregroundStyle(.red)
-                                    Button("Cancel") { showDeleteConfirm = false }
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.4))
+                            Button(role: .destructive) {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDeleteConfirm = true
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "trash")
+                                    Text("Delete \(name.isEmpty ? "Entity" : name)")
+                                    Spacer()
                                 }
-                                .padding(16)
-                                .frame(maxWidth: .infinity)
-                                .glassCard(cornerRadius: 16)
-                            } else {
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                    showDeleteConfirm = true
-                                } label: {
-                                    Text("DELETE \(name.isEmpty ? "ENTITY" : name.uppercased())")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .tracking(2)
-                                        .foregroundStyle(.red)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 16)
-                                        .background(Color.red.opacity(0.05))
-                                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.red.opacity(0.3), lineWidth: 1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .confirmationDialog(
+                                "Delete \"\(name.isEmpty ? "this entity" : name)\"?",
+                                isPresented: $showDeleteConfirm,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Delete Entity", role: .destructive) {
+                                    if let company { vm.deleteCompany(company, context: context) }
+                                    dismiss()
                                 }
-                                .buttonStyle(.plain)
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("This will permanently delete this entity and all associated data. This action cannot be undone.")
                             }
                         }
                     }
@@ -246,36 +236,24 @@ struct EditCompanySheet: View {
                 .padding(20)
                 .padding(.bottom, 40)
             }
-            .background(Color.zifrBG)
+            .background(Color(hex: "#171717"))
             .navigationTitle(isEditing ? "Edit Entity" : "New Entity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
-                        // Cancel (X)
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 36, height: 36)
-                                .liquidGlass(cornerRadius: 18)
-                        }
-                        
-                        // Save (Checkmark)
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            save()
-                            dismiss()
-                        } label: {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle((hasChanges && !name.isEmpty) ? Color.green : Color.white.opacity(0.5))
-                                .frame(width: 36, height: 36)
-                                .liquidGlass(cornerRadius: 18)
-                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: hasChanges)
-                        }
-                        .disabled(!hasChanges || name.isEmpty)
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
                     }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        save()
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .tint((hasChanges && !name.isEmpty) ? .green : nil)
+                    .disabled(!hasChanges || name.isEmpty)
                 }
             }
         }
@@ -329,7 +307,7 @@ struct EditCompanySheet: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(Color(hex: "#171717"))
+            .background(Color.black)
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)

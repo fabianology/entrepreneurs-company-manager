@@ -38,6 +38,7 @@ final class Institution {
     var username: String = ""
     var email: String = ""
     var password: String = ""
+    var twoFactor: String = ""
     var accountsData: Data = Data()
     var company: Company?
 
@@ -49,6 +50,7 @@ final class Institution {
         username: String = "",
         email: String = "",
         password: String = "",
+        twoFactor: String = "",
         accounts: [InstitutionAccount] = []
     ) {
         self.id = id
@@ -58,6 +60,7 @@ final class Institution {
         self.username = username
         self.email = email
         self.password = password
+        self.twoFactor = twoFactor
         self.accountsData = (try? JSONEncoder().encode(accounts)) ?? Data()
     }
 

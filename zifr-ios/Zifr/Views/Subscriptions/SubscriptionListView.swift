@@ -235,13 +235,13 @@ struct SubscriptionCardView: View {
                                 .font(.system(size: 11, weight: .semibold))
                                 .textCase(.uppercase)
                                 .tracking(0.3)
-                                .foregroundStyle(sub.renew == "Manual" ? Color.red : Color.zifrGreen)
+                                .foregroundStyle(Color.gray)
                             statusPipe()
                             Text(sub.isFree ? "Active" : "Paid")
                                 .font(.system(size: 11, weight: .semibold))
                                 .textCase(.uppercase)
                                 .tracking(0.3)
-                                .foregroundStyle(Color.zifrGreen)
+                                .foregroundStyle(Color.gray)
                             Spacer()
                         }
                         .padding(.horizontal, 24)
@@ -677,24 +677,40 @@ struct SubscriptionCardView: View {
 struct DynamicLoginLabelView: View {
     let loginId: String
     var ignoreSubscriptionId: String? = nil
+    var ignoreInstitutionId: String? = nil
     
     @Query private var allSubscriptions: [Subscription]
+    @Query private var allInstitutions: [Institution]
     
     var body: some View {
-        let normalizedEmail = loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        if !normalizedEmail.isEmpty && normalizedEmail.contains("@") {
-            let computedServices: [UsedInEmailService] = allSubscriptions.compactMap { s in
+        let normalizedLogin = loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalizedLogin.isEmpty {
+            let subServices: [String] = allSubscriptions.compactMap { s in
                 if let ignoreId = ignoreSubscriptionId, s.id == ignoreId { return nil }
                 
-                if s.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail {
-                    return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .primary)
-                } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }) {
-                    return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .linked)
+                if s.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
+                    return s.name.isEmpty ? "Unnamed Service" : s.name
+                } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin }) {
+                    return s.name.isEmpty ? "Unnamed Service" : s.name
                 }
                 return nil
             }
             
-            let allTextTags = computedServices.map { $0.name }
+            let instServices: [String] = allInstitutions.compactMap { i in
+                if let ignoreId = ignoreInstitutionId, i.id == ignoreId { return nil }
+                
+                let instLogin = i.username.isEmpty ? i.email : i.username
+                if instLogin.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
+                    return i.name.isEmpty ? "Unnamed Institution" : i.name
+                } else if i.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin && !i.email.isEmpty {
+                    return i.name.isEmpty ? "Unnamed Institution" : i.name
+                }
+                return nil
+            }
+            
+            let allTextTags = (subServices + instServices).reduce(into: [String]()) { result, name in
+                if !result.contains(name) { result.append(name) }
+            }
             
             if !allTextTags.isEmpty {
                 HStack(spacing: 4) {

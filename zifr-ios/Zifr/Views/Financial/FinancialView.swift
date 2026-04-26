@@ -626,7 +626,7 @@ struct InstitutionCardView: View {
                         }
                         
                         let loginValue = institution.username.isEmpty ? institution.email : institution.username
-                        DynamicLoginLabelView(loginId: loginValue)
+                        DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -1043,12 +1043,12 @@ struct EditInstitutionSheet: View {
     @State private var showPassword = false
     
     struct Snapshot: Equatable {
-        var name, loginUrl, username, email, password: String
+        var name, loginUrl, username, email, password, twoFactor: String
     }
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: institution.name, loginUrl: institution.loginUrl, username: institution.username, email: institution.email, password: institution.password)
+        Snapshot(name: institution.name, loginUrl: institution.loginUrl, username: institution.username, email: institution.email, password: institution.password, twoFactor: institution.twoFactor)
     }
 
     private var isDirty: Bool {
@@ -1101,7 +1101,16 @@ struct EditInstitutionSheet: View {
                                 ZifrField(
                                     label: "LOGIN ID",
                                     placeholder: "username",
-                                    text: Binding(get: { institution.username.isEmpty ? institution.email : institution.username }, set: { institution.username = $0 }),
+                                    text: Binding(
+                                        get: { institution.username.isEmpty ? institution.email : institution.username },
+                                        set: { newValue in
+                                            let old = institution.username
+                                            institution.username = newValue
+                                            if newValue.contains("@") && (institution.email.isEmpty || institution.email == old) {
+                                                institution.email = newValue
+                                            }
+                                        }
+                                    ),
                                     keyboardType: .emailAddress
                                 )
 
@@ -1128,7 +1137,23 @@ struct EditInstitutionSheet: View {
                             }
                             
                             let loginValue = institution.username.isEmpty ? institution.email : institution.username
-                            DynamicLoginLabelView(loginId: loginValue)
+                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id)
+                        }
+                        
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "EMAIL",
+                                placeholder: "name@company.com",
+                                text: Binding(get: { institution.email }, set: { institution.email = $0 }),
+                                keyboardType: .emailAddress
+                            )
+                            .textInputAutocapitalization(.never)
+
+                            ZifrField(
+                                label: "2FA",
+                                placeholder: "Phone or App",
+                                text: Binding(get: { institution.twoFactor }, set: { institution.twoFactor = $0 })
+                            )
                         }
                     }
                     .padding(.vertical, 4)
