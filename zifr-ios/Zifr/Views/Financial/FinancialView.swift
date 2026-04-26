@@ -39,12 +39,12 @@ struct FinancialView: View {
                             Label("Add Account", systemImage: "building.columns")
                         }
                     } label: {
-                        HStack(spacing: 4) {
-                            Text("SOLO CARD/LOAN").font(.system(size: 9, weight: .heavy)).tracking(0.5).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Image(systemName: "chevron.down").font(.system(size: 7, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        HStack(spacing: 6) {
+                            Text("SOLO CARD").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         }
-                        .padding(.horizontal, 14)
-                        .frame(height: 28)
+                        .padding(.horizontal, 20)
+                        .frame(height: 36)
                         .background(Color(hex: "#171717"))
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
