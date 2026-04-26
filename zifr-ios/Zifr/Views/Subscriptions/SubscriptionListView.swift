@@ -20,7 +20,23 @@ struct SubscriptionListView: View {
             LazyVStack(spacing: 0) {
                 // Add button row — exact CiFr style
                 HStack(spacing: 12) {
-                    Spacer()
+                    Button(action: { 
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newSub = vm.addSubscription(context: context, companyId: company.id) 
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("SERVICE")
+                                .font(.system(size: 12, weight: .heavy))
+                                .tracking(1)
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                        }
+                        .frame(width: 145, height: 36)
+                        .background(Color(hex: "#223E5A"))
+                        .clipShape(Capsule())
+                    }
 
                     Menu {
                         Button {
@@ -50,24 +66,7 @@ struct SubscriptionListView: View {
                             .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
 
-                    Button(action: { 
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        newSub = vm.addSubscription(context: context, companyId: company.id) 
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("SERVICE")
-                                .font(.system(size: 12, weight: .heavy))
-                                .tracking(1)
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                        }
-                        .padding(.horizontal, 20)
-                        .frame(height: 36)
-                        .background(Color(hex: "#223E5A"))
-                        .clipShape(Capsule())
-                    }
+                    Spacer()
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)

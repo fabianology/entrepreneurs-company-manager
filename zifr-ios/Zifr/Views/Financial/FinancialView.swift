@@ -23,36 +23,19 @@ struct FinancialView: View {
             VStack(spacing: 0) {
                 // ── Action Bar ──
                 HStack(spacing: 8) {
-                    Menu {
-                        Button {
-                            newCard = vm.addCard(context: context, companyId: company.id)
-                        } label: {
-                            Label("Add Card", systemImage: "creditcard")
-                        }
-                        Button {
-                            newLoan = vm.addLoan(context: context, companyId: company.id)
-                        } label: {
-                            Label("Add Loan", systemImage: "dollarsign.circle")
-                        }
-                        Button {
-                            newInst = vm.addInstitution(context: context, companyId: company.id)
-                        } label: {
-                            Label("Add Account", systemImage: "building.columns")
-                        }
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newInst = vm.addInstitution(context: context, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
-                            Text("SOLO CARD").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                            Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("INSTITUTION").font(.system(size: 12, weight: .heavy)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
                         }
-                        .padding(.horizontal, 20)
-                        .frame(height: 36)
-                        .background(Color(hex: "#171717"))
+                        .frame(width: 145, height: 36)
+                        .background(Color(hex: "#223E5A"))
                         .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
                     }
 
-                    Spacer()
-                    
                     Menu {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -108,23 +91,39 @@ struct FinancialView: View {
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        newInst = vm.addInstitution(context: context, companyId: company.id)
+
+                    Spacer()
+
+                    Menu {
+                        Button {
+                            newCard = vm.addCard(context: context, companyId: company.id)
+                        } label: {
+                            Label("Add Card", systemImage: "creditcard")
+                        }
+                        Button {
+                            newLoan = vm.addLoan(context: context, companyId: company.id)
+                        } label: {
+                            Label("Add Loan", systemImage: "dollarsign.circle")
+                        }
+                        Button {
+                            newInst = vm.addInstitution(context: context, companyId: company.id)
+                        } label: {
+                            Label("Add Account", systemImage: "building.columns")
+                        }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("INSTITUTION").font(.system(size: 12, weight: .heavy)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("SOLO CARD").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
-                        .background(Color(hex: "#223E5A"))
+                        .background(Color(hex: "#171717"))
                         .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 4)
-                .padding(.bottom, 24)
+                .padding(.bottom, 20)
                 
                 // ── Main Wallet Stack ──
                 LazyVStack(spacing: 20) {

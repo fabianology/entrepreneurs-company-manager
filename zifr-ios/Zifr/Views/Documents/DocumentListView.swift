@@ -23,8 +23,24 @@ struct DocumentListView: View {
             LazyVStack(spacing: 24) {
                 // Add button row
                 HStack(spacing: 12) {
-                    Spacer()
-                    
+                    Button { 
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        newDoc = vm.addDocument(context: context, companyId: company.id) 
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("DOCUMENT")
+                                .font(.system(size: 12, weight: .heavy))
+                                .tracking(1)
+                                .foregroundStyle(Color.white)
+                        }
+                        .frame(width: 145, height: 36)
+                        .background(Color(hex: "#223E5A"))
+                        .clipShape(Capsule())
+                    }
+
                     Menu {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -53,25 +69,7 @@ struct DocumentListView: View {
                             .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
 
-
-                    Button { 
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        newDoc = vm.addDocument(context: context, companyId: company.id) 
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("DOCUMENT")
-                                .font(.system(size: 12, weight: .heavy))
-                                .tracking(1)
-                                .foregroundStyle(Color.white)
-                        }
-                        .padding(.horizontal, 20)
-                        .frame(height: 36)
-                        .background(Color(hex: "#223E5A"))
-                        .clipShape(Capsule())
-                    }
+                    Spacer()
                 }
                 .padding(.horizontal, 20)
 
