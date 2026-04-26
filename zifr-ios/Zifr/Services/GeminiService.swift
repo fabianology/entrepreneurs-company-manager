@@ -19,7 +19,7 @@ actor GeminiService {
     ]
 
     // MARK: - Generic Generate
-    private func generate(model: String = "gemini-2.0-flash", prompt: String) async throws -> String {
+    private func generate(model: String = "gemini-flash-latest", prompt: String) async throws -> String {
         let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -75,7 +75,7 @@ actor GeminiService {
         3. Be helpful and professional.
         """
         do {
-            return try await generate(model: "gemini-2.0-flash", prompt: prompt)
+            return try await generate(model: "gemini-flash-latest", prompt: prompt)
         } catch {
             return "Could not process that query right now."
         }
@@ -103,7 +103,7 @@ actor GeminiService {
         """
         
         do {
-            let result = try await generate(model: "gemini-2.0-flash", prompt: prompt)
+            let result = try await generate(model: "gemini-flash-latest", prompt: prompt)
             let cleanedJSON = result.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
             
             if let data = cleanedJSON.data(using: .utf8) {
