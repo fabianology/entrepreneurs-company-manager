@@ -31,6 +31,9 @@ actor GeminiService {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, _) = try await URLSession.shared.data(for: request)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        if let errorMessage = json?["error"] as? [String: Any], let message = errorMessage["message"] as? String {
+            return "API Error: \(message)"
+        }
         let candidates = json?["candidates"] as? [[String: Any]]
         let content = candidates?.first?["content"] as? [String: Any]
         let parts = content?["parts"] as? [[String: Any]]
@@ -75,6 +78,42 @@ actor GeminiService {
             return try await generate(model: "gemini-2.0-flash", prompt: prompt)
         } catch {
             return "Could not process that query right now."
+        }
+    }
+
+    // MARK: - Document Scanning AI
+    func categorizeDocument(text: String, isPersonal: Bool = false) async -> [String: String]? {
+        let validCategories = isPersonal 
+            ? "\"Medical\", \"Identity & Vital Docs\", \"Legal\", \"Taxes\", \"Property & Estate\", or \"Other\""
+            : "\"Formation & Governance\", \"Tax & IRS\", \"Legal & IP\", \"Contracts & HR\", \"Compliance & Insurance\", \"Identity & Vital Records\", \"Property & Assets\", \"Estate & Medical\", or \"Other\""
+            
+        let prompt = """
+        You are an expert financial and legal assistant for an entrepreneur. 
+        I am giving you the raw OCR text of a scanned document. 
+        Your job is to analyze it and return a strict JSON dictionary with EXACTLY these four keys:
+        - "name": A concise, clear title for the document (e.g. "Vendor Name - Document Type - Year" or similar appropriate title).
+        - "category": MUST be one of these exact strings: \(validCategories).
+        - "date": The effective date, signature date, or upload date of the document in 'MMM dd, yyyy' format (e.g. 'Oct 12, 2025'). If none found, leave empty string.
+        - "notes": A very short 1-sentence summary of what this document is.
+
+        Return ONLY the JSON. No markdown formatting, no backticks, no explanations. Just a raw {"name":"...", "category":"...", "date":"...", "notes":"..."}.
+
+        Raw OCR Text:
+        \(text)
+        """
+        
+        do {
+            let result = try await generate(model: "gemini-2.0-flash", prompt: prompt)
+            let cleanedJSON = result.replacingOccurrences(of: "```json", with: "").replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if let data = cleanedJSON.data(using: .utf8) {
+                let dict = try JSONDecoder().decode([String: String].self, from: data)
+                return dict
+            }
+            return nil
+        } catch {
+            print("Gemini Categorization Error: \(error)")
+            return nil
         }
     }
 }

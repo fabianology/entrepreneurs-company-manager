@@ -14,11 +14,36 @@ struct CompanyDetailView: View {
     @Query private var allLoans: [Loan]
     @Query private var allDocuments: [CompanyDocument]
 
-    var subscriptions: [Subscription] { allSubscriptions.filter { $0.companyId == company.id } }
-    var cards: [FinancialCard] { allCards.filter { $0.companyId == company.id } }
-    var institutions: [Institution] { allInstitutions.filter { $0.companyId == company.id } }
-    var loans: [Loan] { allLoans.filter { $0.companyId == company.id } }
-    var documents: [CompanyDocument] { allDocuments.filter { $0.companyId == company.id } }
+    var subscriptions: [Subscription] {
+        let filtered = allSubscriptions.filter { $0.companyId == company.id }
+        guard !vm.searchQuery.isEmpty else { return filtered }
+        let q = vm.searchQuery.lowercased()
+        return filtered.filter { $0.name.lowercased().contains(q) || $0.loginId.lowercased().contains(q) || $0.paymentMethod.lowercased().contains(q) }
+    }
+    var cards: [FinancialCard] {
+        let filtered = allCards.filter { $0.companyId == company.id }
+        guard !vm.searchQuery.isEmpty else { return filtered }
+        let q = vm.searchQuery.lowercased()
+        return filtered.filter { $0.name.lowercased().contains(q) || $0.institutionName.lowercased().contains(q) || $0.network.lowercased().contains(q) || $0.last4.lowercased().contains(q) }
+    }
+    var institutions: [Institution] {
+        let filtered = allInstitutions.filter { $0.companyId == company.id }
+        guard !vm.searchQuery.isEmpty else { return filtered }
+        let q = vm.searchQuery.lowercased()
+        return filtered.filter { $0.name.lowercased().contains(q) || $0.username.lowercased().contains(q) || $0.email.lowercased().contains(q) }
+    }
+    var loans: [Loan] {
+        let filtered = allLoans.filter { $0.companyId == company.id }
+        guard !vm.searchQuery.isEmpty else { return filtered }
+        let q = vm.searchQuery.lowercased()
+        return filtered.filter { $0.name.lowercased().contains(q) || $0.lender.lowercased().contains(q) }
+    }
+    var documents: [CompanyDocument] {
+        let filtered = allDocuments.filter { $0.companyId == company.id }
+        guard !vm.searchQuery.isEmpty else { return filtered }
+        let q = vm.searchQuery.lowercased()
+        return filtered.filter { $0.name.lowercased().contains(q) }
+    }
 
     @State private var showEditCompany = false
     @State private var dragOffset: CGFloat = 0

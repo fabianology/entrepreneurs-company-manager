@@ -92,31 +92,52 @@ struct SubscriptionListView: View {
         }
     }
 
+    @State private var dummyNetflix = Subscription(
+        name: "Netflix",
+        cost: 22.99,
+        billingCycle: "Monthly",
+        paymentMethod: "Apple Card •••• 1234",
+        nextRenewal: "15",
+        status: "Active",
+        website: "netflix.com",
+        loginId: "founder@company.com",
+        password: "••••••••",
+        showSubServicesTab: false,
+        showLinkedEmailsTab: false
+    )
+
     private var emptyState: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             newSub = vm.addSubscription(context: context, companyId: company.id)
         }) {
-            VStack(spacing: 16) {
-                Text("🌐")
-                    .font(.system(size: 28))
-                Text("+ Add Your First Service")
-                    .font(.system(size: 9, weight: .black))
-                    .textCase(.uppercase)
-                    .tracking(3)
-                    .foregroundStyle(Color.white.opacity(0.4))
+            ZStack {
+                SubscriptionCardView(
+                    sub: dummyNetflix,
+                    allSubscriptions: [],
+                    institutions: [],
+                    cards: [],
+                    onEdit: {}
+                )
+                .allowsHitTesting(false)
+                .blur(radius: 3)
+                
+                VStack(spacing: 16) {
+                    Image(systemName: "square.3.layers.3d")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white)
+                    Text("+ ADD YOUR FIRST SERVICE")
+                        .font(.system(size: 11, weight: .black))
+                        .textCase(.uppercase)
+                        .tracking(2)
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 40)
-            .background(Color(hex: "#171717").opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 32))
-            .overlay(
-                RoundedRectangle(cornerRadius: 32)
-                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [6]))
-                    .foregroundStyle(Color.white.opacity(0.2))
-            )
         }
         .padding(.horizontal, 20)
+        .padding(.top, 40)
     }
 }
 

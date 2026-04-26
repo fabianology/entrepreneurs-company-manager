@@ -10,6 +10,9 @@ struct DocumentListView: View {
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
     @State private var openURL: IdentifiableURL? = nil
+    @State private var selectedType: String = "All"
+    @State private var isScanning = false
+    @State private var isProcessingScan = false
 
     var grouped: [String: [CompanyDocument]] {
         Dictionary(grouping: documents, by: \.type)
@@ -50,6 +53,7 @@ struct DocumentListView: View {
                             .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
 
+
                     Button { 
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         newDoc = vm.addDocument(context: context, companyId: company.id) 
@@ -61,7 +65,7 @@ struct DocumentListView: View {
                             Text("DOCUMENT")
                                 .font(.system(size: 12, weight: .heavy))
                                 .tracking(1)
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                                .foregroundStyle(Color.white)
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
@@ -71,26 +75,92 @@ struct DocumentListView: View {
                 }
                 .padding(.horizontal, 20)
 
+                VStack(spacing: 12) {
+                    // Category Dashboard Grid
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
+                        ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
+                            let count = grouped[type]?.count ?? 0
+                            CategoryGridCard(
+                                title: type,
+                                icon: CompanyDocument.icon(for: type),
+                                count: count,
+                                isSelected: selectedType == type
+                            ) {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                if selectedType == type {
+                                    selectedType = "All"
+                                } else {
+                                    selectedType = type
+                                }
+                            }
+                        }
+                    }
+
+                    // All Documents Box
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        selectedType = "All"
+                    } label: {
+                        HStack {
+                            Text("ALL DOCUMENTS")
+                                .font(.system(size: 12, weight: .bold))
+                                .tracking(1)
+                                .foregroundStyle(selectedType == "All" ? Color(hex: "#918457") : .white)
+                            Spacer()
+                            if documents.count > 0 {
+                                Text("\(documents.count)")
+                                    .font(.system(size: 10, weight: .black))
+                                    .foregroundStyle(selectedType == "All" ? Color(hex: "#918457") : .white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(selectedType == "All" ? Color(hex: "#918457").opacity(0.15) : Color.white.opacity(0.15))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 40)
+                        .background(Color.clear)
+                        .liquidGlass(cornerRadius: 12)
+                    }
+                }
+                .padding(.horizontal, 20)
+
                 if documents.isEmpty {
                     emptyState.padding(.horizontal, 20)
                 } else {
-                    ForEach(CompanyDocument.types, id: \.self) { type in
-                        if let docs = grouped[type], !docs.isEmpty {
-                            VStack(spacing: 10) {
-                                // CiFr-style section header
-                                HStack {
-                                    Text(type)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .textCase(.uppercase)
-                                        .tracking(3)
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                    Spacer()
-                                    Text("\(docs.count)")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.25))
+                    if selectedType == "All" {
+                        VStack(spacing: 10) {
+                            ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
+                                if let docs = grouped[type], !docs.isEmpty {
+                                    ForEach(docs) { doc in
+                                        DocumentRow(doc: doc) {
+                                            editingDoc = doc
+                                        } onOpen: {
+                                            if let u = URL(string: doc.url.hasPrefix("http") ? doc.url : "https://\(doc.url)") {
+                                                openURL = IdentifiableURL(url: u)
+                                            }
+                                        }
+                                        .padding(.horizontal, 20)
+                                    }
                                 }
-                                .padding(.horizontal, 20)
-
+                            }
+                        }
+                    } else {
+                        // Show only selected category
+                        let docs = grouped[selectedType] ?? []
+                        if docs.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "folder")
+                                    .font(.system(size: 32))
+                                    .foregroundStyle(Color.white.opacity(0.2))
+                                Text("No Documents")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 60)
+                        } else {
+                            VStack(spacing: 10) {
                                 ForEach(docs) { doc in
                                     DocumentRow(doc: doc) {
                                         editingDoc = doc
@@ -109,36 +179,152 @@ struct DocumentListView: View {
             .padding(.bottom, 120)
         }
         .scrollIndicators(.hidden)
+        .overlay(alignment: .bottom) {
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                isScanning = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "viewfinder")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color(hex: "#A2A2A2"))
+                    Text("SCAN")
+                        .font(.system(size: 12, weight: .heavy))
+                        .tracking(1)
+                        .foregroundStyle(Color.white)
+                }
+                .padding(.horizontal, 20)
+                .frame(height: 36)
+                .background(Color(hex: "#223E5A"))
+                .clipShape(Capsule())
+                .shadow(color: Color.zifrBlue.opacity(0.5), radius: 12, x: 0, y: 0)
+            }
+            .padding(.bottom, 20)
+        }
+        .overlay {
+            if isProcessingScan {
+                ZStack {
+                    Color.black.opacity(0.8).ignoresSafeArea()
+                    VStack(spacing: 20) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 40))
+                            .foregroundStyle(Color.zifrBlue)
+                            .shimmer()
+                        Text("AI is extracting data...")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .shimmer()
+                    }
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $isScanning) {
+            DocumentScannerView {
+                isScanning = false
+            } onComplete: { images in
+                isScanning = false
+                processScan(images)
+            } onError: { error in
+                isScanning = false
+                print("Scanner error: \(error)")
+            }
+            .ignoresSafeArea()
+        }
         .sheet(item: $newDoc) { doc in
-            EditDocumentSheet(doc: doc, vm: vm, isNew: true)
+            EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
         .sheet(item: $editingDoc) { doc in
-            EditDocumentSheet(doc: doc, vm: vm, isNew: false)
+            EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: company.structure)
         }
         .sheet(item: $openURL) { wrapper in
             SafariView(url: wrapper.url)
         }
     }
 
+    @State private var dummyDoc = CompanyDocument(
+        name: "Articles of Incorporation",
+        type: "Formation & Governance",
+        url: "drive.google.com/...",
+        uploadDate: "Oct 12, 2025",
+        notes: "Filed in Delaware"
+    )
+
     private var emptyState: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 44))
-                .foregroundStyle(Color.white.opacity(0.2))
-            Text("No Documents")
-                .font(.system(size: 16, weight: .black)).foregroundStyle(.white)
-            Text("Store formation docs, contracts, and more")
-                .font(.system(size: 13)).foregroundStyle(Color.white.opacity(0.35))
-                .multilineTextAlignment(.center)
-            Button("Add Document") { 
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                newDoc = vm.addDocument(context: context, companyId: company.id) 
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            newDoc = vm.addDocument(context: context, companyId: company.id)
+        }) {
+            ZStack {
+                // Dummy document row
+                VStack(spacing: 0) {
+                    DocumentRow(doc: dummyDoc, onEdit: {}, onOpen: {})
+                }
+                .allowsHitTesting(false)
+                .blur(radius: 3)
+                
+                // Glass overlay
+                VStack(spacing: 16) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.white)
+                    Text("+ ADD YOUR FIRST DOCUMENT")
+                        .font(.system(size: 11, weight: .black))
+                        .textCase(.uppercase)
+                        .tracking(2)
+                        .foregroundStyle(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
             }
-                .font(.system(size: 13, weight: .black)).foregroundStyle(.black)
-                .padding(.horizontal, 24).padding(.vertical, 12)
-                .background(.white).clipShape(Capsule())
         }
-        .frame(maxWidth: .infinity).padding(.vertical, 60)
+        .padding(.top, 40)
+    }
+
+    private func processScan(_ images: [UIImage]) {
+        isProcessingScan = true
+        
+        Task {
+            do {
+                // 1. OCR Extract Text
+                let extractedText = try await DocumentProcessor.shared.extractText(from: images)
+                
+                // 2. AI Categorization
+                let categorization = await GeminiService.shared.categorizeDocument(text: extractedText, isPersonal: company.structure == "Personal")
+                
+                // 3. Generate PDF
+                let filename = categorization?["name"] ?? UUID().uuidString
+                let pdfURL = DocumentProcessor.shared.generatePDF(from: images, filename: filename)
+                
+                // 4. Create Document
+                await MainActor.run {
+                    let doc = vm.addDocument(context: context, companyId: company.id)
+                    
+                    if let cat = categorization {
+                        doc.name = cat["name"] ?? "Scanned Document"
+                        doc.type = cat["category"] ?? "Other"
+                        doc.uploadDate = cat["date"] ?? ""
+                        doc.notes = cat["notes"] ?? ""
+                    }
+                    
+                    if let url = pdfURL {
+                        doc.url = url.absoluteString
+                    }
+                    
+                    isProcessingScan = false
+                    
+                    // Delay slightly to let the UI settle before opening sheet
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        editingDoc = doc
+                    }
+                }
+                
+            } catch {
+                print("Failed to process scan: \(error)")
+                await MainActor.run {
+                    isProcessingScan = false
+                }
+            }
+        }
     }
 }
 
@@ -194,6 +380,7 @@ struct EditDocumentSheet: View {
     @Bindable var doc: CompanyDocument
     @Bindable var vm: AppViewModel
     let isNew: Bool
+    let companyStructure: String
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
@@ -220,9 +407,15 @@ struct EditDocumentSheet: View {
                     ZifrField(label: "Document Name", placeholder: "Articles of Incorporation", text: Binding(get: { doc.name }, set: { doc.name = $0 }))
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Document Type").zifrLabel()
-                        Picker("Type", selection: Binding(get: { doc.type }, set: { doc.type = $0 })) {
-                            ForEach(CompanyDocument.types, id: \.self) { Text($0).tag($0) }
-                        }.pickerStyle(.segmented)
+                        HStack {
+                            Picker("Type", selection: Binding(get: { doc.type }, set: { doc.type = $0 })) {
+                                ForEach(CompanyDocument.types(for: companyStructure), id: \.self) { Text($0).tag($0) }
+                            }
+                            .pickerStyle(.menu)
+                            .tint(.white)
+                            Spacer()
+                        }
+                        .cifrField()
                     }
                     ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url }, set: { doc.url = $0 }), keyboardType: .URL)
                     ZifrField(label: "Upload Date", placeholder: "April 15, 2026", text: Binding(get: { doc.uploadDate }, set: { doc.uploadDate = $0 }))
@@ -298,6 +491,7 @@ struct EditDocumentSheet: View {
                     }
                     .foregroundStyle(Color.white.opacity(0.5))
                 }
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { vm.saveDoc(doc, context: context); dismiss() }
                         .font(.system(size: 15, weight: .black))
@@ -321,4 +515,47 @@ struct SafariView: UIViewControllerRepresentable {
 struct IdentifiableURL: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+struct CategoryGridCard: View {
+    let title: String
+    let icon: String
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top) {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(isSelected ? Color(hex: "#918457") : .white)
+                    
+                    Spacer()
+                    
+                    if count > 0 {
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundStyle(isSelected ? Color(hex: "#918457") : .white)
+                            .frame(width: 20, height: 20)
+                            .background(isSelected ? Color(hex: "#918457").opacity(0.15) : Color.white.opacity(0.15))
+                            .clipShape(Circle())
+                    }
+                }
+                
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(isSelected ? Color(hex: "#918457") : Color.white.opacity(0.7))
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(10)
+            .frame(height: 75)
+            .frame(maxWidth: .infinity)
+            .background(Color.clear)
+            .liquidGlass(cornerRadius: 16)
+        }
+    }
 }

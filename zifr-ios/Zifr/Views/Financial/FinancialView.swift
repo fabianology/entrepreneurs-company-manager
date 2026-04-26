@@ -128,22 +128,74 @@ struct FinancialView: View {
                 // ── Main Wallet Stack ──
                 LazyVStack(spacing: 20) {
                     if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
-                        // Empty State
+                        // Empty State — dummy Amex wallet with glass overlay
+                        let dummyAmex = Institution(
+                            name: "American Express",
+                            loginUrl: "americanexpress.com",
+                            username: "founder@company.com",
+                            password: "••••••••",
+                            accounts: [
+                                InstitutionAccount(name: "Amex Platinum", type: "Credit Card", last4: "1005", balance: 0, limit: 25000)
+                            ]
+                        )
+                        let dummyCard1 = FinancialCard(
+                            name: "Amex Platinum",
+                            institutionName: "American Express",
+                            cardHolder: "Jane Founder",
+                            last4: "1005",
+                            expiry: "09/27",
+                            network: "Amex",
+                            type: "Credit",
+                            limit: 25000,
+                            autopay: "Yes",
+                            apr: 29.99
+                        )
+                        
                         Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             newInst = vm.addInstitution(context: context, companyId: company.id)
                         } label: {
-                            VStack(spacing: 12) {
-                                Text("🏦").font(.system(size: 40))
-                                Text("+ Add Your First Institution")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                            ZStack {
+                                // Dummy wallet stack
+                                VStack(spacing: 0) {
+                                    ZStack(alignment: .top) {
+                                        FinancialCardVisual(card: dummyCard1, isPopped: false)
+                                            .frame(height: 110)
+                                            .offset(y: -36)
+                                            .zIndex(2)
+                                        InstitutionCardView(
+                                            institution: dummyAmex,
+                                            totalMonthlyPayment: 0,
+                                            cardCount: 1,
+                                            loanCount: 0,
+                                            loans: [],
+                                            vm: vm,
+                                            onEdit: {},
+                                            onEditLoan: { _ in }
+                                        )
+                                        .zIndex(3)
+                                    }
+                                    .padding(.top, 36)
+                                }
+                                .allowsHitTesting(false)
+                                .blur(radius: 3)
+                                
+                                // Glass overlay
+                                VStack(spacing: 16) {
+                                    Image(systemName: "creditcard")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.white)
+                                    Text("+ ADD YOUR FIRST INSTITUTION")
+                                        .font(.system(size: 11, weight: .black))
+                                        .textCase(.uppercase)
+                                        .tracking(2)
+                                        .foregroundStyle(.white)
+                                }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
                             }
-                            .frame(width: 300, height: 200)
-                            .background(Color(hex: "#171717").opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 28))
-                            .overlay(RoundedRectangle(cornerRadius: 28).stroke(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [6])))
                         }
-                        .padding(.top, 20)
+                        .padding(.top, 40)
                     } else {
                         // Institutions Block
                         if !institutions.isEmpty {

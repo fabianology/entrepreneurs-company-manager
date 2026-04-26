@@ -202,6 +202,8 @@ final class AppViewModel {
         let subtitle: String
         let companyId: String
         let tab: CompanyTab
+        var password: String? = nil
+        var loginId: String? = nil
     }
 
     enum SearchResultType { case company, subscription, financial, document }
@@ -214,17 +216,18 @@ final class AppViewModel {
         for c in companies where c.name.lowercased().contains(q) {
             results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, tab: .subscriptions))
         }
-        for s in subscriptions where s.name.lowercased().contains(q) {
+        for s in subscriptions where s.name.lowercased().contains(q) || s.loginId.lowercased().contains(q) || s.paymentMethod.lowercased().contains(q) {
             let company = companies.first { $0.id == s.companyId }
-            results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, tab: .subscriptions))
+            results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, tab: .subscriptions, password: s.password.isEmpty ? nil : s.password, loginId: s.loginId.isEmpty ? nil : s.loginId))
         }
-        for card in cards where card.name.lowercased().contains(q) || card.institutionName.lowercased().contains(q) {
+        for card in cards where card.name.lowercased().contains(q) || card.institutionName.lowercased().contains(q) || card.network.lowercased().contains(q) || card.last4.lowercased().contains(q) {
             let company = companies.first { $0.id == card.companyId }
-            results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, tab: .financial))
+            results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, tab: .financial, password: card.password.isEmpty ? nil : card.password, loginId: card.login.isEmpty ? nil : card.login))
         }
-        for inst in institutions where inst.name.lowercased().contains(q) {
+        for inst in institutions where inst.name.lowercased().contains(q) || inst.username.lowercased().contains(q) || inst.email.lowercased().contains(q) {
             let company = companies.first { $0.id == inst.companyId }
-            results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, tab: .financial))
+            let loginId = !inst.username.isEmpty ? inst.username : (!inst.email.isEmpty ? inst.email : nil)
+            results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, tab: .financial, password: inst.password.isEmpty ? nil : inst.password, loginId: loginId))
         }
         for loan in loans where loan.name.lowercased().contains(q) || loan.lender.lowercased().contains(q) {
             let company = companies.first { $0.id == loan.companyId }
@@ -235,5 +238,22 @@ final class AppViewModel {
             results.append(.init(type: .document, title: doc.name, subtitle: company?.name ?? "", companyId: doc.companyId, tab: .documents))
         }
         return results
+    }
+
+    // MARK: - AI Search
+    func askGeminiSearch(query: String, companies: [Company], subscriptions: [Subscription], cards: [FinancialCard]) async -> String {
+        var minifiedData = ""
+        for company in companies {
+            minifiedData += "Company: \(company.name)\n"
+            let coSubs = subscriptions.filter { $0.companyId == company.id }
+            if !coSubs.isEmpty {
+                minifiedData += "- Subs: " + coSubs.map { "\($0.name)($\($0.cost)/\($0.billingCycle))" }.joined(separator: ", ") + "\n"
+            }
+            let coCards = cards.filter { $0.companyId == company.id }
+            if !coCards.isEmpty {
+                minifiedData += "- Cards: " + coCards.map { "\($0.name)(ends \($0.last4))" }.joined(separator: ", ") + "\n"
+            }
+        }
+        return await GeminiService.shared.askPortfolioQuestion(data: minifiedData, question: query)
     }
 }
