@@ -43,7 +43,7 @@ struct DocumentListView: View {
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                             .frame(width: 36, height: 36)
                             .background(.ultraThinMaterial)
                             .clipShape(Circle())
