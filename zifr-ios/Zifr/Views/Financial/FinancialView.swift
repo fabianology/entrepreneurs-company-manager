@@ -18,7 +18,8 @@ struct FinancialView: View {
     @State private var poppedCardId: String? = nil
     
     var body: some View {
-        ScrollView {
+        ScrollViewReader { proxy in
+            ScrollView {
             VStack(spacing: 0) {
                 // ── Action Bar ──
                 HStack(spacing: 8) {
@@ -222,6 +223,7 @@ struct FinancialView: View {
                                 standaloneWalletStack(cards: standaloneCards)
                                 ForEach(standaloneLoans) { loan in
                                     LoanCardView(loan: loan, onEdit: { editingLoan = loan })
+                                        .id(loan.id)
                                 }
                             }
                         }
@@ -230,7 +232,7 @@ struct FinancialView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 120)
             }
-        }
+    }
         .scrollIndicators(.hidden)
         .sheet(item: $newInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: true) }
         .sheet(item: $editingInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false) }
@@ -238,6 +240,40 @@ struct FinancialView: View {
         .sheet(item: $editingCard) { c in EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: false) }
         .sheet(item: $newLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards) }
         .sheet(item: $editingLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: false, institutions: institutions, cards: cards) }
+        .onChange(of: vm.deepLinkModelId) { _, newValue in
+            handleDeepLink(id: newValue, proxy: proxy)
+        }
+        .onAppear {
+            handleDeepLink(id: vm.deepLinkModelId, proxy: proxy)
+        }
+        }
+    }
+    
+    private func handleDeepLink(id: String?, proxy: ScrollViewProxy) {
+        guard let id = id else { return }
+        if let c = cards.first(where: { $0.id == id }) {
+            poppedCardId = c.id
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    proxy.scrollTo(c.id, anchor: .center)
+                }
+            }
+            vm.deepLinkModelId = nil
+        } else if let i = institutions.first(where: { $0.id == id }) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    proxy.scrollTo(i.id, anchor: .center)
+                }
+            }
+            vm.deepLinkModelId = nil
+        } else if let l = loans.first(where: { $0.id == id }) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    proxy.scrollTo(l.id, anchor: .center)
+                }
+            }
+            vm.deepLinkModelId = nil
+        }
     }
     
     private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
@@ -271,6 +307,7 @@ struct FinancialView: View {
                         let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
                         
                         FinancialCardVisual(card: card, isPopped: isPopped)
+                            .id(card.id)
                             .frame(height: isPopped ? fullCardH : cardH)
                             .scaleEffect(scale)
                             .offset(y: yOffset)
@@ -307,6 +344,7 @@ struct FinancialView: View {
                 onEdit: { editingInst = inst },
                 onEditLoan: { editingLoan = $0 }
             )
+            .id(inst.id)
             .zIndex(20)
         }
         .padding(.top, instCards.isEmpty ? 0 : CGFloat(instCards.count) * peekOffset + 16)
@@ -326,6 +364,7 @@ struct FinancialView: View {
                     let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
                     
                     FinancialCardVisual(card: card, isPopped: isPopped)
+                        .id(card.id)
                         .frame(height: fullCardH)
                         .scaleEffect(scale)
                         .offset(y: yOffset)

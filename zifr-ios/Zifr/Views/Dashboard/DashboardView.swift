@@ -15,10 +15,10 @@ struct DashboardView: View {
     @State private var showSharedWithMe = false
     @State private var editingCompany: Company? = nil
     @State private var companyToDelete: Company? = nil
-    @State private var path = NavigationPath()
+
 
     var body: some View {
-        NavigationStack(path: $path) {
+        NavigationStack(path: $vm.path) {
             List {
                 // Header Group
                 VStack(spacing: 0) {
@@ -49,19 +49,19 @@ struct DashboardView: View {
                             vm.selectedCompany = company
                             vm.activeTab = .subscriptions
                             vm.touchCompany(company, context: context)
-                            path.append(company)
+                            vm.path.append(company)
                         },
                         onViewFinancials: {
                             vm.selectedCompany = company
                             vm.activeTab = .financial
                             vm.touchCompany(company, context: context)
-                            path.append(company)
+                            vm.path.append(company)
                         },
                         onViewDocuments: {
                             vm.selectedCompany = company
                             vm.activeTab = .documents
                             vm.touchCompany(company, context: context)
-                            path.append(company)
+                            vm.path.append(company)
                         }
                     )
                     .onTapGesture {

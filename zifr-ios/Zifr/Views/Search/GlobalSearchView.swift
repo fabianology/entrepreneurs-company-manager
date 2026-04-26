@@ -14,9 +14,12 @@ struct GlobalSearchView: View {
     @State private var visiblePasswords: Set<UUID> = []
     @State private var isThinking = false
     @State private var aiResponse: String? = nil
+    
+    enum SearchScope { case global, company }
+    @State private var searchScope: SearchScope = .global
 
     var results: [AppViewModel.SearchResult] {
-        vm.globalSearch(
+        let allResults = vm.globalSearch(
             query: vm.searchQuery,
             companies: companies,
             subscriptions: subscriptions,
@@ -25,6 +28,12 @@ struct GlobalSearchView: View {
             loans: loans,
             documents: documents
         )
+        
+        if searchScope == .company, let selectedId = vm.selectedCompany?.id {
+            return allResults.filter { $0.companyId == selectedId }
+        }
+        
+        return allResults
     }
 
     var body: some View {
@@ -52,6 +61,16 @@ struct GlobalSearchView: View {
                 .liquidGlass(cornerRadius: 14)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
+                
+                if !vm.path.isEmpty, let company = vm.selectedCompany {
+                    Picker("Search Scope", selection: $searchScope) {
+                        Text("Across Companies").tag(SearchScope.global)
+                        Text("Across \(company.name)").tag(SearchScope.company)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                }
 
                 if vm.searchQuery.isEmpty {
                     Spacer()
@@ -77,7 +96,7 @@ struct GlobalSearchView: View {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 Task {
                                     isThinking = true
-                                    aiResponse = await vm.askGeminiSearch(query: vm.searchQuery, companies: companies, subscriptions: subscriptions, cards: cards)
+                                    aiResponse = await vm.askGeminiSearch(query: vm.searchQuery, companies: companies, subscriptions: subscriptions, cards: cards, institutions: institutions)
                                     isThinking = false
                                 }
                             } label: {
@@ -143,13 +162,28 @@ struct GlobalSearchView: View {
                                         navigate(to: result)
                                     } label: {
                                         HStack(spacing: 14) {
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .fill(resultColor(result).opacity(0.15))
+                                            if let web = result.externalWebsite, !web.isEmpty {
+                                                ZStack {
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .fill(Color.clear)
+                                                        .frame(width: 38, height: 38)
+                                                    FaviconImage(website: web, size: 24)
+                                                }
+                                            } else if let logoData = result.logoData, let uiImage = UIImage(data: logoData) {
+                                                Image(uiImage: uiImage)
+                                                    .resizable()
+                                                    .scaledToFill()
                                                     .frame(width: 38, height: 38)
-                                                Image(systemName: resultIcon(result))
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundStyle(resultColor(result))
+                                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            } else {
+                                                ZStack {
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .fill(resultColor(result).opacity(0.15))
+                                                        .frame(width: 38, height: 38)
+                                                    Image(systemName: resultIcon(result))
+                                                        .font(.system(size: 14, weight: .semibold))
+                                                        .foregroundStyle(resultColor(result))
+                                                }
                                             }
                                             VStack(alignment: .leading, spacing: 2) {
                                                 Text(result.title)
@@ -228,7 +262,7 @@ struct GlobalSearchView: View {
                 }
             }
             .background(Color.zifrBG)
-            .navigationTitle("Search")
+            .navigationTitle(!vm.path.isEmpty && vm.selectedCompany != nil ? "Search \(vm.selectedCompany!.name.uppercased())" : "Search")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -244,13 +278,24 @@ struct GlobalSearchView: View {
                 aiResponse = nil
             }
         }
-        .onAppear { searchFocused = true }
+        .onAppear {
+            searchFocused = true
+            
+            // Apply DESIGN.md colors to segmented picker
+            UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(Color(hex: "#1c1c1e"))
+            UISegmentedControl.appearance().backgroundColor = UIColor(Color(hex: "#111111"))
+            UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+            UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(white: 1, alpha: 0.5)], for: .normal)
+        }
     }
+
 
     private func navigate(to result: AppViewModel.SearchResult) {
         if let company = companies.first(where: { $0.id == result.companyId }) {
             vm.selectedCompany = company
             vm.activeTab = result.tab
+            vm.deepLinkModelId = result.modelId
+            vm.path.append(company)
         }
         vm.searchQuery = ""
         dismiss()

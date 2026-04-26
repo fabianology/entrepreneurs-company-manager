@@ -208,7 +208,13 @@ struct EditSubscriptionSheet: View {
                 get: { sub.billingCycle },
                 set: { (newCycle: String) in
                     if newCycle != sub.billingCycle {
-                        sub.nextRenewal = newCycle == "Monthly" ? "1" : ""
+                        if newCycle == "Monthly" {
+                            sub.nextRenewal = "1"
+                        } else {
+                            let df = DateFormatter()
+                            df.dateFormat = "MMM d"
+                            sub.nextRenewal = df.string(from: Date())
+                        }
                     }
                     sub.billingCycle = newCycle
                 }
@@ -659,6 +665,15 @@ struct EditSubscriptionSheet: View {
             .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
             .onAppear {
+                if sub.nextRenewal.isEmpty {
+                    if sub.billingCycle == "Monthly" {
+                        sub.nextRenewal = "1"
+                    } else {
+                        let df = DateFormatter()
+                        df.dateFormat = "MMM d"
+                        sub.nextRenewal = df.string(from: Date())
+                    }
+                }
                 snapshot = currentSnapshot
                 if sub.twoFactorAuth != "None" || !sub.recoveryMethod.isEmpty {
                     showSecurity = true

@@ -15,7 +15,8 @@ struct SubscriptionListView: View {
 
 
     var body: some View {
-        ScrollView {
+        ScrollViewReader { proxy in
+            ScrollView {
             LazyVStack(spacing: 0) {
                 // Add button row — exact CiFr style
                 HStack(spacing: 12) {
@@ -76,6 +77,7 @@ struct SubscriptionListView: View {
                 } else {
                     ForEach(subscriptions) { sub in
                         SubscriptionCardView(sub: sub, allSubscriptions: subscriptions, institutions: institutions, cards: cards, onEdit: { editingSub = sub })
+                            .id(sub.id)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 16)
                     }
@@ -89,6 +91,25 @@ struct SubscriptionListView: View {
         }
         .sheet(item: $newSub) { sub in
             EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
+        }
+        .onChange(of: vm.deepLinkModelId) { _, newValue in
+            handleDeepLink(id: newValue, proxy: proxy)
+        }
+        .onAppear {
+            handleDeepLink(id: vm.deepLinkModelId, proxy: proxy)
+        }
+        }
+    }
+    
+    private func handleDeepLink(id: String?, proxy: ScrollViewProxy) {
+        guard let id = id else { return }
+        if let s = subscriptions.first(where: { $0.id == id }) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                    proxy.scrollTo(s.id, anchor: .center)
+                }
+            }
+            vm.deepLinkModelId = nil
         }
     }
 
