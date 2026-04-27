@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0BFFDDE1FF715E861E2482EB /* CompanyAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AFA05E28920F297646C677 /* CompanyAvatar.swift */; };
+		13B10D8A2F9F287F00AA707E /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 13B10D892F9F287F00AA707E /* logo.png */; };
 		22D969D0670A82296E3CCE6B /* Loan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89FF19CB274064BB06D6017 /* Loan.swift */; };
 		371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C5A710215BBAF96C2E51F /* ZifrApp.swift */; };
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
@@ -42,6 +43,7 @@
 		03CAB6D4DDF65D7F0680343C /* Zifr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zifr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0ACC52E30ED6C458351E1CC0 /* patch2.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch2.py; sourceTree = "<group>"; };
 		0F35D3D91F4D431D42B40709 /* FinancialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialCard.swift; sourceTree = "<group>"; };
+		13B10D892F9F287F00AA707E /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
 		2E23D2AE452D41F40D63BCAE /* Zifr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zifr.entitlements; sourceTree = "<group>"; };
 		3141954F83AF71011D282471 /* Color+Zifr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Zifr.swift"; sourceTree = "<group>"; };
@@ -198,6 +200,7 @@
 				3696D93244084E7BD912BD0C /* ViewModels */,
 				C1AA476FBE894000904BEFDD /* Views */,
 				F0659DFD146E87AD652064B7 /* Secrets.local.xcconfig */,
+				13B10D892F9F287F00AA707E /* logo.png */,
 			);
 			path = Zifr;
 			sourceTree = "<group>";
@@ -277,6 +280,7 @@
 			files = (
 				AA347BC4FF41CCA325EC3B99 /* patch.py in Resources */,
 				F2ECD35FF479C6DACC511E83 /* patch2.py in Resources */,
+				13B10D8A2F9F287F00AA707E /* logo.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

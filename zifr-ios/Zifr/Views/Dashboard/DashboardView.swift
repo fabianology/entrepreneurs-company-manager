@@ -16,6 +16,10 @@ struct DashboardView: View {
     @State private var editingCompany: Company? = nil
     @State private var companyToDelete: Company? = nil
 
+    @State private var dummyCompany = Company(
+        name: "Acme Holdings LLC",
+        structure: "LLC"
+    )
 
     var body: some View {
         NavigationStack(path: $vm.path) {
@@ -26,14 +30,35 @@ struct DashboardView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 40)
 
-                    Text("Your Companies")
-                        .font(.system(size: 12, weight: .bold))
-                        .textCase(.uppercase)
-                        .tracking(4)
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 4)
-                        .padding(.bottom, 16)
+                    HStack {
+                        LiquidGlassButtonContainer(
+                            title: "ENTITY",
+                            onAdd: {
+                                showAddCompany = true
+                            }
+                        ) {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                // Future cloudkit sharing
+                            } label: {
+                                Label("Entire Portfolio", systemImage: "folder.badge.person.crop")
+                            }
+                            Divider()
+                            ForEach(companies) { company in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    // Future cloudkit sharing for company
+                                } label: {
+                                    Label(company.name.isEmpty ? "Entity" : company.name, systemImage: "building.2")
+                                }
+                            }
+                        }
+                        Spacer()
+                        Text("YOUR PORTFOLIO")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                    }
+                    .padding(.bottom, 16)
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -90,27 +115,40 @@ struct DashboardView: View {
                 }
 
                 // Add company button
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    showAddCompany = true
-                } label: {
-                    VStack(spacing: 10) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 26, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                        Text("Create New Entity")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.4))
+                Group {
+                    if companies.isEmpty {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showAddCompany = true
+                        } label: {
+                            ZStack {
+                                CompanyCardView(
+                                    company: dummyCompany,
+                                    monthlyBurn: 0.0,
+                                    onEdit: {},
+                                    onViewSubscriptions: {},
+                                    onViewFinancials: {},
+                                    onViewDocuments: {}
+                                )
+                                .allowsHitTesting(false)
+                                .blur(radius: 3)
+                                .opacity(0.8)
+
+                                VStack(spacing: 16) {
+                                    Image(systemName: "plus.app.fill")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.white)
+                                    Text("+ CREATE YOUR FIRST ENTITY")
+                                        .font(.system(size: 11, weight: .black))
+                                        .textCase(.uppercase)
+                                        .tracking(2)
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                        }
+                        .padding(.top, 4)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 28)
-                    .background(
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
-                            .foregroundStyle(Color.white.opacity(0.2))
-                    )
                 }
-                .padding(.top, 4)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: hasOrphanedRecords ? 16 : 120, trailing: 20))
@@ -241,11 +279,17 @@ struct DashboardView: View {
 
     private var headerSection: some View {
         VStack(spacing: 12) {
-            // "CiFr" style — all-lowercase brand name, big & bold, tight tracking
-            Text("MILOOM")
-                .font(.system(size: 42, weight: .black))
-                .foregroundStyle(.white)
-                .tracking(-1)
+            if let uiImage = UIImage(named: "logo.png") {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 50)
+            } else {
+                Text("MILOOM")
+                    .font(.system(size: 42, weight: .black))
+                    .foregroundStyle(.white)
+                    .tracking(-1)
+            }
 
             if !vm.quote.isEmpty {
                 let parts = vm.quote.components(separatedBy: " - ")
