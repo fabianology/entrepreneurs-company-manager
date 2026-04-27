@@ -291,7 +291,18 @@ struct SubscriptionCardView: View {
                                 .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(.white)
 
-                            if !sub.isFree {
+                            if sub.isFree {
+                                HStack(spacing: 5) {
+                                    Circle()
+                                        .fill(Color.zifrGreen)
+                                        .frame(width: 6, height: 6)
+                                        .shadow(color: Color.zifrGreen, radius: 3)
+                                    Text("FREE")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                }
+                                .padding(.top, 2)
+                            } else {
                                 HStack(spacing: 14) {
                                     costColumn(value: primaryTotal, label: primaryLabel)
                                     if secondaryTotal > 0 {
@@ -306,7 +317,17 @@ struct SubscriptionCardView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 10)
-                    .padding(.bottom, sub.isFree ? 18 : 10)
+                    .padding(.bottom, sub.isFree ? 4 : 10)
+
+                    if sub.isFree {
+                        // 80% width divider under logo row
+                        Rectangle()
+                            .fill(Color.white.opacity(0.1))
+                            .frame(height: 1)
+                            .padding(.leading, 24)
+                            .padding(.trailing, 70) // Rough 80% of card width
+                            .padding(.bottom, 10)
+                    }
 
                     // Status row — CiFr dot + pipes style
                     if !sub.isFree {

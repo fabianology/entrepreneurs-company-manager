@@ -41,6 +41,26 @@ final class AppViewModel {
     }
 
     func deleteCompany(_ company: Company, context: ModelContext) {
+        let id = company.id
+        
+        // Manual Cascade Delete: SwiftData's native cascade occasionally leaves orphaned records if they are faulted.
+        // Explicitly deleting them by companyId guarantees the database is clean and global search drops them.
+        if let subs = try? context.fetch(FetchDescriptor<Subscription>(predicate: #Predicate { $0.companyId == id })) {
+            subs.forEach { context.delete($0) }
+        }
+        if let insts = try? context.fetch(FetchDescriptor<Institution>(predicate: #Predicate { $0.companyId == id })) {
+            insts.forEach { context.delete($0) }
+        }
+        if let cards = try? context.fetch(FetchDescriptor<FinancialCard>(predicate: #Predicate { $0.companyId == id })) {
+            cards.forEach { context.delete($0) }
+        }
+        if let loans = try? context.fetch(FetchDescriptor<Loan>(predicate: #Predicate { $0.companyId == id })) {
+            loans.forEach { context.delete($0) }
+        }
+        if let docs = try? context.fetch(FetchDescriptor<CompanyDocument>(predicate: #Predicate { $0.companyId == id })) {
+            docs.forEach { context.delete($0) }
+        }
+
         context.delete(company)
         try? context.save()
         if selectedCompany?.id == company.id { selectedCompany = nil }
