@@ -53,7 +53,7 @@ struct EditCompanySheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 20))
                         
                         formSection {
-                            ZifrField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name)
+                            ZifrField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
                         }
                     }
                     .padding(.top, 8)
@@ -61,7 +61,7 @@ struct EditCompanySheet: View {
                     // Website Row
                     HStack(spacing: 16) {
                         formSection {
-                            ZifrField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL)
+                            ZifrField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL, textContentType: .URL)
                         }
                         
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {

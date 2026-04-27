@@ -1120,6 +1120,8 @@ struct EditInstitutionSheet: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    
+    @Query private var allSubscriptions: [Subscription]
 
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
@@ -1173,14 +1175,15 @@ struct EditInstitutionSheet: View {
                                 label: "WEBSITE",
                                 placeholder: "chase.com",
                                 text: Binding(get: { institution.loginUrl }, set: { institution.loginUrl = $0 }),
-                                keyboardType: .URL
+                                keyboardType: .URL,
+                                textContentType: .URL
                             )
                             .textInputAutocapitalization(.never)
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 12) {
-                                ZifrField(
+                                ZifrAutocompleteField(
                                     label: "LOGIN ID",
                                     placeholder: "username",
                                     text: Binding(
@@ -1201,7 +1204,8 @@ struct EditInstitutionSheet: View {
                                         label: "PASSWORD",
                                         placeholder: "••••••••",
                                         text: Binding(get: { institution.password }, set: { institution.password = $0 }),
-                                        isSecure: !showPassword
+                                        isSecure: !showPassword,
+                                        textContentType: .password
                                     )
                                     .textInputAutocapitalization(.never)
 
@@ -1227,7 +1231,8 @@ struct EditInstitutionSheet: View {
                                 label: "EMAIL",
                                 placeholder: "name@company.com",
                                 text: Binding(get: { institution.email }, set: { institution.email = $0 }),
-                                keyboardType: .emailAddress
+                                keyboardType: .emailAddress,
+                                textContentType: .emailAddress
                             )
                             .textInputAutocapitalization(.never)
 
@@ -2019,7 +2024,7 @@ struct EditCardSheet: View {
     @ViewBuilder private var row1: some View {
         HStack(spacing: 12) {
             ZifrField(label: "CARD NICKNAME", placeholder: "e.g. Sapphire", text: Binding(get: { card.name }, set: { card.name = $0 }))
-            ZifrField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }))
+            ZifrField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }), textContentType: .name)
         }
     }
 

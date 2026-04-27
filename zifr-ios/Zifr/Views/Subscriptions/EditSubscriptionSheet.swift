@@ -12,6 +12,8 @@ struct EditSubscriptionSheet: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    
+    @Query private var allSubscriptions: [Subscription]
 
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
@@ -341,7 +343,8 @@ struct EditSubscriptionSheet: View {
                                     label: "WEBSITE",
                                     placeholder: "shopify.com",
                                     text: Binding(get: { sub.website }, set: { sub.website = $0 }),
-                                    keyboardType: .URL
+                                    keyboardType: .URL,
+                                    textContentType: .URL
                                 )
                                 .textInputAutocapitalization(.never)
                             }
@@ -349,11 +352,13 @@ struct EditSubscriptionSheet: View {
                         
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 12) {
-                                ZifrField(
+                                ZifrAutocompleteField(
                                     label: "LOGIN ID",
                                     placeholder: "username or email",
                                     text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 }),
-                                    keyboardType: .emailAddress
+                                    keyboardType: .emailAddress,
+                                    textContentType: .username,
+                                    suggestions: allSubscriptions.map { $0.loginId }.filter { !$0.isEmpty } + institutions.map { $0.username }.filter { !$0.isEmpty } + institutions.map { $0.email }.filter { !$0.isEmpty }
                                 )
                                 
                                 ZStack(alignment: .bottomTrailing) {
@@ -361,7 +366,8 @@ struct EditSubscriptionSheet: View {
                                         label: "PASSWORD",
                                         placeholder: "••••••••",
                                         text: Binding(get: { sub.password }, set: { sub.password = $0 }),
-                                        isSecure: !showPassword
+                                        isSecure: !showPassword,
+                                        textContentType: .password
                                     )
                                     .textInputAutocapitalization(.never)
                                     

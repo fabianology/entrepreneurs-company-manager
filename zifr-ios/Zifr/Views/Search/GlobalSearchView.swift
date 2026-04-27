@@ -261,11 +261,10 @@ struct GlobalSearchView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                 } else {
                     ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(resultColor(result).opacity(0.15))
+                        Color.clear
                             .frame(width: 38, height: 38)
                         Image(systemName: resultIcon(result))
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(resultColor(result))
                     }
                 }

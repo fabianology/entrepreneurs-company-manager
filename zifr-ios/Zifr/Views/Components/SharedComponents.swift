@@ -7,6 +7,7 @@ struct ZifrField: View {
     @Binding var text: String
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .default
+    var textContentType: UITextContentType? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -18,9 +19,11 @@ struct ZifrField: View {
             Group {
                 if isSecure {
                     SecureField(placeholder, text: $text)
+                        .textContentType(textContentType)
                 } else {
                     TextField(placeholder, text: $text)
                         .keyboardType(keyboardType)
+                        .textContentType(textContentType)
                 }
             }
             .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
@@ -368,5 +371,173 @@ struct ProContextMenuModifier: ViewModifier {
 extension View {
     func proContextMenu(password: String? = nil, loginId: String? = nil, last4: String? = nil) -> some View {
         self.modifier(ProContextMenuModifier(password: password, loginId: loginId, last4: last4))
+    }
+}
+
+// MARK: - Tier 2 Autofill Smart Components
+import SwiftData
+
+struct SubscriptionAutofillBar: View {
+    let typedName: String
+    let currentCompanyId: String
+    let onAutofill: (Subscription) -> Void
+    
+    @Query private var allSubscriptions: [Subscription]
+    @Query private var allCompanies: [Company]
+    
+    var body: some View {
+        if let match = findMatch() {
+            let companyName = allCompanies.first(where: { $0.id == match.companyId })?.name ?? "Another Entity"
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onAutofill(match)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.zifrGold)
+                    Text("Autofill from \(companyName)")
+                        .font(.system(size: 13, weight: .bold))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.zifrGold.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.zifrGold.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+    }
+    
+    private func findMatch() -> Subscription? {
+        let normalized = typedName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty && normalized.count > 2 else { return nil }
+        return allSubscriptions.first { 
+            $0.companyId != currentCompanyId && 
+            $0.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalized 
+        }
+    }
+}
+
+struct InstitutionAutofillBar: View {
+    let typedName: String
+    let currentCompanyId: String
+    let onAutofill: (Institution) -> Void
+    
+    @Query private var allInstitutions: [Institution]
+    @Query private var allCompanies: [Company]
+    
+    var body: some View {
+        if let match = findMatch() {
+            let companyName = allCompanies.first(where: { $0.id == match.companyId })?.name ?? "Another Entity"
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onAutofill(match)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.zifrGold)
+                    Text("Autofill from \(companyName)")
+                        .font(.system(size: 13, weight: .bold))
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.zifrGold.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.zifrGold.opacity(0.3), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+    }
+    
+    private func findMatch() -> Institution? {
+        let normalized = typedName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty && normalized.count > 2 else { return nil }
+        return allInstitutions.first { 
+            $0.companyId != currentCompanyId && 
+            $0.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalized 
+        }
+    }
+}
+
+struct ZifrAutocompleteField: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+    var keyboardType: UIKeyboardType = .default
+    var textContentType: UITextContentType? = nil
+    var suggestions: [String] = []
+    
+    @FocusState private var isFocused: Bool
+    
+    var filteredSuggestions: [String] {
+        guard !text.isEmpty else { return [] }
+        return Array(Set(suggestions))
+            .filter { $0.lowercased().contains(text.lowercased()) && $0 != text }
+            .sorted()
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if !label.isEmpty {
+                Text(label)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            
+            TextField(placeholder, text: $text)
+                .keyboardType(keyboardType)
+                .textContentType(textContentType)
+                .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
+                .autocorrectionDisabled()
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color(hex: "#111111"))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(isFocused ? Color.zifrGold.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1))
+                .focused($isFocused)
+            
+            if isFocused && !filteredSuggestions.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(filteredSuggestions.prefix(3)), id: \.self) { suggestion in
+                        Button {
+                            text = suggestion
+                            isFocused = false
+                        } label: {
+                            HStack {
+                                Text(suggestion)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#1a1a1a"))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if suggestion != filteredSuggestions.prefix(3).last {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.05))
+                                .frame(height: 1)
+                        }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .padding(.top, 4)
+            }
+        }
     }
 }

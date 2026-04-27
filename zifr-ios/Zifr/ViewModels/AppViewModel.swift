@@ -264,27 +264,61 @@ final class AppViewModel {
     func globalSearch(query: String, companies: [Company], subscriptions: [Subscription], cards: [FinancialCard], institutions: [Institution], loans: [Loan], documents: [CompanyDocument]) -> [SearchResult] {
         guard !query.isEmpty else { return [] }
         let q = query.lowercased()
+        let tokens = q.split(separator: " ").map { String($0) }
         var results: [SearchResult] = []
 
-        let isSubQuery = ["subscription", "subscriptions", "service", "services"].contains(q)
-        let isBankQuery = ["bank", "banks", "institution", "institutions"].contains(q)
+        let isSubQuery = ["subscription", "subscriptions", "service", "services", "recurring", "monthly", "yearly", "annual", "saas"].contains(q)
+        let isBankQuery = ["bank", "banks", "institution", "institutions", "account", "accounts"].contains(q)
+        let isCardQuery = ["card", "cards", "credit", "debit", "payment"].contains(q) || q.contains("credit card") || q.contains("debit card")
+        let isLoanQuery = ["loan", "loans", "debt", "financing", "borrow"].contains(q)
 
-        for c in companies where c.name.lowercased().contains(q) {
-            results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, modelId: c.id, tab: .subscriptions, logoData: c.logoData))
+        func matches(_ payload: String) -> Bool {
+            let p = payload.lowercased()
+            return tokens.allSatisfy { p.contains($0) }
+        }
+
+        for c in companies {
+            let payload = [c.name, c.structure, c.companyDescription, c.website].joined(separator: " ")
+            if matches(payload) {
+                results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, modelId: c.id, tab: .subscriptions, logoData: c.logoData))
+            }
         }
         
         for s in subscriptions {
-            let companyName = companies.first { $0.id == s.companyId }?.name.lowercased() ?? ""
-            if isSubQuery || s.name.lowercased().contains(q) || s.loginId.lowercased().contains(q) || s.paymentMethod.lowercased().contains(q) || companyName.contains(q) {
+            let companyName = companies.first { $0.id == s.companyId }?.name ?? ""
+            var payloadArr: [String] = [s.name, s.loginId, s.paymentMethod, companyName, s.website, s.status, s.billingCycle, s.pricingModel, s.recoveryMethod, s.twoFactorAuth]
+            payloadArr.append(s.notes)
+            
+            payloadArr.append(contentsOf: s.subServices.map { $0.name })
+            payloadArr.append(contentsOf: s.subServices.map { $0.purpose })
+            payloadArr.append(contentsOf: s.linkedEmails.map { $0.email })
+            payloadArr.append(contentsOf: s.linkedEmails.map { $0.provider })
+            payloadArr.append(contentsOf: s.linkedEmails.map { $0.usedFor })
+            
+            let payload = payloadArr.joined(separator: " ")
+            
+            if isSubQuery || matches(payload) {
                 let company = companies.first { $0.id == s.companyId }
                 results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, modelId: s.id, tab: .subscriptions, password: s.password.isEmpty ? nil : s.password, loginId: s.loginId.isEmpty ? nil : s.loginId, logoData: company?.logoData, externalWebsite: s.website, isFree: s.isFree, cost: s.cost, status: s.status))
             }
         }
         
         for card in cards {
-            let companyName = companies.first { $0.id == card.companyId }?.name.lowercased() ?? ""
-            let paysForMatch = subscriptions.contains { $0.paymentMethod == card.name && ($0.name.lowercased().contains(q) || $0.loginId.lowercased().contains(q)) }
-            if isBankQuery || card.name.lowercased().contains(q) || card.institutionName.lowercased().contains(q) || card.network.lowercased().contains(q) || card.last4.lowercased().contains(q) || paysForMatch || companyName.contains(q) {
+            let companyName = companies.first { $0.id == card.companyId }?.name ?? ""
+            let paysForMatch = subscriptions.contains { $0.paymentMethod == card.name && matches($0.name + " " + $0.loginId) }
+            
+            var payloadArr = [card.name, card.institutionName, card.network, card.last4, card.type, card.status, card.paidFrom, card.cardHolder, card.notes, companyName, card.type + " card", card.type + " cards"]
+            payloadArr.append("apr \(card.apr)% \(card.apr)")
+            if card.promoApr > 0 || card.promoEnds > Date() {
+                payloadArr.append("promo apr \(card.promoApr)% \(card.promoApr)")
+                if card.promoApr == 0 {
+                    payloadArr.append("0% 0")
+                }
+            }
+            
+            let payload = payloadArr.joined(separator: " ")
+            
+            if isBankQuery || isCardQuery || paysForMatch || matches(payload) {
                 let company = companies.first { $0.id == card.companyId }
                 let inst = institutions.first { $0.name.lowercased() == card.institutionName.lowercased() }
                 results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password.isEmpty ? nil : card.password, loginId: card.login.isEmpty ? nil : card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl, status: card.status, last4: card.last4, network: card.network, paysFor: subscriptions.filter { $0.paymentMethod == card.name }.map { $0.name }, cardType: card.type))
@@ -292,10 +326,19 @@ final class AppViewModel {
         }
         
         for inst in institutions {
-            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }) && (sub.name.lowercased().contains(q) || sub.loginId.lowercased().contains(q)) }
-            let companyName = companies.first { $0.id == inst.companyId }?.name.lowercased() ?? ""
-            let cardPaysForMatch = cards.contains { card in card.institutionName.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in sub.paymentMethod == card.name && (sub.name.lowercased().contains(q) || sub.loginId.lowercased().contains(q)) } }
-            if isBankQuery || inst.name.lowercased().contains(q) || inst.username.lowercased().contains(q) || inst.email.lowercased().contains(q) || paysForMatch || cardPaysForMatch || companyName.contains(q) {
+            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }) && matches(sub.name + " " + sub.loginId) }
+            let companyName = companies.first { $0.id == inst.companyId }?.name ?? ""
+            let cardPaysForMatch = cards.contains { card in card.institutionName.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in sub.paymentMethod == card.name && matches(sub.name + " " + sub.loginId) } }
+            
+            var payloadArr = [inst.name, inst.username, inst.email, inst.loginUrl, companyName]
+            payloadArr.append(contentsOf: inst.accounts.map { $0.name })
+            payloadArr.append(contentsOf: inst.accounts.map { $0.type })
+            payloadArr.append(contentsOf: inst.accounts.map { $0.last4 })
+            payloadArr.append(contentsOf: inst.accounts.map { $0.cardHolder })
+            payloadArr.append(contentsOf: inst.accounts.map { $0.network })
+            let payload = payloadArr.joined(separator: " ")
+            
+            if isBankQuery || paysForMatch || cardPaysForMatch || matches(payload) {
                 let company = companies.first { $0.id == inst.companyId }
                 let loginId = !inst.username.isEmpty ? inst.username : (!inst.email.isEmpty ? inst.email : nil)
                 results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password.isEmpty ? nil : inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl, paysFor: subscriptions.filter { sub in inst.accounts.contains { acc in sub.paymentMethod == acc.name } || sub.paymentMethod == inst.name }.map { $0.name }))
@@ -303,8 +346,10 @@ final class AppViewModel {
         }
         
         for loan in loans {
-            let companyName = companies.first { $0.id == loan.companyId }?.name.lowercased() ?? ""
-            if loan.name.lowercased().contains(q) || loan.lender.lowercased().contains(q) || companyName.contains(q) {
+            let companyName = companies.first { $0.id == loan.companyId }?.name ?? ""
+            let payload = [loan.name, loan.lender, loan.role, loan.interestType, loan.term, loan.scheduleFrequency, loan.status, loan.notes, companyName].joined(separator: " ")
+            
+            if isLoanQuery || matches(payload) {
                 let company = companies.first { $0.id == loan.companyId }
                 let inst = institutions.first { $0.name.lowercased() == loan.lender.lowercased() }
                 results.append(.init(type: .financial, title: loan.name, subtitle: company?.name ?? "", companyId: loan.companyId, modelId: loan.id, tab: .financial, logoData: company?.logoData, externalWebsite: inst?.loginUrl))
@@ -312,8 +357,10 @@ final class AppViewModel {
         }
         
         for doc in documents {
-            let companyName = companies.first { $0.id == doc.companyId }?.name.lowercased() ?? ""
-            if doc.name.lowercased().contains(q) || companyName.contains(q) {
+            let companyName = companies.first { $0.id == doc.companyId }?.name ?? ""
+            let payload = [doc.name, doc.type, doc.notes, companyName].joined(separator: " ")
+            
+            if matches(payload) {
                 let company = companies.first { $0.id == doc.companyId }
                 results.append(.init(type: .document, title: doc.name, subtitle: company?.name ?? "", companyId: doc.companyId, modelId: doc.id, tab: .documents, logoData: company?.logoData))
             }
