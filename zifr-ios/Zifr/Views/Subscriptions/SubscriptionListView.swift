@@ -75,7 +75,18 @@ struct SubscriptionListView: View {
                     emptyState
                 } else {
                     ForEach(subscriptions) { sub in
-                        SubscriptionCardView(sub: sub, allSubscriptions: subscriptions, institutions: institutions, cards: cards, onEdit: { editingSub = sub })
+                        SubscriptionCardView(
+                            sub: sub, 
+                            allSubscriptions: subscriptions, 
+                            institutions: institutions, 
+                            cards: cards, 
+                            onEdit: { editingSub = sub },
+                            onBankTapped: { id in
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                vm.activeTab = .financial
+                                vm.deepLinkModelId = id
+                            }
+                        )
                             .id(sub.id)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 16)
@@ -169,6 +180,7 @@ struct SubscriptionCardView: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onEdit: () -> Void
+    var onBankTapped: ((String) -> Void)? = nil
 
     @State private var expanded = false
     @State private var showSubServices = false
@@ -223,6 +235,59 @@ struct SubscriptionCardView: View {
         }
     }
 
+    var shortDueOn: String {
+        guard !sub.nextRenewal.isEmpty else { return "—" }
+        func ordinal(_ n: Int) -> String {
+            let tens = (n % 100) / 10
+            if tens == 1 { return "\(n)th" }
+            switch n % 10 {
+            case 1: return "\(n)st"
+            case 2: return "\(n)nd"
+            case 3: return "\(n)rd"
+            default: return "\(n)th"
+            }
+        }
+        if sub.billingCycle == "Monthly" {
+            if let day = Int(sub.nextRenewal) { return ordinal(day) }
+            return sub.nextRenewal
+        } else {
+            let parts = sub.nextRenewal.split(separator: " ")
+            if parts.count == 2, let day = Int(parts[1]) {
+                return "\(parts[0]) \(ordinal(day))"
+            }
+            return sub.nextRenewal
+        }
+    }
+
+    var statusRowTuple: (top: String, bottom: String) {
+        if sub.status == "Paused" { return ("Paused", "") }
+        if sub.isFree { return ("Free", "") }
+        let cycle = sub.billingCycle == "Monthly" ? "month" : "year"
+        let verb = sub.renew == "Manual" ? "Manual pay on" : "Auto pay on"
+        return (verb, "\(shortDueOn) every \(cycle)")
+    }
+    
+    var bankAccountTuple: (bank: String, account: String, modelId: String?)? {
+        if sub.paymentMethod.isEmpty { return nil }
+        
+        if let card = cards.first(where: { $0.name == sub.paymentMethod }) {
+            let inst = card.institutionName.isEmpty ? "Paid From" : card.institutionName
+            let suffix = card.last4.isEmpty ? "" : " ••••\(card.last4)"
+            return (inst, "\(card.name)\(suffix)", card.id)
+        }
+        
+        for inst in institutions {
+            if let acc = inst.accounts.first(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) {
+                let instName = inst.name.isEmpty ? "Paid From" : inst.name
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                let suffix = acc.last4.isEmpty ? "" : " ••••\(acc.last4)"
+                return (instName, "\(accName)\(suffix)", inst.id)
+            }
+        }
+        
+        return ("Paid From", sub.paymentMethod, nil)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // ── Top: tap opens edit ──────────────────────────────────────
@@ -245,9 +310,9 @@ struct SubscriptionCardView: View {
                         }
 
                         // Name + costs
-                        VStack(alignment: .leading, spacing: 0) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(sub.name.isEmpty ? "Service" : sub.name)
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.system(size: 18, weight: .semibold))
                                 .foregroundStyle(.white)
 
                             if !sub.isFree {
@@ -257,35 +322,84 @@ struct SubscriptionCardView: View {
                                         dividerLine()
                                         costColumn(value: secondaryTotal, label: secondaryLabel)
                                     }
-                                    dividerLine()
-                                    costColumn(value: totalAnnual, label: "est. yearly")
                                 }
                             }
                         }
+                        .padding(.top, 8)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 24)
-                    .padding(.bottom, sub.isFree ? 18 : 4)
+                    .padding(.top, 10)
+                    .padding(.bottom, sub.isFree ? 18 : 10)
 
                     // Status row — CiFr dot + pipes style
                     if !sub.isFree {
-                        HStack(spacing: 8) {
-                            statusDot(sub: sub)
-                            Text(sub.isFree ? "Free" : (sub.renew == "Manual" ? "Manual" : "Auto Renew"))
-                                .font(.system(size: 11, weight: .semibold))
-                                .textCase(.uppercase)
-                                .tracking(0.3)
-                                .foregroundStyle(Color.gray)
-                            statusPipe()
-                            Text(sub.isFree ? "Active" : "Paid")
-                                .font(.system(size: 11, weight: .semibold))
-                                .textCase(.uppercase)
-                                .tracking(0.3)
-                                .foregroundStyle(Color.gray)
-                            Spacer()
+                        VStack(spacing: 0) {
+                            HStack(spacing: 8) {
+                                statusDot(sub: sub)
+                                
+                                let sTuple = statusRowTuple
+                                if sub.status == "Paused" {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(sTuple.top)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(Color(hex: "#911c26"))
+                                        if !sTuple.bottom.isEmpty {
+                                            Text(sTuple.bottom)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(Color(hex: "#911c26").opacity(0.7))
+                                        }
+                                    }
+                                    .textCase(.uppercase)
+                                    .tracking(0.3)
+                                } else {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(sTuple.top)
+                                            .font(.system(size: 11, weight: .semibold))
+                                            .foregroundStyle(Color.gray)
+                                        if !sTuple.bottom.isEmpty {
+                                            Text(sTuple.bottom)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(Color.gray.opacity(0.7))
+                                        }
+                                    }
+                                    .textCase(.uppercase)
+                                    .tracking(0.3)
+                                }
+                                
+                                if let accTuple = bankAccountTuple {
+                                    statusPipe()
+                                    Button {
+                                        if let id = accTuple.modelId {
+                                            onBankTapped?(id)
+                                        }
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(accTuple.bank)
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.gray)
+                                            Text(accTuple.account)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundStyle(Color.gray.opacity(0.7))
+                                        }
+                                        .textCase(.uppercase)
+                                        .tracking(0.3)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(hex: "#111111"))
+                            .overlay(
+                                Rectangle()
+                                    .frame(height: 1)
+                                    .foregroundStyle(Color.white.opacity(0.05)),
+                                alignment: .top
+                            )
                         }
-                        .padding(.horizontal, 24)
                         .padding(.bottom, 12)
                     }
 
@@ -305,28 +419,7 @@ struct SubscriptionCardView: View {
             }
             .buttonStyle(.plain)
 
-            // ── Billing Details accordion ───────────────────────────────────
-            if !sub.isFree {
-                accordionDivider()
-                accordionToggle(label: expanded ? "Hide Billing" : "Billing Details", expanded: expanded) {
-                    withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                }
-                if expanded {
-                    VStack(spacing: 12) {
-                        HStack(spacing: 16) {
-                            detailCell(label: "Paid From", value: sub.paymentMethod.isEmpty ? "—" : sub.paymentMethod)
-                            detailCell(label: "Due On", value: formattedDueOn)
-                        }
-                        if !sub.notes.isEmpty {
-                            detailCell(label: "Notes", value: sub.notes)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
-                    .clipped()
-                }
-            }
+
 
             // ── Supplemental Services accordion ─────────────────────────
             if sub.showSubServicesTab {
@@ -555,12 +648,12 @@ struct SubscriptionCardView: View {
     // MARK: - Helpers
 
     private func costColumn(value: Double, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text("$\(String(format: "%.0f", value))")
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.white)
             Text(label)
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.4))
         }
     }
@@ -695,20 +788,22 @@ struct SubscriptionCardView: View {
             } + legacyTags
                 
             if !allTextTags.isEmpty {
-                HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("LINKED TO:")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.4))
                         .textCase(.uppercase)
                     
-                    Image(systemName: "link")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#545454"))
-                    
-                    Text(allTextTags.joined(separator: " | "))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color(hex: "#545454"))
-                        .lineLimit(2)
+                    HStack(spacing: 4) {
+                        Image(systemName: "link")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#545454"))
+                        
+                        Text(allTextTags.joined(separator: " | "))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color(hex: "#545454"))
+                            .lineLimit(2)
+                    }
                 }
             }
         }
@@ -754,20 +849,22 @@ struct DynamicLoginLabelView: View {
             }
             
             if !allTextTags.isEmpty {
-                HStack(spacing: 4) {
-                    Text("LOGIN USED IN:")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("LOGIN ALSO USED IN:")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.4))
                         .textCase(.uppercase)
                     
-                    Image(systemName: "link")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#545454"))
-                    
-                    Text(allTextTags.joined(separator: " | "))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color(hex: "#545454"))
-                        .lineLimit(2)
+                    HStack(spacing: 4) {
+                        Image(systemName: "link")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#545454"))
+                        
+                        Text(allTextTags.joined(separator: " | "))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color(hex: "#545454"))
+                            .lineLimit(2)
+                    }
                 }
                 .padding(.top, 2)
             }

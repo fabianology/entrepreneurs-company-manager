@@ -695,7 +695,13 @@ struct InstitutionCardView: View {
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 6)
+                    
+                    Rectangle()
+                        .frame(height: 1)
+                        .foregroundStyle(Color.white.opacity(0.08))
+                        .frame(width: UIScreen.main.bounds.width * 0.8)
+                        .padding(.bottom, 12)
 
                     // ── Credentials (tap-to-copy) ────
                     VStack(alignment: .leading, spacing: 8) {

@@ -242,8 +242,8 @@ struct DashboardView: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             // "CiFr" style — all-lowercase brand name, big & bold, tight tracking
-            Text("Zifr")
-                .font(.system(size: 48, weight: .black))
+            Text("MILOOM")
+                .font(.system(size: 42, weight: .black))
                 .foregroundStyle(.white)
                 .tracking(-1)
 

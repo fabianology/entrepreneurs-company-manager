@@ -96,7 +96,13 @@ struct EditSubscriptionSheet: View {
         let df = DateFormatter()
         df.dateFormat = "MMM d"
         return Binding(
-            get: { df.date(from: sub.nextRenewal) ?? Date() },
+            get: {
+                let parsed = df.date(from: sub.nextRenewal) ?? Date()
+                let currentYear = Calendar.current.component(.year, from: Date())
+                var comps = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: parsed)
+                comps.year = currentYear
+                return Calendar.current.date(from: comps) ?? Date()
+            },
             set: { sub.nextRenewal = df.string(from: $0) }
         )
     }
