@@ -927,6 +927,7 @@ struct InstitutionCardView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
             .buttonStyle(.plain)
+            .proContextMenu(password: institution.password, loginId: institution.username.isEmpty ? institution.email : institution.username, last4: nil)
         }
     }
 }
@@ -947,7 +948,7 @@ struct FinancialCardView: View {
                             endPoint: .bottomTrailing
                         ))
                         .frame(width: 44, height: 28)
-                    Text("••\(card.last4)")
+                    Text(card.network == "Amex" ? "••• \(card.last4)" : "•••• \(card.last4)")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(card.cardGradientHex.first?.uppercased() == "#FFFFFF" ? .black : .white)
                 }
@@ -983,6 +984,7 @@ struct FinancialCardView: View {
             .glassCard(cornerRadius: 18)
         }
         .buttonStyle(.plain)
+        .proContextMenu(password: card.password, loginId: card.login, last4: card.last4)
     }
 }
 
@@ -1571,33 +1573,27 @@ struct InstitutionCardsSection: View {
                             Text("💳").font(.system(size: 18))
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(card.name.isEmpty ? "Unnamed Card" : card.name)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
                                 HStack(spacing: 6) {
-                                    Text(card.type)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.45))
-                                    Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
-                                    Text(card.network)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.45))
-                                    Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
-                                    Text("••\(card.last4)")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    Text(card.name.isEmpty ? "Unnamed Card" : card.name)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    
+                                    HStack(spacing: 4) {
+                                        Text(card.type)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.45))
+                                        Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                        Text(card.network == "Amex" ? "••• \(card.last4)" : "•••• \(card.last4)")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.45))
+                                    }
                                 }
+                                
+                                Text(card.paidFrom.isEmpty ? "No payment source" : "Paid from \(card.paidFrom)")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.45))
                             }
                             Spacer()
-                            Text(card.status.uppercased())
-                                .font(.system(size: 9, weight: .black))
-                                .tracking(0.5)
-                                .foregroundStyle(card.status == "Active" ? Color.green : (card.status == "Frozen" ? Color.orange : Color.red))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background((card.status == "Active" ? Color.green : (card.status == "Frozen" ? Color.orange : Color.red)).opacity(0.12))
-                                .clipShape(Capsule())
-                            
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 10, weight: .semibold))
                                 .foregroundStyle(Color.white.opacity(0.2))
@@ -2029,11 +2025,19 @@ struct EditCardSheet: View {
 
     @ViewBuilder private var row2: some View {
         HStack(spacing: 12) {
-            ZifrField(label: "LAST 4", placeholder: "****", text: Binding(get: { card.last4 }, set: { card.last4 = $0 }), keyboardType: .numberPad)
+            let isAmex = card.network == "Amex"
+            ZifrField(label: isAmex ? "LAST 5" : "LAST 4", placeholder: isAmex ? "*****" : "****", text: Binding(get: { card.last4 }, set: { card.last4 = $0 }), keyboardType: .numberPad)
                 .onChange(of: card.last4) { old, new in
+                    let maxLen = card.network == "Amex" ? 5 : 4
                     let filtered = new.filter { $0.isNumber }
-                    let truncated = String(filtered.prefix(4))
+                    let truncated = String(filtered.prefix(maxLen))
                     if card.last4 != truncated { card.last4 = truncated }
+                }
+                .onChange(of: card.network) { old, new in
+                    let maxLen = new == "Amex" ? 5 : 4
+                    if card.last4.count > maxLen {
+                        card.last4 = String(card.last4.prefix(maxLen))
+                    }
                 }
             cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
             cardPicker(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)

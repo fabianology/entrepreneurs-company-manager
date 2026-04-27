@@ -315,3 +315,58 @@ struct LiquidGlassButtonContainer<MenuContent: View>: View {
         .frame(width: 145 + 12 + 36, height: 46)
     }
 }
+
+
+// MARK: - Pro Context Menu (Zero-Click Access)
+struct ProContextMenuModifier: ViewModifier {
+    let password: String?
+    let loginId: String?
+    let last4: String?
+    
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                if let pwd = password, !pwd.isEmpty {
+                    Button {
+                        UIPasteboard.general.string = pwd
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } label: {
+                        Label("Copy Password", systemImage: "key.fill")
+                    }
+                }
+                if let login = loginId, !login.isEmpty {
+                    Button {
+                        UIPasteboard.general.string = login
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } label: {
+                        Label("Copy Login ID", systemImage: "person.crop.circle")
+                    }
+                }
+                if let l4 = last4, !l4.isEmpty {
+                    Button {
+                        UIPasteboard.general.string = l4
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    } label: {
+                        Label("Copy Last 4", systemImage: "creditcard.fill")
+                    }
+                }
+                
+                if (loginId != nil && !loginId!.isEmpty) || (password != nil && !password!.isEmpty) {
+                    let shareText = [
+                        (loginId != nil && !loginId!.isEmpty) ? "Login: \(loginId!)" : nil,
+                        (password != nil && !password!.isEmpty) ? "Password: \(password!)" : nil
+                    ].compactMap { $0 }.joined(separator: "\n")
+                    
+                    ShareLink(item: shareText) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
+    }
+}
+
+extension View {
+    func proContextMenu(password: String? = nil, loginId: String? = nil, last4: String? = nil) -> some View {
+        self.modifier(ProContextMenuModifier(password: password, loginId: loginId, last4: last4))
+    }
+}

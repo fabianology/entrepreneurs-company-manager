@@ -230,8 +230,15 @@ final class AppViewModel {
         var loginId: String? = nil
         var logoData: Data? = nil
         var externalWebsite: String? = nil
+        var isFree: Bool? = nil
+        var cost: Double? = nil
+        var status: String? = nil
+        var last4: String? = nil
+        var network: String? = nil
+        var paysFor: [String]? = nil
+        var cardType: String? = nil
 
-        init(type: SearchResultType, title: String, subtitle: String, companyId: String, modelId: String, tab: CompanyTab, password: String? = nil, loginId: String? = nil, logoData: Data? = nil, externalWebsite: String? = nil) {
+        init(type: SearchResultType, title: String, subtitle: String, companyId: String, modelId: String, tab: CompanyTab, password: String? = nil, loginId: String? = nil, logoData: Data? = nil, externalWebsite: String? = nil, isFree: Bool? = nil, cost: Double? = nil, status: String? = nil, last4: String? = nil, network: String? = nil, paysFor: [String]? = nil, cardType: String? = nil) {
             self.type = type
             self.title = title
             self.subtitle = subtitle
@@ -242,6 +249,13 @@ final class AppViewModel {
             self.loginId = loginId
             self.logoData = logoData
             self.externalWebsite = externalWebsite
+            self.isFree = isFree
+            self.cost = cost
+            self.status = status
+            self.last4 = last4
+            self.network = network
+            self.paysFor = paysFor
+            self.cardType = cardType
         }
     }
 
@@ -258,28 +272,51 @@ final class AppViewModel {
         for c in companies where c.name.lowercased().contains(q) {
             results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, modelId: c.id, tab: .subscriptions, logoData: c.logoData))
         }
-        for s in subscriptions where isSubQuery || s.name.lowercased().contains(q) || s.loginId.lowercased().contains(q) || s.paymentMethod.lowercased().contains(q) {
-            let company = companies.first { $0.id == s.companyId }
-            results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, modelId: s.id, tab: .subscriptions, password: s.password.isEmpty ? nil : s.password, loginId: s.loginId.isEmpty ? nil : s.loginId, logoData: company?.logoData, externalWebsite: s.website))
+        
+        for s in subscriptions {
+            let companyName = companies.first { $0.id == s.companyId }?.name.lowercased() ?? ""
+            if isSubQuery || s.name.lowercased().contains(q) || s.loginId.lowercased().contains(q) || s.paymentMethod.lowercased().contains(q) || companyName.contains(q) {
+                let company = companies.first { $0.id == s.companyId }
+                results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, modelId: s.id, tab: .subscriptions, password: s.password.isEmpty ? nil : s.password, loginId: s.loginId.isEmpty ? nil : s.loginId, logoData: company?.logoData, externalWebsite: s.website, isFree: s.isFree, cost: s.cost, status: s.status))
+            }
         }
-        for card in cards where isBankQuery || card.name.lowercased().contains(q) || card.institutionName.lowercased().contains(q) || card.network.lowercased().contains(q) || card.last4.lowercased().contains(q) {
-            let company = companies.first { $0.id == card.companyId }
-            let inst = institutions.first { $0.name.lowercased() == card.institutionName.lowercased() }
-            results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password.isEmpty ? nil : card.password, loginId: card.login.isEmpty ? nil : card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl))
+        
+        for card in cards {
+            let companyName = companies.first { $0.id == card.companyId }?.name.lowercased() ?? ""
+            let paysForMatch = subscriptions.contains { $0.paymentMethod == card.name && ($0.name.lowercased().contains(q) || $0.loginId.lowercased().contains(q)) }
+            if isBankQuery || card.name.lowercased().contains(q) || card.institutionName.lowercased().contains(q) || card.network.lowercased().contains(q) || card.last4.lowercased().contains(q) || paysForMatch || companyName.contains(q) {
+                let company = companies.first { $0.id == card.companyId }
+                let inst = institutions.first { $0.name.lowercased() == card.institutionName.lowercased() }
+                results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password.isEmpty ? nil : card.password, loginId: card.login.isEmpty ? nil : card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl, status: card.status, last4: card.last4, network: card.network, paysFor: subscriptions.filter { $0.paymentMethod == card.name }.map { $0.name }, cardType: card.type))
+            }
         }
-        for inst in institutions where isBankQuery || inst.name.lowercased().contains(q) || inst.username.lowercased().contains(q) || inst.email.lowercased().contains(q) {
-            let company = companies.first { $0.id == inst.companyId }
-            let loginId = !inst.username.isEmpty ? inst.username : (!inst.email.isEmpty ? inst.email : nil)
-            results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password.isEmpty ? nil : inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl))
+        
+        for inst in institutions {
+            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }) && (sub.name.lowercased().contains(q) || sub.loginId.lowercased().contains(q)) }
+            let companyName = companies.first { $0.id == inst.companyId }?.name.lowercased() ?? ""
+            let cardPaysForMatch = cards.contains { card in card.institutionName.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in sub.paymentMethod == card.name && (sub.name.lowercased().contains(q) || sub.loginId.lowercased().contains(q)) } }
+            if isBankQuery || inst.name.lowercased().contains(q) || inst.username.lowercased().contains(q) || inst.email.lowercased().contains(q) || paysForMatch || cardPaysForMatch || companyName.contains(q) {
+                let company = companies.first { $0.id == inst.companyId }
+                let loginId = !inst.username.isEmpty ? inst.username : (!inst.email.isEmpty ? inst.email : nil)
+                results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password.isEmpty ? nil : inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl, paysFor: subscriptions.filter { sub in inst.accounts.contains { acc in sub.paymentMethod == acc.name } || sub.paymentMethod == inst.name }.map { $0.name }))
+            }
         }
-        for loan in loans where loan.name.lowercased().contains(q) || loan.lender.lowercased().contains(q) {
-            let company = companies.first { $0.id == loan.companyId }
-            let inst = institutions.first { $0.name.lowercased() == loan.lender.lowercased() }
-            results.append(.init(type: .financial, title: loan.name, subtitle: company?.name ?? "", companyId: loan.companyId, modelId: loan.id, tab: .financial, logoData: company?.logoData, externalWebsite: inst?.loginUrl))
+        
+        for loan in loans {
+            let companyName = companies.first { $0.id == loan.companyId }?.name.lowercased() ?? ""
+            if loan.name.lowercased().contains(q) || loan.lender.lowercased().contains(q) || companyName.contains(q) {
+                let company = companies.first { $0.id == loan.companyId }
+                let inst = institutions.first { $0.name.lowercased() == loan.lender.lowercased() }
+                results.append(.init(type: .financial, title: loan.name, subtitle: company?.name ?? "", companyId: loan.companyId, modelId: loan.id, tab: .financial, logoData: company?.logoData, externalWebsite: inst?.loginUrl))
+            }
         }
-        for doc in documents where doc.name.lowercased().contains(q) {
-            let company = companies.first { $0.id == doc.companyId }
-            results.append(.init(type: .document, title: doc.name, subtitle: company?.name ?? "", companyId: doc.companyId, modelId: doc.id, tab: .documents, logoData: company?.logoData))
+        
+        for doc in documents {
+            let companyName = companies.first { $0.id == doc.companyId }?.name.lowercased() ?? ""
+            if doc.name.lowercased().contains(q) || companyName.contains(q) {
+                let company = companies.first { $0.id == doc.companyId }
+                results.append(.init(type: .document, title: doc.name, subtitle: company?.name ?? "", companyId: doc.companyId, modelId: doc.id, tab: .documents, logoData: company?.logoData))
+            }
         }
         return results
     }

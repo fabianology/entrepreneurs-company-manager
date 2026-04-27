@@ -616,6 +616,7 @@ struct SubscriptionCardView: View {
             .presentationCornerRadius(24)
         }
         // ── Linked email HUD ─────────────────────────────────────────────
+        .proContextMenu(password: sub.password, loginId: sub.loginId, last4: nil)
         .sheet(isPresented: $showEmailHUD) {
             LinkedEmailHUD(
                 draft: $emailDraft,

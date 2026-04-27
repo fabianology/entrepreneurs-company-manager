@@ -157,101 +157,22 @@ struct GlobalSearchView: View {
                                 }
                                 .padding(.top, 40)
                             } else {
-                                ForEach(results) { result in
-                                    Button {
-                                        navigate(to: result)
-                                    } label: {
-                                        HStack(spacing: 14) {
-                                            if let web = result.externalWebsite, !web.isEmpty {
-                                                ZStack {
-                                                    RoundedRectangle(cornerRadius: 10)
-                                                        .fill(Color.clear)
-                                                        .frame(width: 38, height: 38)
-                                                    FaviconImage(website: web, size: 24)
-                                                }
-                                            } else if let logoData = result.logoData, let uiImage = UIImage(data: logoData) {
-                                                Image(uiImage: uiImage)
-                                                    .resizable()
-                                                    .scaledToFill()
-                                                    .frame(width: 38, height: 38)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                                            } else {
-                                                ZStack {
-                                                    RoundedRectangle(cornerRadius: 10)
-                                                        .fill(resultColor(result).opacity(0.15))
-                                                        .frame(width: 38, height: 38)
-                                                    Image(systemName: resultIcon(result))
-                                                        .font(.system(size: 14, weight: .semibold))
-                                                        .foregroundStyle(resultColor(result))
-                                                }
-                                            }
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(result.title)
-                                                    .font(.system(size: 14, weight: .bold))
-                                                    .foregroundStyle(.white)
-                                                    .lineLimit(1)
-                                                if !result.subtitle.isEmpty {
-                                                    Text(result.subtitle)
-                                                        .font(.system(size: 11, weight: .medium))
-                                                        .foregroundStyle(Color.white.opacity(0.4))
-                                                        .lineLimit(1)
-                                                }
-                                                if let loginId = result.loginId, !loginId.isEmpty {
-                                                    Text(loginId)
-                                                        .font(.system(size: 10, weight: .medium))
-                                                        .foregroundStyle(.secondary)
-                                                        .lineLimit(1)
-                                                }
-                                            }
-                                            Spacer(minLength: 8)
-                                            
-                                            if let pwd = result.password, !pwd.isEmpty {
-                                                HStack(spacing: 4) {
-                                                    Button {
-                                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                        if visiblePasswords.contains(result.id) {
-                                                            visiblePasswords.remove(result.id)
-                                                        } else {
-                                                            visiblePasswords.insert(result.id)
-                                                        }
-                                                    } label: {
-                                                        Image(systemName: visiblePasswords.contains(result.id) ? "eye.slash" : "eye")
-                                                            .font(.system(size: 16))
-                                                            .foregroundStyle(.secondary)
-                                                    }
-                                                    .frame(width: 36, height: 36)
-                                                    .background(Color.white.opacity(0.05))
-                                                    .clipShape(Circle())
-                                                    
-                                                    if visiblePasswords.contains(result.id) {
-                                                        Text(pwd)
-                                                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                                            .foregroundStyle(.white)
-                                                            .padding(.horizontal, 8)
-                                                        
-                                                        Button {
-                                                            UIPasteboard.general.string = pwd
-                                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                                        } label: {
-                                                            Image(systemName: "doc.on.doc")
-                                                                .font(.system(size: 14))
-                                                                .foregroundStyle(.secondary)
-                                                        }
-                                                        .frame(width: 36, height: 36)
-                                                        .background(Color.white.opacity(0.05))
-                                                        .clipShape(Circle())
-                                                    }
-                                                }
-                                            } else {
-                                                Image(systemName: "chevron.right")
-                                                    .font(.system(size: 11, weight: .bold))
-                                                    .foregroundStyle(Color.white.opacity(0.2))
-                                            }
-                                        }
-                                        .padding(14)
-                                        .glassCard(cornerRadius: 16)
-                                    }
-                                    .buttonStyle(.plain)
+                                let companyResults = results.filter { $0.type == .company }
+                                let subResults = results.filter { $0.type == .subscription }
+                                let finResults = results.filter { $0.type == .financial }
+                                let docResults = results.filter { $0.type == .document }
+                                
+                                if !companyResults.isEmpty {
+                                    searchSection(title: "ENTITIES", items: companyResults)
+                                }
+                                if !subResults.isEmpty {
+                                    searchSection(title: "SERVICES", items: subResults)
+                                }
+                                if !finResults.isEmpty {
+                                    searchSection(title: "FINANCIALS", items: finResults)
+                                }
+                                if !docResults.isEmpty {
+                                    searchSection(title: "DOCUMENTS", items: docResults)
                                 }
                             }
                         }
@@ -259,6 +180,7 @@ struct GlobalSearchView: View {
                         .padding(.bottom, 40)
                     }
                     .scrollIndicators(.hidden)
+                    .scrollDismissesKeyboard(.immediately)
                 }
             }
             .background(Color.zifrBG)
@@ -289,6 +211,192 @@ struct GlobalSearchView: View {
         }
     }
 
+
+
+    @ViewBuilder
+    private func searchSection(title: String, items: [AppViewModel.SearchResult]) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(1)
+                .foregroundStyle(Color.white.opacity(0.4))
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+            
+            VStack(spacing: 0) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, result in
+                    searchResultRow(result)
+                    
+                    if index < items.count - 1 {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.05))
+                            .frame(height: 1)
+                            .padding(.leading, 64)
+                    }
+                }
+            }
+            .glassCard(cornerRadius: 16)
+        }
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private func searchResultRow(_ result: AppViewModel.SearchResult) -> some View {
+        Button {
+            navigate(to: result)
+        } label: {
+            HStack(spacing: 14) {
+                if let web = result.externalWebsite, !web.isEmpty {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.clear)
+                            .frame(width: 38, height: 38)
+                        FaviconImage(website: web, size: 24)
+                    }
+                } else if let logoData = result.logoData, let uiImage = UIImage(data: logoData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 38, height: 38)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(resultColor(result).opacity(0.15))
+                            .frame(width: 38, height: 38)
+                        Image(systemName: resultIcon(result))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(resultColor(result))
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Text(result.title)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            
+                        if result.type == .subscription {
+                            if let isFree = result.isFree, isFree {
+                                Text("FREE")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                            } else if let cost = result.cost {
+                                Text(String(format: "$%.2f/mo.", cost))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                            }
+                        }
+                            
+                        if result.type == .financial {
+                            if let cType = result.cardType {
+                                Text(cType.uppercased())
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .tracking(0.3)
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                            }
+                            
+                            if let net = result.network, let l4 = result.last4, !net.isEmpty, !l4.isEmpty {
+                                Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                Text(net == "Amex" ? "••• \(l4)" : "•••• \(l4)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                            }
+                        }
+                    }
+                    
+                    if result.type == .financial, let paysFor = result.paysFor, !paysFor.isEmpty {
+                        Text("PAYS FOR: \(paysFor.joined(separator: ", "))".uppercased())
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(Color.white.opacity(0.45))
+                            .lineLimit(1)
+                    }
+                    
+                    if let loginId = result.loginId, !loginId.isEmpty {
+                        Text("LOGIN: \(loginId)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .lineLimit(1)
+                    }
+                    
+                    if let pwd = result.password, !pwd.isEmpty {
+                        Text("PASSWORD: ••••••••")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.3)
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 8)
+                
+                if !result.subtitle.isEmpty {
+                    let formattedSubtitle: String = {
+                        let parts = result.subtitle.split(separator: " ", maxSplits: 1)
+                        if parts.count >= 2 {
+                            return "\(parts[0])\n\(parts[1])".uppercased()
+                        }
+                        return result.subtitle.uppercased()
+                    }()
+                    
+                    Text(formattedSubtitle)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(0.3)
+                        .foregroundStyle(Color(hex: "#223e5a"))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.2))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if let pwd = result.password, !pwd.isEmpty {
+                Button {
+                    UIPasteboard.general.string = pwd
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                } label: {
+                    Label("Copy Password", systemImage: "key.fill")
+                }
+            }
+            if let loginId = result.loginId, !loginId.isEmpty {
+                Button {
+                    UIPasteboard.general.string = loginId
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                } label: {
+                    Label("Copy Login ID", systemImage: "person.crop.circle")
+                }
+            }
+            if let l4 = result.last4, !l4.isEmpty {
+                Button {
+                    UIPasteboard.general.string = l4
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                } label: {
+                    Label("Copy Last 4", systemImage: "creditcard.fill")
+                }
+            }
+            
+            if (result.loginId != nil && !result.loginId!.isEmpty) || (result.password != nil && !result.password!.isEmpty) {
+                let shareText = [
+                    (result.loginId != nil && !result.loginId!.isEmpty) ? "Login: \(result.loginId!)" : nil,
+                    (result.password != nil && !result.password!.isEmpty) ? "Password: \(result.password!)" : nil
+                ].compactMap { $0 }.joined(separator: "\n")
+                
+                ShareLink(item: shareText) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+    }
 
     private func navigate(to result: AppViewModel.SearchResult) {
         if let company = companies.first(where: { $0.id == result.companyId }) {
