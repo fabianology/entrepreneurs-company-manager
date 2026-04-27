@@ -23,20 +23,12 @@ struct FinancialView: View {
             VStack(spacing: 0) {
                 // ── Action Bar ──
                 HStack(spacing: 8) {
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        newInst = vm.addInstitution(context: context, companyId: company.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("INSTITUTION").font(.system(size: 12, weight: .heavy)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                    LiquidGlassButtonContainer(
+                        title: "INSTITUTION",
+                        onAdd: {
+                            newInst = vm.addInstitution(context: context, companyId: company.id)
                         }
-                        .frame(width: 145, height: 36)
-                        .background(Color(hex: "#223E5A"))
-                        .clipShape(Capsule())
-                    }
-
-                    Menu {
+                    ) {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             print("Triggering CloudKit Sharing for All Financials")
@@ -82,14 +74,6 @@ struct FinancialView: View {
                                 }
                             }
                         }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
 
                     Spacer()
@@ -733,7 +717,7 @@ struct InstitutionCardView: View {
 
             // ── Accordion ──────────────────────────────────────────────────
             accordionDivider()
-            accordionToggle(label: expanded ? "Hide Accounts" : "Linked Accounts", count: institution.accounts.count + loanCount, expanded: expanded) {
+            accordionToggle(label: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded) {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }

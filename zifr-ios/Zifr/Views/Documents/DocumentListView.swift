@@ -23,25 +23,12 @@ struct DocumentListView: View {
             LazyVStack(spacing: 24) {
                 // Add button row
                 HStack(spacing: 12) {
-                    Button { 
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        newDoc = vm.addDocument(context: context, companyId: company.id) 
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("DOCUMENT")
-                                .font(.system(size: 12, weight: .heavy))
-                                .tracking(1)
-                                .foregroundStyle(Color.white)
+                    LiquidGlassButtonContainer(
+                        title: "DOCUMENT",
+                        onAdd: {
+                            newDoc = vm.addDocument(context: context, companyId: company.id)
                         }
-                        .frame(width: 145, height: 36)
-                        .background(Color(hex: "#223E5A"))
-                        .clipShape(Capsule())
-                    }
-
-                    Menu {
+                    ) {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             print("Triggering CloudKit Sharing for All Documents")
@@ -59,16 +46,7 @@ struct DocumentListView: View {
                                 Label(doc.name.isEmpty ? "Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
                             }
                         }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
-
                     Spacer()
                 }
                 .padding(.horizontal, 20)

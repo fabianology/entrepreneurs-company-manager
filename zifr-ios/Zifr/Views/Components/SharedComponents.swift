@@ -222,3 +222,96 @@ struct DoubleField: View {
         text = isInt ? String(format: "%.0f", value) : String(value)
     }
 }
+import SwiftUI
+
+struct LiquidGlassButtonContainer<MenuContent: View>: View {
+    let title: String
+    let onAdd: () -> Void
+    @ViewBuilder let shareMenuContent: () -> MenuContent
+    
+    @State private var dragOffset: CGSize = .zero
+    @State private var isPressing = false
+    
+    var body: some View {
+        ZStack {
+            // Liquid Glass Background
+            Canvas { context, size in
+                context.addFilter(.alphaThreshold(min: 0.5, color: Color(hex: "#223d5a")))
+                context.addFilter(.blur(radius: 8))
+                
+                context.drawLayer { ctx in
+                    if let blobs = context.resolveSymbol(id: "blobs") {
+                        ctx.draw(blobs, at: CGPoint(x: size.width / 2, y: size.height / 2))
+                    }
+                }
+            } symbols: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Capsule()
+                            .fill(Color.black)
+                            .frame(width: isPressing ? 160 : 145, height: isPressing ? 46 : 36)
+                            .offset(dragOffset)
+                    }
+                    .frame(width: 145, height: 36) // Fixed footprint to prevent shifting
+                    
+                    Circle()
+                        .fill(Color.black)
+                        .frame(width: 36, height: 36)
+                }
+                .tag("blobs")
+            }
+            .padding(-20)
+            
+            // Interactive UI Overlays
+            HStack(spacing: 12) {
+                // Main Expandable Button
+                ZStack {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                        Text(title)
+                            .font(.system(size: 12, weight: .heavy))
+                            .tracking(1)
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                    }
+                    .frame(width: isPressing ? 160 : 145, height: isPressing ? 46 : 36)
+                    .offset(dragOffset)
+                }
+                .frame(width: 145, height: 36) // Fixed footprint
+                .contentShape(Capsule())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            withAnimation(.interactiveSpring(response: 0.3, dampingFraction: 0.7)) {
+                                isPressing = true
+                                dragOffset = value.translation
+                            }
+                        }
+                        .onEnded { value in
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                                isPressing = false
+                                dragOffset = .zero
+                            }
+                            if abs(value.translation.width) < 10 && abs(value.translation.height) < 10 {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onAdd()
+                            }
+                        }
+                )
+                
+                // Share Menu
+                Menu {
+                    shareMenuContent()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(Color(hex: "#A2A2A2"))
+                        .frame(width: 36, height: 36)
+                        .contentShape(Circle())
+                }
+            }
+        }
+        .frame(width: 145 + 12 + 36, height: 46)
+    }
+}
