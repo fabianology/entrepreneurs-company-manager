@@ -54,7 +54,7 @@ struct DashboardView: View {
                             }
                         }
                         Spacer()
-                        Text("YOUR PORTFOLIO")
+                        Text("MILOOM")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
@@ -69,6 +69,8 @@ struct DashboardView: View {
                     CompanyCardView(
                         company: company,
                         monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
+                        totalDebt: vm.totalDebt(for: company, loans: loans, cards: cards),
+                        totalCredit: vm.totalCredit(for: company, cards: cards),
                         onEdit: { editingCompany = company },
                         onViewSubscriptions: {
                             vm.selectedCompany = company
@@ -125,6 +127,8 @@ struct DashboardView: View {
                                 CompanyCardView(
                                     company: dummyCompany,
                                     monthlyBurn: 0.0,
+                                    totalDebt: 0.0,
+                                    totalCredit: 0.0,
                                     onEdit: {},
                                     onViewSubscriptions: {},
                                     onViewFinancials: {},
@@ -197,7 +201,7 @@ struct DashboardView: View {
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
             }
-            .overlay(alignment: .bottom) {
+            .safeAreaInset(edge: .bottom) {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     vm.showSearch = true

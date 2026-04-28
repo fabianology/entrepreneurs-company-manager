@@ -45,6 +45,7 @@ struct CompanyDetailView: View {
         return filtered.filter { $0.name.lowercased().contains(q) }
     }
 
+    @State private var showCompanyMeta = false
     @State private var showEditCompany = false
     @State private var dragOffset: CGFloat = 0
     @State private var swipeHandled = false
@@ -82,6 +83,7 @@ struct CompanyDetailView: View {
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
         }
+        // Popover moved to the button
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 0) {
                 Divider().background(Color.white.opacity(0.1))
@@ -89,19 +91,21 @@ struct CompanyDetailView: View {
                     HStack(spacing: 20) { // Grouping left utilities
                         // Menu Button
                         Menu {
-                            Button {
-                                dismiss()
-                            } label: {
-                                Label("Dashboard", systemImage: "square.grid.2x2")
-                            }
-                            Button {
-                                // admin coming soon
-                            } label: {
-                                Label("Settings", systemImage: "gearshape")
+                            ControlGroup {
+                                Button {
+                                    // admin coming soon
+                                } label: {
+                                    Label("Admin", systemImage: "person.crop.circle")
+                                }
+                                Button {
+                                    dismiss()
+                                } label: {
+                                    Label("MILOOM", systemImage: "square.grid.2x2")
+                                }
                             }
                             
                             if !allCompanies.isEmpty {
-                                Section("Jump to Company") {
+                                Section("Jump to Entity") {
                                     ForEach(allCompanies) { c in
                                         Button {
                                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -148,11 +152,19 @@ struct CompanyDetailView: View {
                                 vm.activeTab = tab
                                 tabBounces[tab, default: 0] += 1
                             } label: {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                    .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                    .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                    .frame(width: 32, height: 44)
+                                if tab == .financial {
+                                    Image(systemName: tab.icon)
+                                        .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                        .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
+                                        .frame(width: 32, height: 44)
+                                } else {
+                                    Image(systemName: tab.icon)
+                                        .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                        .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                        .frame(width: 32, height: 44)
+                                }
                             }
                         }
                     }
@@ -213,10 +225,35 @@ struct CompanyDetailView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 // Company name — 28pt bold, matches CiFr
-                Text(company.name.isEmpty ? "Company" : company.name)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                Button {
+                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                    showCompanyMeta = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(company.name.isEmpty ? "Company" : company.name)
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .rotationEffect(.degrees(showCompanyMeta ? 180 : 0))
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showCompanyMeta)
+                    }
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showCompanyMeta, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
+                    CompanyMetaSheet(
+                        company: company,
+                        subscriptions: subscriptions,
+                        institutions: institutions,
+                        cards: cards,
+                        loans: loans,
+                        documents: documents
+                    )
+                    .frame(width: 360, height: 580)
+                    .presentationCompactAdaptation(.popover)
+                }
 
                 // Dynamic metrics sub-line per tab
                 metricSubLine

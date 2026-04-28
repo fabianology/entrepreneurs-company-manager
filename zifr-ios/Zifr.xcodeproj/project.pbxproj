@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0BFFDDE1FF715E861E2482EB /* CompanyAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AFA05E28920F297646C677 /* CompanyAvatar.swift */; };
 		13B10D8A2F9F287F00AA707E /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 13B10D892F9F287F00AA707E /* logo.png */; };
+		13B10D922FA0A1A900AA707E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B10D912FA0A1A900AA707E /* Assets.xcassets */; };
 		22D969D0670A82296E3CCE6B /* Loan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89FF19CB274064BB06D6017 /* Loan.swift */; };
 		371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C5A710215BBAF96C2E51F /* ZifrApp.swift */; };
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
@@ -30,6 +31,7 @@
 		BA57027EA5350F4639B6C911 /* Company.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75FA7DD2F2423504DA06F6D9 /* Company.swift */; };
 		BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9602D7532DE04DFA8294ACAE /* DashboardView.swift */; };
 		C0602B559E7624043CF0A151 /* Color+Zifr.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3141954F83AF71011D282471 /* Color+Zifr.swift */; };
+		C3936073425DB658A729D2FC /* CompanyMetaSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79281FD54DCDB57245A6AF0 /* CompanyMetaSheet.swift */; };
 		DEEB7F47CBCE5D07C0F17701 /* Institution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008FF13CD7DB43FB47297A75 /* Institution.swift */; };
 		E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED204010D74AB9325095BD9A /* DocumentScannerService.swift */; };
 		F2ECD35FF479C6DACC511E83 /* patch2.py in Resources */ = {isa = PBXBuildFile; fileRef = 0ACC52E30ED6C458351E1CC0 /* patch2.py */; };
@@ -44,6 +46,7 @@
 		0ACC52E30ED6C458351E1CC0 /* patch2.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch2.py; sourceTree = "<group>"; };
 		0F35D3D91F4D431D42B40709 /* FinancialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialCard.swift; sourceTree = "<group>"; };
 		13B10D892F9F287F00AA707E /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
+		13B10D912FA0A1A900AA707E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
 		2E23D2AE452D41F40D63BCAE /* Zifr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zifr.entitlements; sourceTree = "<group>"; };
 		3141954F83AF71011D282471 /* Color+Zifr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Zifr.swift"; sourceTree = "<group>"; };
@@ -64,6 +67,7 @@
 		C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDocument.swift; sourceTree = "<group>"; };
 		D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialView.swift; sourceTree = "<group>"; };
+		D79281FD54DCDB57245A6AF0 /* CompanyMetaSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CompanyMetaSheet.swift; sourceTree = "<group>"; };
 		D89FF19CB274064BB06D6017 /* Loan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loan.swift; sourceTree = "<group>"; };
 		DCADE3750A4CFA0353D88977 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DE716A0EE836D6C85D35CA28 /* DocumentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentListView.swift; sourceTree = "<group>"; };
@@ -88,6 +92,7 @@
 			children = (
 				556340A3A5DAA4657EC93B4C /* CompanyDetailView.swift */,
 				186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */,
+				D79281FD54DCDB57245A6AF0 /* CompanyMetaSheet.swift */,
 			);
 			path = Company;
 			sourceTree = "<group>";
@@ -201,6 +206,7 @@
 				C1AA476FBE894000904BEFDD /* Views */,
 				F0659DFD146E87AD652064B7 /* Secrets.local.xcconfig */,
 				13B10D892F9F287F00AA707E /* logo.png */,
+				13B10D912FA0A1A900AA707E /* Assets.xcassets */,
 			);
 			path = Zifr;
 			sourceTree = "<group>";
@@ -280,6 +286,7 @@
 			files = (
 				AA347BC4FF41CCA325EC3B99 /* patch.py in Resources */,
 				F2ECD35FF479C6DACC511E83 /* patch2.py in Resources */,
+				13B10D922FA0A1A900AA707E /* Assets.xcassets in Resources */,
 				13B10D8A2F9F287F00AA707E /* logo.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -317,6 +324,7 @@
 				7F5587DB6B51FFC6F517FD51 /* SubscriptionListView.swift in Sources */,
 				70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */,
 				371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */,
+				C3936073425DB658A729D2FC /* CompanyMetaSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
