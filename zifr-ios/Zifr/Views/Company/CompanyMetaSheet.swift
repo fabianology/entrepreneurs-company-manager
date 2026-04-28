@@ -84,8 +84,8 @@ struct CompanyMetaSheet: View {
                 cube(top: "\(documents.count)", bottom: "FILES")
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 20)
         }
+        .safeAreaPadding(.vertical, 24)
         .background(Color.clear)
     }
 
