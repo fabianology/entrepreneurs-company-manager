@@ -10,7 +10,7 @@ struct CompanyMetaSheet: View {
     let documents: [CompanyDocument]
     @Environment(\.dismiss) private var dismiss
 
-    private let darkSurface = Color(hex: "#0d0d0d")
+    private let darkSurface = Color(hex: "#1c1c1e")
     private let dimSurface  = Color(hex: "#141414")
     private let subsColor   = Color(hex: "#2070BD")
     private let finColor    = Color(hex: "#1A7077")
@@ -83,7 +83,8 @@ struct CompanyMetaSheet: View {
 
                 cube(top: "\(documents.count)", bottom: "FILES")
             }
-            .padding(12)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 20)
         }
         .background(Color.clear)
     }
@@ -93,7 +94,7 @@ struct CompanyMetaSheet: View {
     private var headerBanner: some View {
         HStack {
             VStack(alignment: .leading, spacing: 3) {
-                Text("META VIEW")
+                Text("THE BIG PICTURE")
                     .font(.system(size: 15, weight: .black))
                     .foregroundStyle(.white)
                     .tracking(1)

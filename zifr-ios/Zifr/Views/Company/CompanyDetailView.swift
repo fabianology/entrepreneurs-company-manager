@@ -98,6 +98,11 @@ struct CompanyDetailView: View {
                                     Label("Admin", systemImage: "person.crop.circle")
                                 }
                                 Button {
+                                    let generator = UIImpactFeedbackGenerator(style: .heavy)
+                                    generator.impactOccurred()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { generator.impactOccurred() }
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { generator.impactOccurred() }
+                                    
                                     dismiss()
                                 } label: {
                                     Label("MILOOM", systemImage: "square.grid.2x2")
@@ -199,6 +204,8 @@ struct CompanyDetailView: View {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
                             } else if vm.activeTab == .documents {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
+                            } else if vm.activeTab == .subscriptions {
+                                dismiss()
                             }
                         } else {
                             // Swipe Right to Left (Go Forward)
@@ -242,6 +249,17 @@ struct CompanyDetailView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .background(alignment: .top) {
+                    if showCompanyMeta {
+                        Circle()
+                            .fill(Color.black.opacity(0.85))
+                            .frame(width: 400, height: 400)
+                            .blur(radius: 60)
+                            .offset(y: 40)
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+                }
                 .popover(isPresented: $showCompanyMeta, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
                     CompanyMetaSheet(
                         company: company,
