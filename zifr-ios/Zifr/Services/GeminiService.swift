@@ -10,14 +10,6 @@ actor GeminiService {
 
     private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models"
 
-    private let fallbackQuotes = [
-        "The best way to predict the future is to create it. - Peter Drucker",
-        "The way to get started is to quit talking and begin doing. - Walt Disney",
-        "Your time is limited, so don't waste it living someone else's life. - Steve Jobs",
-        "If you are not embarrassed by the first version of your product, you've launched too late. - Reid Hoffman",
-        "Risk more than others think is safe. Dream more than others think is practical. - Howard Schultz"
-    ]
-
     // MARK: - Generic Generate
     private func generate(model: String = "gemini-flash-latest", prompt: String) async throws -> String {
         let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)")!
@@ -38,19 +30,6 @@ actor GeminiService {
         let content = candidates?.first?["content"] as? [String: Any]
         let parts = content?["parts"] as? [[String: Any]]
         return parts?.first?["text"] as? String ?? ""
-    }
-
-    // MARK: - Entrepreneurial Quote
-    func getEntrepreneurialQuote() async -> String {
-        let prompt = "Provide one short, highly inspiring quote for entrepreneurs or business owners. Return only the quote and the author name separated by \" - \". Example: \"The way to get started is to quit talking and begin doing. - Walt Disney\""
-        do {
-            let result = try await generate(prompt: prompt)
-            return result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                ? fallbackQuotes.randomElement()!
-                : result.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch {
-            return fallbackQuotes.randomElement()!
-        }
     }
 
     // MARK: - Email Purpose

@@ -1,0 +1,32 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project Zifr.xcodeproj -scheme Zifr -destination "platform=iOS Simulator,name=iPhone 15 Pro,OS=17.5"
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, arch:arm64, id:2F689A88-90FF-4D9A-8A3F-B17FDAD31ACF, OS:17.5, name:iPhone 15 Pro }
+{ platform:iOS Simulator, arch:x86_64, id:2F689A88-90FF-4D9A-8A3F-B17FDAD31ACF, OS:17.5, name:iPhone 15 Pro }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (1 target)
+    Target 'Zifr' in project 'Zifr' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+error: unable to attach DB: error: accessing build database "/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/XCBuildData/build.db": database is locked Possibly there are two concurrent builds running in the same filesystem location.
+** BUILD FAILED **
+
+
+The following build commands failed:
+	Building project Zifr with scheme Zifr
+(1 failure)

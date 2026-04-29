@@ -480,10 +480,22 @@ struct ZifrAutocompleteField: View {
     @FocusState private var isFocused: Bool
     
     var filteredSuggestions: [String] {
-        guard !text.isEmpty else { return [] }
-        return Array(Set(suggestions))
+        let counts = suggestions.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
+        let unique = counts.keys
+
+        if text.isEmpty {
+            return unique.sorted {
+                if counts[$0] != counts[$1] { return counts[$0]! > counts[$1]! }
+                return $0 < $1
+            }
+        }
+
+        return unique
             .filter { $0.lowercased().contains(text.lowercased()) && $0 != text }
-            .sorted()
+            .sorted {
+                if counts[$0] != counts[$1] { return counts[$0]! > counts[$1]! }
+                return $0 < $1
+            }
     }
     
     var body: some View {
@@ -505,7 +517,7 @@ struct ZifrAutocompleteField: View {
                 .padding(.vertical, 12)
                 .background(Color(hex: "#111111"))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(isFocused ? Color.zifrGold.opacity(0.5) : Color.white.opacity(0.1), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                 .focused($isFocused)
             
             if isFocused && !filteredSuggestions.isEmpty {

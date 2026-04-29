@@ -133,7 +133,7 @@ struct SubscriptionListView: View {
                     Image(systemName: "square.3.layers.3d")
                         .font(.system(size: 28))
                         .foregroundStyle(.white)
-                    Text("+ ADD YOUR FIRST SERVICE")
+                    Text("ADD YOUR FIRST SERVICE")
                         .font(.system(size: 11, weight: .black))
                         .textCase(.uppercase)
                         .tracking(2)
@@ -243,13 +243,13 @@ struct SubscriptionCardView: View {
         return (verb, "\(shortDueOn) every \(cycle)")
     }
     
-    var bankAccountTuple: (bank: String, account: String, modelId: String?)? {
+    var bankAccountTuple: (bank: String, account: String, type: String, modelId: String?)? {
         if sub.paymentMethod.isEmpty { return nil }
         
         if let card = cards.first(where: { $0.name == sub.paymentMethod }) {
             let inst = card.institutionName.isEmpty ? "Paid From" : card.institutionName
             let suffix = card.last4.isEmpty ? "" : " ••••\(card.last4)"
-            return (inst, "\(card.name)\(suffix)", card.id)
+            return (inst, "\(card.name)\(suffix)", card.type, card.id)
         }
         
         for inst in institutions {
@@ -257,11 +257,11 @@ struct SubscriptionCardView: View {
                 let instName = inst.name.isEmpty ? "Paid From" : inst.name
                 let accName = acc.name.isEmpty ? acc.type : acc.name
                 let suffix = acc.last4.isEmpty ? "" : " ••••\(acc.last4)"
-                return (instName, "\(accName)\(suffix)", inst.id)
+                return (instName, "\(accName)\(suffix)", acc.type, inst.id)
             }
         }
         
-        return ("Paid From", sub.paymentMethod, nil)
+        return ("Paid From", sub.paymentMethod, "", nil)
     }
 
     var body: some View {
@@ -372,9 +372,19 @@ struct SubscriptionCardView: View {
                                         }
                                     } label: {
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(accTuple.bank)
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundStyle(Color.gray)
+                                            HStack(spacing: 4) {
+                                                Text(accTuple.bank)
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Color.gray)
+                                                if !accTuple.type.isEmpty {
+                                                    Text("·")
+                                                        .font(.system(size: 11, weight: .bold))
+                                                        .foregroundStyle(Color.gray.opacity(0.5))
+                                                    Text(accTuple.type)
+                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .foregroundStyle(Color.gray.opacity(0.7))
+                                                }
+                                            }
                                             Text(accTuple.account)
                                                 .font(.system(size: 10, weight: .semibold))
                                                 .foregroundStyle(Color.gray.opacity(0.7))
@@ -593,6 +603,7 @@ struct SubscriptionCardView: View {
             SubServiceHUD(
                 draft: $subDraft,
                 isNew: isNewSubService,
+                companyId: sub.companyId,
                 institutions: institutions,
                 cards: cards,
                 onSave: {

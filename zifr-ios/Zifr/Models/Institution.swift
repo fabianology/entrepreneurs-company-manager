@@ -6,6 +6,7 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
     var name: String = ""
     var type: String = "Checking"
     var last4: String = ""
+    var accountNumber: String? = nil
     var balance: Double = 0
     var currency: String = "USD"
     var cardHolder: String = ""
@@ -19,7 +20,7 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
 
     static let allTypes = [
         "Checking", "Savings", "Investing", "CD",
-        "Credit Card", "Debit Card", "Debit (Linked)", "FSA", "HSA",
+        "FSA", "HSA",
         "401(k)", "Roth 401(k)", "IRA", "Roth IRA",
         "Rollover IRA", "SEP IRA", "529", "Other"
     ]

@@ -10,6 +10,7 @@ final class FinancialCard {
     var password: String = ""
     var institutionName: String = ""
     var cardHolder: String = ""
+    var cardNumber: String = ""
     var last4: String = ""
     var expiry: String = ""
     var network: String = "Visa"
@@ -18,7 +19,7 @@ final class FinancialCard {
     var limit: Double = 0
     var paidFrom: String = ""
     var paidOn: String = ""
-    var autopay: String = "N/A"
+    var autopay: String = "Yes"
     var balance: Double = 0.0
     var moPayment: Double = 0.0
     var apr: Double = 0.0
@@ -36,6 +37,7 @@ final class FinancialCard {
         password: String = "",
         institutionName: String = "",
         cardHolder: String = "",
+        cardNumber: String = "",
         last4: String = "",
         expiry: String = "",
         network: String = "Visa",
@@ -44,7 +46,7 @@ final class FinancialCard {
         limit: Double = 0,
         paidFrom: String = "",
         paidOn: String = "",
-        autopay: String = "N/A",
+        autopay: String = "Yes",
         balance: Double = 0,
         moPayment: Double = 0,
         apr: Double = 0,
@@ -60,6 +62,7 @@ final class FinancialCard {
         self.password = password
         self.institutionName = institutionName
         self.cardHolder = cardHolder
+        self.cardNumber = cardNumber
         self.last4 = last4
         self.expiry = expiry
         self.network = network

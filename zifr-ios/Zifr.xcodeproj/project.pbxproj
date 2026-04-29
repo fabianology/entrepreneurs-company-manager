@@ -11,6 +11,7 @@
 		13B10D8A2F9F287F00AA707E /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 13B10D892F9F287F00AA707E /* logo.png */; };
 		13B10D922FA0A1A900AA707E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B10D912FA0A1A900AA707E /* Assets.xcassets */; };
 		22D969D0670A82296E3CCE6B /* Loan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89FF19CB274064BB06D6017 /* Loan.swift */; };
+		2FBF284B0EA19D8F3421C6E7 /* AddAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1E1EC6DF73C39B2B8DB2DA /* AddAccountSheet.swift */; };
 		371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C5A710215BBAF96C2E51F /* ZifrApp.swift */; };
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
 		46CFAE72D8A339D9D82C3BFC /* FinancialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */; };
@@ -76,6 +77,7 @@
 		ED204010D74AB9325095BD9A /* DocumentScannerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentScannerService.swift; sourceTree = "<group>"; };
 		F0659DFD146E87AD652064B7 /* Secrets.local.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = Secrets.local.xcconfig; sourceTree = "<group>"; };
 		FB03F357FB890C8E4972D112 /* SharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComponents.swift; sourceTree = "<group>"; };
+		FB1E1EC6DF73C39B2B8DB2DA /* AddAccountSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AddAccountSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -101,6 +103,7 @@
 			isa = PBXGroup;
 			children = (
 				D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */,
+				FB1E1EC6DF73C39B2B8DB2DA /* AddAccountSheet.swift */,
 			);
 			path = Financial;
 			sourceTree = "<group>";
@@ -325,6 +328,7 @@
 				70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */,
 				371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */,
 				C3936073425DB658A729D2FC /* CompanyMetaSheet.swift in Sources */,
+				2FBF284B0EA19D8F3421C6E7 /* AddAccountSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

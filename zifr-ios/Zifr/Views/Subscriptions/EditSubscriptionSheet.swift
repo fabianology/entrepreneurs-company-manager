@@ -277,7 +277,7 @@ struct EditSubscriptionSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text(sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod)
+                    Text(sub.paymentMethod.isEmpty ? "N/A" : sub.paymentMethod)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(sub.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
@@ -696,6 +696,7 @@ struct EditSubscriptionSheet: View {
             .navigationDestination(isPresented: $showPaymentPicker) {
                 PaymentMethodPickerView(
                     currentMethod: sub.paymentMethod,
+                    companyId: sub.companyId,
                     institutions: institutions,
                     cards: cards,
                     onSelect: { sub.paymentMethod = $0 }
@@ -742,6 +743,7 @@ struct EditSubscriptionSheet: View {
                 SubServiceHUD(
                     draft: $subDraft,
                     isNew: subDraftIndex == nil,
+                    companyId: sub.companyId,
                     institutions: institutions,
                     cards: cards,
                     onSave: {
@@ -805,26 +807,19 @@ struct SubServicesSection: View {
     var body: some View {
         Section {
             if detailLevel != "Essentials" {
-                HStack(spacing: 12) {
-                    Toggle("", isOn: $sub.showSubServicesTab)
-                        .labelsHidden()
-                        .tint(.green)
-                        .scaleEffect(0.7)
-
-                    Button { onAdd() } label: {
-                        HStack {
-                                Spacer()
-                                Text("💾  Add Supplemental Service")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color(hex: "#A2A2A2"))
-                                Spacer()
-                            }
-                            .frame(height: 40)
-                            .background(Color(hex: "#223E5A"))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                Button { onAdd() } label: {
+                    HStack {
+                        Spacer()
+                        Text("💾  Add Supplemental Service")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                        Spacer()
                     }
-                    .buttonStyle(.plain)
+                    .frame(height: 40)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .buttonStyle(.plain)
             }
 
                 ForEach(sub.subServices.indices, id: \.self) { i in
@@ -898,6 +893,7 @@ struct SubServicesSection: View {
 struct SubServiceHUD: View {
     @Binding var draft: SubService
     let isNew: Bool
+    let companyId: String
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onSave: () -> Void
@@ -945,7 +941,7 @@ struct SubServiceHUD: View {
                                     showPaymentPicker = true
                                 } label: {
                                     HStack {
-                                        Text(draft.paymentMethod.isEmpty ? "None" : draft.paymentMethod)
+                                        Text(draft.paymentMethod.isEmpty ? "N/A" : draft.paymentMethod)
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
                                             .lineLimit(1)
@@ -1125,6 +1121,7 @@ struct SubServiceHUD: View {
             .sheet(isPresented: $showPaymentPicker) {
                 PaymentMethodPickerView(
                     currentMethod: draft.paymentMethod,
+                    companyId: companyId,
                     institutions: institutions,
                     cards: cards,
                     onSelect: { draft.paymentMethod = $0 }
@@ -1278,26 +1275,19 @@ struct LinkedEmailsSection: View {
     var body: some View {
         Section {
             if detailLevel != "Essentials" {
-                HStack(spacing: 12) {
-                    Toggle("", isOn: $sub.showLinkedEmailsTab)
-                        .labelsHidden()
-                        .tint(.green)
-                        .scaleEffect(0.7)
-
-                    Button { onAdd() } label: {
-                        HStack {
-                                Spacer()
-                                Text("📨  Add Linked Email")
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(Color(hex: "#A2A2A2"))
-                                Spacer()
-                            }
-                            .frame(height: 40)
-                            .background(Color(hex: "#223E5A"))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                Button { onAdd() } label: {
+                    HStack {
+                        Spacer()
+                        Text("📨  Add Linked Email")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                        Spacer()
                     }
-                    .buttonStyle(.plain)
+                    .frame(height: 40)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                .buttonStyle(.plain)
             }
 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in
@@ -1328,6 +1318,15 @@ struct LinkedEmailsSection: View {
 struct LinkedEmailHUD: View {
     @Binding var draft: LinkedEmail
     let isNew: Bool
+    
+    @Query private var allInstitutions: [Institution]
+    
+    private var allLogins: [String] {
+        let subLogins = allSubscriptions.map { $0.loginId }
+        let instUsers = allInstitutions.map { $0.username }
+        let instEmails = allInstitutions.map { $0.email }
+        return (subLogins + instUsers + instEmails).filter { !$0.isEmpty }
+    }
     let onSave: () -> Void
     let onCancel: () -> Void
     var onDelete: (() -> Void)? = nil
@@ -1464,11 +1463,12 @@ struct LinkedEmailHUD: View {
                     VStack(spacing: 12) {
 
                         // Row 1: Address (full width)
-                        ZifrField(
+                        ZifrAutocompleteField(
                             label: "EMAIL ADDRESS",
                             placeholder: "name@example.com",
                             text: $draft.email,
-                            keyboardType: .emailAddress
+                            keyboardType: .emailAddress,
+                            suggestions: allLogins
                         )
 
                         // Row 2: Provider + Access Method
@@ -1570,10 +1570,14 @@ struct LinkedEmailHUD: View {
 
 struct PaymentMethodPickerView: View {
     let currentMethod: String
+    let companyId: String
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Query private var allCompanies: [Company]
+    @Query private var allInstitutions: [Institution]
+    @Query private var allCards: [FinancialCard]
 
     @State private var searchText = ""
     @AppStorage("userCustomPaymentMethods") private var storedCustomMethods: String = ""
@@ -1581,16 +1585,31 @@ struct PaymentMethodPickerView: View {
     @State private var itemToEdit: String? = nil
     @State private var editedItemName: String = ""
     @State private var showEditAlert = false
+    
+    @State private var selectedScope: String = "current"
 
     struct AccountDisplay: Identifiable {
         let id = UUID()
         let instName: String
+        let companyId: String
         let account: InstitutionAccount
+    }
+    
+    private var currentCompanyName: String {
+        allCompanies.first { $0.id == companyId }?.name ?? "Current Entity"
+    }
+
+    private var effectiveInstitutions: [Institution] {
+        selectedScope == "all" ? allInstitutions : institutions
+    }
+    
+    private var effectiveCards: [FinancialCard] {
+        selectedScope == "all" ? allCards : cards
     }
 
     var accountDisplays: [AccountDisplay] {
-        institutions.flatMap { inst in
-            inst.accounts.map { AccountDisplay(instName: inst.name, account: $0) }
+        effectiveInstitutions.flatMap { inst in
+            inst.accounts.map { AccountDisplay(instName: inst.name, companyId: inst.companyId, account: $0) }
         }
     }
 
@@ -1600,14 +1619,14 @@ struct PaymentMethodPickerView: View {
     }
 
     var filteredCards: [FinancialCard] {
-        if searchText.isEmpty { return cards }
-        return cards.filter { ($0.name + $0.type + $0.last4 + $0.institutionName).localizedCaseInsensitiveContains(searchText) }
+        if searchText.isEmpty { return effectiveCards }
+        return effectiveCards.filter { ($0.name + $0.type + $0.last4 + $0.institutionName).localizedCaseInsensitiveContains(searchText) }
     }
     
     var allCustomMethods: [String] {
         let stored = storedCustomMethods.split(separator: ",").map(String.init)
         let predefinedAccounts = Set(accountDisplays.map { $0.account.name.isEmpty ? $0.account.type : $0.account.name })
-        let predefinedCards = Set(cards.map(\.name))
+        let predefinedCards = Set(effectiveCards.map(\.name))
         let allPredefined = predefinedAccounts.union(predefinedCards)
         
         return Array(Set(stored).subtracting(allPredefined)).sorted()
@@ -1622,7 +1641,7 @@ struct PaymentMethodPickerView: View {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if q.isEmpty { return true }
         if accountDisplays.contains(where: { ($0.account.name.isEmpty ? $0.account.type : $0.account.name).lowercased() == q }) { return true }
-        if cards.contains(where: { $0.name.lowercased() == q }) { return true }
+        if effectiveCards.contains(where: { $0.name.lowercased() == q }) { return true }
         if allCustomMethods.contains(where: { $0.lowercased() == q }) { return true }
         return false
     }
@@ -1680,7 +1699,7 @@ struct PaymentMethodPickerView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.secondary)
-                TextField("Search or enter custom", text: $searchText)
+                TextField("Enter custom or Search", text: $searchText)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(.primary)
                     .autocorrectionDisabled()
@@ -1697,13 +1716,25 @@ struct PaymentMethodPickerView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
+            Picker("Entity Scope", selection: $selectedScope) {
+                Label(currentCompanyName, systemImage: "building.2")
+                    .symbolRenderingMode(.monochrome)
+                    .tag("current")
+                Label("All entities", systemImage: "globe")
+                    .symbolRenderingMode(.monochrome)
+                    .tag("all")
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 8)
+
             List {
             Section {
                 Button {
                     selectStandard("")
                 } label: {
                     HStack {
-                        Text("None")
+                        Text("N/A")
                             .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.5))
                         Spacer()
@@ -1835,10 +1866,23 @@ struct PaymentMethodPickerView: View {
                                     .font(.system(size: 12))
                                 }
                                 Spacer()
-                                if currentMethod == name {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.zifrGreen)
+                                
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    if currentMethod == name {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color.zifrGreen)
+                                    }
+                                    
+                                    if let company = allCompanies.first(where: { $0.id == display.companyId }) {
+                                        Text(company.name.uppercased())
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .tracking(0.3)
+                                            .foregroundStyle(Color(hex: "#2070BD"))
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.trailing)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
                                 }
                             }
                         }
@@ -1888,10 +1932,23 @@ struct PaymentMethodPickerView: View {
                                     .font(.system(size: 12))
                                 }
                                 Spacer()
-                                if currentMethod == card.name {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.zifrGreen)
+                                
+                                VStack(alignment: .trailing, spacing: 4) {
+                                    if currentMethod == card.name {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color.zifrGreen)
+                                    }
+                                    
+                                    if let company = allCompanies.first(where: { $0.id == card.companyId }) {
+                                        Text(company.name.uppercased())
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .tracking(0.3)
+                                            .foregroundStyle(Color(hex: "#2070BD"))
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.trailing)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
                                 }
                             }
                         }

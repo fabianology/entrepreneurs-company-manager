@@ -1,7 +1,7 @@
 Command line invocation:
     /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project Zifr.xcodeproj -scheme Zifr -destination "platform=iOS Simulator,name=iPhone 15 Pro"
 
-2026-04-28 13:39:11.479 xcodebuild[72055:8038436] Writing error result bundle to /var/folders/xf/7f0thqj132j_c8hzyqd8j4pm0000gn/T/ResultBundle_2026-28-04_13-39-0011.xcresult
+2026-04-28 14:05:19.267 xcodebuild[73171:8071850] Writing error result bundle to /var/folders/xf/7f0thqj132j_c8hzyqd8j4pm0000gn/T/ResultBundle_2026-28-04_14-05-0019.xcresult
 xcodebuild: error: Unable to find a device matching the provided destination specifier:
 		{ platform:iOS Simulator, OS:latest, name:iPhone 15 Pro }
 

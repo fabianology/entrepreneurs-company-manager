@@ -148,7 +148,7 @@ struct EditCompanySheet: View {
                                 navButton(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), text: "Subscriptions") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .subscriptions; dismiss() }
                                 }
-                                navButton(icon: "creditcard", color: Color(hex: "#1A7077"), text: "Financials") {
+                                navButton(icon: "dollarsign.bank.building", color: Color(hex: "#1A7077"), text: "Financials") {
                                     if let company { vm.selectedCompany = company; vm.activeTab = .financial; dismiss() }
                                 }
                                 navButton(icon: "doc.text", color: Color(hex: "#918457"), text: "Docs") {

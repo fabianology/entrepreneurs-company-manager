@@ -23,80 +23,29 @@ struct FinancialView: View {
             VStack(spacing: 0) {
                 // ── Action Bar ──
                 HStack(spacing: 8) {
-                    LiquidGlassButtonContainer(
-                        title: "INSTITUTION",
-                        onAdd: {
-                            newInst = vm.addInstitution(context: context, companyId: company.id)
-                        }
-                    ) {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            print("Triggering CloudKit Sharing for All Financials")
-                        } label: {
-                            Label("All Financials", systemImage: "folder.badge.person.crop")
-                        }
-                        
-                        Divider()
-                        
-                        if !institutions.isEmpty {
-                            Section("Institutions") {
-                                ForEach(institutions) { inst in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        print("Triggering CloudKit Sharing for \(inst.name)")
-                                    } label: {
-                                        Label(inst.name.isEmpty ? "Institution" : inst.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                        if !cards.isEmpty {
-                            Section("Cards") {
-                                ForEach(cards) { card in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        print("Triggering CloudKit Sharing for \(card.name)")
-                                    } label: {
-                                        Label(card.name.isEmpty ? "Card" : card.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                        if !loans.isEmpty {
-                            Section("Loans") {
-                                ForEach(loans) { loan in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        print("Triggering CloudKit Sharing for \(loan.name)")
-                                    } label: {
-                                        Label(loan.name.isEmpty ? "Loan" : loan.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     Spacer()
 
                     Menu {
-                        Button {
-                            newCard = vm.addCard(context: context, companyId: company.id)
-                        } label: {
-                            Label("Add Card", systemImage: "creditcard")
-                        }
-                        Button {
-                            newLoan = vm.addLoan(context: context, companyId: company.id)
-                        } label: {
-                            Label("Add Loan", systemImage: "dollarsign.circle")
-                        }
                         Button {
                             newInst = vm.addInstitution(context: context, companyId: company.id)
                         } label: {
                             Label("Add Account", systemImage: "building.columns")
                         }
+                        if !institutions.isEmpty {
+                            Button {
+                                newCard = vm.addCard(context: context, companyId: company.id)
+                            } label: {
+                                Label("Add Card", systemImage: "creditcard")
+                            }
+                            Button {
+                                newLoan = vm.addLoan(context: context, companyId: company.id)
+                            } label: {
+                                Label("Add Loan", systemImage: "dollarsign.circle")
+                            }
+                        }
                     } label: {
                         HStack(spacing: 6) {
-                            Text("SOLO CARD").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("+ ADD").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
                             Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         }
                         .padding(.horizontal, 20)
@@ -166,10 +115,10 @@ struct FinancialView: View {
                                 
                                 // Glass overlay
                                 VStack(spacing: 16) {
-                                    Image(systemName: "creditcard")
+                                    Image(systemName: "dollarsign.bank.building")
                                         .font(.system(size: 28))
                                         .foregroundStyle(.white)
-                                    Text("+ ADD YOUR FIRST INSTITUTION")
+                                    Text("ADD YOUR FIRST INSTITUTION")
                                         .font(.system(size: 11, weight: .black))
                                         .textCase(.uppercase)
                                         .tracking(2)
@@ -643,7 +592,7 @@ struct InstitutionCardView: View {
                             }
                         }
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(institution.name.isEmpty ? "New Bank" : institution.name)
+                            Text(institution.name.isEmpty ? "Institution" : institution.name)
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.white)
 
@@ -811,6 +760,7 @@ struct InstitutionCardView: View {
             InstitutionAccountHUD(
                 draft: $accountDraft,
                 isNew: false,
+                institutionName: institution.name.isEmpty ? "Institution" : institution.name,
                 onSave: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         var updated = institution.accounts
@@ -1396,7 +1346,7 @@ struct EditInstitutionSheet: View {
             .onAppear {
                 snapshot = currentSnapshot
             }
-            .navigationTitle(institution.name.isEmpty ? "New Bank" : institution.name)
+            .navigationTitle(institution.name.isEmpty ? "Institution" : institution.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1415,7 +1365,7 @@ struct EditInstitutionSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    Button(isNew ? "Add Account" : "Save") {
                         vm.saveInstitution(institution, context: context)
                         dismiss()
                     }
@@ -1428,6 +1378,7 @@ struct EditInstitutionSheet: View {
                 InstitutionAccountHUD(
                     draft: $accountDraft,
                     isNew: accountDraftIndex == nil,
+                    institutionName: institution.name.isEmpty ? "Institution" : institution.name,
                     onSave: {
                         var accs = institution.accounts
                         if let idx = accountDraftIndex {
@@ -1455,7 +1406,7 @@ struct EditInstitutionSheet: View {
             .sheet(item: $cardDraft, onDismiss: { 
                 cardDraft = nil 
             }) { cd in
-                EditCardSheet(card: cd, vm: vm, institutions: institutions, cards: cards, isNew: cd.name.isEmpty && cd.last4.isEmpty)
+                EditCardSheet(card: cd, vm: vm, institutions: institutions, cards: cards, isNew: cd.name.isEmpty && cd.last4.isEmpty, isInstitutionContext: true)
             }
             .sheet(item: $loanDraft, onDismiss: { 
                 loanDraft = nil 
@@ -1476,18 +1427,21 @@ struct InstitutionAccountsSection: View {
     var body: some View {
         Section {
             Button { onAdd() } label: {
-                HStack {
-                        Spacer()
-                        Text("🏦  Add Account")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Spacer()
-                    }
-                    .frame(height: 40)
-                    .background(Color(hex: "#222E2F"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 3) {
+                    Text("ADD ACCOUNT")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("checking · savings · investing · 401(k)")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 12))
 
                 ForEach(institution.accounts.indices, id: \.self) { i in
                     let acc = institution.accounts[i]
@@ -1559,18 +1513,21 @@ struct InstitutionCardsSection: View {
     var body: some View {
         Section {
             Button { onAdd() } label: {
-                HStack {
-                        Spacer()
-                        Text("💳  Add Card")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Spacer()
-                    }
-                    .frame(height: 40)
-                    .background(Color(hex: "#222E2F"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 3) {
+                    Text("ADD CARD")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("credit card · debit card")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 12))
 
                 ForEach(cards, id: \.id) { card in
                     Button { onEdit(card) } label: {
@@ -1637,18 +1594,21 @@ struct InstitutionLoansSection: View {
     var body: some View {
         Section {
             Button { onAdd() } label: {
-                HStack {
-                        Spacer()
-                        Text("💸  Add Loan")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Spacer()
-                    }
-                    .frame(height: 40)
-                    .background(Color(hex: "#222E2F"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                VStack(spacing: 3) {
+                    Text("ADD LOAN")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text("lending out · bank loan · custom loan")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.tertiary)
                 }
-                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .contentShape(RoundedRectangle(cornerRadius: 12))
 
                 ForEach(loans, id: \.id) { loan in
                     Button { onEdit(loan) } label: {
@@ -1710,6 +1670,7 @@ struct InstitutionLoansSection: View {
 struct InstitutionAccountHUD: View {
     @Binding var draft: InstitutionAccount
     let isNew: Bool
+    let institutionName: String
     let onSave: () -> Void
     let onCancel: () -> Void
     var onDelete: (() -> Void)? = nil
@@ -1729,65 +1690,68 @@ struct InstitutionAccountHUD: View {
             Form {
                 Section {
                     VStack(spacing: 12) {
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "ACCOUNT NAME",
-                                placeholder: "e.g. Primary Checking",
-                                text: $draft.name
-                            )
-                            ZifrField(
-                                label: "LAST 4",
-                                placeholder: "****",
-                                text: $draft.last4,
-                                keyboardType: .numberPad
-                            )
-                            .onChange(of: draft.last4) { old, new in
-                                let filtered = new.filter { $0.isNumber }
-                                let truncated = String(filtered.prefix(4))
-                                if draft.last4 != truncated { draft.last4 = truncated }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("TYPE")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            Picker("", selection: $draft.type) {
+                                ForEach(InstitutionAccount.allTypes, id: \.self) { t in
+                                    Text(t).tag(t)
+                                }
                             }
+                            .labelsHidden()
+                            .padding(.leading, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .contentShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        .buttonStyle(.borderless)
 
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("TYPE")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                Picker("", selection: $draft.type) {
-                                    ForEach(InstitutionAccount.allTypes, id: \.self) { t in
-                                        Text(t).tag(t)
+                        ZifrField(
+                            label: "ACCOUNT NAME",
+                            placeholder: "e.g. Primary Checking",
+                            text: $draft.name
+                        )
+
+                        ZifrField(
+                            label: "ACCOUNT NUMBER",
+                            placeholder: "e.g. 1234567890",
+                            text: Binding(
+                                get: { draft.accountNumber ?? "" },
+                                set: { newValue in
+                                    draft.accountNumber = newValue
+                                    let filtered = newValue.filter { $0.isNumber }
+                                    if filtered.count >= 4 {
+                                        draft.last4 = String(filtered.suffix(4))
+                                    } else {
+                                        draft.last4 = filtered
                                     }
                                 }
-                                .labelsHidden()
-                                .padding(.leading, 6)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(height: 44)
-                                .background(Color(hex: "#111111"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                                .contentShape(RoundedRectangle(cornerRadius: 14))
-                            }
-                            .buttonStyle(.borderless)
+                            ),
+                            keyboardType: .numberPad
+                        )
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("BALANCE")
-                                    .font(.system(size: 11, weight: .bold))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("BALANCE")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            HStack(spacing: 4) {
+                                Text("$")
+                                    .font(.system(size: 14, weight: .bold))
                                     .foregroundStyle(Color.white.opacity(0.5))
-                                HStack(spacing: 4) {
-                                    Text("$")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    DoubleField(placeholder: "0.00", value: $draft.balance)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                }
-                                .padding(.horizontal, 16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(height: 44)
-                                .background(Color(hex: "#111111"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                DoubleField(placeholder: "0.00", value: $draft.balance)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
                             }
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
                     }
                     .padding(.vertical, 4)
@@ -1825,12 +1789,22 @@ struct InstitutionAccountHUD: View {
             .scrollContentBackground(.hidden)
             .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
-            .navigationTitle(isNew ? "Add Account" : "Edit Account")
-            .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 initialDraft = draft
             }
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(draft.name.isEmpty ? (isNew ? "Add Account" : "Edit Account") : draft.name)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text(institutionName)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
@@ -1972,15 +1946,34 @@ struct EditCardSheet: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
     let isNew: Bool
+    var isInstitutionContext: Bool = false
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
+    @State private var showDeleteInstitutionConfirm = false
+    @State private var institutionToDelete: Institution? = nil
     
     @Query private var subscriptions: [Subscription]
     
     @State private var showFinancials = false
     @State private var showPaymentPicker = false
+    @State private var isNewInstitution: Bool = false
+    
+    // Institution Draft
+    @State private var instWebsite: String = ""
+    @State private var instLogin: String = ""
+    @State private var instPass: String = ""
+    @State private var instEmail: String = ""
+    @State private var instTwoFactor: String = ""
+    @State private var showInstPassword = false
+    @State private var isEditingInstitution = true
 
+    private var allLogins: [String] {
+        let subLogins = subscriptions.map { $0.loginId }
+        let instUsers = institutions.map { $0.username }
+        let instEmails = institutions.map { $0.email }
+        return (subLogins + instUsers + instEmails).filter { !$0.isEmpty }
+    }
     private var autoPayBinding: Binding<Bool> {
         Binding(
             get: { card.autopay == "Yes" },
@@ -2021,6 +2014,154 @@ struct EditCardSheet: View {
         return snap != currentSnapshot
     }
 
+    @ViewBuilder private var institutionDetailsSection: some View {
+        VStack(spacing: 16) {
+            if !isNewInstitution {
+                HStack {
+                    Text("INSTITUTION DETAILS")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.5)
+                        .foregroundStyle(Color.white.opacity(0.5))
+                    Spacer()
+                    Button {
+                        withAnimation { isEditingInstitution.toggle() }
+                    } label: {
+                        Image(systemName: isEditingInstitution ? "lock.open.fill" : "lock.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(isEditingInstitution ? Color.green : Color.white.opacity(0.4))
+                    }
+                }
+                .padding(.bottom, 4)
+            }
+
+            Group {
+                if isNewInstitution {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: { card.institutionName }, set: { card.institutionName = $0 }))
+                        
+                        let matches = institutions.filter { $0.name.lowercased().contains(card.institutionName.lowercased()) && $0.name.lowercased() != card.institutionName.lowercased() }
+                        
+                        if !matches.isEmpty && !card.institutionName.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(matches.prefix(3)) { inst in
+                                        Button {
+                                            isNewInstitution = false
+                                            card.institutionName = inst.name
+                                            instWebsite = inst.loginUrl
+                                            instLogin = inst.username
+                                            instPass = inst.password
+                                            instEmail = inst.email
+                                            instTwoFactor = inst.twoFactor
+                                            isEditingInstitution = false
+                                        } label: {
+                                            Text("Switch to \(inst.name)")
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundStyle(Color.green)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(Color.green.opacity(0.1))
+                                                .clipShape(Capsule())
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                        }
+                    }
+                }
+                
+                ZifrField(label: "WEBSITE", placeholder: "chase.com", text: $instWebsite, keyboardType: .URL, textContentType: .URL)
+                    .textInputAutocapitalization(.never)
+                
+                HStack(spacing: 12) {
+                    ZifrAutocompleteField(label: "LOGIN ID", placeholder: "username", text: $instLogin, keyboardType: .emailAddress, textContentType: nil, suggestions: allLogins)
+                    
+                    ZStack(alignment: .bottomTrailing) {
+                        ZifrField(label: "PASSWORD", placeholder: "••••••••", text: $instPass, isSecure: !showInstPassword, textContentType: .password)
+                            .textInputAutocapitalization(.never)
+
+                        Button {
+                            showInstPassword.toggle()
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Image(systemName: showInstPassword ? "eye.slash.fill" : "eye.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .padding()
+                        }
+                        .padding(.bottom, 2)
+                        .disabled(!isEditingInstitution)
+                    }
+                }
+                
+                HStack(spacing: 12) {
+                    ZifrAutocompleteField(label: "EMAIL", placeholder: "name@company.com", text: $instEmail, keyboardType: .emailAddress, textContentType: .emailAddress, suggestions: allLogins)
+                        .textInputAutocapitalization(.never)
+
+                    ZifrField(label: "2FA", placeholder: "Phone or App", text: $instTwoFactor)
+                }
+            }
+            .disabled(!isEditingInstitution)
+            .opacity(!isEditingInstitution ? 0.6 : 1.0)
+        }
+    }
+
+    @ViewBuilder private var institutionSelectorRow: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("FINANCIAL INSTITUTION")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Color.white.opacity(0.5))
+            
+            VStack(spacing: 0) {
+                if !institutions.isEmpty {
+                    Picker("Institution Mode", selection: $isNewInstitution) {
+                        Text("Select Existing").tag(false)
+                        Text("Create New").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.bottom, 12)
+                }
+                
+                if !isNewInstitution && !institutions.isEmpty {
+                    Menu {
+                        ForEach(institutions) { inst in
+                            Button(inst.name.isEmpty ? "Unnamed" : inst.name) {
+                                card.institutionName = inst.name
+                                instWebsite = inst.loginUrl
+                                instLogin = inst.username
+                                instPass = inst.password
+                                instEmail = inst.email
+                                instTwoFactor = inst.twoFactor
+                                isEditingInstitution = false
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(card.institutionName.isEmpty ? "Select Institution..." : card.institutionName)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(card.institutionName.isEmpty ? Color.white.opacity(0.4) : .white)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 52)
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(.bottom, 16)
+                }
+                
+                if isNewInstitution || !card.institutionName.isEmpty {
+                    institutionDetailsSection
+                }
+            }
+        }
+    }
+
     @ViewBuilder private var row1: some View {
         HStack(spacing: 12) {
             ZifrField(label: "CARD NICKNAME", placeholder: "e.g. Sapphire", text: Binding(get: { card.name }, set: { card.name = $0 }))
@@ -2029,23 +2170,31 @@ struct EditCardSheet: View {
     }
 
     @ViewBuilder private var row2: some View {
-        HStack(spacing: 12) {
-            let isAmex = card.network == "Amex"
-            ZifrField(label: isAmex ? "LAST 5" : "LAST 4", placeholder: isAmex ? "*****" : "****", text: Binding(get: { card.last4 }, set: { card.last4 = $0 }), keyboardType: .numberPad)
-                .onChange(of: card.last4) { old, new in
-                    let maxLen = card.network == "Amex" ? 5 : 4
+        VStack(spacing: 12) {
+            ZifrField(label: "CARD NUMBER", placeholder: "0000 0000 0000 0000", text: Binding(get: { card.cardNumber }, set: { card.cardNumber = $0 }), keyboardType: .numberPad)
+                .onChange(of: card.cardNumber) { old, new in
                     let filtered = new.filter { $0.isNumber }
-                    let truncated = String(filtered.prefix(maxLen))
-                    if card.last4 != truncated { card.last4 = truncated }
-                }
-                .onChange(of: card.network) { old, new in
-                    let maxLen = new == "Amex" ? 5 : 4
-                    if card.last4.count > maxLen {
-                        card.last4 = String(card.last4.prefix(maxLen))
+                    if card.cardNumber != filtered { card.cardNumber = filtered }
+                    
+                    if let first = filtered.first {
+                        if first == "4" { card.network = "Visa" }
+                        else if first == "5" { card.network = "Mastercard" }
+                        else if first == "3" { card.network = "Amex" }
+                        else if first == "6" { card.network = "Discover" }
+                    }
+                    
+                    let maxLen = card.network == "Amex" ? 5 : 4
+                    if filtered.count >= maxLen {
+                        card.last4 = String(filtered.suffix(maxLen))
+                    } else {
+                        card.last4 = filtered
                     }
                 }
-            cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
-            cardPicker(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
+            
+            HStack(spacing: 12) {
+                cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
+                cardPicker(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
+            }
         }
     }
 
@@ -2248,6 +2397,9 @@ struct EditCardSheet: View {
             Form {
                 Section {
                     VStack(spacing: 12) {
+                        if !isInstitutionContext {
+                            institutionSelectorRow
+                        }
                         row1
                         row2
                         if card.type.lowercased() != "debit" {
@@ -2325,7 +2477,11 @@ struct EditCardSheet: View {
                             VStack(spacing: 12) {
                                 HStack(spacing: 12) {
                                     moneyField(label: "BALANCE", value: Binding(get: { card.balance }, set: { card.balance = $0 }))
-                                    moneyField(label: "CREDIT LIMIT", value: Binding(get: { card.limit }, set: { card.limit = $0 }))
+                                    if card.type == "Credit" {
+                                        moneyField(label: "CREDIT LIMIT", value: Binding(get: { card.limit }, set: { card.limit = $0 }))
+                                    } else {
+                                        Color.clear.frame(maxWidth: .infinity)
+                                    }
                                 }
 
                                 HStack(spacing: 12) {
@@ -2420,10 +2576,37 @@ struct EditCardSheet: View {
                         .buttonStyle(.plain)
                         .confirmationDialog("Delete Card?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("Delete Card", role: .destructive) {
+                                let instName = card.institutionName
                                 vm.deleteCard(card, context: context)
-                                dismiss()
+                                
+                                let remainingCards = cards.filter { $0.institutionName.lowercased() == instName.lowercased() && $0.id != card.id }
+                                if let orphanedInst = institutions.first(where: { $0.name.lowercased() == instName.lowercased() }) {
+                                    if remainingCards.isEmpty && orphanedInst.accounts.isEmpty {
+                                        institutionToDelete = orphanedInst
+                                        
+                                        // Slight delay so the first sheet closes cleanly before showing second
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            showDeleteInstitutionConfirm = true
+                                        }
+                                    } else {
+                                        dismiss()
+                                    }
+                                } else {
+                                    dismiss()
+                                }
                             }
                             Button("Cancel", role: .cancel) {}
+                        }
+                        .confirmationDialog("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm, titleVisibility: .visible) {
+                            Button("Yes, Delete", role: .destructive) {
+                                if let inst = institutionToDelete {
+                                    vm.deleteInstitution(inst, context: context)
+                                }
+                                dismiss()
+                            }
+                            Button("No, Keep It", role: .cancel) { dismiss() }
+                        } message: {
+                            Text("This was the last item for \(institutionToDelete?.name ?? "this institution"). Do you want to delete the institution profile too?")
                         }
                     }
                     .listRowBackground(Color.clear)
@@ -2436,7 +2619,12 @@ struct EditCardSheet: View {
             .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
             .onAppear {
-                snapshot = currentSnapshot
+                if isNew {
+                    isNewInstitution = institutions.isEmpty
+                } else {
+                    isNewInstitution = card.institutionName.isEmpty || !institutions.contains(where: { $0.name.lowercased() == card.institutionName.lowercased() })
+                }
+                if snapshot == nil { snapshot = currentSnapshot }
             }
             .navigationTitle(isNew ? "New Card" : card.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -2467,6 +2655,26 @@ struct EditCardSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
+                        if isNewInstitution {
+                            let newInst = vm.addInstitution(context: context, companyId: card.companyId)
+                            newInst.name = card.institutionName
+                            newInst.loginUrl = instWebsite
+                            newInst.username = instLogin
+                            newInst.password = instPass
+                            newInst.email = instEmail
+                            newInst.twoFactor = instTwoFactor
+                            vm.saveInstitution(newInst, context: context)
+                        } else if !card.institutionName.isEmpty {
+                            if let existing = institutions.first(where: { $0.name.lowercased() == card.institutionName.lowercased() }) {
+                                existing.loginUrl = instWebsite
+                                existing.username = instLogin
+                                existing.password = instPass
+                                existing.email = instEmail
+                                existing.twoFactor = instTwoFactor
+                                vm.saveInstitution(existing, context: context)
+                            }
+                        }
+                        
                         vm.saveCard(card, context: context)
                         dismiss()
                     }
@@ -2479,6 +2687,7 @@ struct EditCardSheet: View {
                 NavigationStack {
                     PaymentMethodPickerView(
                         currentMethod: card.paidFrom,
+                        companyId: card.companyId,
                         institutions: institutions,
                         cards: cards
                     ) { method in

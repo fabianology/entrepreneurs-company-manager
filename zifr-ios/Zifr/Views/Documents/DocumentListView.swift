@@ -243,7 +243,7 @@ struct DocumentListView: View {
                     Image(systemName: "doc.text")
                         .font(.system(size: 28))
                         .foregroundStyle(.white)
-                    Text("+ ADD YOUR FIRST DOCUMENT")
+                    Text("ADD YOUR FIRST DOCUMENT")
                         .font(.system(size: 11, weight: .black))
                         .textCase(.uppercase)
                         .tracking(2)

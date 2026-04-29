@@ -97,17 +97,21 @@ final class AppViewModel {
         if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
             card.company = company
         }
-        context.insert(card)
         return card
     }
 
     func saveCard(_ card: FinancialCard, context: ModelContext) {
+        if card.modelContext == nil {
+            context.insert(card)
+        }
         try? context.save()
     }
 
     func deleteCard(_ card: FinancialCard, context: ModelContext) {
         cleanUpCustomPaymentMethod(name: card.name)
-        context.delete(card)
+        if card.modelContext != nil {
+            context.delete(card)
+        }
         try? context.save()
     }
 
@@ -117,11 +121,13 @@ final class AppViewModel {
         if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
             inst.company = company
         }
-        context.insert(inst)
         return inst
     }
 
     func saveInstitution(_ inst: Institution, context: ModelContext) {
+        if inst.modelContext == nil {
+            context.insert(inst)
+        }
         try? context.save()
     }
 
@@ -147,7 +153,9 @@ final class AppViewModel {
             }
         }
         
-        context.delete(inst)
+        if inst.modelContext != nil {
+            context.delete(inst)
+        }
         try? context.save()
     }
     
@@ -168,16 +176,20 @@ final class AppViewModel {
         if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
             loan.company = company
         }
-        context.insert(loan)
         return loan
     }
 
     func saveLoan(_ loan: Loan, context: ModelContext) {
+        if loan.modelContext == nil {
+            context.insert(loan)
+        }
         try? context.save()
     }
 
     func deleteLoan(_ loan: Loan, context: ModelContext) {
-        context.delete(loan)
+        if loan.modelContext != nil {
+            context.delete(loan)
+        }
         try? context.save()
     }
 
