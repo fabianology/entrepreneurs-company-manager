@@ -16,6 +16,7 @@
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
 		46CFAE72D8A339D9D82C3BFC /* FinancialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */; };
 		5970666C186E2CA75860907F /* CompanyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */; };
+		5AF73D3FFD2596CC379EBE93 /* EntityHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6A29A143D9B48D108DC5712 /* EntityHomeView.swift */; };
 		656E6D3AAA4F61BC73C58401 /* CompanyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73663491A43CB99703F9853B /* CompanyCardView.swift */; };
 		67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1CA7408BE63B84A63BABDB8 /* Date+Formatting.swift */; };
 		70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */; };
@@ -63,6 +64,7 @@
 		9602D7532DE04DFA8294ACAE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		96AFA05E28920F297646C677 /* CompanyAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyAvatar.swift; sourceTree = "<group>"; };
 		99D7628D8C499839405F0CB0 /* EditSubscriptionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSubscriptionSheet.swift; sourceTree = "<group>"; };
+		B6A29A143D9B48D108DC5712 /* EntityHomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EntityHomeView.swift; sourceTree = "<group>"; };
 		BB13F6178324168ED9317DB1 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
 		C1CA7408BE63B84A63BABDB8 /* Date+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Formatting.swift"; sourceTree = "<group>"; };
 		C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDocument.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 				556340A3A5DAA4657EC93B4C /* CompanyDetailView.swift */,
 				186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */,
 				D79281FD54DCDB57245A6AF0 /* CompanyMetaSheet.swift */,
+				B6A29A143D9B48D108DC5712 /* EntityHomeView.swift */,
 			);
 			path = Company;
 			sourceTree = "<group>";
@@ -329,6 +332,7 @@
 				371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */,
 				C3936073425DB658A729D2FC /* CompanyMetaSheet.swift in Sources */,
 				2FBF284B0EA19D8F3421C6E7 /* AddAccountSheet.swift in Sources */,
+				5AF73D3FFD2596CC379EBE93 /* EntityHomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

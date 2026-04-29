@@ -9,8 +9,9 @@ struct EditCompanySheet: View {
     var company: Company?
 
     @State private var name: String = ""
-    @State private var structure: String = "LLC"
-    @State private var colorHex: String = "#4f46e5"
+    @State private var structure: String = "Individual"
+    @State private var entityCategory: String = "Personal"
+    @State private var colorHex: String = "#000000"
     @State private var website: String = ""
     @State private var logoData: Data? = nil
     @State private var selectedPhoto: PhotosPickerItem? = nil
@@ -51,6 +52,19 @@ struct EditCompanySheet: View {
                         }
                         .frame(width: 76, height: 76)
                         .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .onTapGesture {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            let colors = Company.brandColors
+                            if let currentIndex = colors.firstIndex(of: colorHex) {
+                                let nextIndex = (currentIndex + 1) % colors.count
+                                withAnimation(.spring(response: 0.3)) {
+                                    colorHex = colors[nextIndex]
+                                }
+                            } else {
+                                colorHex = colors.first ?? "#000000"
+                            }
+                            logoData = nil // tapping color box clears logo to show color
+                        }
                         
                         formSection {
                             ZifrField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
@@ -89,51 +103,55 @@ struct EditCompanySheet: View {
                     }
                     .fixedSize(horizontal: false, vertical: true) // forces HStack to adhere to formSection's natural height
 
-                    // Structure picker
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("ENTITY STRUCTURE")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
-                            .padding(.horizontal, 4)
-                        Picker("", selection: $structure) {
-                            ForEach(Company.structures, id: \.self) { s in
-                                Text(s).tag(s)
+                    // Entity Category & Structure
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Category Picker (Personal vs Business)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("ENTITY CATEGORY")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .padding(.horizontal, 4)
+                            
+                            Picker("", selection: $entityCategory) {
+                                Text("Personal").tag("Personal")
+                                Text("Business").tag("Business")
                             }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(height: 120)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                        .clipped()
-                    }
-
-                    // Color picker
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("IDENTITY COLOR")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
-                            .padding(.horizontal, 4)
-                        HStack(spacing: 10) {
-                            ForEach(Company.brandColors, id: \.self) { hex in
-                                Button {
-                                    colorHex = hex
-                                    logoData = nil
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                } label: {
-                                    Circle()
-                                        .fill(Color(hex: hex))
-                                        .frame(width: 32, height: 32)
-                                        .overlay(
-                                            Circle().stroke(Color.white.opacity(0.5), lineWidth: colorHex == hex && logoData == nil ? 2 : 0)
-                                        )
-                                        .scaleEffect(colorHex == hex && logoData == nil ? 1.15 : 1)
-                                        .animation(.spring(response: 0.3), value: colorHex)
+                            .pickerStyle(.segmented)
+                            .onChange(of: entityCategory) { _, newValue in
+                                // Reset structure when category changes
+                                if newValue == "Personal" {
+                                    structure = "Individual"
+                                } else {
+                                    structure = "LLC"
                                 }
                             }
                         }
-                        .padding(.horizontal, 4)
+
+                        // Structure picker (Wheel)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("ENTITY STRUCTURE")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .padding(.horizontal, 4)
+                            
+                            Picker("", selection: $structure) {
+                                if entityCategory == "Personal" {
+                                    Text("Household").tag("Household")
+                                    Text("Individual").tag("Individual")
+                                } else {
+                                    ForEach(Company.structures.filter { $0 != "Personal" && $0 != "Household" && $0 != "Individual" }, id: \.self) { s in
+                                        Text(s).tag(s)
+                                    }
+                                }
+                            }
+                            .pickerStyle(.wheel)
+                            .frame(height: 120)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(hex: "#111111"))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .clipped()
+                        }
                     }
 
                     VStack(spacing: 30) {
@@ -264,6 +282,7 @@ struct EditCompanySheet: View {
         if let c = company {
             return name != c.name ||
                    structure != c.structure ||
+                   entityCategory != ( (c.structure == "Individual" || c.structure == "Household") ? "Personal" : "Business" ) ||
                    colorHex != c.colorHex ||
                    website != c.website ||
                    logoData != c.logoData
@@ -276,6 +295,7 @@ struct EditCompanySheet: View {
         guard let c = company else { return }
         name = c.name
         structure = c.structure
+        entityCategory = (c.structure == "Individual" || c.structure == "Household") ? "Personal" : "Business"
         colorHex = c.colorHex
         website = c.website
         logoData = c.logoData

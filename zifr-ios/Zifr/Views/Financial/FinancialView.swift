@@ -27,6 +27,62 @@ struct FinancialView: View {
 
                     Menu {
                         Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            print("Triggering CloudKit Sharing for All Financials")
+                        } label: {
+                            Label("All Financials", systemImage: "folder.badge.person.crop")
+                        }
+                        
+                        Divider()
+                        
+                        if !institutions.isEmpty {
+                            Section("Institutions") {
+                                ForEach(institutions) { inst in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(inst.name)")
+                                    } label: {
+                                        Label(inst.name.isEmpty ? "Institution" : inst.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                            }
+                        }
+                        if !cards.isEmpty {
+                            Section("Cards") {
+                                ForEach(cards) { card in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(card.name)")
+                                    } label: {
+                                        Label(card.name.isEmpty ? "Card" : card.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                            }
+                        }
+                        if !loans.isEmpty {
+                            Section("Loans") {
+                                ForEach(loans) { loan in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(loan.name)")
+                                    } label: {
+                                        Label(loan.name.isEmpty ? "Loan" : loan.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.blue)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                    }
+
+                    Menu {
+                        Button {
                             newInst = vm.addInstitution(context: context, companyId: company.id)
                         } label: {
                             Label("Add Account", systemImage: "building.columns")
@@ -45,7 +101,7 @@ struct FinancialView: View {
                         }
                     } label: {
                         HStack(spacing: 6) {
-                            Text("+ ADD").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("ADD ACCOUNT").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
                             Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         }
                         .padding(.horizontal, 20)

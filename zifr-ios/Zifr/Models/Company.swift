@@ -51,7 +51,7 @@ extension Company {
     static let structures = [
         "LLC", "S-Corp", "C-Corp", "Small Business",
         "Sole Proprietorship", "Partnership",
-        "Holding Company", "Non-Profit", "Personal", "Other"
+        "Holding Company", "Non-Profit", "Household", "Individual", "Other"
     ]
 
     static let brandColors = [

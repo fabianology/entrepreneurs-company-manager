@@ -7,20 +7,23 @@ import Observation
 final class AppViewModel {
     // MARK: - Navigation State
     var selectedCompany: Company?
-    var activeTab: CompanyTab = .subscriptions
+    var activeTab: CompanyTab = .home
     var searchQuery: String = ""
     var showSearch: Bool = false
     var quote: String = ""
     var deepLinkModelId: String? = nil
     var path = NavigationPath()
+    var startWithCommandCenter: Bool = false
 
     enum CompanyTab: String, CaseIterable {
+        case home = "Home"
         case subscriptions = "Services"
         case financial = "Financial"
         case documents = "Docs"
 
         var icon: String {
             switch self {
+            case .home:          return "square.grid.2x2"
             case .subscriptions: return "square.3.layers.3d"
             case .financial:     return "dollarsign.bank.building"
             case .documents:     return "doc.text"

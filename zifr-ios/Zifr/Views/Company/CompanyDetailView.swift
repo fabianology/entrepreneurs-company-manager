@@ -45,7 +45,7 @@ struct CompanyDetailView: View {
         return filtered.filter { $0.name.lowercased().contains(q) }
     }
 
-    @State private var showCompanyMeta = false
+    @State private var showCommandCenter = false
     @State private var showEditCompany = false
     @State private var dragOffset: CGFloat = 0
     @State private var swipeHandled = false
@@ -67,16 +67,48 @@ struct CompanyDetailView: View {
                 .padding(.bottom, 24)
                 
             // ── Content ──────────────────────────────────────────────────
-            Group {
+            ZStack(alignment: .top) {
                 switch vm.activeTab {
-                case .subscriptions:
+                case .subscriptions, .home:
                     SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
                 case .financial:
                     FinancialView(company: company, cards: cards, institutions: institutions, loans: loans, vm: vm)
                 case .documents:
                     DocumentListView(company: company, documents: documents, vm: vm)
                 }
+                
+                if showCommandCenter {
+                    EntityHomeView(
+                        company: company,
+                        subscriptions: subscriptions,
+                        cards: cards,
+                        institutions: institutions,
+                        loans: loans,
+                        documents: documents,
+                        allCompanies: allCompanies,
+                        allSubscriptions: allSubscriptions,
+                        allCards: allCards,
+                        allLoans: allLoans,
+                        vm: vm
+                    )
+                    .background(Color.black)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .zIndex(1)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 30, coordinateSpace: .local)
+                            .onEnded { value in
+                                let transY = value.translation.height
+                                let predictedY = value.predictedEndTranslation.height
+                                // Hard swipe up
+                                if transY < -50 && predictedY < -400 {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = false }
+                                }
+                            }
+                    )
+                }
             }
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandCenter)
         }
         .background(Color.black)
         .navigationBarTitleDisplayMode(.inline)
@@ -151,10 +183,11 @@ struct CompanyDetailView: View {
 
                     // Tab Controls (Pages icons) aligned to the right
                     HStack(spacing: 28) { // Distributed equally
-                        ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
+                        ForEach(AppViewModel.CompanyTab.allCases.filter { $0 != .home }, id: \.self) { tab in
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 vm.activeTab = tab
+                                showCommandCenter = false
                                 tabBounces[tab, default: 0] += 1
                             } label: {
                                 if tab == .financial {
@@ -199,17 +232,21 @@ struct CompanyDetailView: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         
                         if transX > 0 {
-                            // Swipe Left to Right
-                            if vm.activeTab == .financial {
+                            // Swipe Left to Right (Go Back / Open Command Center)
+                            if showCommandCenter {
+                                dismiss()
+                            } else if vm.activeTab == .subscriptions {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = true }
+                            } else if vm.activeTab == .financial {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
                             } else if vm.activeTab == .documents {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
-                            } else if vm.activeTab == .subscriptions {
-                                dismiss()
                             }
                         } else {
-                            // Swipe Right to Left (Go Forward)
-                            if vm.activeTab == .subscriptions {
+                            // Swipe Right to Left (Go Forward / Close Command Center)
+                            if showCommandCenter {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = false }
+                            } else if vm.activeTab == .subscriptions {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
                             } else if vm.activeTab == .financial {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .documents }
@@ -222,6 +259,12 @@ struct CompanyDetailView: View {
                 }
         )
         .navigationBarBackButtonHidden(true)
+        .onAppear {
+            if vm.startWithCommandCenter {
+                showCommandCenter = true
+                vm.startWithCommandCenter = false
+            }
+        }
     }
 
     // MARK: - Company Header (mirrors CiFr's CompanyHeader.tsx)
@@ -234,44 +277,21 @@ struct CompanyDetailView: View {
                 // Company name — 28pt bold, matches CiFr
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    showCompanyMeta = true
+                    showCommandCenter.toggle()
                 } label: {
                     HStack(spacing: 8) {
                         Text(company.name.isEmpty ? "Company" : company.name)
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Image(systemName: "chevron.down")
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(.white.opacity(0.5))
-                            .rotationEffect(.degrees(showCompanyMeta ? 180 : 0))
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showCompanyMeta)
+                            .rotationEffect(.degrees(showCommandCenter ? 90 : 0))
+                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showCommandCenter)
                     }
                 }
                 .buttonStyle(.plain)
-                .background(alignment: .top) {
-                    if showCompanyMeta {
-                        Circle()
-                            .fill(Color.black.opacity(0.85))
-                            .frame(width: 400, height: 400)
-                            .blur(radius: 60)
-                            .offset(y: 40)
-                            .allowsHitTesting(false)
-                            .transition(.opacity)
-                    }
-                }
-                .popover(isPresented: $showCompanyMeta, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-                    CompanyMetaSheet(
-                        company: company,
-                        subscriptions: subscriptions,
-                        institutions: institutions,
-                        cards: cards,
-                        loans: loans,
-                        documents: documents
-                    )
-                    .frame(width: 360, height: 580)
-                    .presentationCompactAdaptation(.popover)
-                }
 
                 // Dynamic metrics sub-line per tab
                 metricSubLine
@@ -283,7 +303,7 @@ struct CompanyDetailView: View {
     @ViewBuilder
     private var metricSubLine: some View {
         switch vm.activeTab {
-        case .subscriptions:
+        case .subscriptions, .home:
             let active = subscriptions.filter { $0.status == "Active" }
             let moTotal = active.reduce(0.0) { $0 + $1.monthlyTotal }
             let yrTotal = active.reduce(0.0) { $0 + $1.yearlyTotal }
@@ -346,6 +366,7 @@ struct CompanyDetailView: View {
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
         switch tab {
+        case .home:          return Color.white.opacity(0.85)
         case .subscriptions: return Color(hex: "#2070BD")
         case .financial:     return Color(hex: "#1A7077")
         case .documents:     return Color(hex: "#918457")

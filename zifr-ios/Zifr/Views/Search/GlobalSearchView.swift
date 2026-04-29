@@ -402,6 +402,7 @@ struct GlobalSearchView: View {
             vm.selectedCompany = company
             vm.activeTab = result.tab
             vm.deepLinkModelId = result.modelId
+            vm.startWithCommandCenter = (result.type == .company)
             vm.path.append(company)
         }
         vm.searchQuery = ""
