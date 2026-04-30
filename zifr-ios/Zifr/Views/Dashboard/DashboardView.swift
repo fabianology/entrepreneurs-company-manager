@@ -75,21 +75,18 @@ struct DashboardView: View {
                         onViewSubscriptions: {
                             vm.selectedCompany = company
                             vm.activeTab = .subscriptions
-                            vm.startWithCommandCenter = false
                             vm.touchCompany(company, context: context)
                             vm.path.append(company)
                         },
                         onViewFinancials: {
                             vm.selectedCompany = company
                             vm.activeTab = .financial
-                            vm.startWithCommandCenter = false
                             vm.touchCompany(company, context: context)
                             vm.path.append(company)
                         },
                         onViewDocuments: {
                             vm.selectedCompany = company
                             vm.activeTab = .documents
-                            vm.startWithCommandCenter = false
                             vm.touchCompany(company, context: context)
                             vm.path.append(company)
                         }
@@ -97,8 +94,7 @@ struct DashboardView: View {
                     .onTapGesture {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         vm.selectedCompany = company
-                        vm.activeTab = .financial
-                        vm.startWithCommandCenter = true
+                        vm.activeTab = .home
                         vm.touchCompany(company, context: context)
                         vm.path.append(company)
                     }

@@ -45,11 +45,8 @@ struct CompanyDetailView: View {
         return filtered.filter { $0.name.lowercased().contains(q) }
     }
 
-    @State private var showCommandCenter = false
     @State private var showEditCompany = false
-    @State private var dragOffset: CGFloat = 0
     @State private var swipeHandled = false
-    
     @State private var tabBounces: [AppViewModel.CompanyTab: Int] = [:]
     @State private var searchBounce: Int = 0
 
@@ -69,15 +66,7 @@ struct CompanyDetailView: View {
             // ── Content ──────────────────────────────────────────────────
             ZStack(alignment: .top) {
                 switch vm.activeTab {
-                case .subscriptions, .home:
-                    SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
-                case .financial:
-                    FinancialView(company: company, cards: cards, institutions: institutions, loans: loans, vm: vm)
-                case .documents:
-                    DocumentListView(company: company, documents: documents, vm: vm)
-                }
-                
-                if showCommandCenter {
+                case .home:
                     EntityHomeView(
                         company: company,
                         subscriptions: subscriptions,
@@ -91,24 +80,14 @@ struct CompanyDetailView: View {
                         allLoans: allLoans,
                         vm: vm
                     )
-                    .background(Color.black)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .zIndex(1)
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 30, coordinateSpace: .local)
-                            .onEnded { value in
-                                let transY = value.translation.height
-                                let predictedY = value.predictedEndTranslation.height
-                                // Hard swipe up
-                                if transY < -50 && predictedY < -400 {
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = false }
-                                }
-                            }
-                    )
+                case .subscriptions:
+                    SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
+                case .financial:
+                    FinancialView(company: company, cards: cards, institutions: institutions, loans: loans, vm: vm)
+                case .documents:
+                    DocumentListView(company: company, documents: documents, vm: vm)
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showCommandCenter)
         }
         .background(Color.black)
         .navigationBarTitleDisplayMode(.inline)
@@ -183,11 +162,10 @@ struct CompanyDetailView: View {
 
                     // Tab Controls (Pages icons) aligned to the right
                     HStack(spacing: 28) { // Distributed equally
-                        ForEach(AppViewModel.CompanyTab.allCases.filter { $0 != .home }, id: \.self) { tab in
+                        ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 vm.activeTab = tab
-                                showCommandCenter = false
                                 tabBounces[tab, default: 0] += 1
                             } label: {
                                 if tab == .financial {
@@ -196,6 +174,22 @@ struct CompanyDetailView: View {
                                         .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
                                         .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
                                         .frame(width: 32, height: 44)
+                                } else if tab == .home {
+                                    if #available(iOS 18.0, *) {
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                            .symbolRenderingMode(vm.activeTab == tab ? .palette : .monochrome)
+                                            .foregroundStyle(vm.activeTab == tab ? Color(hex: "#7f1d25") : .secondary, vm.activeTab == tab ? .white : .secondary)
+                                            .symbolEffect(.wiggle, value: tabBounces[tab, default: 0])
+                                            .frame(width: 32, height: 44)
+                                    } else {
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                            .symbolRenderingMode(vm.activeTab == tab ? .palette : .monochrome)
+                                            .foregroundStyle(vm.activeTab == tab ? Color(hex: "#7f1d25") : .secondary, vm.activeTab == tab ? .white : .secondary)
+                                            .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                            .frame(width: 32, height: 44)
+                                    }
                                 } else {
                                     Image(systemName: tab.icon)
                                         .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
@@ -232,20 +226,20 @@ struct CompanyDetailView: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         
                         if transX > 0 {
-                            // Swipe Left to Right (Go Back / Open Command Center)
-                            if showCommandCenter {
+                            // Swipe Left to Right (Go Back)
+                            if vm.activeTab == .home {
                                 dismiss()
                             } else if vm.activeTab == .subscriptions {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = true }
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .home }
                             } else if vm.activeTab == .financial {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
                             } else if vm.activeTab == .documents {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
                             }
                         } else {
-                            // Swipe Right to Left (Go Forward / Close Command Center)
-                            if showCommandCenter {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = false }
+                            // Swipe Right to Left (Go Forward)
+                            if vm.activeTab == .home {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
                             } else if vm.activeTab == .subscriptions {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
                             } else if vm.activeTab == .financial {
@@ -259,12 +253,7 @@ struct CompanyDetailView: View {
                 }
         )
         .navigationBarBackButtonHidden(true)
-        .onAppear {
-            if vm.startWithCommandCenter {
-                showCommandCenter = true
-                vm.startWithCommandCenter = false
-            }
-        }
+
     }
 
     // MARK: - Company Header (mirrors CiFr's CompanyHeader.tsx)
@@ -275,23 +264,10 @@ struct CompanyDetailView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 // Company name — 28pt bold, matches CiFr
-                Button {
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    showCommandCenter.toggle()
-                } label: {
-                    HStack(spacing: 8) {
-                        Text(company.name.isEmpty ? "Company" : company.name)
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.5))
-                            .rotationEffect(.degrees(showCommandCenter ? 90 : 0))
-                            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showCommandCenter)
-                    }
-                }
-                .buttonStyle(.plain)
+                Text(company.name.isEmpty ? "Company" : company.name)
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
 
                 // Dynamic metrics sub-line per tab
                 metricSubLine

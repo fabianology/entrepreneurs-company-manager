@@ -103,38 +103,38 @@ struct EditCompanySheet: View {
                     }
                     .fixedSize(horizontal: false, vertical: true) // forces HStack to adhere to formSection's natural height
 
-                    // Entity Category & Structure
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Category Picker (Personal vs Business)
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("ENTITY CATEGORY")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                                .padding(.horizontal, 4)
-                            
-                            Picker("", selection: $entityCategory) {
-                                Text("Personal").tag("Personal")
-                                Text("Business").tag("Business")
-                            }
-                            .pickerStyle(.segmented)
-                            .onChange(of: entityCategory) { _, newValue in
-                                // Reset structure when category changes
-                                if newValue == "Personal" {
-                                    structure = "Individual"
-                                } else {
-                                    structure = "LLC"
-                                }
+                    // Entity Category
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ENTITY CATEGORY")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .padding(.horizontal, 4)
+                        
+                        Picker("", selection: $entityCategory) {
+                            Text("Personal").tag("Personal")
+                            Text("Business").tag("Business")
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: entityCategory) { _, newValue in
+                            // Reset structure when category changes
+                            if newValue == "Personal" {
+                                structure = "Individual"
+                            } else {
+                                structure = "LLC"
                             }
                         }
+                    }
 
-                        // Structure picker (Wheel)
+                    // Structure & Tutorial side-by-side
+                    HStack(alignment: .bottom, spacing: 12) {
+                        // Structure picker
                         VStack(alignment: .leading, spacing: 8) {
                             Text("ENTITY STRUCTURE")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.5))
                                 .padding(.horizontal, 4)
                             
-                            Picker("", selection: $structure) {
+                            Picker("Select Structure", selection: $structure) {
                                 if entityCategory == "Personal" {
                                     Text("Household").tag("Household")
                                     Text("Individual").tag("Individual")
@@ -144,14 +144,42 @@ struct EditCompanySheet: View {
                                     }
                                 }
                             }
-                            .pickerStyle(.wheel)
-                            .frame(height: 120)
-                            .frame(maxWidth: .infinity)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                            .clipped()
+                            .pickerStyle(.menu)
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
+                        .frame(maxWidth: .infinity)
+
+                        // Tutorial Button
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("HELP & GUIDE")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .padding(.horizontal, 4)
+
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "play.circle")
+                                        .font(.system(size: 14))
+                                    Text("Tutorial")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color.black)
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.2), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
 
                     VStack(spacing: 30) {
@@ -175,23 +203,7 @@ struct EditCompanySheet: View {
                             }
                         }
 
-                        // Tutorial
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "play.circle")
-                                Text("Tutorial")
-                            }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 44)
-                            .background(Color.black)
-                            .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            .clipShape(RoundedRectangle(cornerRadius: 22))
-                        }
-                        .buttonStyle(.plain)
+
 
                         // Share Entity
                         if isEditing {
