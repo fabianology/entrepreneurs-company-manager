@@ -21,14 +21,11 @@ struct DocumentListView: View {
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 24) {
-                // Add button row
-                HStack(spacing: 12) {
-                    LiquidGlassButtonContainer(
-                        title: "DOCUMENT",
-                        onAdd: {
-                            newDoc = vm.addDocument(context: context, companyId: company.id)
-                        }
-                    ) {
+                // ── Action Bar ──
+                HStack(spacing: 8) {
+                    Spacer()
+
+                    Menu {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             print("Triggering CloudKit Sharing for All Documents")
@@ -36,18 +33,42 @@ struct DocumentListView: View {
                             Label("All Documents", systemImage: "folder.badge.person.crop")
                         }
                         
-                        Divider()
-                        
-                        ForEach(documents) { doc in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                print("Triggering CloudKit Sharing for \(doc.name)")
-                            } label: {
-                                Label(doc.name.isEmpty ? "Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
+                        if !documents.isEmpty {
+                            Divider()
+                            Section("Documents") {
+                                ForEach(documents) { doc in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(doc.name)")
+                                    } label: {
+                                        Label(doc.name.isEmpty ? "Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
                             }
                         }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.gray)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
-                    Spacer()
+
+                    Button {
+                        newDoc = vm.addDocument(context: context, companyId: company.id)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("ADD DOCUMENT").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Image(systemName: "plus").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        }
+                        .padding(.horizontal, 20)
+                        .frame(height: 36)
+                        .background(Color(hex: "#171717"))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    }
                 }
                 .padding(.horizontal, 20)
 

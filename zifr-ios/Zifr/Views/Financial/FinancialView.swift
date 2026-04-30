@@ -74,7 +74,7 @@ struct FinancialView: View {
                     } label: {
                         Image(systemName: "square.and.arrow.up")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(.gray)
                             .frame(width: 36, height: 36)
                             .background(.ultraThinMaterial)
                             .clipShape(Circle())
@@ -2003,6 +2003,7 @@ struct EditCardSheet: View {
     let cards: [FinancialCard]
     let isNew: Bool
     var isInstitutionContext: Bool = false
+    var customTitle: String? = nil
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
@@ -2284,21 +2285,25 @@ struct EditCardSheet: View {
                     Text("PAID ON")
                         .font(.system(size: 11, weight: .bold))
                         .foregroundStyle(Color.white.opacity(0.5))
-                    Picker("", selection: paidOnBinding) {
-                        ForEach(1...31, id: \.self) { day in
-                            Text(ordinal(day)).tag(day)
+                    HStack {
+                        Picker("", selection: paidOnBinding) {
+                            ForEach(1...31, id: \.self) { day in
+                                Text(ordinal(day)).tag(day)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .tint(.white)
+                        Spacer()
                     }
-                    .labelsHidden()
                     .padding(.leading, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 44)
                     .background(Color(hex: "#111111"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    .contentShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .frame(width: (geo.size.width - 12) * 0.4)
             }
         }
@@ -2682,7 +2687,7 @@ struct EditCardSheet: View {
                 }
                 if snapshot == nil { snapshot = currentSnapshot }
             }
-            .navigationTitle(isNew ? "New Card" : card.name)
+            .navigationTitle(customTitle ?? (isNew ? "New Card" : card.name))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -2795,21 +2800,26 @@ struct EditCardSheet: View {
             Text(label)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.5))
-            Picker("", selection: sel) {
-                ForEach(opts, id: \.self) { t in
-                    Text(t).tag(t)
+            HStack {
+                Picker("", selection: sel) {
+                    ForEach(opts, id: \.self) { t in
+                        Text(t).tag(t)
+                    }
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .tint(.white)
+                
+                Spacer()
             }
-            .labelsHidden()
             .padding(.leading, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
             .background(Color(hex: "#111111"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
     }
 
     private func moneyField(label: String, value: Binding<Double>) -> some View {
@@ -3069,21 +3079,26 @@ struct EditLoanSheet: View {
             Text(label)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.5))
-            Picker("", selection: sel) {
-                ForEach(opts, id: \.self) { t in
-                    Text(t).tag(t)
+            HStack {
+                Picker("", selection: sel) {
+                    ForEach(opts, id: \.self) { t in
+                        Text(t).tag(t)
+                    }
                 }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .tint(.white)
+                
+                Spacer()
             }
-            .labelsHidden()
             .padding(.leading, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
             .background(Color(hex: "#111111"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-            .contentShape(RoundedRectangle(cornerRadius: 14))
         }
-        .buttonStyle(.borderless)
+        .buttonStyle(.plain)
     }
 
     private func datePicker(label: String, selection: Binding<Date>) -> some View {

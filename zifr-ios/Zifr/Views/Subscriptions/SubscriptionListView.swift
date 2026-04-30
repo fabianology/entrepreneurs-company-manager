@@ -18,31 +18,54 @@ struct SubscriptionListView: View {
         ScrollViewReader { proxy in
             ScrollView {
             LazyVStack(spacing: 0) {
-                // Add button row — exact CiFr style
-                HStack(spacing: 12) {
-                    LiquidGlassButtonContainer(
-                        title: "SERVICE",
-                        onAdd: {
-                            newSub = vm.addSubscription(context: context, companyId: company.id)
-                        }
-                    ) {
+                // ── Action Bar ──
+                HStack(spacing: 8) {
+                    Spacer()
+
+                    Menu {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             print("Triggering CloudKit Sharing for All Subscriptions")
                         } label: {
                             Label("All Subscriptions", systemImage: "folder.badge.person.crop")
                         }
-                        Divider()
-                        ForEach(subscriptions) { sub in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                print("Triggering CloudKit Sharing for \(sub.name)")
-                            } label: {
-                                Label(sub.name.isEmpty ? "Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
+                        
+                        if !subscriptions.isEmpty {
+                            Divider()
+                            Section("Subscriptions") {
+                                ForEach(subscriptions) { sub in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        print("Triggering CloudKit Sharing for \(sub.name)")
+                                    } label: {
+                                        Label(sub.name.isEmpty ? "Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
                             }
                         }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.gray)
+                            .frame(width: 36, height: 36)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                     }
-                    Spacer()
+
+                    Button {
+                        newSub = vm.addSubscription(context: context, companyId: company.id)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("ADD SERVICE").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                            Image(systemName: "plus").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        }
+                        .padding(.horizontal, 20)
+                        .frame(height: 36)
+                        .background(Color(hex: "#171717"))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)

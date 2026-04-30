@@ -116,7 +116,7 @@ struct CompanyDetailView: View {
                                     
                                     dismiss()
                                 } label: {
-                                    Label("MILOOM", systemImage: "square.grid.2x2")
+                                    Label("Dashboard", systemImage: "square.grid.2x2")
                                 }
                             }
                             
@@ -175,21 +175,11 @@ struct CompanyDetailView: View {
                                         .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
                                         .frame(width: 32, height: 44)
                                 } else if tab == .home {
-                                    if #available(iOS 18.0, *) {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                            .symbolRenderingMode(vm.activeTab == tab ? .palette : .monochrome)
-                                            .foregroundStyle(vm.activeTab == tab ? Color(hex: "#7f1d25") : .secondary, vm.activeTab == tab ? .white : .secondary)
-                                            .symbolEffect(.wiggle, value: tabBounces[tab, default: 0])
-                                            .frame(width: 32, height: 44)
-                                    } else {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                            .symbolRenderingMode(vm.activeTab == tab ? .palette : .monochrome)
-                                            .foregroundStyle(vm.activeTab == tab ? Color(hex: "#7f1d25") : .secondary, vm.activeTab == tab ? .white : .secondary)
-                                            .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                            .frame(width: 32, height: 44)
-                                    }
+                                    Image(systemName: tab.icon)
+                                        .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                        .foregroundStyle(vm.activeTab == tab ? .white : .secondary)
+                                        .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                        .frame(width: 32, height: 44)
                                 } else {
                                     Image(systemName: tab.icon)
                                         .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
@@ -279,7 +269,13 @@ struct CompanyDetailView: View {
     @ViewBuilder
     private var metricSubLine: some View {
         switch vm.activeTab {
-        case .subscriptions, .home:
+        case .home:
+            Text("COMMAND CENTER")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.6))
+                .tracking(2)
+
+        case .subscriptions:
             let active = subscriptions.filter { $0.status == "Active" }
             let moTotal = active.reduce(0.0) { $0 + $1.monthlyTotal }
             let yrTotal = active.reduce(0.0) { $0 + $1.yearlyTotal }

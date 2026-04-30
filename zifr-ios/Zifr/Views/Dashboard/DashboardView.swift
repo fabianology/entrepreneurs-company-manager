@@ -30,13 +30,11 @@ struct DashboardView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 40)
 
-                    HStack {
-                        LiquidGlassButtonContainer(
-                            title: "ENTITY",
-                            onAdd: {
-                                showAddCompany = true
-                            }
-                        ) {
+                    HStack(spacing: 8) {
+                        Spacer()
+                        
+                        // Share Button
+                        Menu {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 // Future cloudkit sharing
@@ -52,11 +50,30 @@ struct DashboardView: View {
                                     Label(company.name.isEmpty ? "Entity" : company.name, systemImage: "building.2")
                                 }
                             }
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.gray)
+                                .frame(width: 36, height: 36)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                         }
-                        Spacer()
-                        Text("MILOOM")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.4))
+                        
+                        // Add Button
+                        Button {
+                            showAddCompany = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("ADD ENTITY").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                                Image(systemName: "plus").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                            }
+                            .padding(.horizontal, 20)
+                            .frame(height: 36)
+                            .background(Color(hex: "#171717"))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        }
                     }
                     .padding(.bottom, 16)
                 }
@@ -291,11 +308,6 @@ struct DashboardView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 50)
-            } else {
-                Text("MILOOM")
-                    .font(.system(size: 42, weight: .black))
-                    .foregroundStyle(.white)
-                    .tracking(-1)
             }
 
             if !vm.quote.isEmpty {

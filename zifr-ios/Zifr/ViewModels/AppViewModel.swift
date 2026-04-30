@@ -22,7 +22,7 @@ final class AppViewModel {
 
         var icon: String {
             switch self {
-            case .home:          return "dot.crosshair"
+            case .home:          return "circle.grid.3x3.fill"
             case .subscriptions: return "square.3.layers.3d"
             case .financial:     return "dollarsign.bank.building"
             case .documents:     return "doc.text"

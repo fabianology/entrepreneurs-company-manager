@@ -14,7 +14,7 @@ struct EntityHomeView: View {
     let allLoans: [Loan]
     @Bindable var vm: AppViewModel
 
-    // MARK: – Design Tokens
+    // MARK: - Design Tokens
     private let darkSurface = Color(hex: "#1c1c1e")
     private let dimSurface  = Color(hex: "#141414")
     private let subsColor   = Color(hex: "#2070BD")
@@ -22,7 +22,17 @@ struct EntityHomeView: View {
     private let docsColor   = Color(hex: "#918457")
     private let homeColor   = Color.white.opacity(0.85)
 
-    // MARK: – Computed Metrics (Subscriptions)
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var expandedInstitutions: Set<String> = []
+    @State private var expandedCategories: Set<String> = []
+    
+    // Quick Add States
+    @State private var newSub: Subscription? = nil
+    @State private var newCard: FinancialCard? = nil
+    @State private var newDoc: CompanyDocument? = nil
+
+    // MARK: - Computed Metrics (Subscriptions)
     private var activeSubscriptions: [Subscription] { subscriptions.filter { $0.status == "Active" } }
     private var monthlyBurn: Double {
         activeSubscriptions.reduce(0.0) { acc, sub in
@@ -31,19 +41,8 @@ struct EntityHomeView: View {
             return acc + base + extras
         }
     }
-    private var yearlyBurn: Double { monthlyBurn * 12 }
-    private var freeCount: Int { subscriptions.filter { $0.isFree }.count }
-    private var pausedCount: Int { subscriptions.filter { $0.status == "Paused" }.count }
-    private var cancelledCount: Int { subscriptions.filter { $0.status == "Cancelled" }.count }
-    private var topCostliest: [(String, Double)] {
-        activeSubscriptions
-            .map { ($0.name, $0.billingCycle == "Monthly" ? $0.cost : $0.cost / 12) }
-            .sorted { $0.1 > $1.1 }
-            .prefix(3)
-            .map { ($0.0, $0.1) }
-    }
-
-    // MARK: – Computed Metrics (Financial)
+    
+    // MARK: - Computed Metrics (Financial)
     private var creditCards: [FinancialCard] { cards.filter { $0.type == "Credit" } }
     private var totalDebt: Double {
         loans.filter { $0.role == "Bank Loan" }.reduce(0) { $0 + $1.remainingBalance }
@@ -56,11 +55,6 @@ struct EntityHomeView: View {
         guard totalCreditLimit > 0 else { return 0 }
         return totalCreditUsed / totalCreditLimit
     }
-    private var loanDebt: Double { loans.filter { $0.role == "Bank Loan" }.reduce(0) { $0 + $1.remainingBalance } }
-    private var owedToMe: Double { loans.filter { $0.role == "I'm Lending" }.reduce(0) { $0 + $1.remainingBalance } }
-    private var activePromos: Int {
-        creditCards.filter { $0.promoApr == 0 && $0.promoEnds > Date() }.count
-    }
     private var expiringPromos: [(String, Int)] {
         let thirtyDays = Date().addingTimeInterval(30 * 24 * 3600)
         return creditCards
@@ -71,7 +65,7 @@ struct EntityHomeView: View {
             }
     }
 
-    // MARK: – Computed Metrics (Documents)
+    // MARK: - Computed Metrics (Documents)
     private var docCategories: [String] {
         company.structure == "Personal"
         ? CompanyDocument.personalTypes
@@ -80,34 +74,7 @@ struct EntityHomeView: View {
     private var coveredCategories: Set<String> { Set(documents.map(\.type)) }
     private var categoryCoverage: Int { coveredCategories.intersection(docCategories).count }
 
-    // MARK: – Computed Metrics (Portfolio)
-    private var portfolioMonthlyBurn: Double {
-        allSubscriptions.filter { $0.status == "Active" }.reduce(0.0) { acc, sub in
-            let base = sub.billingCycle == "Monthly" ? sub.cost : sub.cost / 12
-            let extras = sub.subServices.filter { $0.status != .paused }.reduce(0.0) { $0 + $1.cost }
-            return acc + base + extras
-        }
-    }
-    private var portfolioSharePercent: Double {
-        guard portfolioMonthlyBurn > 0 else { return 0 }
-        return (monthlyBurn / portfolioMonthlyBurn) * 100
-    }
-    private var burnRank: Int {
-        let ranked = allCompanies.sorted { c1, c2 in
-            entityBurn(c1) > entityBurn(c2)
-        }
-        return (ranked.firstIndex(where: { $0.id == company.id }) ?? 0) + 1
-    }
-
-    private func entityBurn(_ c: Company) -> Double {
-        allSubscriptions.filter { $0.companyId == c.id && $0.status == "Active" }.reduce(0.0) { acc, sub in
-            let base = sub.billingCycle == "Monthly" ? sub.cost : sub.cost / 12
-            let extras = sub.subServices.filter { $0.status != .paused }.reduce(0.0) { $0 + $1.cost }
-            return acc + base + extras
-        }
-    }
-
-    // MARK: – Alerts
+    // MARK: - Alerts
     private var isZeroState: Bool {
         subscriptions.isEmpty && cards.isEmpty && institutions.isEmpty && loans.isEmpty && documents.isEmpty
     }
@@ -115,127 +82,114 @@ struct EntityHomeView: View {
     private var alerts: [HomeAlert] {
         var result: [HomeAlert] = []
 
-        // Promo APR expiring
         for (name, days) in expiringPromos {
-            result.append(HomeAlert(
-                icon: "exclamationmark.triangle.fill",
-                color: .orange,
-                text: "Promo APR on \(name) expires in \(days) days"
-            ))
+            result.append(HomeAlert(icon: "exclamationmark.triangle.fill", color: .orange, text: "Promo APR on \(name) expires in \(days) days"))
         }
 
-        // High credit utilization
         if creditUtilization > 0.7 && totalCreditLimit > 0 {
-            result.append(HomeAlert(
-                icon: "creditcard.trianglebadge.exclamationmark.fill",
-                color: .orange,
-                text: "Credit utilization at \(Int(creditUtilization * 100))%"
-            ))
+            result.append(HomeAlert(icon: "creditcard.trianglebadge.exclamationmark.fill", color: .orange, text: "Credit utilization at \(Int(creditUtilization * 100))%"))
         }
 
-        // Missing critical documents
         let criticalMissing = docCategories.filter { !coveredCategories.contains($0) && $0 != "Other" }
         if !criticalMissing.isEmpty {
-            result.append(HomeAlert(
-                icon: "doc.badge.clock.fill",
-                color: Color.white.opacity(0.5),
-                text: "\(criticalMissing.count) document \(criticalMissing.count == 1 ? "category" : "categories") missing"
-            ))
+            result.append(HomeAlert(icon: "doc.badge.clock.fill", color: Color.white.opacity(0.5), text: "\(criticalMissing.count) document \(criticalMissing.count == 1 ? "category" : "categories") missing"))
         }
 
-        // Stale entity
         let daysSinceModified = Calendar.current.dateComponents([.day], from: company.lastModified, to: Date()).day ?? 0
         if daysSinceModified > 90 {
-            result.append(HomeAlert(
-                icon: "clock.arrow.circlepath",
-                color: Color.white.opacity(0.4),
-                text: "Not updated in \(daysSinceModified) days"
-            ))
+            result.append(HomeAlert(icon: "clock.arrow.circlepath", color: Color.white.opacity(0.4), text: "Not updated in \(daysSinceModified) days"))
         }
 
         return result
     }
 
-    // MARK: – Body
+    // MARK: - Body
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 12) {
+        VStack(spacing: 0) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 32) {
+                    quickAddRow
+                        .padding(.top, 16)
+                    
+                    if isZeroState {
+                        zeroStateBanner
+                            .padding(.horizontal, 20)
+                    }
 
-                // ── ZONE 1: Vital Signs ──────────────────────────────
-                vitalSignsSection
+                    // FINANCIAL ACCORDION
+                    financialSection
 
-                // ── ZERO STATE BANNER ────────────────────────────────
-                if isZeroState {
-                    zeroStateBanner
+                    // SUBSCRIPTIONS (Timeline + Cards)
+                    subscriptionSection
+
+                    // DOCUMENTS ACCORDION
+                    documentSection
+                    
+                    Spacer().frame(height: 40)
                 }
-
-                // ── ZONE 2: Alerts ───────────────────────────────────
-                if !alerts.isEmpty {
-                    alertsSection
-                }
-
-                // ── ZONE 3: Cash Flow ────────────────────────────────
-                cashFlowCard
-
-                // ── ZONE 4: Financial Health ─────────────────────────
-                financialHealthCard
-
-                // ── ZONE 5: Document Vault ───────────────────────────
-                documentVaultCard
-
-                // ── ZONE 6: Portfolio Context ────────────────────────
-                if allCompanies.count > 1 {
-                    portfolioContextCard
-                }
-
-                Spacer().frame(height: 40)
             }
-            .padding(.horizontal, 20)
+            
+            HomeHeroView()
+                .padding(.bottom, 8)
         }
         .background(Color.black)
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zone 1: Vital Signs
-    // ══════════════════════════════════════════════════════════════════
-
-    private var vitalSignsSection: some View {
-        HStack(spacing: 8) {
-            vitalCube(top: formatCurrency(monthlyBurn), bottom: "BURN/MO")
-            vitalCube(top: formatCurrency(totalDebt), bottom: "TOTAL DEBT")
-            vitalCube(top: formatCurrency(availableCredit), bottom: "AVAIL CREDIT")
-            vitalCube(top: "\(documents.count)", bottom: "DOCUMENTS")
+        .sheet(item: $newSub) { sub in
+            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
+        }
+        .sheet(item: $newCard) { c in
+            EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: true, customTitle: "Add Account")
+        }
+        .sheet(item: $newDoc) { doc in
+            EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
     }
 
-    private func vitalCube(top: String, bottom: String, highlight: Color? = nil) -> some View {
-        VStack(spacing: 4) {
-            Text(top)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(highlight ?? .white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(bottom)
-                .font(.system(size: 8, weight: .black))
-                .foregroundStyle(Color.white.opacity(0.35))
-                .tracking(0.5)
-                .multilineTextAlignment(.center)
+    // MARK: - Shared Views
+    private var quickAddRow: some View {
+        HStack(spacing: 12) {
+            quickAddButton(icon: "square.3.layers.3d", title: "Add Service", color: subsColor) {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                newSub = vm.addSubscription(context: modelContext, companyId: company.id)
+            }
+            quickAddButton(icon: "dollarsign.bank.building", title: "Add Account", color: finColor) {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                newCard = vm.addCard(context: modelContext, companyId: company.id)
+            }
+            quickAddButton(icon: "doc.text", title: "Add Doc", color: docsColor) {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                newDoc = vm.addDocument(context: modelContext, companyId: company.id)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 68)
-        .background(darkSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 20)
     }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zero State Banner
-    // ══════════════════════════════════════════════════════════════════
+    
+    private func quickAddButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(color)
+                Text(title)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(Color(hex: "#111111"))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
 
     private var zeroStateBanner: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: "sparkles")
-                    .foregroundStyle(Color.zifrGold)
+                    .foregroundStyle(Color.zifrGreen)
                 Text("Command Center Active")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
@@ -249,434 +203,621 @@ struct EntityHomeView: View {
         .padding(16)
         .background(dimSurface)
         .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.zifrGold.opacity(0.2), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.zifrGreen.opacity(0.2), lineWidth: 1))
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zone 2: Alerts
-    // ══════════════════════════════════════════════════════════════════
 
-    private var alertsSection: some View {
-        VStack(spacing: 6) {
-            ForEach(alerts) { alert in
-                HStack(spacing: 10) {
-                    Image(systemName: alert.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(alert.color)
-                    Text(alert.text)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.75))
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(alert.color.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(alert.color.opacity(0.15), lineWidth: 1)
-                )
-            }
-        }
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zone 3: Cash Flow
-    // ══════════════════════════════════════════════════════════════════
-
-    private var cashFlowCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    // MARK: - Financial Section
+    private var financialSection: some View {
+        VStack(spacing: 0) {
             // Header
-            cardHeader(title: "CASH FLOW", icon: "square.3.layers.3d", color: subsColor) {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                vm.activeTab = .subscriptions
-            }
-
-            // Monthly / Yearly
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("RECURRING/MO")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    HStack(spacing: 6) {
-                        Text(formatCurrency(monthlyBurn))
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(.white)
-                        Text("(\(activeSubscriptions.filter { $0.billingCycle == "Monthly" }.count))")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                    }
-                }
-                Spacer()
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(width: 1, height: 36)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("RECURRING/YR")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    HStack(spacing: 6) {
-                        Text(formatCurrency(yearlyBurn))
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundStyle(.white)
-                        Text("(\(activeSubscriptions.filter { $0.billingCycle == "Yearly" }.count))")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                    }
-                }
-            }
-
-            // Counts row
-            HStack(spacing: 8) {
-                countPill(label: "ACTIVE", count: activeSubscriptions.count, color: .zifrGreen)
-                countPill(label: "FREE", count: freeCount, color: .white)
-                countPill(label: "PAUSED", count: pausedCount, color: .orange)
-                countPill(label: "CANCELLED", count: cancelledCount, color: .red)
-            }
-
-            // Top 3 costliest
-            if !topCostliest.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("TOP SPEND")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    ForEach(Array(topCostliest.enumerated()), id: \.offset) { idx, item in
-                        HStack(spacing: 8) {
-                            Text("\(idx + 1)")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(subsColor.opacity(0.6))
-                                .frame(width: 16)
-                            Text(item.0)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                            Spacer()
-                            Text("$\(String(format: "%.0f", item.1))/mo")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.6))
-                        }
-                    }
-                }
-                .padding(.top, 4)
-            }
-        }
-        .padding(16)
-        .background(darkSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.05), lineWidth: 1))
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zone 4: Financial Health
-    // ══════════════════════════════════════════════════════════════════
-
-    private var financialHealthCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            cardHeader(title: "FINANCIAL HEALTH", icon: "dollarsign.bank.building", color: finColor) {
+            Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 vm.activeTab = .financial
-            }
-
-            // Entity counts
-            HStack(spacing: 8) {
-                countCube(emoji: "🏦", count: institutions.count, label: "BANKS")
-                countCube(emoji: "💳", count: cards.count, label: "CARDS")
-                countCube(emoji: "📑", count: loans.count, label: "LOANS")
-            }
-
-            // Debt vs Owed
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LOAN DEBT")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    Text(formatCurrency(loanDebt))
-                        .font(.system(size: 18, weight: .bold))
+            } label: {
+                HStack {
+                    Image(systemName: "dollarsign.bank.building")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(finColor)
+                    Text("FINANCIAL")
+                        .font(.system(size: 13, weight: .black))
+                        .tracking(1.5)
                         .foregroundStyle(.white)
-                }
-                Spacer()
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(width: 1, height: 32)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("OWED TO ME")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    Text(owedToMe > 0 ? formatCurrency(owedToMe) : "—")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(owedToMe > 0 ? .zifrGreen : Color.white.opacity(0.3))
-                }
-            }
-            .padding(.horizontal, 4)
-
-            // Credit utilization bar
-            if totalCreditLimit > 0 {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("CREDIT UTILIZATION")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.35))
-                            .tracking(0.5)
-                        Spacer()
-                        Text("\(Int(creditUtilization * 100))%")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(utilizationColor)
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text(formatCurrency(totalDebt)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                        Text(" debt").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        
+                        Text(formatCurrency(availableCredit)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                        Text(" avail").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
                     }
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .padding(.leading, 4)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 6)
+            }
+            .buttonStyle(.plain)
 
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.white.opacity(0.06))
-                                .frame(height: 8)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(utilizationColor)
-                                .frame(width: geo.size.width * min(1, creditUtilization), height: 8)
+            // Institutions
+            VStack(spacing: 12) {
+                ForEach(institutions) { inst in
+                    institutionRow(inst)
+                }
+                // Orphaned cards
+                let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == card.institutionName.lowercased() } }
+                let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == loan.lender.lowercased() } }
+                
+                if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
+                    VStack(spacing: 0) {
+                        HStack {
+                            Image(systemName: "building.columns")
+                                .font(.system(size: 20))
+                                .foregroundStyle(finColor)
+                                .frame(width: 32)
+                            Text("Other Accounts")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                            Spacer()
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 16)
+                        .background(darkSurface)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        
+                        VStack(spacing: 0) {
+                            ForEach(orphanedCards) { card in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    vm.activeTab = .financial
+                                } label: {
+                                    cardRow(card)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
+                                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                            }
+                            ForEach(orphanedLoans) { loan in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    vm.activeTab = .financial
+                                } label: {
+                                    loanRow(loan)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 10)
+                                }
+                                .buttonStyle(.plain)
+                                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                            }
                         }
                     }
-                    .frame(height: 8)
-
-                    HStack {
-                        Text(formatCurrency(totalCreditUsed) + " used")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                        Spacer()
-                        Text(formatCurrency(availableCredit) + " available")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                    }
-                }
-
-                // Active promos
-                if activePromos > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(finColor)
-                        Text("\(activePromos) active 0% promo\(activePromos == 1 ? "" : "s")")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.6))
-                        Spacer()
-                    }
-                    .padding(.top, 2)
+                    .padding(.horizontal, 20)
                 }
             }
         }
-        .padding(16)
-        .background(darkSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.05), lineWidth: 1))
     }
-
-    private var utilizationColor: Color {
-        if creditUtilization > 0.7 { return .orange }
-        if creditUtilization > 0.5 { return Color(hex: "#EBC351") }
-        return .zifrGreen
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zone 5: Document Vault
-    // ══════════════════════════════════════════════════════════════════
-
-    private var documentVaultCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            cardHeader(title: "DOCUMENT VAULT", icon: "doc.text", color: docsColor) {
+    
+    private func institutionRow(_ inst: Institution) -> some View {
+        let isExpanded = expandedInstitutions.contains(inst.id)
+        let instCards = cards.filter { $0.institutionName.lowercased() == inst.name.lowercased() }
+        let instLoans = loans.filter { $0.role == "Bank Loan" && $0.lender.lowercased() == inst.name.lowercased() }
+        
+        let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
+        let instCredit = instCards.reduce(0) { $0 + $1.limit }
+        
+        return VStack(spacing: 0) {
+            Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                vm.activeTab = .documents
+                if isExpanded { expandedInstitutions.remove(inst.id) }
+                else { expandedInstitutions.insert(inst.id) }
+            } label: {
+                HStack {
+                    if !inst.loginUrl.isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(inst.loginUrl)&sz=128") {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView().frame(width: 32, height: 32)
+                            case .success(let image):
+                                image.resizable().aspectRatio(contentMode: .fill).frame(width: 32, height: 32).clipShape(Circle())
+                            case .failure:
+                                ZStack {
+                                    Circle().fill(finColor).frame(width: 32, height: 32)
+                                    Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
+                                }
+                            @unknown default:
+                                ZStack {
+                                    Circle().fill(finColor).frame(width: 32, height: 32)
+                                    Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
+                                }
+                            }
+                        }
+                    } else {
+                        ZStack {
+                            Circle().fill(finColor).frame(width: 32, height: 32)
+                            Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
+                        }
+                    }
+                    Text(inst.name)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.leading, 4)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Debt")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(instDebt))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    Divider().background(Color.white.opacity(0.2)).frame(height: 24).padding(.horizontal, 8)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Credit")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(instCredit))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .padding(.leading, 8)
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .background(darkSurface)
+                .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 0 : 14))
             }
-
-            // File count
-            HStack(spacing: 8) {
-                Text("\(documents.count)")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(.white)
-                Text("FILES")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.35))
-                    .tracking(0.5)
-                Spacer()
-                Text("\(categoryCoverage)/\(docCategories.filter { $0 != "Other" }.count) categories")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.4))
-            }
-
-            // Category grid
-            let filteredCategories = docCategories.filter { $0 != "Other" }
-            let columns = [GridItem(.flexible()), GridItem(.flexible())]
-            LazyVGrid(columns: columns, spacing: 6) {
-                ForEach(filteredCategories, id: \.self) { category in
-                    HStack(spacing: 6) {
-                        Image(systemName: coveredCategories.contains(category) ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(coveredCategories.contains(category) ? docsColor : Color.white.opacity(0.15))
-                        Text(shortCategoryName(category))
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(coveredCategories.contains(category) ? Color.white.opacity(0.7) : Color.white.opacity(0.25))
-                            .lineLimit(1)
-                        Spacer()
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(inst.accounts) { acc in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            vm.activeTab = .financial
+                        } label: {
+                            accountRow(acc)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                    }
+                    ForEach(instCards) { card in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            vm.activeTab = .financial
+                        } label: {
+                            cardRow(card)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                    }
+                    ForEach(instLoans) { loan in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            vm.activeTab = .financial
+                        } label: {
+                            loanRow(loan)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+                        Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
                     }
                 }
+                .background(darkSurface)
+                .clipShape(RoundedCorner(radius: 14, corners: [.bottomLeft, .bottomRight]))
             }
         }
-        .padding(16)
-        .background(darkSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.05), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
     }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Zone 6: Portfolio Context
-    // ══════════════════════════════════════════════════════════════════
-
-    private var portfolioContextCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "chart.pie.fill")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(homeColor)
-                Text("PORTFOLIO")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.4))
-                    .tracking(1.5)
-                Spacer()
-            }
-
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("RANK BY SPEND")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    Text("#\(burnRank) of \(allCompanies.count)")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-                Spacer()
-                Rectangle()
-                    .fill(Color.white.opacity(0.06))
-                    .frame(width: 1, height: 32)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("PORTFOLIO SHARE")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                        .tracking(0.5)
-                    Text("\(Int(portfolioSharePercent))%")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(.white)
-                }
-            }
-
-            // Portfolio total
-            HStack(spacing: 4) {
-                Text("Total portfolio burn:")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.4))
-                Text(formatCurrency(portfolioMonthlyBurn) + "/mo")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.6))
-                Text("across \(allCompanies.count) entities")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.4))
-            }
-        }
-        .padding(16)
-        .background(dimSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.05), lineWidth: 1))
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // MARK: – Shared Components
-    // ══════════════════════════════════════════════════════════════════
-
-    private func cardHeader(title: String, icon: String, color: Color, onTap: @escaping () -> Void) -> some View {
-        Button(action: onTap) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(color)
-                Text(title)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.4))
-                    .tracking(1.5)
-                Spacer()
-                Text("VIEW")
-                    .font(.system(size: 9, weight: .black))
-                    .foregroundStyle(color.opacity(0.6))
-                    .tracking(1)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(color.opacity(0.4))
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func countPill(label: String, count: Int, color: Color) -> some View {
-        HStack(spacing: 4) {
-            Text("\(count)")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(count > 0 ? color : Color.white.opacity(0.2))
-            Text(label)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.3))
-                .tracking(0.3)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 36)
-        .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func countCube(emoji: String, count: Int, label: String) -> some View {
-        VStack(spacing: 4) {
-            HStack(spacing: 4) {
-                Text(emoji)
-                    .font(.system(size: 15))
-                Text("\(count)")
-                    .font(.system(size: 18, weight: .bold))
+    
+    private func accountRow(_ acc: InstitutionAccount) -> some View {
+        HStack {
+            Text(accountEmoji(for: acc.type))
+                .font(.system(size: 14))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(acc.name.isEmpty ? acc.type : acc.name)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.white)
+                Text("···\(acc.last4.isEmpty ? "0000" : acc.last4)")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
             }
-            Text(label)
-                .font(.system(size: 8, weight: .black))
-                .foregroundStyle(Color.white.opacity(0.35))
-                .tracking(0.5)
+            Spacer()
+            Text("—")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.3))
+                .padding(.trailing, 24)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatCurrency(acc.balance))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("available")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .frame(width: 70, alignment: .trailing)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 60)
-        .background(dimSurface)
+    }
+    
+    private func cardRow(_ card: FinancialCard) -> some View {
+        HStack {
+            Image(systemName: "creditcard.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.7))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(card.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                Text("···\(card.last4) | \(card.cardHolder)")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatCurrency(card.balance))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Balance")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .padding(.trailing, 16)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatCurrency(card.limit))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("limit")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .frame(width: 70, alignment: .trailing)
+        }
+    }
+    
+    private func loanRow(_ loan: Loan) -> some View {
+        HStack {
+            Image(systemName: "doc.text.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(Color.white.opacity(0.7))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(loan.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.white)
+                Text("\(loan.term)")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatCurrency(loan.remainingBalance))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Remaining")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .padding(.trailing, 16)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(formatCurrency(loan.principalAmount))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("principal")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .frame(width: 70, alignment: .trailing)
+        }
+    }
+    
+    private func accountEmoji(for type: String) -> String {
+        switch type {
+        case "Checking": return "🏦"
+        case "Savings": return "💰"
+        case "CD": return "📀"
+        case "Investing": return "📈"
+        case "401(k)", "Roth 401(k)", "IRA", "Roth IRA", "Rollover IRA", "SEP IRA": return "🪺"
+        case "529": return "🎓"
+        default: return "📋"
+        }
+    }
+
+    // MARK: - Subscription Section
+    private var subscriptionSection: some View {
+        VStack(spacing: 12) {
+            // Header
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                vm.activeTab = .subscriptions
+            } label: {
+                HStack {
+                    Image(systemName: "square.3.layers.3d")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(subsColor)
+                    Text("SUBSCRIPTIONS")
+                        .font(.system(size: 13, weight: .black))
+                        .tracking(1.5)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text("\(activeSubscriptions.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                        Text(" active").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        
+                        Text(formatCurrency(monthlyBurn)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                        Text("/mo").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .padding(.leading, 4)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 6)
+            }
+            .buttonStyle(.plain)
+
+
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(activeSubscriptions) { sub in
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        vm.activeTab = .subscriptions
+                    } label: {
+                        subscriptionCard(sub)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private func subscriptionCard(_ sub: Subscription) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 6) {
+                if !sub.website.isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(sub.website)&sz=128") {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView().frame(width: 28, height: 28)
+                        case .success(let image):
+                            image.resizable().aspectRatio(contentMode: .fill).frame(width: 28, height: 28).clipShape(RoundedRectangle(cornerRadius: 6))
+                        case .failure:
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 28, height: 28)
+                                Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
+                            }
+                        @unknown default:
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 28, height: 28)
+                                Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
+                            }
+                        }
+                    }
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 28, height: 28)
+                        Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
+                    }
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(sub.name)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text("$\(String(format: "%.0f", sub.cost))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                }
+                Spacer(minLength: 0)
+            }
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Due: \(formattedDueOn(sub))")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .lineLimit(1)
+                
+                let payStr = sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod
+                Text("Paid From: \(payStr)")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                
+                // If paid from a known card, find its bank
+                let instName = cards.first(where: { $0.name == sub.paymentMethod })?.institutionName ?? ""
+                if !instName.isEmpty {
+                    Text(instName)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(darkSurface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
+    
+    private func formatDue(_ date: Date) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "MMM d"
+        return df.string(from: date)
+    }
+    
+    private func formattedDueOn(_ sub: Subscription) -> String {
+        guard !sub.nextRenewal.isEmpty else { return "Unknown" }
+        func ordinal(_ n: Int) -> String {
+            let tens = (n % 100) / 10
+            if tens == 1 { return "\(n)th" }
+            switch n % 10 {
+            case 1: return "\(n)st"
+            case 2: return "\(n)nd"
+            case 3: return "\(n)rd"
+            default: return "\(n)th"
+            }
+        }
+        if sub.billingCycle == "Monthly" {
+            if let day = Int(sub.nextRenewal) { return "\(ordinal(day)) every mo." }
+            return sub.nextRenewal + " every mo."
+        } else {
+            let parts = sub.nextRenewal.split(separator: " ")
+            if parts.count == 2, let day = Int(parts[1]) {
+                return "\(parts[0]) \(ordinal(day)) every yr."
+            }
+            return sub.nextRenewal + " every yr."
+        }
+    }
+    
+    private func brandColor(_ name: String) -> Color {
+        let hash = abs(name.unicodeScalars.reduce(0) { ($0 << 5) &+ $0 &+ Int($1.value) })
+        let hue = Double(hash % 360) / 360.0
+        return Color(hue: hue, saturation: 0.65, brightness: 0.75)
+    }
 
-    // MARK: – Helpers
+    // MARK: - Documents Section
+    private var documentSection: some View {
+        VStack(spacing: 0) {
+            // Header
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                vm.activeTab = .documents
+            } label: {
+                HStack {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(docsColor)
+                    Text("DOCUMENTS")
+                        .font(.system(size: 13, weight: .black))
+                        .tracking(1.5)
+                        .foregroundStyle(.white)
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text("\(documents.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                        Text(" docs").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        
+                        Text("\(coveredCategories.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                        Text(" categories").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .padding(.leading, 4)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 6)
+            }
+            .buttonStyle(.plain)
 
+            // Categories Accordion
+            VStack(spacing: 8) {
+                ForEach(docCategories.filter { coveredCategories.contains($0) }, id: \.self) { category in
+                    let docsInCategory = documents.filter { $0.type == category }
+                    let isExpanded = expandedCategories.contains(category)
+                    
+                    VStack(spacing: 0) {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if isExpanded { expandedCategories.remove(category) }
+                            else { expandedCategories.insert(category) }
+                        } label: {
+                            HStack {
+                                Image(systemName: docsInCategory.isEmpty ? "circle" : "checkmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(docsInCategory.isEmpty ? Color.white.opacity(0.2) : docsColor)
+                                Text(category)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("(\(docsInCategory.count))")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                Spacer()
+                                if !docsInCategory.isEmpty {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                                }
+                            }
+                            .padding(.vertical, 14)
+                            .padding(.horizontal, 16)
+                            .background(darkSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: isExpanded && !docsInCategory.isEmpty ? 0 : 12))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(docsInCategory.isEmpty)
+                        
+                        if isExpanded && !docsInCategory.isEmpty {
+                            VStack(spacing: 0) {
+                                ForEach(docsInCategory) { doc in
+                                    HStack {
+                                        Text(doc.name)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.8))
+                                        Spacer()
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                                }
+                            }
+                            .background(darkSurface)
+                            .clipShape(RoundedCorner(radius: 12, corners: [.bottomLeft, .bottomRight]))
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    // MARK: - Helpers
     private func formatCurrency(_ value: Double) -> String {
         if value == 0 { return "$0" }
         if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
         return "$\(String(format: "%.0f", value))"
     }
-
-    private func shortCategoryName(_ name: String) -> String {
-        // Shorten long compound names for the grid
-        name.replacingOccurrences(of: " & ", with: " & ")
-            .components(separatedBy: " & ")
-            .first ?? name
-    }
 }
 
-// MARK: – Alert Model
+// MARK: - Alert Model
 struct HomeAlert: Identifiable {
     let id = UUID()
     let icon: String
     let color: Color
     let text: String
+}
+
+// MARK: - View Extension
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
+    }
 }
