@@ -128,9 +128,6 @@ struct EntityHomeView: View {
                     Spacer().frame(height: 40)
                 }
             }
-            
-            HomeHeroView()
-                .padding(.bottom, 8)
         }
         .background(Color.black)
         .sheet(item: $newSub) { sub in
@@ -215,31 +212,50 @@ struct EntityHomeView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 vm.activeTab = .financial
             } label: {
-                HStack {
-                    Image(systemName: "dollarsign.bank.building")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(finColor)
-                    Text("FINANCIAL")
-                        .font(.system(size: 13, weight: .black))
-                        .tracking(1.5)
-                        .foregroundStyle(.white)
-                    Spacer()
-                    
-                    HStack(spacing: 8) {
-                        Text(formatCurrency(totalDebt)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
-                        Text(" debt").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "dollarsign.bank.building")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(finColor)
+                        Text("FINANCIAL")
+                            .font(.system(size: 13, weight: .black))
+                            .tracking(1.5)
+                            .foregroundStyle(.white)
+                        Spacer()
                         
-                        Text(formatCurrency(availableCredit)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
-                        Text(" avail").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        HStack(spacing: 8) {
+                            Text(formatCurrency(totalDebt)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" debt").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                            
+                            Text(formatCurrency(availableCredit)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" avail").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .padding(.leading, 4)
                     }
                     
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .padding(.leading, 4)
+                    let debtRatio = totalCreditLimit > 0 ? min(1.0, totalDebt / totalCreditLimit) : 0
+                    let percentage = totalCreditLimit > 0 ? Int((totalDebt / totalCreditLimit) * 100) : 0
+                    HStack(spacing: 8) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.1))
+                                Capsule().fill(finColor)
+                                    .frame(width: geo.size.width * CGFloat(debtRatio))
+                            }
+                        }
+                        .frame(height: 4)
+                        
+                        Text("\(percentage)% DTC")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 6)
+                .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
 
@@ -425,101 +441,147 @@ struct EntityHomeView: View {
     }
     
     private func accountRow(_ acc: InstitutionAccount) -> some View {
-        HStack {
-            Text(accountEmoji(for: acc.type))
-                .font(.system(size: 14))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(acc.name.isEmpty ? acc.type : acc.name)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                Text("···\(acc.last4.isEmpty ? "0000" : acc.last4)")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+        let nameToMatch = acc.name.isEmpty ? acc.type : acc.name
+        let paidSubs = subscriptions.filter { $0.paymentMethod == nameToMatch }
+        return VStack(spacing: 8) {
+            HStack {
+                Text(accountEmoji(for: acc.type))
+                    .font(.system(size: 14))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(nameToMatch)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                    Text("···\(acc.last4.isEmpty ? "0000" : acc.last4)")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                Spacer()
+                Text("—")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.white.opacity(0.3))
+                    .padding(.trailing, 24)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatCurrency(acc.balance))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("available")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 70, alignment: .trailing)
             }
-            Spacer()
-            Text("—")
-                .font(.system(size: 13))
-                .foregroundStyle(Color.white.opacity(0.3))
-                .padding(.trailing, 24)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(formatCurrency(acc.balance))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("available")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+            if !paidSubs.isEmpty {
+                HStack(spacing: 4) {
+                    Text("Pays for:")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                    Text(paidSubs.map { $0.name }.joined(separator: ", "))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Spacer()
+                }
             }
-            .frame(width: 70, alignment: .trailing)
         }
     }
     
     private func cardRow(_ card: FinancialCard) -> some View {
-        HStack {
-            Image(systemName: "creditcard.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.white.opacity(0.7))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(card.name)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                Text("···\(card.last4) | \(card.cardHolder)")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+        let paidSubs = subscriptions.filter { $0.paymentMethod == card.name }
+        return VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "creditcard.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(card.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                    Text("···\(card.last4) | \(card.cardHolder)")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatCurrency(card.balance))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("Balance")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .padding(.trailing, 16)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatCurrency(card.limit))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("limit")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 70, alignment: .trailing)
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(formatCurrency(card.balance))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("Balance")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+            if !paidSubs.isEmpty {
+                HStack(spacing: 4) {
+                    Text("Pays for:")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                    Text(paidSubs.map { $0.name }.joined(separator: ", "))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Spacer()
+                }
             }
-            .padding(.trailing, 16)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(formatCurrency(card.limit))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("limit")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
-            }
-            .frame(width: 70, alignment: .trailing)
         }
     }
     
     private func loanRow(_ loan: Loan) -> some View {
-        HStack {
-            Image(systemName: "doc.text.fill")
-                .font(.system(size: 12))
-                .foregroundStyle(Color.white.opacity(0.7))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(loan.name)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.white)
-                Text("\(loan.term)")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+        let paidSubs = subscriptions.filter { $0.paymentMethod == loan.name }
+        return VStack(spacing: 8) {
+            HStack {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color.white.opacity(0.7))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(loan.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white)
+                    Text("\(loan.term)")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatCurrency(loan.remainingBalance))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("Remaining")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .padding(.trailing, 16)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatCurrency(loan.principalAmount))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("principal")
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 70, alignment: .trailing)
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(formatCurrency(loan.remainingBalance))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("Remaining")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+            if !paidSubs.isEmpty {
+                HStack(spacing: 4) {
+                    Text("Pays for:")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                    Text(paidSubs.map { $0.name }.joined(separator: ", "))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Spacer()
+                }
             }
-            .padding(.trailing, 16)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(formatCurrency(loan.principalAmount))
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                Text("principal")
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
-            }
-            .frame(width: 70, alignment: .trailing)
         }
     }
     
@@ -543,48 +605,69 @@ struct EntityHomeView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 vm.activeTab = .subscriptions
             } label: {
-                HStack {
-                    Image(systemName: "square.3.layers.3d")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(subsColor)
-                    Text("SUBSCRIPTIONS")
-                        .font(.system(size: 13, weight: .black))
-                        .tracking(1.5)
-                        .foregroundStyle(.white)
-                    Spacer()
-                    
-                    HStack(spacing: 8) {
-                        Text("\(activeSubscriptions.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
-                        Text(" active").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "square.3.layers.3d")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(subsColor)
+                        Text("SUBSCRIPTIONS")
+                            .font(.system(size: 13, weight: .black))
+                            .tracking(1.5)
+                            .foregroundStyle(.white)
+                        Spacer()
                         
-                        Text(formatCurrency(monthlyBurn)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
-                        Text("/mo").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        HStack(spacing: 8) {
+                            Text("\(activeSubscriptions.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" active").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                            
+                            Text(formatCurrency(monthlyBurn)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text("/mo").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .padding(.leading, 4)
                     }
                     
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .padding(.leading, 4)
+                    let autoRenewCount = activeSubscriptions.filter { $0.isAutoRenew }.count
+                    let autoRenewRatio = activeSubscriptions.isEmpty ? 0.0 : Double(autoRenewCount) / Double(activeSubscriptions.count)
+                    let autoRenewPct = Int(autoRenewRatio * 100)
+                    
+                    HStack(spacing: 8) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.1))
+                                Capsule().fill(subsColor)
+                                    .frame(width: geo.size.width * CGFloat(autoRenewRatio))
+                            }
+                        }
+                        .frame(height: 4)
+                        
+                        Text("\(autoRenewPct)% Auto-Renew")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 6)
+                .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
 
-
-            let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(activeSubscriptions) { sub in
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        vm.activeTab = .subscriptions
-                    } label: {
-                        subscriptionCard(sub)
+            let chunkedSubs = activeSubscriptions.chunked(into: 4)
+            VStack(spacing: 12) {
+                ForEach(Array(chunkedSubs.enumerated()), id: \.offset) { index, chunk in
+                    MarqueeRow(items: chunk, reverse: index % 2 != 0) { sub in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            vm.activeTab = .subscriptions
+                        } label: {
+                            subscriptionCard(sub)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 20)
         }
     }
     
@@ -621,7 +704,7 @@ struct EntityHomeView: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                    Text("$\(String(format: "%.0f", sub.cost))")
+                    Text(sub.cost == 0 ? "Free" : "$\(String(format: "%.0f", sub.cost))")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.7))
                 }
@@ -631,25 +714,38 @@ struct EntityHomeView: View {
             Divider().background(Color.white.opacity(0.1))
             
             VStack(alignment: .leading, spacing: 3) {
-                Text("Due: \(formattedDueOn(sub))")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.6))
-                    .lineLimit(1)
+                HStack(spacing: 0) {
+                    Text("Due: ")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.6))
+                    Text(formattedDueOn(sub))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white)
+                }
                 
                 let payStr = sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod
-                Text("Paid From: \(payStr)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.6))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
                 
-                // If paid from a known card, find its bank
-                let instName = cards.first(where: { $0.name == sub.paymentMethod })?.institutionName ?? ""
-                if !instName.isEmpty {
-                    Text(instName)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .lineLimit(1)
+                let instName: String = {
+                    if let c = cards.first(where: { $0.name == sub.paymentMethod }), !c.institutionName.isEmpty {
+                        return c.institutionName
+                    }
+                    if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty {
+                        return inst.name
+                    }
+                    return ""
+                }()
+                
+                let fullPayStr = instName.isEmpty ? payStr : "\(instName) \(payStr)"
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Paid From:")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.6))
+                    Text(fullPayStr)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             Spacer(minLength: 0)
@@ -819,5 +915,67 @@ struct RoundedCorner: Shape {
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
         return Path(path.cgPath)
+    }
+}
+
+// MARK: - Array Extension for Chunking
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        stride(from: 0, to: count, by: size).map {
+            Array(self[$0 ..< Swift.min($0 + size, count)])
+        }
+    }
+}
+
+// MARK: - Marquee Row View
+struct MarqueeRow<Item: Identifiable & Equatable, Content: View>: View {
+    let items: [Item]
+    let reverse: Bool
+    @ViewBuilder let content: (Item) -> Content
+    
+    @State private var offset: CGFloat = 0
+    @State private var isAnimating = false
+    @State private var isKilled = false
+    
+    var body: some View {
+        GeometryReader { geo in
+            let totalWidth = CGFloat(items.count) * 156 + CGFloat(max(0, items.count - 1)) * 12
+            let maxOffset = max(0, totalWidth - geo.size.width)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(items) { item in
+                        content(item)
+                            .frame(width: 156) // Fixed width for marquee predictability
+                    }
+                }
+                .offset(x: isKilled ? 0 : (reverse ? -maxOffset + offset : -offset))
+                .animation(.linear(duration: 0.1), value: isKilled)
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 15)
+                    .onChanged { _ in
+                        if !isKilled {
+                            isKilled = true
+                        }
+                    }
+            )
+            .onAppear {
+                startAnimation(maxOffset: maxOffset)
+            }
+        }
+        .frame(height: 120) // Adjusted height to accommodate VStack and prevent clipping
+        .clipped()
+    }
+    
+    private func startAnimation(maxOffset: CGFloat) {
+        guard !items.isEmpty && !isAnimating && maxOffset > 0 else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            withAnimation(.linear(duration: Double(items.count) * 6.0).repeatForever(autoreverses: true)) {
+                offset = maxOffset
+            }
+            isAnimating = true
+        }
     }
 }

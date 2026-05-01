@@ -83,31 +83,7 @@ struct DashboardView: View {
 
                 // Company cards
                 ForEach(filteredCompanies) { company in
-                    CompanyCardView(
-                        company: company,
-                        monthlyBurn: vm.monthlyBurn(for: company, subscriptions: subscriptions),
-                        totalDebt: vm.totalDebt(for: company, loans: loans, cards: cards),
-                        totalCredit: vm.totalCredit(for: company, cards: cards),
-                        onEdit: { editingCompany = company },
-                        onViewSubscriptions: {
-                            vm.selectedCompany = company
-                            vm.activeTab = .subscriptions
-                            vm.touchCompany(company, context: context)
-                            vm.path.append(company)
-                        },
-                        onViewFinancials: {
-                            vm.selectedCompany = company
-                            vm.activeTab = .financial
-                            vm.touchCompany(company, context: context)
-                            vm.path.append(company)
-                        },
-                        onViewDocuments: {
-                            vm.selectedCompany = company
-                            vm.activeTab = .documents
-                            vm.touchCompany(company, context: context)
-                            vm.path.append(company)
-                        }
-                    )
+                    companyCardRow(for: company)
                     .onTapGesture {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         vm.selectedCompany = company
@@ -146,9 +122,11 @@ struct DashboardView: View {
                             ZStack {
                                 CompanyCardView(
                                     company: dummyCompany,
-                                    monthlyBurn: 0.0,
-                                    totalDebt: 0.0,
-                                    totalCredit: 0.0,
+                                    cardsCount: 0,
+                                    institutionsCount: 0,
+                                    loansCount: 0,
+                                    subscriptionsCount: 0,
+                                    docsCount: 0,
                                     onEdit: {},
                                     onViewSubscriptions: {},
                                     onViewFinancials: {},
@@ -339,6 +317,43 @@ struct DashboardView: View {
         .task {
             if vm.quote.isEmpty { await vm.loadQuote() }
         }
+    }
+    
+    @ViewBuilder
+    private func companyCardRow(for company: Company) -> some View {
+        let cCount = cards.filter { $0.company?.id == company.id }.count
+        let iCount = institutions.filter { $0.company?.id == company.id }.count
+        let lCount = loans.filter { $0.company?.id == company.id }.count
+        let sCount = subscriptions.filter { $0.company?.id == company.id }.count
+        let dCount = documents.filter { $0.company?.id == company.id }.count
+
+        CompanyCardView(
+            company: company,
+            cardsCount: cCount,
+            institutionsCount: iCount,
+            loansCount: lCount,
+            subscriptionsCount: sCount,
+            docsCount: dCount,
+            onEdit: { editingCompany = company },
+            onViewSubscriptions: {
+                vm.selectedCompany = company
+                vm.activeTab = .subscriptions
+                vm.touchCompany(company, context: context)
+                vm.path.append(company)
+            },
+            onViewFinancials: {
+                vm.selectedCompany = company
+                vm.activeTab = .financial
+                vm.touchCompany(company, context: context)
+                vm.path.append(company)
+            },
+            onViewDocuments: {
+                vm.selectedCompany = company
+                vm.activeTab = .documents
+                vm.touchCompany(company, context: context)
+                vm.path.append(company)
+            }
+        )
     }
 }
 
@@ -603,10 +618,13 @@ struct SharedWithMeView: View {
             }
 
         case .financial:
-            HStack(spacing: 18) {
-                emojiCount("🏦", institutions.count)
-                emojiCount("💳", cards.count)
-                emojiCount("📑", loans.count)
+            let creditCards = cards.filter { $0.type == "Credit" }
+            let totalDebt = loans.filter { $0.role == "Bank Loan" }.reduce(0.0) { $0 + $1.remainingBalance } + creditCards.reduce(0.0) { $0 + $1.balance }
+            let totalCredit = creditCards.reduce(0.0) { $0 + $1.limit }
+
+            HStack(spacing: 10) {
+                financialMetricPair(emoji: "💸", label: "Debt", value: totalDebt)
+                financialMetricPair(emoji: "💰", label: "Credit", value: totalCredit)
             }
 
         case .documents:
@@ -643,6 +661,22 @@ struct SharedWithMeView: View {
         }
     }
 
+    private func financialMetricPair(emoji: String, label: String, value: Double) -> some View {
+        HStack(spacing: 4) {
+            Text(emoji).font(.system(size: 17))
+            HStack(spacing: 3) {
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Text("$\(String(format: "%.0f", value))")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+        }
+    }
+
 
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
@@ -653,4 +687,5 @@ struct SharedWithMeView: View {
         case .documents:     return Color(hex: "#918457")
         }
     }
+
 }

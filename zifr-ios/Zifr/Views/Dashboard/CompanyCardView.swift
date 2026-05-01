@@ -3,9 +3,11 @@ import SwiftUI
 /// The company card displayed on the Dashboard — mirrors CiFr mobile app layout exactly.
 struct CompanyCardView: View {
     let company: Company
-    let monthlyBurn: Double
-    let totalDebt: Double
-    let totalCredit: Double
+    let cardsCount: Int
+    let institutionsCount: Int
+    let loansCount: Int
+    let subscriptionsCount: Int
+    let docsCount: Int
     let onEdit: () -> Void
     let onViewSubscriptions: () -> Void
     let onViewFinancials: () -> Void
@@ -16,7 +18,7 @@ struct CompanyCardView: View {
             // ── Top Section ───────────────────────────────────────────────
             VStack(spacing: 0) {
                 // ── Top Row ─────────────────────────────────────────────────
-            HStack(alignment: .center, spacing: 0) {
+            HStack(alignment: .top, spacing: 0) {
                 // Logo
                 CompanyAvatar(company: company, size: 56)
                     .padding(.trailing, 14)
@@ -32,20 +34,26 @@ struct CompanyCardView: View {
                         .foregroundStyle(Color.white.opacity(0.4))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Image(systemName: "circle.grid.3x3.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.black)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
             .padding(.bottom, 16)
 
-            // Financial Data Grid (4 Columns)
+            // Count Data Grid (5 Columns)
             HStack {
-                financialColumn(title: "Debt$", value: totalDebt)
+                countColumn(title: "Cards", count: cardsCount)
                 Spacer()
-                financialColumn(title: "Credit$", value: totalCredit)
+                countColumn(title: "Inst", count: institutionsCount)
                 Spacer()
-                financialColumn(title: "recur/mo", value: monthlyBurn)
+                countColumn(title: "Loans", count: loansCount)
                 Spacer()
-                financialColumn(title: "recur/yr", value: monthlyBurn * 12)
+                countColumn(title: "Subs", count: subscriptionsCount)
+                Spacer()
+                countColumn(title: "Docs", count: docsCount)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 16)
@@ -77,25 +85,15 @@ struct CompanyCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
     }
 
-    private func financialColumn(title: String, value: Double) -> some View {
+    private func countColumn(title: String, count: Int) -> some View {
         VStack(spacing: 4) {
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.4))
             
-            Text(formatCurrency(value))
+            Text("\(count)")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
-        }
-    }
-
-    private func formatCurrency(_ value: Double) -> String {
-        if value == 0 {
-            return "$0"
-        } else if value >= 1000 {
-            return "$\(String(format: "%.1fk", value / 1000))"
-        } else {
-            return "$\(String(format: "%.0f", value))"
         }
     }
 

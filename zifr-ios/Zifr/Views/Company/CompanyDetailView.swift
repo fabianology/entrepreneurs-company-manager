@@ -294,10 +294,13 @@ struct CompanyDetailView: View {
             }
 
         case .financial:
-            HStack(spacing: 18) {
-                emojiCount("🏦", institutions.count)
-                emojiCount("💳", cards.count)
-                emojiCount("📑", loans.count)
+            let creditCards = cards.filter { $0.type == "Credit" }
+            let totalDebt = loans.filter { $0.role == "Bank Loan" }.reduce(0.0) { $0 + $1.remainingBalance } + creditCards.reduce(0.0) { $0 + $1.balance }
+            let totalCredit = creditCards.reduce(0.0) { $0 + $1.limit }
+
+            HStack(spacing: 10) {
+                financialMetricPair(emoji: "💸", label: "Debt", value: totalDebt)
+                financialMetricPair(emoji: "💰", label: "Credit", value: totalCredit)
             }
 
         case .documents:
@@ -331,6 +334,22 @@ struct CompanyDetailView: View {
             Text("(\(n))")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.5))
+        }
+    }
+
+    private func financialMetricPair(emoji: String, label: String, value: Double) -> some View {
+        HStack(spacing: 4) {
+            Text(emoji).font(.system(size: 17))
+            HStack(spacing: 3) {
+                Text(label)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Text("$\(String(format: "%.0f", value))")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
     }
 
