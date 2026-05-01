@@ -800,31 +800,51 @@ struct EntityHomeView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 vm.activeTab = .documents
             } label: {
-                HStack {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(docsColor)
-                    Text("DOCUMENTS")
-                        .font(.system(size: 13, weight: .black))
-                        .tracking(1.5)
-                        .foregroundStyle(.white)
-                    Spacer()
-                    
-                    HStack(spacing: 8) {
-                        Text("\(documents.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
-                        Text(" docs").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(docsColor)
+                        Text("DOCUMENTS")
+                            .font(.system(size: 13, weight: .black))
+                            .tracking(1.5)
+                            .foregroundStyle(.white)
+                        Spacer()
                         
-                        Text("\(coveredCategories.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
-                        Text(" categories").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        HStack(spacing: 8) {
+                            Text("\(documents.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" docs").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                            
+                            Text("\(coveredCategories.count)").font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" categories").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .padding(.leading, 4)
                     }
                     
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                        .padding(.leading, 4)
+                    let completionRatio = docCategories.isEmpty ? 0.0 : Double(coveredCategories.count) / Double(docCategories.count)
+                    let completionPct = Int(completionRatio * 100)
+                    
+                    HStack(spacing: 8) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.1))
+                                Capsule().fill(docsColor)
+                                    .frame(width: geo.size.width * CGFloat(completionRatio))
+                            }
+                        }
+                        .frame(height: 4)
+                        
+                        Text("\(completionPct)% Vault Completion")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 6)
+                .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
 

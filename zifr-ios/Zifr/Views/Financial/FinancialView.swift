@@ -2083,9 +2083,14 @@ struct EditCardSheet: View {
                     Button {
                         withAnimation { isEditingInstitution.toggle() }
                     } label: {
-                        Image(systemName: isEditingInstitution ? "lock.open.fill" : "lock.fill")
-                            .font(.system(size: 12))
-                            .foregroundStyle(isEditingInstitution ? Color.green : Color.white.opacity(0.4))
+                        HStack(spacing: 4) {
+                            Text(isEditingInstitution ? "lock" : "edit")
+                                .font(.system(size: 10, weight: .bold))
+                                .textCase(.uppercase)
+                            Image(systemName: isEditingInstitution ? "lock.open.fill" : "lock.fill")
+                                .font(.system(size: 12))
+                        }
+                        .foregroundStyle(.white)
                     }
                 }
                 .padding(.bottom, 4)
@@ -2160,7 +2165,7 @@ struct EditCardSheet: View {
                 }
             }
             .disabled(!isEditingInstitution)
-            .opacity(!isEditingInstitution ? 0.6 : 1.0)
+            .opacity(!isEditingInstitution ? 0.25 : 1.0)
         }
     }
 
@@ -2477,63 +2482,21 @@ struct EditCardSheet: View {
                 .listRowSeparator(.hidden)
 
                 // MARK: - Financial Details
-                if !showFinancials {
-                    Section {
-                        Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                showFinancials = true
-                            }
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "banknote.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.35))
-                                Text("SHOW FINANCIAL DETAILS")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.35))
-                                Spacer()
-                                Image(systemName: "plus")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.25))
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 36)
-                            .background(Color.white.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                Section {
+                    VStack(spacing: 0) {
+                        HStack {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.07))
+                                .frame(height: 1)
+                            Text("FINANCIALS")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.25))
+                                .fixedSize()
+                            Rectangle()
+                                .fill(Color.white.opacity(0.07))
+                                .frame(height: 1)
                         }
-                        .buttonStyle(.plain)
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
-                    .listRowSeparator(.hidden)
-                }
-
-                if showFinancials {
-                    Section {
-                        VStack(spacing: 0) {
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    showFinancials = false
-                                }
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                HStack {
-                                    Rectangle()
-                                        .fill(Color.white.opacity(0.07))
-                                        .frame(height: 1)
-                                    Text("FINANCIALS")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.25))
-                                        .fixedSize()
-                                    Image(systemName: "chevron.up")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.2))
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.bottom, 8)
+                        .padding(.bottom, 8)
 
                             VStack(spacing: 12) {
                                 HStack(spacing: 12) {
@@ -2569,8 +2532,6 @@ struct EditCardSheet: View {
                     .listRowBackground(Color.clear)
                     .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                     .listRowSeparator(.hidden)
-                }
-
                 // MARK: - Notes
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
