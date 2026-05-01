@@ -1,6 +1,5 @@
 import SwiftUI
 import Foundation
-import SwiftData
 import Observation
 
 @Observable
@@ -11,7 +10,7 @@ final class AppViewModel {
     var searchQuery: String = ""
     var showSearch: Bool = false
     var quote: String = ""
-    var deepLinkModelId: String? = nil
+    var deepLinkModelId: UUID? = nil
     var path = NavigationPath()
 
     enum CompanyTab: String, CaseIterable {
@@ -30,135 +29,130 @@ final class AppViewModel {
         }
     }
 
-    // MARK: - CRUD: Companies
-    func addCompany(context: ModelContext, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
-        let company = Company(name: name, structure: structure, colorHex: colorHex, logoData: logoData, website: website)
-        context.insert(company)
-        try? context.save()
+    // CRUD: Companies
+    func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
+        let company = Company(userId: userId, name: name, structure: structure, companyDescription: nil, colorHex: colorHex, logoData: logoData, website: website)
+        appState.companies.append(company)
+        Task { try? await DataRepository.shared.insertCompany(company) }
     }
 
-    func updateCompany(_ company: Company, context: ModelContext) {
-        company.lastModified = Date()
-        try? context.save()
+    func updateCompany(_ company: Company, appState: AppState) {
+        var mutableCompany = company
+        mutableCompany.lastModified = Date()
+        if let idx = appState.companies.firstIndex(where: { $0.id == company.id }) {
+            appState.companies[idx] = mutableCompany
+        }
+        Task { try? await DataRepository.shared.updateCompany(mutableCompany) }
     }
 
-    func deleteCompany(_ company: Company, context: ModelContext) {
-        let id = company.id
+    func deleteCompany(_ company: Company, appState: AppState) {
+        appState.companies.removeAll { $0.id == company.id }
+        appState.subscriptions.removeAll { $0.companyId == company.id }
+        appState.institutions.removeAll { $0.companyId == company.id }
+        appState.cards.removeAll { $0.companyId == company.id }
+        appState.loans.removeAll { $0.companyId == company.id }
+        appState.documents.removeAll { $0.companyId == company.id }
         
-        // Manual Cascade Delete: SwiftData's native cascade occasionally leaves orphaned records if they are faulted.
-        // Explicitly deleting them by companyId guarantees the database is clean and global search drops them.
-        if let subs = try? context.fetch(FetchDescriptor<Subscription>(predicate: #Predicate { $0.companyId == id })) {
-            subs.forEach { context.delete($0) }
-        }
-        if let insts = try? context.fetch(FetchDescriptor<Institution>(predicate: #Predicate { $0.companyId == id })) {
-            insts.forEach { context.delete($0) }
-        }
-        if let cards = try? context.fetch(FetchDescriptor<FinancialCard>(predicate: #Predicate { $0.companyId == id })) {
-            cards.forEach { context.delete($0) }
-        }
-        if let loans = try? context.fetch(FetchDescriptor<Loan>(predicate: #Predicate { $0.companyId == id })) {
-            loans.forEach { context.delete($0) }
-        }
-        if let docs = try? context.fetch(FetchDescriptor<CompanyDocument>(predicate: #Predicate { $0.companyId == id })) {
-            docs.forEach { context.delete($0) }
-        }
-
-        context.delete(company)
-        try? context.save()
+        Task { try? await DataRepository.shared.deleteCompany(company.id) }
         if selectedCompany?.id == company.id { selectedCompany = nil }
     }
 
-    func touchCompany(_ company: Company, context: ModelContext) {
-        company.lastViewed = Date()
-        try? context.save()
+    func touchCompany(_ company: Company, appState: AppState) {
+        var mutableCompany = company
+        mutableCompany.lastViewed = Date()
+        if let idx = appState.companies.firstIndex(where: { $0.id == company.id }) {
+            appState.companies[idx] = mutableCompany
+        }
+        Task { try? await DataRepository.shared.updateCompany(mutableCompany) }
     }
 
-    // MARK: - CRUD: Subscriptions
-    func addSubscription(context: ModelContext, companyId: String) -> Subscription {
-        let sub = Subscription(companyId: companyId)
-        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
-            sub.company = company
-        }
-        context.insert(sub)
+    // CRUD: Subscriptions
+    func addSubscription(appState: AppState, userId: UUID, companyId: UUID) -> Subscription {
+        let sub = Subscription(userId: userId, companyId: companyId)
+        appState.subscriptions.append(sub)
+        Task { try? await DataRepository.shared.insertSubscription(sub) }
         return sub
     }
 
-    func saveSub(_ sub: Subscription, context: ModelContext) {
-        sub.lastUpdated = Date()
-        try? context.save()
-    }
-
-    func deleteSub(_ sub: Subscription, context: ModelContext) {
-        context.delete(sub)
-        try? context.save()
-    }
-
-    // MARK: - CRUD: Financial Cards
-    func addCard(context: ModelContext, companyId: String) -> FinancialCard {
-        let card = FinancialCard(companyId: companyId)
-        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
-            card.company = company
+    func saveSub(_ sub: Subscription, appState: AppState) {
+        var mutableSub = sub
+        mutableSub.lastUpdated = Date()
+        if let idx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) {
+            appState.subscriptions[idx] = mutableSub
+        } else {
+            appState.subscriptions.append(mutableSub)
         }
+        Task { try? await DataRepository.shared.updateSubscription(mutableSub) }
+    }
+
+    func deleteSub(_ sub: Subscription, appState: AppState) {
+        appState.subscriptions.removeAll { $0.id == sub.id }
+        Task { try? await DataRepository.shared.deleteSubscription(sub.id) }
+    }
+
+    // CRUD: Financial Cards
+    func addCard(appState: AppState, userId: UUID, companyId: UUID) -> FinancialCard {
+        let card = FinancialCard(userId: userId, companyId: companyId)
+        appState.cards.append(card)
+        Task { try? await DataRepository.shared.insertCard(card) }
         return card
     }
 
-    func saveCard(_ card: FinancialCard, context: ModelContext) {
-        if card.modelContext == nil {
-            context.insert(card)
+    func saveCard(_ card: FinancialCard, appState: AppState) {
+        if let idx = appState.cards.firstIndex(where: { $0.id == card.id }) {
+            appState.cards[idx] = card
+            Task { try? await DataRepository.shared.updateCard(card) }
+        } else {
+            appState.cards.append(card)
+            Task { try? await DataRepository.shared.insertCard(card) }
         }
-        try? context.save()
     }
 
-    func deleteCard(_ card: FinancialCard, context: ModelContext) {
+    func deleteCard(_ card: FinancialCard, appState: AppState) {
         cleanUpCustomPaymentMethod(name: card.name)
-        if card.modelContext != nil {
-            context.delete(card)
-        }
-        try? context.save()
+        appState.cards.removeAll { $0.id == card.id }
+        Task { try? await DataRepository.shared.deleteCard(card.id) }
     }
 
-    // MARK: - CRUD: Institutions
-    func addInstitution(context: ModelContext, companyId: String) -> Institution {
-        let inst = Institution(companyId: companyId)
-        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
-            inst.company = company
-        }
+    // CRUD: Institutions
+    func addInstitution(appState: AppState, userId: UUID, companyId: UUID) -> Institution {
+        let inst = Institution(userId: userId, companyId: companyId)
+        appState.institutions.append(inst)
+        Task { try? await DataRepository.shared.insertInstitution(inst) }
         return inst
     }
 
-    func saveInstitution(_ inst: Institution, context: ModelContext) {
-        if inst.modelContext == nil {
-            context.insert(inst)
+    func saveInstitution(_ inst: Institution, appState: AppState) {
+        if let idx = appState.institutions.firstIndex(where: { $0.id == inst.id }) {
+            appState.institutions[idx] = inst
+            Task { try? await DataRepository.shared.updateInstitution(inst) }
+        } else {
+            appState.institutions.append(inst)
+            Task { try? await DataRepository.shared.insertInstitution(inst) }
         }
-        try? context.save()
     }
 
-    func deleteInstitution(_ inst: Institution, context: ModelContext) {
+    func deleteInstitution(_ inst: Institution, appState: AppState) {
         let instName = inst.name
         let instCompanyId = inst.companyId
         
-        // Clean up accounts and cards from custom methods
         for acc in inst.accounts {
             cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
         }
         
-        if let allCards = try? context.fetch(FetchDescriptor<FinancialCard>()) {
-            for c in allCards where c.companyId == instCompanyId && c.institutionName == instName {
-                cleanUpCustomPaymentMethod(name: c.name)
-                context.delete(c)
-            }
+        for c in appState.cards where c.companyId == instCompanyId && c.institutionName == instName {
+            cleanUpCustomPaymentMethod(name: c.name)
+            appState.cards.removeAll { $0.id == c.id }
+            Task { try? await DataRepository.shared.deleteCard(c.id) }
         }
         
-        if let allLoans = try? context.fetch(FetchDescriptor<Loan>()) {
-            for l in allLoans where l.companyId == instCompanyId && l.lender == instName {
-                context.delete(l)
-            }
+        for l in appState.loans where l.companyId == instCompanyId && l.lender == instName {
+            appState.loans.removeAll { $0.id == l.id }
+            Task { try? await DataRepository.shared.deleteLoan(l.id) }
         }
         
-        if inst.modelContext != nil {
-            context.delete(inst)
-        }
-        try? context.save()
+        appState.institutions.removeAll { $0.id == inst.id }
+        Task { try? await DataRepository.shared.deleteInstitution(inst.id) }
     }
     
     func cleanUpCustomPaymentMethod(name: String) {
@@ -172,49 +166,53 @@ final class AppViewModel {
         }
     }
 
-    // MARK: - CRUD: Loans
-    func addLoan(context: ModelContext, companyId: String) -> Loan {
-        let loan = Loan(companyId: companyId)
-        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
-            loan.company = company
-        }
+    // CRUD: Loans
+    func addLoan(appState: AppState, userId: UUID, companyId: UUID) -> Loan {
+        let loan = Loan(userId: userId, companyId: companyId)
+        appState.loans.append(loan)
+        Task { try? await DataRepository.shared.insertLoan(loan) }
         return loan
     }
 
-    func saveLoan(_ loan: Loan, context: ModelContext) {
-        if loan.modelContext == nil {
-            context.insert(loan)
+    func saveLoan(_ loan: Loan, appState: AppState) {
+        if let idx = appState.loans.firstIndex(where: { $0.id == loan.id }) {
+            appState.loans[idx] = loan
+            Task { try? await DataRepository.shared.updateLoan(loan) }
+        } else {
+            appState.loans.append(loan)
+            Task { try? await DataRepository.shared.insertLoan(loan) }
         }
-        try? context.save()
     }
 
-    func deleteLoan(_ loan: Loan, context: ModelContext) {
-        if loan.modelContext != nil {
-            context.delete(loan)
-        }
-        try? context.save()
+    func deleteLoan(_ loan: Loan, appState: AppState) {
+        appState.loans.removeAll { $0.id == loan.id }
+        Task { try? await DataRepository.shared.deleteLoan(loan.id) }
     }
 
-    // MARK: - CRUD: Documents
-    func addDocument(context: ModelContext, companyId: String) -> CompanyDocument {
-        let doc = CompanyDocument(companyId: companyId)
-        if let company = try? context.fetch(FetchDescriptor<Company>(predicate: #Predicate { $0.id == companyId })).first {
-            doc.company = company
-        }
-        context.insert(doc)
+    // CRUD: Documents
+    func addDocument(appState: AppState, userId: UUID, companyId: UUID) -> CompanyDocument {
+        let doc = CompanyDocument(userId: userId, companyId: companyId)
+        appState.documents.append(doc)
+        Task { try? await DataRepository.shared.insertDocument(doc) }
         return doc
     }
 
-    func saveDoc(_ doc: CompanyDocument, context: ModelContext) {
-        try? context.save()
+    func saveDoc(_ doc: CompanyDocument, appState: AppState) {
+        if let idx = appState.documents.firstIndex(where: { $0.id == doc.id }) {
+            appState.documents[idx] = doc
+            Task { try? await DataRepository.shared.updateDocument(doc) }
+        } else {
+            appState.documents.append(doc)
+            Task { try? await DataRepository.shared.insertDocument(doc) }
+        }
     }
 
-    func deleteDoc(_ doc: CompanyDocument, context: ModelContext) {
-        context.delete(doc)
-        try? context.save()
+    func deleteDoc(_ doc: CompanyDocument, appState: AppState) {
+        appState.documents.removeAll { $0.id == doc.id }
+        Task { try? await DataRepository.shared.deleteDocument(doc.id) }
     }
 
-    // MARK: - Monthly Burn
+    // Monthly Burn
     func monthlyBurn(for company: Company, subscriptions: [Subscription]) -> Double {
         subscriptions
             .filter { $0.companyId == company.id }
@@ -258,20 +256,18 @@ final class AppViewModel {
         "Waste no more time arguing what a good man should be. Be one. - Marcus Aurelius"
     ]
 
-    // MARK: - Quotes
     func loadQuote() async {
         let q = localQuotes.randomElement() ?? ""
         await MainActor.run { self.quote = q }
     }
 
-    // MARK: - Global Search Results
     struct SearchResult: Identifiable {
         let id = UUID()
         let type: SearchResultType
         let title: String
         let subtitle: String
-        let companyId: String
-        let modelId: String
+        let companyId: UUID
+        let modelId: UUID
         let tab: CompanyTab
         var password: String? = nil
         var loginId: String? = nil
@@ -285,7 +281,7 @@ final class AppViewModel {
         var paysFor: [String]? = nil
         var cardType: String? = nil
 
-        init(type: SearchResultType, title: String, subtitle: String, companyId: String, modelId: String, tab: CompanyTab, password: String? = nil, loginId: String? = nil, logoData: Data? = nil, externalWebsite: String? = nil, isFree: Bool? = nil, cost: Double? = nil, status: String? = nil, last4: String? = nil, network: String? = nil, paysFor: [String]? = nil, cardType: String? = nil) {
+        init(type: SearchResultType, title: String, subtitle: String, companyId: UUID, modelId: UUID, tab: CompanyTab, password: String? = nil, loginId: String? = nil, logoData: Data? = nil, externalWebsite: String? = nil, isFree: Bool? = nil, cost: Double? = nil, status: String? = nil, last4: String? = nil, network: String? = nil, paysFor: [String]? = nil, cardType: String? = nil) {
             self.type = type
             self.title = title
             self.subtitle = subtitle
@@ -325,7 +321,7 @@ final class AppViewModel {
         }
 
         for c in companies {
-            let payload = [c.name, c.structure, c.companyDescription, c.website].joined(separator: " ")
+            let payload = [c.name, c.structure, c.companyDescription ?? "", c.website ?? ""].joined(separator: " ")
             if matches(payload) {
                 results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, modelId: c.id, tab: .subscriptions, logoData: c.logoData))
             }
@@ -333,8 +329,8 @@ final class AppViewModel {
         
         for s in subscriptions {
             let companyName = companies.first { $0.id == s.companyId }?.name ?? ""
-            var payloadArr: [String] = [s.name, s.loginId, s.paymentMethod, companyName, s.website, s.status, s.billingCycle, s.pricingModel, s.recoveryMethod, s.twoFactorAuth]
-            payloadArr.append(s.notes)
+            var payloadArr: [String] = [s.name, s.loginId ?? "", s.paymentMethod ?? "", companyName, s.website ?? "", s.status, s.billingCycle, s.pricingModel, s.recoveryMethod ?? "", s.twoFactorAuth]
+            payloadArr.append(s.notes ?? "")
             
             payloadArr.append(contentsOf: s.subServices.map { $0.name })
             payloadArr.append(contentsOf: s.subServices.map { $0.purpose })
@@ -346,17 +342,17 @@ final class AppViewModel {
             
             if isSubQuery || matches(payload) {
                 let company = companies.first { $0.id == s.companyId }
-                results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, modelId: s.id, tab: .subscriptions, password: s.password.isEmpty ? nil : s.password, loginId: s.loginId.isEmpty ? nil : s.loginId, logoData: company?.logoData, externalWebsite: s.website, isFree: s.isFree, cost: s.cost, status: s.status))
+                results.append(.init(type: .subscription, title: s.name, subtitle: company?.name ?? "", companyId: s.companyId, modelId: s.id, tab: .subscriptions, password: s.password, loginId: s.loginId, logoData: company?.logoData, externalWebsite: s.website, isFree: s.isFree, cost: s.cost, status: s.status))
             }
         }
         
         for card in cards {
             let companyName = companies.first { $0.id == card.companyId }?.name ?? ""
-            let paysForMatch = subscriptions.contains { $0.paymentMethod == card.name && matches($0.name + " " + $0.loginId) }
+            let paysForMatch = subscriptions.contains { $0.paymentMethod == card.name && matches($0.name + " " + ($0.loginId ?? "")) }
             
-            var payloadArr = [card.name, card.institutionName, card.network, card.last4, card.type, card.status, card.paidFrom, card.cardHolder, card.notes, companyName, card.type + " card", card.type + " cards"]
+            var payloadArr = [card.name, card.institutionName ?? "", card.network, card.last4 ?? "", card.type, card.status, card.paidFrom ?? "", card.cardHolder ?? "", card.notes ?? "", companyName, card.type + " card", card.type + " cards"]
             payloadArr.append("apr \(card.apr)% \(card.apr)")
-            if card.promoApr > 0 || card.promoEnds > Date() {
+            if card.promoApr > 0 || (card.promoEnds ?? Date()) > Date() {
                 payloadArr.append("promo apr \(card.promoApr)% \(card.promoApr)")
                 if card.promoApr == 0 {
                     payloadArr.append("0% 0")
@@ -367,17 +363,17 @@ final class AppViewModel {
             
             if isBankQuery || isCardQuery || paysForMatch || matches(payload) {
                 let company = companies.first { $0.id == card.companyId }
-                let inst = institutions.first { $0.name.lowercased() == card.institutionName.lowercased() }
-                results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password.isEmpty ? nil : card.password, loginId: card.login.isEmpty ? nil : card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl, status: card.status, last4: card.last4, network: card.network, paysFor: subscriptions.filter { $0.paymentMethod == card.name }.map { $0.name }, cardType: card.type))
+                let inst = institutions.first { $0.name.lowercased() == (card.institutionName?.lowercased() ?? "") }
+                results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password, loginId: card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl, status: card.status, last4: card.last4, network: card.network, paysFor: subscriptions.filter { $0.paymentMethod == card.name }.map { $0.name }, cardType: card.type))
             }
         }
         
         for inst in institutions {
-            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }) && matches(sub.name + " " + sub.loginId) }
+            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }) && matches(sub.name + " " + (sub.loginId ?? "")) }
             let companyName = companies.first { $0.id == inst.companyId }?.name ?? ""
-            let cardPaysForMatch = cards.contains { card in card.institutionName.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in sub.paymentMethod == card.name && matches(sub.name + " " + sub.loginId) } }
+            let cardPaysForMatch = cards.contains { card in card.institutionName?.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in sub.paymentMethod == card.name && matches(sub.name + " " + (sub.loginId ?? "")) } }
             
-            var payloadArr = [inst.name, inst.username, inst.email, inst.loginUrl, companyName]
+            var payloadArr = [inst.name, inst.username ?? "", inst.email ?? "", inst.loginUrl ?? "", companyName]
             payloadArr.append(contentsOf: inst.accounts.map { $0.name })
             payloadArr.append(contentsOf: inst.accounts.map { $0.type })
             payloadArr.append(contentsOf: inst.accounts.map { $0.last4 })
@@ -387,25 +383,25 @@ final class AppViewModel {
             
             if isBankQuery || paysForMatch || cardPaysForMatch || matches(payload) {
                 let company = companies.first { $0.id == inst.companyId }
-                let loginId = !inst.username.isEmpty ? inst.username : (!inst.email.isEmpty ? inst.email : nil)
-                results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password.isEmpty ? nil : inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl, paysFor: subscriptions.filter { sub in inst.accounts.contains { acc in sub.paymentMethod == acc.name } || sub.paymentMethod == inst.name }.map { $0.name }))
+                let loginId = !(inst.username?.isEmpty ?? true) ? inst.username : (!(inst.email?.isEmpty ?? true) ? inst.email : nil)
+                results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl, paysFor: subscriptions.filter { sub in inst.accounts.contains { acc in sub.paymentMethod == acc.name } || sub.paymentMethod == inst.name }.map { $0.name }))
             }
         }
         
         for loan in loans {
             let companyName = companies.first { $0.id == loan.companyId }?.name ?? ""
-            let payload = [loan.name, loan.lender, loan.role, loan.interestType, loan.term, loan.scheduleFrequency, loan.status, loan.notes, companyName].joined(separator: " ")
+            let payload = [loan.name, loan.lender ?? "", loan.role, loan.interestType, loan.term, loan.scheduleFrequency, loan.status, loan.notes ?? "", companyName].joined(separator: " ")
             
             if isLoanQuery || matches(payload) {
                 let company = companies.first { $0.id == loan.companyId }
-                let inst = institutions.first { $0.name.lowercased() == loan.lender.lowercased() }
+                let inst = institutions.first { $0.name.lowercased() == (loan.lender?.lowercased() ?? "") }
                 results.append(.init(type: .financial, title: loan.name, subtitle: company?.name ?? "", companyId: loan.companyId, modelId: loan.id, tab: .financial, logoData: company?.logoData, externalWebsite: inst?.loginUrl))
             }
         }
         
         for doc in documents {
             let companyName = companies.first { $0.id == doc.companyId }?.name ?? ""
-            let payload = [doc.name, doc.type, doc.notes, companyName].joined(separator: " ")
+            let payload = [doc.name, doc.type, doc.notes ?? "", companyName].joined(separator: " ")
             
             if matches(payload) {
                 let company = companies.first { $0.id == doc.companyId }
@@ -422,15 +418,15 @@ final class AppViewModel {
             minifiedData += "Company: \(company.name)\n"
             let coSubs = subscriptions.filter { $0.companyId == company.id }
             if !coSubs.isEmpty {
-                minifiedData += "- Subs: " + coSubs.map { "\($0.name)($\($0.cost)/\($0.billingCycle) renews \($0.nextRenewal) login: \($0.loginId.isEmpty ? "none" : $0.loginId))" }.joined(separator: ", ") + "\n"
+                minifiedData += "- Subs: " + coSubs.map { "\($0.name)($\($0.cost)/\($0.billingCycle) renews \($0.nextRenewal ?? "") login: \(($0.loginId?.isEmpty ?? true) ? "none" : ($0.loginId ?? "")))" }.joined(separator: ", ") + "\n"
             }
             let coCards = cards.filter { $0.companyId == company.id }
             if !coCards.isEmpty {
-                minifiedData += "- Cards: " + coCards.map { "\($0.name)(ends \($0.last4))" }.joined(separator: ", ") + "\n"
+                minifiedData += "- Cards: " + coCards.map { "\($0.name)(ends \($0.last4 ?? ""))" }.joined(separator: ", ") + "\n"
             }
             let coInst = institutions.filter { $0.companyId == company.id }
             if !coInst.isEmpty {
-                minifiedData += "- Banks: " + coInst.map { "\($0.name)(user: \($0.username.isEmpty ? "none" : $0.username) email: \($0.email.isEmpty ? "none" : $0.email))" }.joined(separator: ", ") + "\n"
+                minifiedData += "- Banks: " + coInst.map { "\($0.name)(user: \(($0.username?.isEmpty ?? true) ? "none" : ($0.username ?? "")) email: \(($0.email?.isEmpty ?? true) ? "none" : ($0.email ?? "")))" }.joined(separator: ", ") + "\n"
             }
         }
         return await GeminiService.shared.askPortfolioQuestion(data: minifiedData, question: query)

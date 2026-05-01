@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 struct SubscriptionListView: View {
     let company: Company
@@ -7,7 +6,7 @@ struct SubscriptionListView: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
 
     @State private var editingSub: Subscription? = nil
     @State private var newSub: Subscription? = nil
@@ -54,7 +53,7 @@ struct SubscriptionListView: View {
                     }
 
                     Button {
-                        newSub = vm.addSubscription(context: context, companyId: company.id)
+                        newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
                             Text("ADD SERVICE").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
@@ -110,7 +109,7 @@ struct SubscriptionListView: View {
         }
     }
     
-    private func handleDeepLink(id: String?, proxy: ScrollViewProxy) {
+    private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
         guard let id = id else { return }
         if let s = subscriptions.first(where: { $0.id == id }) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -123,6 +122,8 @@ struct SubscriptionListView: View {
     }
 
     @State private var dummyNetflix = Subscription(
+        userId: UUID(),
+        companyId: UUID(),
         name: "Netflix",
         cost: 22.99,
         billingCycle: "Monthly",
@@ -139,7 +140,7 @@ struct SubscriptionListView: View {
     private var emptyState: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            newSub = vm.addSubscription(context: context, companyId: company.id)
+            newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
         }) {
             ZStack {
                 SubscriptionCardView(
@@ -174,12 +175,12 @@ struct SubscriptionListView: View {
 // MARK: - Subscription Card (exact CiFr layout)
 
 struct SubscriptionCardView: View {
-    @Bindable var sub: Subscription
+    @State var sub: Subscription
     let allSubscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onEdit: () -> Void
-    var onBankTapped: ((String) -> Void)? = nil
+    var onBankTapped: ((UUID) -> Void)? = nil
 
     @State private var expanded = false
     @State private var showSubServices = false
@@ -211,7 +212,7 @@ struct SubscriptionCardView: View {
     var totalAnnual: Double { (sub.monthlyTotal * 12) + sub.yearlyTotal }
 
     var formattedDueOn: String {
-        guard !sub.nextRenewal.isEmpty else { return "—" }
+        guard !(sub.nextRenewal ?? "").isEmpty else { return "—" }
         func ordinal(_ n: Int) -> String {
             let tens = (n % 100) / 10
             if tens == 1 { return "\(n)th" }
@@ -223,19 +224,19 @@ struct SubscriptionCardView: View {
             }
         }
         if sub.billingCycle == "Monthly" {
-            if let day = Int(sub.nextRenewal) { return "\(ordinal(day)) of every month" }
-            return sub.nextRenewal + " of every month"
+            if let day = Int(sub.nextRenewal ?? "") { return "\(ordinal(day)) of every month" }
+            return (sub.nextRenewal ?? "") + " of every month"
         } else {
-            let parts = sub.nextRenewal.split(separator: " ")
+            let parts = (sub.nextRenewal ?? "").split(separator: " ")
             if parts.count == 2, let day = Int(parts[1]) {
                 return "\(parts[0]) \(ordinal(day)) every year"
             }
-            return sub.nextRenewal + " every year"
+            return (sub.nextRenewal ?? "") + " every year"
         }
     }
 
     var shortDueOn: String {
-        guard !sub.nextRenewal.isEmpty else { return "—" }
+        guard !(sub.nextRenewal ?? "").isEmpty else { return "—" }
         func ordinal(_ n: Int) -> String {
             let tens = (n % 100) / 10
             if tens == 1 { return "\(n)th" }
@@ -247,14 +248,14 @@ struct SubscriptionCardView: View {
             }
         }
         if sub.billingCycle == "Monthly" {
-            if let day = Int(sub.nextRenewal) { return ordinal(day) }
-            return sub.nextRenewal
+            if let day = Int(sub.nextRenewal ?? "") { return ordinal(day) }
+            return (sub.nextRenewal ?? "")
         } else {
-            let parts = sub.nextRenewal.split(separator: " ")
+            let parts = (sub.nextRenewal ?? "").split(separator: " ")
             if parts.count == 2, let day = Int(parts[1]) {
                 return "\(parts[0]) \(ordinal(day))"
             }
-            return sub.nextRenewal
+            return (sub.nextRenewal ?? "")
         }
     }
 
@@ -266,12 +267,12 @@ struct SubscriptionCardView: View {
         return (verb, "\(shortDueOn) every \(cycle)")
     }
     
-    var bankAccountTuple: (bank: String, account: String, type: String, modelId: String?)? {
-        if sub.paymentMethod.isEmpty { return nil }
+    var bankAccountTuple: (bank: String, account: String, type: String, modelId: UUID?)? {
+        if (sub.paymentMethod ?? "").isEmpty { return nil }
         
         if let card = cards.first(where: { $0.name == sub.paymentMethod }) {
-            let inst = card.institutionName.isEmpty ? "Paid From" : card.institutionName
-            let suffix = card.last4.isEmpty ? "" : " ••••\(card.last4)"
+            let inst = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
+            let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4 ?? "")"
             return (inst, "\(card.name)\(suffix)", card.type, card.id)
         }
         
@@ -279,12 +280,12 @@ struct SubscriptionCardView: View {
             if let acc = inst.accounts.first(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) {
                 let instName = inst.name.isEmpty ? "Paid From" : inst.name
                 let accName = acc.name.isEmpty ? acc.type : acc.name
-                let suffix = acc.last4.isEmpty ? "" : " ••••\(acc.last4)"
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
                 return (instName, "\(accName)\(suffix)", acc.type, inst.id)
             }
         }
         
-        return ("Paid From", sub.paymentMethod, "", nil)
+        return ("Paid From", sub.paymentMethod ?? "", "", nil)
     }
 
     var body: some View {
@@ -299,8 +300,8 @@ struct SubscriptionCardView: View {
                             RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.clear)
                                 .frame(width: 56, height: 56)
-                            if !sub.website.isEmpty {
-                                FaviconImage(website: sub.website, size: 36)
+                            if !(sub.website ?? "").isEmpty {
+                                FaviconImage(website: (sub.website ?? ""), size: 36)
                             } else {
                                 Text(sub.name.isEmpty ? "?" : String(sub.name.prefix(1)).uppercased())
                                     .font(.system(size: 22, weight: .black))
@@ -436,11 +437,11 @@ struct SubscriptionCardView: View {
                     // Credentials row — tap-to-copy
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
-                            copyableCredential(id: sub.id, label: "Login ID", value: sub.loginId, field: "login")
-                            copyableCredential(id: sub.id, label: "Password", value: sub.password, field: "password", isPassword: true)
+                            copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
+                            copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
                         }
                         
-                        DynamicLoginLabelView(loginId: sub.loginId, ignoreSubscriptionId: sub.id)
+                        DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -803,7 +804,7 @@ struct SubscriptionCardView: View {
         let normalizedEmail = email.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         if !normalizedEmail.isEmpty {
             let computedServices: [UsedInEmailService] = allSubscriptions.compactMap { s in
-                if s.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail {
+                if (s.loginId ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail {
                     return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .primary)
                 } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }) {
                     return UsedInEmailService(name: s.name.isEmpty ? "Unnamed Service" : s.name, role: .linked)
@@ -847,16 +848,18 @@ struct DynamicLoginLabelView: View {
     var ignoreSubscriptionId: String? = nil
     var ignoreInstitutionId: String? = nil
     
-    @Query private var allSubscriptions: [Subscription]
-    @Query private var allInstitutions: [Institution]
+    @Environment(AppState.self) private var appState
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
+    
+    private var allInstitutions: [Institution] { appState.institutions }
     
     var body: some View {
         let normalizedLogin = loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         if !normalizedLogin.isEmpty {
             let subServices: [String] = allSubscriptions.compactMap { s in
-                if let ignoreId = ignoreSubscriptionId, s.id == ignoreId { return nil }
+                if let ignoreId = ignoreSubscriptionId, s.id.uuidString == ignoreId { return nil }
                 
-                if s.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
+                if (s.loginId ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
                     return s.name.isEmpty ? "Unnamed Service" : s.name
                 } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin }) {
                     return s.name.isEmpty ? "Unnamed Service" : s.name
@@ -865,12 +868,12 @@ struct DynamicLoginLabelView: View {
             }
             
             let instServices: [String] = allInstitutions.compactMap { i in
-                if let ignoreId = ignoreInstitutionId, i.id == ignoreId { return nil }
+                if let ignoreId = ignoreInstitutionId, i.id.uuidString == ignoreId { return nil }
                 
-                let instLogin = i.username.isEmpty ? i.email : i.username
+                let instLogin = (i.username ?? "").isEmpty ? (i.email ?? "") : (i.username ?? "")
                 if instLogin.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
                     return i.name.isEmpty ? "Unnamed Institution" : i.name
-                } else if i.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin && !i.email.isEmpty {
+                } else if (i.email ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin && !(i.email ?? "").isEmpty {
                     return i.name.isEmpty ? "Unnamed Institution" : i.name
                 }
                 return nil

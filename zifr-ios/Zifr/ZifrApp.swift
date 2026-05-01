@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 extension UIColor {
     convenience init(hex: String) {
@@ -28,62 +27,40 @@ extension UIColor {
 
 @main
 struct ZifrApp: App {
-    let container: ModelContainer
+    @State private var authViewModel = AuthViewModel()
+    @State private var appState = AppState()
 
     init() {
-        // MARK: Global UI Styling
+        // MARK: - Global UI Styling
         UISegmentedControl.appearance().selectedSegmentTintColor = UIColor(hex: "#223E5A")
         UISegmentedControl.appearance().backgroundColor = UIColor(hex: "#111111")
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
         UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white.withAlphaComponent(0.5)], for: .normal)
-
-        let schema = Schema([
-            Company.self,
-            Subscription.self,
-            FinancialCard.self,
-            Institution.self,
-            Loan.self,
-            LoanPayment.self,
-            CompanyDocument.self
-        ])
-
-        // Try 1: CloudKit Configuration
-        let cloudConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false, cloudKitDatabase: .automatic)
-        if let c = try? ModelContainer(for: schema, configurations: cloudConfig) {
-            container = c
-            return
-        }
-
-        // Try 2: Wipe & Retry CloudKit
-        let fm = FileManager.default
-        if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let files = (try? fm.contentsOfDirectory(at: appSupport, includingPropertiesForKeys: nil)) ?? []
-            for file in files {
-                try? fm.removeItem(at: file)
-            }
-        }
-
-        if let c = try? ModelContainer(for: schema, configurations: cloudConfig) {
-            container = c
-            return
-        }
-
-        // Try 3: Fallback to Local Configuration
-        let localConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-        if let c = try? ModelContainer(for: schema, configurations: localConfig) {
-            container = c
-            return
-        }
-
-        // Fatal Error if all else fails
-        fatalError("Failed to initialize SwiftData ModelContainer.")
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .preferredColorScheme(.dark)
+            Group {
+                if authViewModel.isAuthenticated {
+                    RootView()
+                } else {
+                    LoginView(authViewModel: authViewModel)
+                }
+            }
+            .preferredColorScheme(.dark)
+            .environment(authViewModel)
+            .environment(appState)
+            .task {
+                await authViewModel.checkSession()
+                if authViewModel.isAuthenticated {
+                    await DataRepository.shared.fetchAllData(appState: appState)
+                }
+            }
+            .onChange(of: authViewModel.isAuthenticated) { _, isAuth in
+                if isAuth {
+                    Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                }
+            }
         }
-        .modelContainer(container)
     }
 }

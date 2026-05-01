@@ -18,7 +18,7 @@ struct BillingTimelineView: View {
     private func subs(for date: Date) -> [Subscription] {
         let dayOfMonth = calendar.component(.day, from: date)
         return subscriptions.filter { sub in
-            guard let renewal = HomeRenewalParser.parse(sub.nextRenewal) else { return false }
+            guard let nextRenewal = sub.nextRenewal, let renewal = HomeRenewalParser.parse(nextRenewal) else { return false }
             return calendar.component(.day, from: renewal) == dayOfMonth
         }
     }

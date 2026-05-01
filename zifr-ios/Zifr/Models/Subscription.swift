@@ -1,7 +1,6 @@
 import Foundation
-import SwiftData
 
-// MARK: - Embedded Structs (Codable, stored as JSON in SwiftData)
+// MARK: - Embedded Structs (Codable, stored as JSON in Supabase)
 
 struct SubService: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
@@ -29,59 +28,86 @@ struct LinkedEmail: Codable, Identifiable, Hashable {
     var notes: [String] = []
 }
 
-// MARK: - Subscription @Model
+// MARK: - Subscription Struct
 
-@Model
-final class Subscription {
-    var id: String = UUID().uuidString
-    var companyId: String = ""
-    var name: String = ""
-    var cost: Double = 0
-    var currency: String = "USD"
-    var billingCycle: String = "Monthly"
-    var paymentMethod: String = ""
-    var nextRenewal: String = ""
-    var renew: String = "Auto"
-    var status: String = "Active"
-    var subServicesData: Data = Data()
-    var linkedEmailsData: Data = Data()
-    var website: String = ""
-    var loginId: String = ""
-    var password: String = ""
-    var twoFactorAuth: String = "None"
-    var recoveryMethod: String = ""
-    var notes: String = ""
-    var pricingModel: String = "paid"
-    var lastUpdated: Date = Date()
-    var showSubServicesTab: Bool = true
-    var showLinkedEmailsTab: Bool = true
-    var company: Company?
+struct Subscription: Identifiable, Codable, Hashable {
+    var id: UUID
+    var userId: UUID
+    var companyId: UUID
+    var name: String
+    var cost: Double
+    var currency: String
+    var billingCycle: String
+    var paymentMethod: String?
+    var nextRenewal: String?
+    var renew: String
+    var status: String
+    var subServicesData: [SubService]
+    var linkedEmailsData: [LinkedEmail]
+    var website: String?
+    var loginId: String?
+    var password: String?
+    var twoFactorAuth: String
+    var recoveryMethod: String?
+    var notes: String?
+    var pricingModel: String
+    var lastUpdated: Date
+    var showSubServicesTab: Bool
+    var showLinkedEmailsTab: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case companyId = "company_id"
+        case name
+        case cost
+        case currency
+        case billingCycle = "billing_cycle"
+        case paymentMethod = "payment_method"
+        case nextRenewal = "next_renewal"
+        case renew
+        case status
+        case subServicesData = "sub_services_data"
+        case linkedEmailsData = "linked_emails_data"
+        case website
+        case loginId = "login_id"
+        case password
+        case twoFactorAuth = "two_factor_auth"
+        case recoveryMethod = "recovery_method"
+        case notes
+        case pricingModel = "pricing_model"
+        case lastUpdated = "last_updated"
+        case showSubServicesTab = "show_sub_services_tab"
+        case showLinkedEmailsTab = "show_linked_emails_tab"
+    }
 
     init(
-        id: String = UUID().uuidString,
-        companyId: String = "",
+        id: UUID = UUID(),
+        userId: UUID,
+        companyId: UUID,
         name: String = "",
         cost: Double = 0,
         currency: String = "USD",
         billingCycle: String = "Monthly",
-        paymentMethod: String = "",
-        nextRenewal: String = "",
+        paymentMethod: String? = nil,
+        nextRenewal: String? = nil,
         renew: String = "Auto",
         status: String = "Active",
         subServices: [SubService] = [],
         linkedEmails: [LinkedEmail] = [],
-        website: String = "",
-        loginId: String = "",
-        password: String = "",
+        website: String? = nil,
+        loginId: String? = nil,
+        password: String? = nil,
         twoFactorAuth: String = "None",
-        recoveryMethod: String = "",
-        notes: String = "",
+        recoveryMethod: String? = nil,
+        notes: String? = nil,
         pricingModel: String = "paid",
         lastUpdated: Date = Date(),
         showSubServicesTab: Bool = true,
         showLinkedEmailsTab: Bool = true
     ) {
         self.id = id
+        self.userId = userId
         self.companyId = companyId
         self.name = name
         self.cost = cost
@@ -91,8 +117,8 @@ final class Subscription {
         self.nextRenewal = nextRenewal
         self.renew = renew
         self.status = status
-        self.subServicesData = (try? JSONEncoder().encode(subServices)) ?? Data()
-        self.linkedEmailsData = (try? JSONEncoder().encode(linkedEmails)) ?? Data()
+        self.subServicesData = subServices
+        self.linkedEmailsData = linkedEmails
         self.website = website
         self.loginId = loginId
         self.password = password
@@ -106,13 +132,13 @@ final class Subscription {
     }
 
     var subServices: [SubService] {
-        get { (try? JSONDecoder().decode([SubService].self, from: subServicesData)) ?? [] }
-        set { subServicesData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        get { subServicesData }
+        set { subServicesData = newValue }
     }
 
     var linkedEmails: [LinkedEmail] {
-        get { (try? JSONDecoder().decode([LinkedEmail].self, from: linkedEmailsData)) ?? [] }
-        set { linkedEmailsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        get { linkedEmailsData }
+        set { linkedEmailsData = newValue }
     }
 
     var isFree: Bool { pricingModel == "free" }

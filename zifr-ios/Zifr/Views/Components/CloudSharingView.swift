@@ -1,7 +1,5 @@
 import SwiftUI
 import CloudKit
-import SwiftData
-
 struct CloudSharingView: UIViewControllerRepresentable {
     let share: CKShare
     let container: CKContainer

@@ -1,42 +1,41 @@
 import SwiftUI
-import SwiftData
 
 struct CompanyDetailView: View {
     @State var company: Company
     @Bindable var vm: AppViewModel
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
-    @Query(sort: \Company.name) private var allCompanies: [Company]
-    @Query private var allSubscriptions: [Subscription]
-    @Query private var allCards: [FinancialCard]
-    @Query private var allInstitutions: [Institution]
-    @Query private var allLoans: [Loan]
-    @Query private var allDocuments: [CompanyDocument]
+    private var allCompanies: [Company] { appState.companies.sorted { $0.name < $1.name } }
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
+    private var allCards: [FinancialCard] { appState.cards }
+    private var allInstitutions: [Institution] { appState.institutions }
+    private var allLoans: [Loan] { appState.loans }
+    private var allDocuments: [CompanyDocument] { appState.documents }
 
     var subscriptions: [Subscription] {
         let filtered = allSubscriptions.filter { $0.companyId == company.id }
         guard !vm.searchQuery.isEmpty else { return filtered }
         let q = vm.searchQuery.lowercased()
-        return filtered.filter { $0.name.lowercased().contains(q) || $0.loginId.lowercased().contains(q) || $0.paymentMethod.lowercased().contains(q) }
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.loginId ?? "").lowercased().contains(q) || ($0.paymentMethod ?? "").lowercased().contains(q) }
     }
     var cards: [FinancialCard] {
         let filtered = allCards.filter { $0.companyId == company.id }
         guard !vm.searchQuery.isEmpty else { return filtered }
         let q = vm.searchQuery.lowercased()
-        return filtered.filter { $0.name.lowercased().contains(q) || $0.institutionName.lowercased().contains(q) || $0.network.lowercased().contains(q) || $0.last4.lowercased().contains(q) }
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.institutionName ?? "").lowercased().contains(q) || ($0.network ?? "").lowercased().contains(q) || ($0.last4 ?? "").lowercased().contains(q) }
     }
     var institutions: [Institution] {
         let filtered = allInstitutions.filter { $0.companyId == company.id }
         guard !vm.searchQuery.isEmpty else { return filtered }
         let q = vm.searchQuery.lowercased()
-        return filtered.filter { $0.name.lowercased().contains(q) || $0.username.lowercased().contains(q) || $0.email.lowercased().contains(q) }
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.username ?? "").lowercased().contains(q) || ($0.email ?? "").lowercased().contains(q) }
     }
     var loans: [Loan] {
         let filtered = allLoans.filter { $0.companyId == company.id }
         guard !vm.searchQuery.isEmpty else { return filtered }
         let q = vm.searchQuery.lowercased()
-        return filtered.filter { $0.name.lowercased().contains(q) || $0.lender.lowercased().contains(q) }
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.lender ?? "").lowercased().contains(q) }
     }
     var documents: [CompanyDocument] {
         let filtered = allDocuments.filter { $0.companyId == company.id }
@@ -126,7 +125,7 @@ struct CompanyDetailView: View {
                                         Button {
                                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                             company = c
-                                            vm.touchCompany(c, context: context)
+                                            vm.touchCompany(c, appState: appState)
                                         } label: {
                                             if c.id == company.id {
                                                 Label(c.name, systemImage: "checkmark")

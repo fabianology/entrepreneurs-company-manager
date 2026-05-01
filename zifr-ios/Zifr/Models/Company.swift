@@ -1,36 +1,44 @@
 import Foundation
-import SwiftData
 
-@Model
-final class Company {
-    var id: String = UUID().uuidString
-    var name: String = ""
-    var structure: String = "LLC"
-    var companyDescription: String = ""
-    var colorHex: String = "#4f46e5"
-    var logoData: Data? = nil
-    var website: String = ""
-    var lastModified: Date = Date()
-    var lastViewed: Date = Date()
+struct Company: Identifiable, Codable, Hashable {
+    var id: UUID
+    var userId: UUID
+    var name: String
+    var structure: String
+    var companyDescription: String?
+    var colorHex: String
+    var logoData: Data?
+    var website: String?
+    var lastModified: Date
+    var lastViewed: Date
 
-    @Relationship(deleteRule: .cascade, inverse: \Institution.company) var institutions: [Institution]? = []
-    @Relationship(deleteRule: .cascade, inverse: \Subscription.company) var subscriptions: [Subscription]? = []
-    @Relationship(deleteRule: .cascade, inverse: \FinancialCard.company) var financialCards: [FinancialCard]? = []
-    @Relationship(deleteRule: .cascade, inverse: \Loan.company) var loans: [Loan]? = []
-    @Relationship(deleteRule: .cascade, inverse: \CompanyDocument.company) var documents: [CompanyDocument]? = []
-
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case name
+        case structure
+        case companyDescription = "company_description"
+        case colorHex = "color_hex"
+        case logoData = "logo_data"
+        case website
+        case lastModified = "last_modified"
+        case lastViewed = "last_viewed"
+    }
+    
     init(
-        id: String = UUID().uuidString,
+        id: UUID = UUID(),
+        userId: UUID,
         name: String = "",
         structure: String = "LLC",
-        companyDescription: String = "",
+        companyDescription: String? = nil,
         colorHex: String = "#4f46e5",
         logoData: Data? = nil,
-        website: String = "",
+        website: String? = nil,
         lastModified: Date = Date(),
         lastViewed: Date = Date()
     ) {
         self.id = id
+        self.userId = userId
         self.name = name
         self.structure = structure
         self.companyDescription = companyDescription

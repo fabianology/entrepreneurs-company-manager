@@ -10,8 +10,8 @@ struct CompanyAvatar: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
-            } else if !company.website.isEmpty {
-                AsyncImage(url: faviconURL(for: company.website)) { phase in
+            } else if let website = company.website, !website.isEmpty {
+                AsyncImage(url: faviconURL(for: website)) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable().scaledToFit().padding(8)

@@ -1,27 +1,38 @@
 import Foundation
-import SwiftData
 
-@Model
-final class CompanyDocument {
-    var id: String = UUID().uuidString
-    var companyId: String = ""
-    var name: String = "New Document"
-    var type: String = "Other"
-    var url: String = ""
-    var uploadDate: String = ""
-    var notes: String = ""
-    var company: Company?
+struct CompanyDocument: Identifiable, Codable, Hashable {
+    var id: UUID
+    var userId: UUID
+    var companyId: UUID
+    var name: String
+    var type: String
+    var url: String?
+    var uploadDate: String?
+    var notes: String?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case companyId = "company_id"
+        case name
+        case type
+        case url
+        case uploadDate = "upload_date"
+        case notes
+    }
+    
     init(
-        id: String = UUID().uuidString,
-        companyId: String = "",
+        id: UUID = UUID(),
+        userId: UUID,
+        companyId: UUID,
         name: String = "New Document",
         type: String = "Other",
-        url: String = "",
-        uploadDate: String = "",
-        notes: String = ""
+        url: String? = nil,
+        uploadDate: String? = nil,
+        notes: String? = nil
     ) {
         self.id = id
+        self.userId = userId
         self.companyId = companyId
         self.name = name
         self.type = type

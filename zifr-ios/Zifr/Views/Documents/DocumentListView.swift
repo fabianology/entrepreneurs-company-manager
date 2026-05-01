@@ -5,7 +5,7 @@ struct DocumentListView: View {
     let company: Company
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
 
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
@@ -57,7 +57,7 @@ struct DocumentListView: View {
                     }
 
                     Button {
-                        newDoc = vm.addDocument(context: context, companyId: company.id)
+                        newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
                             Text("ADD DOCUMENT").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
@@ -133,7 +133,7 @@ struct DocumentListView: View {
                                         DocumentRow(doc: doc) {
                                             editingDoc = doc
                                         } onOpen: {
-                                            if let u = URL(string: doc.url.hasPrefix("http") ? doc.url : "https://\(doc.url)") {
+                                            if let u = URL(string: (doc.url ?? "").hasPrefix("http") ? (doc.url ?? "") : "https://\((doc.url ?? ""))") {
                                                 openURL = IdentifiableURL(url: u)
                                             }
                                         }
@@ -162,7 +162,7 @@ struct DocumentListView: View {
                                     DocumentRow(doc: doc) {
                                         editingDoc = doc
                                     } onOpen: {
-                                        if let u = URL(string: doc.url.hasPrefix("http") ? doc.url : "https://\(doc.url)") {
+                                        if let u = URL(string: (doc.url ?? "").hasPrefix("http") ? (doc.url ?? "") : "https://\((doc.url ?? ""))") {
                                             openURL = IdentifiableURL(url: u)
                                         }
                                     }
@@ -239,6 +239,8 @@ struct DocumentListView: View {
     }
 
     @State private var dummyDoc = CompanyDocument(
+        userId: UUID(),
+        companyId: UUID(),
         name: "Articles of Incorporation",
         type: "Formation & Governance",
         url: "drive.google.com/...",
@@ -249,7 +251,7 @@ struct DocumentListView: View {
     private var emptyState: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            newDoc = vm.addDocument(context: context, companyId: company.id)
+            newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
         }) {
             ZStack {
                 // Dummy document row
@@ -294,7 +296,7 @@ struct DocumentListView: View {
                 
                 // 4. Create Document
                 await MainActor.run {
-                    let doc = vm.addDocument(context: context, companyId: company.id)
+                    var doc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
                     
                     if let cat = categorization {
                         doc.name = cat["name"] ?? "Scanned Document"
@@ -306,6 +308,7 @@ struct DocumentListView: View {
                     if let url = pdfURL {
                         doc.url = url.absoluteString
                     }
+                    vm.saveDoc(doc, appState: appState)
                     
                     isProcessingScan = false
                     
@@ -343,18 +346,18 @@ struct DocumentRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(doc.name.isEmpty ? "Document" : doc.name)
                     .font(.system(size: 14, weight: .black)).foregroundStyle(.white)
-                if !doc.uploadDate.isEmpty {
-                    Text("Added \(doc.uploadDate)").zifrLabel()
+                if !(doc.uploadDate ?? "").isEmpty {
+                    Text("Added \(doc.uploadDate ?? "")").zifrLabel()
                 }
-                if !doc.notes.isEmpty {
-                    Text(doc.notes)
+                if !(doc.notes ?? "").isEmpty {
+                    Text(doc.notes ?? "")
                         .font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.4))
                         .lineLimit(1)
                 }
             }
             Spacer()
             HStack(spacing: 10) {
-                if !doc.url.isEmpty {
+                if !(doc.url ?? "").isEmpty {
                     Button(action: onOpen) {
                         Image(systemName: "arrow.up.right.square")
                             .font(.system(size: 16, weight: .semibold))
@@ -374,11 +377,11 @@ struct DocumentRow: View {
 }
 
 struct EditDocumentSheet: View {
-    @Bindable var doc: CompanyDocument
+    @State var doc: CompanyDocument
     @Bindable var vm: AppViewModel
     let isNew: Bool
     let companyStructure: String
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
     
@@ -389,7 +392,7 @@ struct EditDocumentSheet: View {
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: doc.name, type: doc.type, url: doc.url, uploadDate: doc.uploadDate, notes: doc.notes)
+        Snapshot(name: doc.name, type: doc.type, url: doc.url ?? "", uploadDate: doc.uploadDate ?? "", notes: doc.notes ?? "")
     }
 
     private var isDirty: Bool {
@@ -414,11 +417,11 @@ struct EditDocumentSheet: View {
                         }
                         .cifrField()
                     }
-                    ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url }, set: { doc.url = $0 }), keyboardType: .URL)
-                    ZifrField(label: "Upload Date", placeholder: "April 15, 2026", text: Binding(get: { doc.uploadDate }, set: { doc.uploadDate = $0 }))
+                    ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url ?? "" }, set: { doc.url = $0 }), keyboardType: .URL)
+                    ZifrField(label: "Upload Date", placeholder: "April 15, 2026", text: Binding(get: { doc.uploadDate ?? "" }, set: { doc.uploadDate = $0 }))
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Notes").zifrLabel()
-                        TextEditor(text: Binding(get: { doc.notes }, set: { doc.notes = $0 }))
+                        TextEditor(text: Binding(get: { doc.notes ?? "" }, set: { doc.notes = $0 }))
                             .font(.system(size: 13)).foregroundStyle(.white)
                             .scrollContentBackground(.hidden).frame(minHeight: 70)
                             .padding(12).background(Color.white.opacity(0.05))
@@ -450,7 +453,7 @@ struct EditDocumentSheet: View {
                         if showDelete {
                             HStack(spacing: 20) {
                                 Text("Sure?").font(.system(size: 12, weight: .bold)).foregroundStyle(.red)
-                                Button("Yes") { vm.deleteDoc(doc, context: context); dismiss() }
+                                Button("Yes") { vm.deleteDoc(doc, appState: appState); dismiss() }
                                     .font(.system(size: 12, weight: .black)).foregroundStyle(.red)
                                 Button("No") { showDelete = false }
                                     .font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
@@ -476,7 +479,7 @@ struct EditDocumentSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { 
                         if isNew { 
-                            vm.deleteDoc(doc, context: context) 
+                            vm.deleteDoc(doc, appState: appState) 
                         } else if let snap = snapshot {
                             doc.name = snap.name
                             doc.type = snap.type
@@ -490,7 +493,7 @@ struct EditDocumentSheet: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { vm.saveDoc(doc, context: context); dismiss() }
+                    Button("Save") { vm.saveDoc(doc, appState: appState); dismiss() }
                         .font(.system(size: 15, weight: .black))
                         .foregroundStyle(isDirty ? Color.green : .white)
                 }

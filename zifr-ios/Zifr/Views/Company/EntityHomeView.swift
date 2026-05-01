@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 struct EntityHomeView: View {
     let company: Company
@@ -22,7 +21,7 @@ struct EntityHomeView: View {
     private let docsColor   = Color(hex: "#918457")
     private let homeColor   = Color.white.opacity(0.85)
 
-    @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
 
     @State private var expandedInstitutions: Set<String> = []
     @State private var expandedCategories: Set<String> = []
@@ -58,9 +57,9 @@ struct EntityHomeView: View {
     private var expiringPromos: [(String, Int)] {
         let thirtyDays = Date().addingTimeInterval(30 * 24 * 3600)
         return creditCards
-            .filter { $0.promoApr == 0 && $0.promoEnds > Date() && $0.promoEnds <= thirtyDays }
+            .filter { $0.promoApr == 0 && ($0.promoEnds ?? .distantPast) > Date() && ($0.promoEnds ?? .distantFuture) <= thirtyDays }
             .map { card in
-                let days = Calendar.current.dateComponents([.day], from: Date(), to: card.promoEnds).day ?? 0
+                let days = Calendar.current.dateComponents([.day], from: Date(), to: card.promoEnds ?? Date()).day ?? 0
                 return (card.name, days)
             }
     }
@@ -146,15 +145,15 @@ struct EntityHomeView: View {
         HStack(spacing: 12) {
             quickAddButton(icon: "square.3.layers.3d", title: "Add Service", color: subsColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                newSub = vm.addSubscription(context: modelContext, companyId: company.id)
+                newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
             }
             quickAddButton(icon: "dollarsign.bank.building", title: "Add Account", color: finColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                newCard = vm.addCard(context: modelContext, companyId: company.id)
+                newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
             }
             quickAddButton(icon: "doc.text", title: "Add Doc", color: docsColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                newDoc = vm.addDocument(context: modelContext, companyId: company.id)
+                newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
             }
         }
         .padding(.horizontal, 20)
@@ -265,8 +264,8 @@ struct EntityHomeView: View {
                     institutionRow(inst)
                 }
                 // Orphaned cards
-                let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == card.institutionName.lowercased() } }
-                let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == loan.lender.lowercased() } }
+                let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == (card.institutionName ?? "").lowercased() } }
+                let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
                 
                 if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
                     VStack(spacing: 0) {
@@ -319,9 +318,9 @@ struct EntityHomeView: View {
     }
     
     private func institutionRow(_ inst: Institution) -> some View {
-        let isExpanded = expandedInstitutions.contains(inst.id)
-        let instCards = cards.filter { $0.institutionName.lowercased() == inst.name.lowercased() }
-        let instLoans = loans.filter { $0.role == "Bank Loan" && $0.lender.lowercased() == inst.name.lowercased() }
+        let isExpanded = expandedInstitutions.contains(inst.id.uuidString)
+        let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == (inst.name).lowercased() }
+        let instLoans = loans.filter { $0.role == "Bank Loan" && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
         
         let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
         let instCredit = instCards.reduce(0) { $0 + $1.limit }
@@ -329,11 +328,11 @@ struct EntityHomeView: View {
         return VStack(spacing: 0) {
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if isExpanded { expandedInstitutions.remove(inst.id) }
-                else { expandedInstitutions.insert(inst.id) }
+                if isExpanded { expandedInstitutions.remove(inst.id.uuidString) }
+                else { expandedInstitutions.insert(inst.id.uuidString) }
             } label: {
                 HStack {
-                    if !inst.loginUrl.isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(inst.loginUrl)&sz=128") {
+                    if !(inst.loginUrl ?? "").isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(inst.loginUrl ?? "")&sz=128") {
                         AsyncImage(url: url) { phase in
                             switch phase {
                             case .empty:
@@ -674,7 +673,7 @@ struct EntityHomeView: View {
     private func subscriptionCard(_ sub: Subscription) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 6) {
-                if !sub.website.isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(sub.website)&sz=128") {
+                if !(sub.website ?? "").isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(sub.website ?? "")&sz=128") {
                     AsyncImage(url: url) { phase in
                         switch phase {
                         case .empty:
@@ -723,11 +722,11 @@ struct EntityHomeView: View {
                         .foregroundStyle(.white)
                 }
                 
-                let payStr = sub.paymentMethod.isEmpty ? "None" : sub.paymentMethod
+                let payStr = (sub.paymentMethod ?? "").isEmpty ? "None" : (sub.paymentMethod ?? "")
                 
                 let instName: String = {
-                    if let c = cards.first(where: { $0.name == sub.paymentMethod }), !c.institutionName.isEmpty {
-                        return c.institutionName
+                    if let c = cards.first(where: { $0.name == sub.paymentMethod }), !(c.institutionName ?? "").isEmpty {
+                        return c.institutionName ?? ""
                     }
                     if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty {
                         return inst.name
@@ -763,7 +762,7 @@ struct EntityHomeView: View {
     }
     
     private func formattedDueOn(_ sub: Subscription) -> String {
-        guard !sub.nextRenewal.isEmpty else { return "Unknown" }
+        guard !(sub.nextRenewal ?? "").isEmpty else { return "Unknown" }
         func ordinal(_ n: Int) -> String {
             let tens = (n % 100) / 10
             if tens == 1 { return "\(n)th" }
@@ -775,14 +774,14 @@ struct EntityHomeView: View {
             }
         }
         if sub.billingCycle == "Monthly" {
-            if let day = Int(sub.nextRenewal) { return "\(ordinal(day)) every mo." }
-            return sub.nextRenewal + " every mo."
+            if let day = Int(sub.nextRenewal ?? "") { return "\(ordinal(day)) every mo." }
+            return (sub.nextRenewal ?? "") + " every mo."
         } else {
-            let parts = sub.nextRenewal.split(separator: " ")
+            let parts = (sub.nextRenewal ?? "").split(separator: " ")
             if parts.count == 2, let day = Int(parts[1]) {
                 return "\(parts[0]) \(ordinal(day)) every yr."
             }
-            return sub.nextRenewal + " every yr."
+            return (sub.nextRenewal ?? "") + " every yr."
         }
     }
     

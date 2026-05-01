@@ -1,51 +1,85 @@
 import Foundation
-import SwiftData
 
-@Model
-final class LoanPayment: Identifiable {
-    var id: String = UUID().uuidString
-    var date: Date = Date()
-    var amount: Double = 0
-    var source: String = ""
-    var loan: Loan?
+struct LoanPayment: Identifiable, Codable, Hashable {
+    var id: UUID
+    var userId: UUID
+    var loanId: UUID
+    var date: Date
+    var amount: Double
+    var source: String?
 
-    init(id: String = UUID().uuidString, date: Date = Date(), amount: Double = 0, source: String = "") {
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case loanId = "loan_id"
+        case date
+        case amount
+        case source
+    }
+    
+    init(id: UUID = UUID(), userId: UUID, loanId: UUID, date: Date = Date(), amount: Double = 0, source: String? = nil) {
         self.id = id
+        self.userId = userId
+        self.loanId = loanId
         self.date = date
         self.amount = amount
         self.source = source
     }
 }
 
-@Model
-final class Loan {
-    var id: String = UUID().uuidString
-    var companyId: String = ""
-    var role: String = "Bank Loan"
-    var lender: String = ""
-    var name: String = ""
-    var principalAmount: Double = 0
-    var remainingBalance: Double = 0
-    var interestType: String = "Percentage"
-    var interestRate: Double = 0
-    var term: String = "0 months"
-    var termYears: Int = 0
-    var termMonths: Int = 0
-    var scheduleFrequency: String = "Monthly"
-    var monthlyPayment: Double = 0
-    var startDate: Date = Date()
-    var maturityDate: Date? = nil
-    var paidOffDate: Date? = nil
-    var status: String = "Active"
-    var notes: String = ""
-    @Relationship(deleteRule: .cascade, inverse: \LoanPayment.loan) var payments: [LoanPayment]? = []
-    var company: Company?
+struct Loan: Identifiable, Codable, Hashable {
+    var id: UUID
+    var userId: UUID
+    var companyId: UUID
+    var role: String
+    var lender: String?
+    var name: String
+    var principalAmount: Double
+    var remainingBalance: Double
+    var interestType: String
+    var interestRate: Double
+    var term: String
+    var termYears: Int
+    var termMonths: Int
+    var scheduleFrequency: String
+    var monthlyPayment: Double
+    var startDate: Date
+    var maturityDate: Date?
+    var paidOffDate: Date?
+    var status: String
+    var notes: String?
+    var payments: [LoanPayment]?
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case companyId = "company_id"
+        case role
+        case lender
+        case name
+        case principalAmount = "principal_amount"
+        case remainingBalance = "remaining_balance"
+        case interestType = "interest_type"
+        case interestRate = "interest_rate"
+        case term
+        case termYears = "term_years"
+        case termMonths = "term_months"
+        case scheduleFrequency = "schedule_frequency"
+        case monthlyPayment = "monthly_payment"
+        case startDate = "start_date"
+        case maturityDate = "maturity_date"
+        case paidOffDate = "paid_off_date"
+        case status
+        case notes
+        case payments
+    }
+    
     init(
-        id: String = UUID().uuidString,
-        companyId: String = "",
+        id: UUID = UUID(),
+        userId: UUID,
+        companyId: UUID,
         role: String = "Bank Loan",
-        lender: String = "",
+        lender: String? = nil,
         name: String = "",
         principalAmount: Double = 0,
         remainingBalance: Double = 0,
@@ -60,10 +94,11 @@ final class Loan {
         maturityDate: Date? = nil,
         paidOffDate: Date? = nil,
         status: String = "Active",
-        notes: String = "",
-        payments: [LoanPayment]? = []
+        notes: String? = nil,
+        payments: [LoanPayment]? = nil
     ) {
         self.id = id
+        self.userId = userId
         self.companyId = companyId
         self.role = role
         self.lender = lender

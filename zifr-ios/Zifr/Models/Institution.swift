@@ -1,5 +1,4 @@
 import Foundation
-import SwiftData
 
 struct InstitutionAccount: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
@@ -30,31 +29,45 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
     }
 }
 
-@Model
-final class Institution {
-    var id: String = UUID().uuidString
-    var companyId: String = ""
-    var name: String = ""
-    var loginUrl: String = ""
-    var username: String = ""
-    var email: String = ""
-    var password: String = ""
-    var twoFactor: String = ""
-    var accountsData: Data = Data()
-    var company: Company?
+struct Institution: Identifiable, Codable, Hashable {
+    var id: UUID
+    var userId: UUID
+    var companyId: UUID
+    var name: String
+    var loginUrl: String?
+    var username: String?
+    var email: String?
+    var password: String?
+    var twoFactor: String?
+    var accountsData: [InstitutionAccount]
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case companyId = "company_id"
+        case name
+        case loginUrl = "login_url"
+        case username
+        case email
+        case password
+        case twoFactor = "two_factor"
+        case accountsData = "accounts_data"
+    }
+    
     init(
-        id: String = UUID().uuidString,
-        companyId: String = "",
+        id: UUID = UUID(),
+        userId: UUID,
+        companyId: UUID,
         name: String = "",
-        loginUrl: String = "",
-        username: String = "",
-        email: String = "",
-        password: String = "",
-        twoFactor: String = "",
+        loginUrl: String? = nil,
+        username: String? = nil,
+        email: String? = nil,
+        password: String? = nil,
+        twoFactor: String? = nil,
         accounts: [InstitutionAccount] = []
     ) {
         self.id = id
+        self.userId = userId
         self.companyId = companyId
         self.name = name
         self.loginUrl = loginUrl
@@ -62,12 +75,12 @@ final class Institution {
         self.email = email
         self.password = password
         self.twoFactor = twoFactor
-        self.accountsData = (try? JSONEncoder().encode(accounts)) ?? Data()
+        self.accountsData = accounts
     }
 
     var accounts: [InstitutionAccount] {
-        get { (try? JSONDecoder().decode([InstitutionAccount].self, from: accountsData)) ?? [] }
-        set { accountsData = (try? JSONEncoder().encode(newValue)) ?? Data() }
+        get { accountsData }
+        set { accountsData = newValue }
     }
 
     var nonCardAccounts: [InstitutionAccount] {

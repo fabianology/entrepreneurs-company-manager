@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 struct FinancialView: View {
     let company: Company
@@ -7,7 +6,7 @@ struct FinancialView: View {
     let institutions: [Institution]
     let loans: [Loan]
     @Bindable var vm: AppViewModel
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
 
     @State private var editingCard: FinancialCard? = nil
     @State private var editingInst: Institution? = nil
@@ -66,7 +65,7 @@ struct FinancialView: View {
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                         print("Triggering CloudKit Sharing for \(loan.name)")
                                     } label: {
-                                        Label(loan.name.isEmpty ? "Loan" : loan.name, systemImage: "person.crop.circle.badge.plus")
+                                        Label((loan.name ?? "").isEmpty ? "Loan" : loan.name, systemImage: "person.crop.circle.badge.plus")
                                     }
                                 }
                             }
@@ -83,18 +82,18 @@ struct FinancialView: View {
 
                     Menu {
                         Button {
-                            newInst = vm.addInstitution(context: context, companyId: company.id)
+                            newInst = vm.addInstitution(appState: appState, userId: company.userId, companyId: company.id)
                         } label: {
                             Label("Add Account", systemImage: "building.columns")
                         }
                         if !institutions.isEmpty {
                             Button {
-                                newCard = vm.addCard(context: context, companyId: company.id)
+                                newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
                             } label: {
                                 Label("Add Card", systemImage: "creditcard")
                             }
                             Button {
-                                newLoan = vm.addLoan(context: context, companyId: company.id)
+                                newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
                             } label: {
                                 Label("Add Loan", systemImage: "dollarsign.circle")
                             }
@@ -119,6 +118,9 @@ struct FinancialView: View {
                     if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy Amex wallet with glass overlay
                         let dummyAmex = Institution(
+                            id: UUID(),
+                            userId: UUID(),
+                            companyId: UUID(),
                             name: "American Express",
                             loginUrl: "americanexpress.com",
                             username: "founder@company.com",
@@ -128,6 +130,9 @@ struct FinancialView: View {
                             ]
                         )
                         let dummyCard1 = FinancialCard(
+                            id: UUID(),
+                            userId: UUID(),
+                            companyId: UUID(),
                             name: "Amex Platinum",
                             institutionName: "American Express",
                             cardHolder: "Jane Founder",
@@ -142,7 +147,7 @@ struct FinancialView: View {
                         
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            newInst = vm.addInstitution(context: context, companyId: company.id)
+                            newInst = vm.addInstitution(appState: appState, userId: company.userId, companyId: company.id)
                         } label: {
                             ZStack {
                                 // Dummy wallet stack
@@ -189,15 +194,15 @@ struct FinancialView: View {
                         // Institutions Block
                         if !institutions.isEmpty {
                                 ForEach(institutions) { inst in
-                                    let instCards = cards.filter { $0.institutionName.lowercased() == inst.name.lowercased() }
-                                    let instLoans = loans.filter { $0.lender.lowercased() == inst.name.lowercased() }
+                                    let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == inst.name.lowercased() }
+                                    let instLoans = loans.filter { ($0.lender ?? "").lowercased() == inst.name.lowercased() }
                                     walletStackForInstitution(inst: inst, instCards: instCards, instLoans: instLoans)
                                 }
                             }
                         
                         // Remaining standalone accounts block
-                        let standaloneCards = cards.filter { c in !institutions.contains { $0.name.lowercased() == c.institutionName.lowercased() } }
-                        let standaloneLoans = loans.filter { l in !institutions.contains { $0.name.lowercased() == l.lender.lowercased() } }
+                        let standaloneCards = cards.filter { c in !institutions.contains { ($0.name ?? "").lowercased() == (c.institutionName ?? "").lowercased() } }
+                        let standaloneLoans = loans.filter { l in !institutions.contains { ($0.name ?? "").lowercased() == (l.lender ?? "").lowercased() } }
                         
                         if !standaloneCards.isEmpty || !standaloneLoans.isEmpty {
                             VStack(alignment: .leading, spacing: 16) {
@@ -237,10 +242,10 @@ struct FinancialView: View {
         }
     }
     
-    private func handleDeepLink(id: String?, proxy: ScrollViewProxy) {
+    private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
         guard let id = id else { return }
         if let c = cards.first(where: { $0.id == id }) {
-            poppedCardId = c.id
+            poppedCardId = c.id.uuidString
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     proxy.scrollTo(c.id, anchor: .center)
@@ -290,7 +295,7 @@ struct FinancialView: View {
         ZStack(alignment: .top) {
             if !instCards.isEmpty {
                 ForEach(Array(instCards.enumerated()), id: \.element.id) { index, card in
-                        let isPopped = poppedCardId == card.id
+                        let isPopped = poppedCardId == card.id.uuidString
                         let yOffset = isPopped ? 16.0 : -(peekOffset + CGFloat(index) * peekOffset)
                         let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
                         
@@ -304,7 +309,7 @@ struct FinancialView: View {
                             .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
                             .onTapGesture {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                if poppedCardId == card.id { poppedCardId = nil } else { poppedCardId = card.id }
+                                if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }
                             }
                             .onLongPressGesture {
                                 editingCard = card
@@ -347,7 +352,7 @@ struct FinancialView: View {
         if !cards.isEmpty {
             ZStack(alignment: .bottom) {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
-                    let isPopped = poppedCardId == card.id
+                    let isPopped = poppedCardId == card.id.uuidString
                     let yOffset = isPopped ? 0.0 : -(CGFloat(index) * peekOffset)
                     let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
                     
@@ -361,7 +366,7 @@ struct FinancialView: View {
                         .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            if poppedCardId == card.id { poppedCardId = nil } else { poppedCardId = card.id }
+                            if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }
                         }
                         .onLongPressGesture {
                             editingCard = card
@@ -450,18 +455,20 @@ struct FinancialCardVisual: View {
     let card: FinancialCard
     let isPopped: Bool
     
-    @Query private var subscriptions: [Subscription]
+    @Environment(AppState.self) private var appState
+    
+    private var subscriptions: [Subscription] { appState.subscriptions }
     
     private var paysForServices: [(name: String, cost: Double)] {
         let cardName = card.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cardName.isEmpty else { return [] }
         var results: [(name: String, cost: Double)] = []
         for sub in subscriptions {
-            if sub.paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+            if (sub.paymentMethod ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
                 results.append((name: sub.name.isEmpty ? "Unnamed Service" : sub.name, cost: sub.cost))
             }
             for subSvc in sub.subServices {
-                if subSvc.paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+                if (subSvc.paymentMethod ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
                     results.append((name: subSvc.name.isEmpty ? "Unnamed Sub-service" : subSvc.name, cost: subSvc.cost))
                 }
             }
@@ -472,7 +479,7 @@ struct FinancialCardVisual: View {
     private var promoEndsString: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM/dd/yy"
-        return formatter.string(from: card.promoEnds)
+        return formatter.string(from: card.promoEnds ?? Date())
     }
 
     var body: some View {
@@ -497,7 +504,7 @@ struct FinancialCardVisual: View {
                             .font(.system(size: isPopped ? 16 : 12, weight: .bold))
                             .foregroundStyle(primaryColor)
                         
-                        if !card.last4.isEmpty {
+                        if !(card.last4 ?? "").isEmpty {
                             Text("•••• \(card.last4)")
                                 .font(.system(size: isPopped ? 14 : 10, weight: .semibold))
                                 .foregroundStyle(secondaryColor)
@@ -514,11 +521,11 @@ struct FinancialCardVisual: View {
                 
                 if isPopped {
                     HStack {
-                        Text(card.cardHolder.isEmpty ? "Name on Card" : card.cardHolder)
+                        Text((card.cardHolder ?? "").isEmpty ? "Name on Card" : (card.cardHolder ?? ""))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
                         Spacer()
-                        Text(card.expiry.isEmpty ? "—" : card.expiry)
+                        Text((card.expiry ?? "").isEmpty ? "—" : (card.expiry ?? ""))
                             .font(.system(size: 11, weight: .bold))
                             .foregroundStyle(isLight ? Color.black.opacity(0.6) : Color.white.opacity(0.6))
                     }
@@ -527,7 +534,7 @@ struct FinancialCardVisual: View {
                     let services = paysForServices
                     let hasFinancials = card.limit > 0 || card.balance > 0 || card.apr > 0 || card.promoApr > 0 || (card.autopay != "N/A" && !card.autopay.isEmpty)
                     
-                    if hasFinancials || !card.paidFrom.isEmpty || !services.isEmpty {
+                    if hasFinancials || !(card.paidFrom ?? "").isEmpty || !services.isEmpty {
                         Divider()
                             .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
                             .padding(.bottom, 6)
@@ -546,25 +553,25 @@ struct FinancialCardVisual: View {
                                     if card.autopay != "N/A" && !card.autopay.isEmpty { cardMetric(title: "AUTO PAY", value: card.autopay, isLight: isLight, primaryColor: primaryColor) }
                                 }
                                 
-                                if !card.paidFrom.isEmpty || !services.isEmpty {
+                                if !(card.paidFrom ?? "").isEmpty || !services.isEmpty {
                                     Divider()
                                         .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
                                 }
                             }
                             
-                            if !card.paidFrom.isEmpty {
+                            if !(card.paidFrom ?? "").isEmpty {
                                 HStack {
                                     Text("PAY FROM")
                                         .font(.system(size: 8, weight: .bold))
                                         .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
                                     Spacer()
-                                    Text(card.paidFrom)
+                                    Text(card.paidFrom ?? "")
                                         .font(.system(size: 10, weight: .semibold))
                                         .foregroundStyle(primaryColor)
                                 }
                             }
                             
-                            if !card.paidFrom.isEmpty && !services.isEmpty {
+                            if !(card.paidFrom ?? "").isEmpty && !services.isEmpty {
                                 Divider()
                                     .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
                             }
@@ -616,6 +623,7 @@ struct FinancialCardVisual: View {
 
 // MARK: - Institution Card
 struct InstitutionCardView: View {
+    @Environment(AppState.self) private var appState
     let institution: Institution
     let totalMonthlyPayment: Double
     let cardCount: Int
@@ -639,8 +647,8 @@ struct InstitutionCardView: View {
                     HStack(alignment: .top, spacing: 16) {
                         ZStack {
                             RoundedRectangle(cornerRadius: 16).fill(Color.clear).frame(width: 56, height: 56)
-                            if !institution.loginUrl.isEmpty {
-                                FaviconImage(website: institution.loginUrl, size: 36)
+                            if !(institution.loginUrl ?? "").isEmpty {
+                                FaviconImage(website: institution.loginUrl ?? "", size: 36)
                             } else {
                                 Image(systemName: "building.columns")
                                     .font(.system(size: 22, weight: .semibold))
@@ -696,22 +704,22 @@ struct InstitutionCardView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
                             copyableCredential(
-                                id: institution.id,
+                                id: institution.id.uuidString,
                                 label: "Login ID",
-                                value: institution.username.isEmpty ? (institution.email.isEmpty ? "—" : institution.email) : institution.username,
+                                value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
                                 field: "login"
                             )
                             copyableCredential(
-                                id: institution.id,
+                                id: institution.id.uuidString,
                                 label: "Password",
-                                value: institution.password,
+                                value: institution.password ?? "",
                                 field: "password",
                                 isPassword: true
                             )
                         }
                         
-                        let loginValue = institution.username.isEmpty ? institution.email : institution.username
-                        DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id)
+                        let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
+                        DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
@@ -771,7 +779,7 @@ struct InstitutionCardView: View {
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(loan.name.isEmpty ? "Loan" : loan.name)
+                                    Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
                                         .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(.white)
                                     
@@ -819,9 +827,9 @@ struct InstitutionCardView: View {
                 institutionName: institution.name.isEmpty ? "Institution" : institution.name,
                 onSave: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
-                        var updated = institution.accounts
-                        updated[idx] = accountDraft
-                        institution.accounts = updated
+                        var updatedInst = institution
+                        updatedInst.accounts[idx] = accountDraft
+                        vm.saveInstitution(updatedInst, appState: appState)
                     }
                     editingAccount = nil
                 },
@@ -830,7 +838,9 @@ struct InstitutionCardView: View {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         let acc = institution.accounts[idx]
                         vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
-                        institution.accounts.remove(at: idx)
+                        var updatedInst = institution
+                        updatedInst.accounts.remove(at: idx)
+                        vm.saveInstitution(updatedInst, appState: appState)
                     }
                     editingAccount = nil
                 }
@@ -933,7 +943,7 @@ struct InstitutionCardView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
             }
             .buttonStyle(.plain)
-            .proContextMenu(password: institution.password, loginId: institution.username.isEmpty ? institution.email : institution.username, last4: nil)
+            .proContextMenu(password: institution.password, loginId: (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? ""), last4: nil)
         }
     }
 }
@@ -975,7 +985,7 @@ struct FinancialCardView: View {
                             .foregroundStyle(Color.white.opacity(0.4))
                         Text("•")
                             .foregroundStyle(Color.white.opacity(0.2))
-                        Text(card.expiry.isEmpty ? "—" : card.expiry)
+                        Text((card.expiry ?? "").isEmpty ? "—" : (card.expiry ?? ""))
                             .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
@@ -996,7 +1006,7 @@ struct FinancialCardView: View {
 
 private extension FinancialCard {
     var cardGradientHex: [String] {
-        let inst = institutionName.lowercased()
+        let inst = (institutionName ?? "").lowercased()
         
         // Known Institutions
         if inst.contains("apple") { return ["#FFFFFF", "#F0F0F5"] }
@@ -1034,10 +1044,10 @@ struct LoanCardView: View {
             VStack(spacing: 12) {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(loan.name.isEmpty ? "Loan" : loan.name)
+                        Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(.white)
-                        Text(loan.lender.isEmpty ? "—" : loan.lender)
+                        Text((loan.lender ?? "").isEmpty ? "—" : (loan.lender ?? ""))
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
@@ -1117,17 +1127,17 @@ struct LoanCardView: View {
 
 // MARK: - Edit Institution Sheet
 struct EditInstitutionSheet: View {
-    @Bindable var institution: Institution
+    @State var institution: Institution
     let institutions: [Institution]
     let cards: [FinancialCard]
     let loans: [Loan]
     @Bindable var vm: AppViewModel
     let isNew: Bool
 
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     
-    @Query private var allSubscriptions: [Subscription]
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
 
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
@@ -1138,7 +1148,7 @@ struct EditInstitutionSheet: View {
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: institution.name, loginUrl: institution.loginUrl, username: institution.username, email: institution.email, password: institution.password, twoFactor: institution.twoFactor)
+        Snapshot(name: institution.name ?? "", loginUrl: institution.loginUrl ?? "", username: institution.username ?? "", email: institution.email ?? "", password: institution.password ?? "", twoFactor: institution.twoFactor ?? "")
     }
 
     private var isDirty: Bool {
@@ -1147,10 +1157,10 @@ struct EditInstitutionSheet: View {
     }
 
     private var instCards: [FinancialCard] {
-        cards.filter { $0.institutionName.lowercased() == institution.name.lowercased() && !institution.name.isEmpty }
+        cards.filter { ($0.institutionName ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
     }
     private var instLoans: [Loan] {
-        loans.filter { $0.lender.lowercased() == institution.name.lowercased() && !institution.name.isEmpty }
+        loans.filter { ($0.lender ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
     }
 
     @State private var showAccountHUD = false
@@ -1180,7 +1190,7 @@ struct EditInstitutionSheet: View {
                             ZifrField(
                                 label: "WEBSITE",
                                 placeholder: "chase.com",
-                                text: Binding(get: { institution.loginUrl }, set: { institution.loginUrl = $0 }),
+                                text: Binding(get: { institution.loginUrl ?? "" }, set: { institution.loginUrl = $0 }),
                                 keyboardType: .URL,
                                 textContentType: .URL
                             )
@@ -1193,11 +1203,11 @@ struct EditInstitutionSheet: View {
                                     label: "LOGIN ID",
                                     placeholder: "username",
                                     text: Binding(
-                                        get: { institution.username.isEmpty ? institution.email : institution.username },
+                                        get: { (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "") },
                                         set: { newValue in
                                             let old = institution.username
                                             institution.username = newValue
-                                            if newValue.contains("@") && (institution.email.isEmpty || institution.email == old) {
+                                            if newValue.contains("@") && ((institution.email ?? "").isEmpty || institution.email == old) {
                                                 institution.email = newValue
                                             }
                                         }
@@ -1209,7 +1219,7 @@ struct EditInstitutionSheet: View {
                                     ZifrField(
                                         label: "PASSWORD",
                                         placeholder: "••••••••",
-                                        text: Binding(get: { institution.password }, set: { institution.password = $0 }),
+                                        text: Binding(get: { institution.password ?? "" }, set: { institution.password = $0 }),
                                         isSecure: !showPassword,
                                         textContentType: .password
                                     )
@@ -1228,15 +1238,15 @@ struct EditInstitutionSheet: View {
                                 }
                             }
                             
-                            let loginValue = institution.username.isEmpty ? institution.email : institution.username
-                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id)
+                            let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
+                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
                         }
                         
                         HStack(spacing: 12) {
                             ZifrField(
                                 label: "EMAIL",
                                 placeholder: "name@company.com",
-                                text: Binding(get: { institution.email }, set: { institution.email = $0 }),
+                                text: Binding(get: { institution.email ?? "" }, set: { institution.email = $0 }),
                                 keyboardType: .emailAddress,
                                 textContentType: .emailAddress
                             )
@@ -1245,12 +1255,12 @@ struct EditInstitutionSheet: View {
                             ZifrField(
                                 label: "2FA",
                                 placeholder: "Phone or App",
-                                text: Binding(get: { institution.twoFactor }, set: { institution.twoFactor = $0 })
+                                text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
                             )
                         }
                     }
                     .padding(.vertical, 4)
-                } header: { EmptyView() }
+                }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
@@ -1294,7 +1304,7 @@ struct EditInstitutionSheet: View {
                 InstitutionCardsSection(
                     cards: instCards,
                     onAdd: {
-                        cardDraft = vm.addCard(context: context, companyId: institution.companyId)
+                        cardDraft = vm.addCard(appState: appState, userId: institution.userId, companyId: institution.companyId)
                         cardDraft?.institutionName = institution.name 
                         showCardHUD = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1304,7 +1314,7 @@ struct EditInstitutionSheet: View {
                         showCardHUD = true
                     },
                     onDelete: { card in
-                        vm.deleteCard(card, context: context)
+                        vm.deleteCard(card, appState: appState)
                     }
                 )
 
@@ -1321,7 +1331,7 @@ struct EditInstitutionSheet: View {
                 InstitutionLoansSection(
                     loans: instLoans,
                     onAdd: {
-                        loanDraft = vm.addLoan(context: context, companyId: institution.companyId)
+                        loanDraft = vm.addLoan(appState: appState, userId: institution.userId, companyId: institution.companyId)
                         loanDraft?.lender = institution.name 
                         showLoanHUD = true
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1331,7 +1341,7 @@ struct EditInstitutionSheet: View {
                         showLoanHUD = true
                     },
                     onDelete: { loan in
-                        vm.deleteLoan(loan, context: context)
+                        vm.deleteLoan(loan, appState: appState)
                     }
                 )
 
@@ -1383,7 +1393,7 @@ struct EditInstitutionSheet: View {
                             titleVisibility: .visible
                         ) {
                             Button("Delete Bank", role: .destructive) {
-                                vm.deleteInstitution(institution, context: context)
+                                vm.deleteInstitution(institution, appState: appState)
                                 dismiss()
                             }
                             Button("Cancel", role: .cancel) {}
@@ -1409,7 +1419,7 @@ struct EditInstitutionSheet: View {
                     Button("Cancel") {
                         
                         if isNew { 
-                            vm.deleteInstitution(institution, context: context) 
+                            vm.deleteInstitution(institution, appState: appState) 
                         } else if let snap = snapshot {
                             institution.name = snap.name
                             institution.loginUrl = snap.loginUrl
@@ -1422,7 +1432,7 @@ struct EditInstitutionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isNew ? "Add Account" : "Save") {
-                        vm.saveInstitution(institution, context: context)
+                        vm.saveInstitution(institution, appState: appState)
                         dismiss()
                     }
                     .fontWeight(.semibold)
@@ -1462,7 +1472,7 @@ struct EditInstitutionSheet: View {
             .sheet(item: $cardDraft, onDismiss: { 
                 cardDraft = nil 
             }) { cd in
-                EditCardSheet(card: cd, vm: vm, institutions: institutions, cards: cards, isNew: cd.name.isEmpty && cd.last4.isEmpty, isInstitutionContext: true)
+                EditCardSheet(card: cd, vm: vm, institutions: institutions, cards: cards, isNew: (cd.name ?? "").isEmpty && (cd.last4 ?? "").isEmpty, isInstitutionContext: true)
             }
             .sheet(item: $loanDraft, onDismiss: { 
                 loanDraft = nil 
@@ -1475,7 +1485,7 @@ struct EditInstitutionSheet: View {
 
 // MARK: - Institution Accounts Section
 struct InstitutionAccountsSection: View {
-    @Bindable var institution: Institution
+    @State var institution: Institution
     @Bindable var vm: AppViewModel
     let onAdd: () -> Void
     let onEdit: (Int, InstitutionAccount) -> Void
@@ -1607,7 +1617,7 @@ struct InstitutionCardsSection: View {
                                     }
                                 }
                                 
-                                Text(card.paidFrom.isEmpty ? "No payment source" : "Paid from \(card.paidFrom)")
+                                Text((card.paidFrom ?? "").isEmpty ? "No payment source" : "Paid from \((card.paidFrom ?? ""))")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.45))
                             }
@@ -1673,7 +1683,7 @@ struct InstitutionLoansSection: View {
                             
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
-                                    Text(loan.name.isEmpty ? "Unnamed Loan" : loan.name)
+                                    Text((loan.name ?? "").isEmpty ? "Unnamed Loan" : loan.name)
                                         .font(.system(size: 14, weight: .bold))
                                         .foregroundStyle(.white)
                                     Text("|")
@@ -1811,7 +1821,7 @@ struct InstitutionAccountHUD: View {
                         }
                     }
                     .padding(.vertical, 4)
-                } header: { EmptyView() }
+                }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
@@ -1877,7 +1887,7 @@ struct InstitutionAccountHUD: View {
 
 // MARK: - Loan Payment HUD
 struct LoanPaymentHUD: View {
-    @Bindable var draft: LoanPayment
+    @State var draft: LoanPayment
     let isNew: Bool
     let institutions: [Institution]
     let cards: [FinancialCard]
@@ -1929,7 +1939,7 @@ struct LoanPaymentHUD: View {
                                 .foregroundStyle(Color.white.opacity(0.5))
                             
                             HStack {
-                                TextField("e.g. Primary Checking", text: $draft.source)
+                                TextField("e.g. Primary Checking", text: Binding(get: { draft.source ?? "" }, set: { draft.source = $0 }))
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundStyle(.white)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1970,7 +1980,7 @@ struct LoanPaymentHUD: View {
                         }
                     }
                     .padding(.vertical, 4)
-                } header: { EmptyView() }
+                }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
@@ -1997,20 +2007,20 @@ struct LoanPaymentHUD: View {
 
 // MARK: - Edit Card Sheet
 struct EditCardSheet: View {
-    @Bindable var card: FinancialCard
+    @State var card: FinancialCard
     @Bindable var vm: AppViewModel
     let institutions: [Institution]
     let cards: [FinancialCard]
     let isNew: Bool
     var isInstitutionContext: Bool = false
     var customTitle: String? = nil
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
     @State private var showDeleteInstitutionConfirm = false
     @State private var institutionToDelete: Institution? = nil
     
-    @Query private var subscriptions: [Subscription]
+    private var subscriptions: [Subscription] { appState.subscriptions }
     
     @State private var showFinancials = false
     @State private var showPaymentPicker = false
@@ -2029,7 +2039,7 @@ struct EditCardSheet: View {
         let subLogins = subscriptions.map { $0.loginId }
         let instUsers = institutions.map { $0.username }
         let instEmails = institutions.map { $0.email }
-        return (subLogins + instUsers + instEmails).filter { !$0.isEmpty }
+        return (subLogins + instUsers + instEmails).compactMap { $0 }.filter { !$0.isEmpty }
     }
     private var autoPayBinding: Binding<Bool> {
         Binding(
@@ -2050,7 +2060,7 @@ struct EditCardSheet: View {
 
     private var paidOnBinding: Binding<Int> {
         Binding(
-            get: { Int(card.paidOn) ?? 1 },
+            get: { Int(card.paidOn ?? "") ?? 1 },
             set: { card.paidOn = "\($0)" }
         )
     }
@@ -2063,7 +2073,7 @@ struct EditCardSheet: View {
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: card.name, last4: card.last4, network: card.network, type: card.type, autopay: card.autopay, cardHolder: card.cardHolder, cardHolderType: card.cardHolderType, expiry: card.expiry, notes: card.notes, balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds)
+        Snapshot(name: card.name ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
     }
 
     private var isDirty: Bool {
@@ -2099,22 +2109,22 @@ struct EditCardSheet: View {
             Group {
                 if isNewInstitution {
                     VStack(alignment: .leading, spacing: 8) {
-                        ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: { card.institutionName }, set: { card.institutionName = $0 }))
+                        ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: { card.institutionName ?? "" }, set: { card.institutionName = $0 }))
                         
-                        let matches = institutions.filter { $0.name.lowercased().contains(card.institutionName.lowercased()) && $0.name.lowercased() != card.institutionName.lowercased() }
+                        let matches = institutions.filter { ($0.name ?? "").lowercased().contains((card.institutionName ?? "").lowercased()) && ($0.name ?? "").lowercased() != (card.institutionName ?? "").lowercased() }
                         
-                        if !matches.isEmpty && !card.institutionName.isEmpty {
+                        if !matches.isEmpty && !(card.institutionName ?? "").isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
                                     ForEach(matches.prefix(3)) { inst in
                                         Button {
                                             isNewInstitution = false
                                             card.institutionName = inst.name
-                                            instWebsite = inst.loginUrl
-                                            instLogin = inst.username
-                                            instPass = inst.password
-                                            instEmail = inst.email
-                                            instTwoFactor = inst.twoFactor
+                                            instWebsite = inst.loginUrl ?? ""
+                                            instLogin = inst.username ?? ""
+                                            instPass = inst.password ?? ""
+                                            instEmail = inst.email ?? ""
+                                            instTwoFactor = inst.twoFactor ?? ""
                                             isEditingInstitution = false
                                         } label: {
                                             Text("Switch to \(inst.name)")
@@ -2191,19 +2201,19 @@ struct EditCardSheet: View {
                         ForEach(institutions) { inst in
                             Button(inst.name.isEmpty ? "Unnamed" : inst.name) {
                                 card.institutionName = inst.name
-                                instWebsite = inst.loginUrl
-                                instLogin = inst.username
-                                instPass = inst.password
-                                instEmail = inst.email
-                                instTwoFactor = inst.twoFactor
+                                instWebsite = inst.loginUrl ?? ""
+                                instLogin = inst.username ?? ""
+                                instPass = inst.password ?? ""
+                                instEmail = inst.email ?? ""
+                                instTwoFactor = inst.twoFactor ?? ""
                                 isEditingInstitution = false
                             }
                         }
                     } label: {
                         HStack {
-                            Text(card.institutionName.isEmpty ? "Select Institution..." : card.institutionName)
+                            Text((card.institutionName ?? "").isEmpty ? "Select Institution..." : (card.institutionName ?? ""))
                                 .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(card.institutionName.isEmpty ? Color.white.opacity(0.4) : .white)
+                                .foregroundStyle((card.institutionName ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                             Spacer()
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(size: 14))
@@ -2217,7 +2227,7 @@ struct EditCardSheet: View {
                     .padding(.bottom, 16)
                 }
                 
-                if isNewInstitution || !card.institutionName.isEmpty {
+                if isNewInstitution || !(card.institutionName ?? "").isEmpty {
                     institutionDetailsSection
                 }
             }
@@ -2226,17 +2236,18 @@ struct EditCardSheet: View {
 
     @ViewBuilder private var row1: some View {
         HStack(spacing: 12) {
-            ZifrField(label: "CARD NICKNAME", placeholder: "e.g. Sapphire", text: Binding(get: { card.name }, set: { card.name = $0 }))
-            ZifrField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder }, set: { card.cardHolder = $0 }), textContentType: .name)
+            ZifrField(label: "CARD NICKNAME", placeholder: "e.g. Sapphire", text: Binding(get: { card.name ?? "" }, set: { card.name = $0 }))
+            ZifrField(label: "NAME ON CARD", placeholder: "Jane Doe", text: Binding(get: { card.cardHolder ?? "" }, set: { card.cardHolder = $0 }), textContentType: .name)
         }
     }
 
     @ViewBuilder private var row2: some View {
         VStack(spacing: 12) {
-            ZifrField(label: "CARD NUMBER", placeholder: "0000 0000 0000 0000", text: Binding(get: { card.cardNumber }, set: { card.cardNumber = $0 }), keyboardType: .numberPad)
+            ZifrField(label: "CARD NUMBER", placeholder: "0000 0000 0000 0000", text: Binding(get: { card.cardNumber ?? "" }, set: { card.cardNumber = $0 }), keyboardType: .numberPad)
                 .onChange(of: card.cardNumber) { old, new in
-                    let filtered = new.filter { $0.isNumber }
-                    if card.cardNumber != filtered { card.cardNumber = filtered }
+                    let newStr = new ?? ""
+                    let filtered = newStr.filter { $0.isNumber }
+                    if (card.cardNumber ?? "") != filtered { card.cardNumber = filtered }
                     
                     if let first = filtered.first {
                         if first == "4" { card.network = "Visa" }
@@ -2325,9 +2336,9 @@ struct EditCardSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text(card.paidFrom.isEmpty ? "None" : card.paidFrom)
+                    Text((card.paidFrom ?? "").isEmpty ? "None" : (card.paidFrom ?? ""))
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(card.paidFrom.isEmpty ? Color.white.opacity(0.4) : .white)
+                        .foregroundStyle((card.paidFrom ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
@@ -2364,10 +2375,10 @@ struct EditCardSheet: View {
                 .frame(height: 44)
             }
             
-            ZifrField(label: "EXPIRES", placeholder: "MM/YY", text: Binding(get: { card.expiry }, set: { card.expiry = $0 }), keyboardType: .numberPad)
+            ZifrField(label: "EXPIRES", placeholder: "MM/YY", text: Binding(get: { card.expiry ?? "" }, set: { card.expiry = $0 }), keyboardType: .numberPad)
                 .onChange(of: card.expiry) { old, new in
-                    var filtered = new.filter { $0.isNumber }
-                    if old.count == 3 && old.hasSuffix("/") && new.count == 2 {
+                    var filtered = (new ?? "").filter { $0.isNumber }
+                    if (old ?? "").count == 3 && (old ?? "").hasSuffix("/") && (new ?? "").count == 2 {
                         filtered = String(filtered.prefix(1))
                     }
                     if filtered.count > 2 {
@@ -2376,7 +2387,7 @@ struct EditCardSheet: View {
                     if filtered.count > 5 {
                         filtered = String(filtered.prefix(5))
                     }
-                    if card.expiry != filtered { card.expiry = filtered }
+                    if (card.expiry ?? "") != filtered { card.expiry = filtered }
                 }
         }
     }
@@ -2386,11 +2397,11 @@ struct EditCardSheet: View {
         guard !cardName.isEmpty else { return [] }
         var results: [(name: String, cost: Double)] = []
         for sub in subscriptions {
-            if sub.paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+            if (sub.paymentMethod ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
                 results.append((name: sub.name.isEmpty ? "Unnamed Service" : sub.name, cost: sub.cost))
             }
             for subSvc in sub.subServices {
-                if subSvc.paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+                if (subSvc.paymentMethod ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
                     results.append((name: subSvc.name.isEmpty ? "Unnamed Sub-service" : subSvc.name, cost: subSvc.cost))
                 }
             }
@@ -2476,7 +2487,7 @@ struct EditCardSheet: View {
                         paysForRow
                     }
                     .padding(.vertical, 4)
-                } header: { EmptyView() }
+                }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
@@ -2523,7 +2534,7 @@ struct EditCardSheet: View {
                                             .frame(maxWidth: .infinity)
                                             .frame(width: (UIScreen.main.bounds.width - 64) * 0.28)
                                         
-                                        datePicker(label: "ENDS", selection: $card.promoEnds)
+                                        datePicker(label: "ENDS", selection: Binding(get: { card.promoEnds ?? Date() }, set: { card.promoEnds = $0 }))
                                     }
                                 }
                             }
@@ -2540,7 +2551,7 @@ struct EditCardSheet: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                             .padding(.leading, 6)
                         
-                        TextField("Add notes...", text: Binding(get: { card.notes }, set: { card.notes = $0 }), axis: .vertical)
+                        TextField("Add notes...", text: Binding(get: { card.notes ?? "" }, set: { card.notes = $0 }), axis: .vertical)
                             .lineLimit(3...6)
                             .font(.system(size: 14))
                             .foregroundStyle(.white)
@@ -2598,11 +2609,11 @@ struct EditCardSheet: View {
                         .buttonStyle(.plain)
                         .confirmationDialog("Delete Card?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("Delete Card", role: .destructive) {
-                                let instName = card.institutionName
-                                vm.deleteCard(card, context: context)
+                                let instNameStr = card.institutionName ?? ""
+                                vm.deleteCard(card, appState: appState)
                                 
-                                let remainingCards = cards.filter { $0.institutionName.lowercased() == instName.lowercased() && $0.id != card.id }
-                                if let orphanedInst = institutions.first(where: { $0.name.lowercased() == instName.lowercased() }) {
+                                let remainingCards = cards.filter { ($0.institutionName ?? "").lowercased() == instNameStr.lowercased() && $0.id != card.id }
+                                if let orphanedInst = institutions.first(where: { $0.name.lowercased() == instNameStr.lowercased() }) {
                                     if remainingCards.isEmpty && orphanedInst.accounts.isEmpty {
                                         institutionToDelete = orphanedInst
                                         
@@ -2622,7 +2633,7 @@ struct EditCardSheet: View {
                         .confirmationDialog("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm, titleVisibility: .visible) {
                             Button("Yes, Delete", role: .destructive) {
                                 if let inst = institutionToDelete {
-                                    vm.deleteInstitution(inst, context: context)
+                                    vm.deleteInstitution(inst, appState: appState)
                                 }
                                 dismiss()
                             }
@@ -2644,7 +2655,7 @@ struct EditCardSheet: View {
                 if isNew {
                     isNewInstitution = institutions.isEmpty
                 } else {
-                    isNewInstitution = card.institutionName.isEmpty || !institutions.contains(where: { $0.name.lowercased() == card.institutionName.lowercased() })
+                    isNewInstitution = (card.institutionName ?? "").isEmpty || !institutions.contains(where: { $0.name.lowercased() == (card.institutionName ?? "").lowercased() })
                 }
                 if snapshot == nil { snapshot = currentSnapshot }
             }
@@ -2654,7 +2665,7 @@ struct EditCardSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
-                            vm.deleteCard(card, context: context) 
+                            vm.deleteCard(card, appState: appState) 
                         } else if let snap = snapshot {
                             card.name = snap.name
                             card.last4 = snap.last4
@@ -2677,27 +2688,8 @@ struct EditCardSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        if isNewInstitution {
-                            let newInst = vm.addInstitution(context: context, companyId: card.companyId)
-                            newInst.name = card.institutionName
-                            newInst.loginUrl = instWebsite
-                            newInst.username = instLogin
-                            newInst.password = instPass
-                            newInst.email = instEmail
-                            newInst.twoFactor = instTwoFactor
-                            vm.saveInstitution(newInst, context: context)
-                        } else if !card.institutionName.isEmpty {
-                            if let existing = institutions.first(where: { $0.name.lowercased() == card.institutionName.lowercased() }) {
-                                existing.loginUrl = instWebsite
-                                existing.username = instLogin
-                                existing.password = instPass
-                                existing.email = instEmail
-                                existing.twoFactor = instTwoFactor
-                                vm.saveInstitution(existing, context: context)
-                            }
-                        }
-                        
-                        vm.saveCard(card, context: context)
+                        saveInstitutionData()
+                        vm.saveCard(card, appState: appState)
                         dismiss()
                     }
                     .fontWeight(.semibold)
@@ -2708,7 +2700,7 @@ struct EditCardSheet: View {
             .sheet(isPresented: $showPaymentPicker) {
                 NavigationStack {
                     PaymentMethodPickerView(
-                        currentMethod: card.paidFrom,
+                        currentMethod: card.paidFrom ?? "",
                         companyId: card.companyId,
                         institutions: institutions,
                         cards: cards
@@ -2783,6 +2775,31 @@ struct EditCardSheet: View {
         .buttonStyle(.plain)
     }
 
+    private func saveInstitutionData() {
+        if isNewInstitution {
+            var newInst = vm.addInstitution(appState: appState, userId: card.userId, companyId: card.companyId)
+            newInst.name = card.institutionName ?? ""
+            newInst.loginUrl = instWebsite
+            newInst.username = instLogin
+            newInst.password = instPass
+            newInst.email = instEmail
+            newInst.twoFactor = instTwoFactor
+            vm.saveInstitution(newInst, appState: appState)
+        } else {
+            let instName = (card.institutionName ?? "").lowercased()
+            if !instName.isEmpty {
+                if var existing = institutions.first(where: { $0.name.lowercased() == instName }) {
+                    existing.loginUrl = instWebsite
+                    existing.username = instLogin
+                    existing.password = instPass
+                    existing.email = instEmail
+                    existing.twoFactor = instTwoFactor
+                    vm.saveInstitution(existing, appState: appState)
+                }
+            }
+        }
+    }
+
     private func moneyField(label: String, value: Binding<Double>) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
@@ -2808,13 +2825,13 @@ struct EditCardSheet: View {
 
 // MARK: - Edit Loan Sheet
 struct EditLoanSheet: View {
-    @Bindable var loan: Loan
+    @State var loan: Loan
     @Bindable var vm: AppViewModel
     let isNew: Bool
     let institutions: [Institution]
     let cards: [FinancialCard]
     var isInstitutionContext: Bool = false
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
     
@@ -2830,19 +2847,19 @@ struct EditLoanSheet: View {
     @State private var isAutoUpdating = false
     @State private var showTermPicker = false
     @State private var showPaymentHUD = false
-    @State private var paymentDraft = LoanPayment()
+    @State private var paymentDraft = LoanPayment(id: UUID(), userId: UUID(), loanId: UUID(), date: Date(), amount: 0.0)
     @State private var editingPaymentId: String? = nil
 
     private var currentSnapshot: Snapshot {
         Snapshot(
-            name: loan.name,
-            lender: loan.lender,
+            name: loan.name ?? "",
+            lender: loan.lender ?? "",
             term: loan.term,
             role: loan.role,
             status: loan.status,
             interestType: loan.interestType,
             scheduleFrequency: loan.scheduleFrequency,
-            notes: loan.notes,
+            notes: loan.notes ?? "",
             principalAmount: loan.principalAmount,
             remainingBalance: loan.remainingBalance,
             monthlyPayment: loan.monthlyPayment,
@@ -2909,7 +2926,7 @@ struct EditLoanSheet: View {
                             HStack {
                                 Spacer()
                                 Image(systemName: "trash")
-                                Text("Delete \(loan.name.isEmpty ? "Loan" : loan.name)")
+                                Text("Delete \((loan.name ?? "").isEmpty ? "Loan" : loan.name)")
                                 Spacer()
                             }
                             .font(.system(size: 15, weight: .semibold))
@@ -2924,7 +2941,7 @@ struct EditLoanSheet: View {
                         .buttonStyle(.plain)
                         .confirmationDialog("Delete Loan?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
                             Button("Delete Loan", role: .destructive) {
-                                vm.deleteLoan(loan, context: context)
+                                vm.deleteLoan(loan, appState: appState)
                                 dismiss()
                             }
                             Button("Cancel", role: .cancel) {}
@@ -2945,7 +2962,7 @@ struct EditLoanSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
-                            vm.deleteLoan(loan, context: context) 
+                            vm.deleteLoan(loan, appState: appState) 
                         } else if let snap = snapshot {
                             loan.name = snap.name
                             loan.lender = snap.lender
@@ -2969,7 +2986,7 @@ struct EditLoanSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        vm.saveLoan(loan, context: context)
+                        vm.saveLoan(loan, appState: appState)
                         dismiss()
                     }
                     .fontWeight(.semibold)
@@ -2981,14 +2998,20 @@ struct EditLoanSheet: View {
                 NavigationStack {
                     HStack(spacing: 0) {
                         Picker("Years", selection: $loan.termYears) {
-                            ForEach(0...30, id: \.self) { year in Text("\(year) \(year == 1 ? "Year" : "Years")").tag(year) }
+                            ForEach(0...30, id: \.self) { year in
+                                let yStr = year == 1 ? "Year" : "Years"
+                                Text("\(year) \(yStr)").tag(year)
+                            }
                         }
                         .pickerStyle(.wheel)
                         .frame(maxWidth: .infinity)
                         .onChange(of: loan.termYears) { _, _ in updateMaturityDate() }
                         
                         Picker("Months", selection: $loan.termMonths) {
-                            ForEach(0...11, id: \.self) { month in Text("\(month) \(month == 1 ? "Month" : "Months")").tag(month) }
+                            ForEach(0...11, id: \.self) { month in
+                                let s = month == 1 ? "Month" : "Months"
+                                Text("\(month) \(s)").tag(month)
+                            }
                         }
                         .pickerStyle(.wheel)
                         .frame(maxWidth: .infinity)
@@ -3012,14 +3035,14 @@ struct EditLoanSheet: View {
                     institutions: institutions,
                     cards: cards,
                     onSave: {
-                        if let id = editingPaymentId, let idx = (loan.payments ?? []).firstIndex(where: { $0.id == id }) {
+                        var idToFind: UUID? = nil
+                        if let eId = editingPaymentId { idToFind = UUID(uuidString: eId) }
+                        if let pId = idToFind, let idx = loan.payments?.firstIndex(where: { $0.id == pId }) {
                             loan.payments?[idx].date = paymentDraft.date
                             loan.payments?[idx].amount = paymentDraft.amount
                             loan.payments?[idx].source = paymentDraft.source
                         } else {
-                            if loan.payments == nil {
-                                loan.payments = []
-                            }
+                            if loan.payments == nil { loan.payments = [] }
                             loan.payments?.append(paymentDraft)
                         }
                         showPaymentHUD = false
@@ -3134,10 +3157,10 @@ struct EditLoanSheet: View {
             // Header Stats
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(loan.name.isEmpty ? "Loan" : loan.name)
+                    Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
                         .font(.system(size: 18, weight: .bold))
                         .foregroundStyle(.white)
-                    Text(loan.lender.isEmpty ? "Lender Unknown" : loan.lender)
+                    Text((loan.lender ?? "").isEmpty ? "Lender Unknown" : (loan.lender ?? ""))
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(Color.white.opacity(0.6))
                 }
@@ -3317,12 +3340,12 @@ struct EditLoanSheet: View {
                 ZifrField(
                     label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LENT TO" : "LENDER", 
                     placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Acme Corp" : "e.g. Chase", 
-                    text: $loan.lender
+                    text: Binding(get: { loan.lender ?? "" }, set: { loan.lender = $0 })
                 )
                 ZifrField(
                     label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LOAN NAME" : "LOAN ID", 
                     placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Bridge Loan" : "e.g. Series A", 
-                    text: $loan.name
+                    text: Binding(get: { loan.name ?? "" }, set: { loan.name = $0 })
                 )
             }
             
@@ -3339,7 +3362,9 @@ struct EditLoanSheet: View {
                             showTermPicker = true
                         } label: {
                             HStack {
-                                Text("\(loan.termYears) \(loan.termYears == 1 ? "Yr" : "Yrs"), \(loan.termMonths) \(loan.termMonths == 1 ? "Mo" : "Mos")")
+                                let yStr = loan.termYears == 1 ? "Yr" : "Yrs"
+                                let mStr = loan.termMonths == 1 ? "Mo" : "Mos"
+                                Text("\(loan.termYears) \(yStr), \(loan.termMonths) \(mStr)")
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundStyle(.white)
                                 Spacer()
@@ -3407,7 +3432,7 @@ struct EditLoanSheet: View {
                     .foregroundStyle(Color.white.opacity(0.5))
                     .padding(.leading, 6)
                 
-                TextField("Add notes...", text: Binding(get: { loan.notes }, set: { loan.notes = $0 }), axis: .vertical)
+                TextField("Add notes...", text: Binding(get: { loan.notes ?? "" }, set: { loan.notes = $0 }), axis: .vertical)
                     .lineLimit(3...6)
                     .font(.system(size: 14))
                     .foregroundStyle(.white)
@@ -3425,6 +3450,11 @@ struct EditLoanSheet: View {
     }
 
     @ViewBuilder
+    private func calculateCumulativeTotal(for index: Int, in payments: [LoanPayment]) -> Double {
+        let prefix = payments.prefix(index + 1)
+        return prefix.reduce(0.0) { $0 + $1.amount }
+    }
+    
     private func paymentRow(index: Int, payment: LoanPayment, cumulativeTotal: Double) -> some View {
         HStack(spacing: 4) {
             Text("\(index)")
@@ -3442,9 +3472,9 @@ struct EditLoanSheet: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
-            Text(payment.source.isEmpty ? "None" : payment.source)
+            Text((payment.source ?? "").isEmpty ? "None" : (payment.source ?? ""))
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(payment.source.isEmpty ? Color.white.opacity(0.4) : .white)
+                .foregroundStyle((payment.source ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
             Text(cumulativeTotal.currencyString)
@@ -3457,22 +3487,24 @@ struct EditLoanSheet: View {
         .modifier(ZifrSwipeActionsModifier(
             onEdit: {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                editingPaymentId = payment.id
-                paymentDraft = LoanPayment(id: payment.id, date: payment.date, amount: payment.amount, source: payment.source)
+                editingPaymentId = payment.id.uuidString
+                paymentDraft = LoanPayment(id: payment.id, userId: loan.userId, loanId: loan.id, date: payment.date, amount: payment.amount, source: payment.source)
                 showPaymentHUD = true
             },
             onDelete: {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation {
-                    loan.payments?.removeAll(where: { $0.id == payment.id })
+                    if let pId = payment.id as UUID? {
+                        loan.payments?.removeAll(where: { $0.id == pId })
+                    }
                 }
             }
         ))
     }
 
-    @ViewBuilder
     private func loanPaymentsLedgerSection() -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        let isPaymentsEmpty = (loan.payments ?? []).isEmpty
+        return VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("PAYMENT LEDGER")
                     .font(.system(size: 11, weight: .bold))
@@ -3481,72 +3513,52 @@ struct EditLoanSheet: View {
             }
             
             VStack(spacing: 0) {
-                HStack(spacing: 4) {
-                    Text("#")
-                        .frame(width: 16, alignment: .leading)
-                    Text("DATE")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("AMOUNT")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("FROM")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("TOTAL")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.4))
-                .textCase(.uppercase)
-                .tracking(1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(hex: "#1C1C1E"))
-                
-                Divider().background(Color.white.opacity(0.05))
-                
-                if (loan.payments ?? []).isEmpty {
-                    Text("No payments recorded yet.")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.3))
-                        .padding(.vertical, 20)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                } else {
-                    let sortedPayments = (loan.payments ?? []).sorted { $0.date < $1.date }
-                    ForEach(Array(sortedPayments.enumerated()), id: \.element.id) { index, payment in
-                        let cumulativeTotal = sortedPayments[0...index].reduce(0) { $0 + $1.amount }
-                        paymentRow(index: index + 1, payment: payment, cumulativeTotal: cumulativeTotal)
-                        
-                        if payment.id != sortedPayments.last?.id {
-                            Divider().background(Color.white.opacity(0.05))
-                        }
-                    }
-                }
+                ledgerHeaderRow
+                ledgerListItems
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
-            
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                editingPaymentId = nil
-                paymentDraft = LoanPayment()
-                showPaymentHUD = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus").font(.system(size: 12, weight: .bold))
-                    Text("Add Payment").font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(Color.white.opacity(0.5))
-                .frame(maxWidth: .infinity)
-                .frame(height: 36)
-                .background(Color.white.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            }
-            .buttonStyle(.plain)
-            .padding(.top, (loan.payments ?? []).isEmpty ? 0 : 4)
+            .padding(.top, isPaymentsEmpty ? 0 : 4)
+            .background(Color(hex: "#1A1A1A"))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+            )
         }
-        .padding(16)
-        .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.05), lineWidth: 1))
+    }
+
+    private var ledgerHeaderRow: some View {
+        HStack(spacing: 4) {
+            Text("#").frame(width: 16, alignment: .leading)
+            Text("DATE").frame(maxWidth: .infinity, alignment: .leading)
+            Text("AMOUNT").frame(width: 80, alignment: .trailing)
+        }
+        .font(.system(size: 9, weight: .bold))
+        .foregroundStyle(Color.white.opacity(0.4))
+        .textCase(.uppercase)
+        .tracking(1)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hex: "#1C1C1E"))
+    }
+
+    @ViewBuilder
+    private var ledgerListItems: some View {
+        if (loan.payments ?? []).isEmpty {
+            Text("No payments recorded yet.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.white.opacity(0.4))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 16)
+        } else {
+            let sortedPayments = (loan.payments ?? []).sorted { $0.date < $1.date }
+            ForEach(Array(sortedPayments.enumerated()), id: \.element.id) { index, payment in
+                paymentRow(index: index + 1, payment: payment, cumulativeTotal: calculateCumulativeTotal(for: index, in: sortedPayments))
+                
+                if payment.id != sortedPayments.last?.id {
+                    Divider().background(Color.white.opacity(0.05))
+                }
+            }
+        }
     }
     
     private func updateMaturityDate() {

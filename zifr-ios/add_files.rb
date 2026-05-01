@@ -1,22 +1,23 @@
 require 'xcodeproj'
-project_path = "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr.xcodeproj"
+
+project_path = 'Zifr.xcodeproj'
 project = Xcodeproj::Project.open(project_path)
-
-group_company = project.main_group.find_subpath(File.join('Zifr', 'Views', 'Company'), true)
-group_services = project.main_group.find_subpath(File.join('Zifr', 'Services'), true)
-
 target = project.targets.first
 
-def add_file_if_needed(project, group, target, path)
-  unless group.files.any? { |f| f.path == File.basename(path) }
-    file_ref = group.new_reference(path)
+files_to_add = [
+  'Zifr/Services/SupabaseService.swift'
+]
+
+files_to_add.each do |file_path|
+  file_ref = project.main_group.find_file_by_path(file_path) || project.main_group.new_reference(file_path)
+  
+  unless target.source_build_phase.files_references.include?(file_ref)
     target.add_file_references([file_ref])
-    puts "Added #{File.basename(path)}"
+    puts "Added #{file_path}"
+  else
+    puts "Already added #{file_path}"
   end
 end
 
-add_file_if_needed(project, group_services, target, 'TickerService.swift')
-add_file_if_needed(project, group_company, target, 'HomeHeroView.swift')
-add_file_if_needed(project, group_company, target, 'HomeBillingTimeline.swift')
-
 project.save
+puts "Saved project."

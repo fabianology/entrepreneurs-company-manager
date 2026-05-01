@@ -1,19 +1,18 @@
 import SwiftUI
-import SwiftData
 
 // MARK: - Edit Subscription Sheet
 
 struct EditSubscriptionSheet: View {
-    @Bindable var sub: Subscription
+    @State var sub: Subscription
     let institutions: [Institution]
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     let isNew: Bool
 
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     
-    @Query private var allSubscriptions: [Subscription]
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
 
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
@@ -46,10 +45,10 @@ struct EditSubscriptionSheet: View {
 
     private var currentSnapshot: Snapshot {
         Snapshot(
-            name: sub.name, website: sub.website, pricingModel: sub.pricingModel, status: sub.status,
-            billingCycle: sub.billingCycle, nextRenewal: sub.nextRenewal, paymentMethod: sub.paymentMethod,
-            renew: sub.renew, loginId: sub.loginId, password: sub.password,
-            twoFactorAuth: sub.twoFactorAuth, recoveryMethod: sub.recoveryMethod, notes: sub.notes,
+            name: sub.name, website: sub.website ?? "", pricingModel: sub.pricingModel ?? "", status: sub.status ?? "",
+            billingCycle: sub.billingCycle ?? "", nextRenewal: sub.nextRenewal ?? "", paymentMethod: sub.paymentMethod ?? "",
+            renew: sub.renew, loginId: sub.loginId ?? "", password: sub.password ?? "",
+            twoFactorAuth: sub.twoFactorAuth ?? "", recoveryMethod: sub.recoveryMethod ?? "", notes: sub.notes ?? "",
             cost: sub.cost, showSubServicesTab: sub.showSubServicesTab, showLinkedEmailsTab: sub.showLinkedEmailsTab
         )
     }
@@ -88,7 +87,7 @@ struct EditSubscriptionSheet: View {
     // Binding: Int day (1–31) ↔ String stored in nextRenewal
     private var dayBinding: Binding<Int> {
         Binding(
-            get: { Int(sub.nextRenewal) ?? 1 },
+            get: { Int(sub.nextRenewal ?? "") ?? 1 },
             set: { sub.nextRenewal = "\($0)" }
         )
     }
@@ -99,7 +98,7 @@ struct EditSubscriptionSheet: View {
         df.dateFormat = "MMM d"
         return Binding(
             get: {
-                let parsed = df.date(from: sub.nextRenewal) ?? Date()
+                let parsed = df.date(from: sub.nextRenewal ?? "") ?? Date()
                 let currentYear = Calendar.current.component(.year, from: Date())
                 var comps = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: parsed)
                 comps.year = currentYear
@@ -277,9 +276,9 @@ struct EditSubscriptionSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text(sub.paymentMethod.isEmpty ? "N/A" : sub.paymentMethod)
+                    Text((sub.paymentMethod ?? "").isEmpty ? "N/A" : (sub.paymentMethod ?? ""))
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(sub.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
+                        .foregroundStyle((sub.paymentMethod ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right")
@@ -342,7 +341,7 @@ struct EditSubscriptionSheet: View {
                                 ZifrField(
                                     label: "WEBSITE",
                                     placeholder: "shopify.com",
-                                    text: Binding(get: { sub.website }, set: { sub.website = $0 }),
+                                    text: Binding(get: { sub.website ?? "" }, set: { sub.website = $0 }),
                                     keyboardType: .URL,
                                     textContentType: .URL
                                 )
@@ -355,17 +354,17 @@ struct EditSubscriptionSheet: View {
                                 ZifrAutocompleteField(
                                     label: "LOGIN ID",
                                     placeholder: "username or email",
-                                    text: Binding(get: { sub.loginId }, set: { sub.loginId = $0 }),
+                                    text: Binding(get: { sub.loginId ?? "" }, set: { sub.loginId = $0 }),
                                     keyboardType: .emailAddress,
                                     textContentType: .username,
-                                    suggestions: allSubscriptions.map { $0.loginId }.filter { !$0.isEmpty } + institutions.map { $0.username }.filter { !$0.isEmpty } + institutions.map { $0.email }.filter { !$0.isEmpty }
+                                    suggestions: allSubscriptions.compactMap { $0.loginId }.filter { !$0.isEmpty } + institutions.compactMap { $0.username }.filter { !$0.isEmpty } + institutions.compactMap { $0.email }.filter { !$0.isEmpty }
                                 )
                                 
                                 ZStack(alignment: .bottomTrailing) {
                                     ZifrField(
                                         label: "PASSWORD",
                                         placeholder: "••••••••",
-                                        text: Binding(get: { sub.password }, set: { sub.password = $0 }),
+                                        text: Binding(get: { sub.password ?? "" }, set: { sub.password = $0 }),
                                         isSecure: !showPassword,
                                         textContentType: .password
                                     )
@@ -384,7 +383,7 @@ struct EditSubscriptionSheet: View {
                                 }
                             }
                             
-                            DynamicLoginLabelView(loginId: sub.loginId, ignoreSubscriptionId: sub.id)
+                            DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                         }
 
                     }
@@ -440,7 +439,7 @@ struct EditSubscriptionSheet: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.5))
                             TextField("Add a note…",
-                                      text: Binding(get: { sub.notes }, set: { sub.notes = $0 }),
+                                      text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }),
                                       axis: .vertical)
                                 .lineLimit(3...6)
                                 .font(.system(size: 14, weight: .medium))
@@ -547,7 +546,7 @@ struct EditSubscriptionSheet: View {
                                 ZifrField(
                                     label: "RECOVERY",
                                     placeholder: "Phone, email…",
-                                    text: Binding(get: { sub.recoveryMethod }, set: { sub.recoveryMethod = $0 })
+                                    text: Binding(get: { sub.recoveryMethod ?? "" }, set: { sub.recoveryMethod = $0 })
                                 )
                                 .autocorrectionDisabled()
                             }
@@ -659,7 +658,7 @@ struct EditSubscriptionSheet: View {
                             titleVisibility: .visible
                         ) {
                             Button("Delete Service", role: .destructive) {
-                                vm.deleteSub(sub, context: context)
+                                vm.deleteSub(sub, appState: appState)
                                 dismiss()
                             }
                             Button("Cancel", role: .cancel) {}
@@ -677,7 +676,7 @@ struct EditSubscriptionSheet: View {
             .background(Color(hex: "#171717"))
             .listSectionSpacing(0)
             .onAppear {
-                if sub.nextRenewal.isEmpty {
+                if (sub.nextRenewal ?? "").isEmpty {
                     if sub.billingCycle == "Monthly" {
                         sub.nextRenewal = "1"
                     } else {
@@ -687,7 +686,7 @@ struct EditSubscriptionSheet: View {
                     }
                 }
                 snapshot = currentSnapshot
-                if sub.twoFactorAuth != "None" || !sub.recoveryMethod.isEmpty {
+                if sub.twoFactorAuth != "None" || !(sub.recoveryMethod ?? "").isEmpty {
                     showSecurity = true
                 }
             }
@@ -695,7 +694,7 @@ struct EditSubscriptionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showPaymentPicker) {
                 PaymentMethodPickerView(
-                    currentMethod: sub.paymentMethod,
+                    currentMethod: sub.paymentMethod ?? "",
                     companyId: sub.companyId,
                     institutions: institutions,
                     cards: cards,
@@ -706,7 +705,7 @@ struct EditSubscriptionSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
-                            vm.deleteSub(sub, context: context) 
+                            vm.deleteSub(sub, appState: appState) 
                         } else if let snap = snapshot {
                             sub.name = snap.name
                             sub.website = snap.website
@@ -730,7 +729,7 @@ struct EditSubscriptionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        vm.saveSub(sub, context: context)
+                        vm.saveSub(sub, appState: appState)
                         dismiss()
                     }
                     .fontWeight(.semibold)
@@ -798,7 +797,7 @@ struct EditSubscriptionSheet: View {
 
 struct SubServicesSection: View {
     @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
-    @Bindable var sub: Subscription
+    @State var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, SubService) -> Void
 
@@ -893,7 +892,7 @@ struct SubServicesSection: View {
 struct SubServiceHUD: View {
     @Binding var draft: SubService
     let isNew: Bool
-    let companyId: String
+    let companyId: UUID
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onSave: () -> Void
@@ -1157,7 +1156,7 @@ struct LinkedEmailCardView: View {
         var seen = Set<String>()
 
         for sub in allSubscriptions {
-            let isPrimary = sub.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail
+            let isPrimary = (sub.loginId ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail
             let isLinked = sub.linkedEmails.contains { $0.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }
             
             let sName = sub.name.isEmpty ? "Unnamed Service" : sub.name
@@ -1264,11 +1263,12 @@ struct LinkedEmailCardView: View {
 
 struct LinkedEmailsSection: View {
     @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
-    @Bindable var sub: Subscription
+    @State var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, LinkedEmail) -> Void
 
-    @Query private var allSubscriptions: [Subscription]
+    @Environment(AppState.self) private var appState
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
 
 
 
@@ -1319,20 +1319,22 @@ struct LinkedEmailHUD: View {
     @Binding var draft: LinkedEmail
     let isNew: Bool
     
-    @Query private var allInstitutions: [Institution]
+    @Environment(AppState.self) private var appState
+    private var allInstitutions: [Institution] { appState.institutions }
     
     private var allLogins: [String] {
-        let subLogins = allSubscriptions.map { $0.loginId }
-        let instUsers = allInstitutions.map { $0.username }
-        let instEmails = allInstitutions.map { $0.email }
-        return (subLogins + instUsers + instEmails).filter { !$0.isEmpty }
+        let subLogins = allSubscriptions.compactMap { $0.loginId }
+        let instUsers = allInstitutions.compactMap { $0.username }
+        let instEmails = allInstitutions.compactMap { $0.email }
+        return (subLogins + instUsers + instEmails).compactMap { $0 }.filter { !$0.isEmpty }
     }
     let onSave: () -> Void
     let onCancel: () -> Void
     var onDelete: (() -> Void)? = nil
 
     @State private var initialDraft: LinkedEmail? = nil
-    @Query private var allSubscriptions: [Subscription]
+    
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
 
     struct UsedInService: Hashable {
         let name: String
@@ -1348,7 +1350,7 @@ struct LinkedEmailHUD: View {
         var seen = Set<String>()
 
         for sub in allSubscriptions {
-            let isPrimary = sub.loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail
+            let isPrimary = (sub.loginId ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail
             let isLinked = sub.linkedEmails.contains { $0.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedEmail }
             
             let sName = sub.name.isEmpty ? "Unnamed Service" : sub.name
@@ -1384,7 +1386,7 @@ struct LinkedEmailHUD: View {
     private var notesBinding: Binding<String> {
         Binding(
             get: { draft.notes.joined(separator: "\n") },
-            set: { draft.notes = $0.components(separatedBy: "\n").filter { !$0.isEmpty } }
+            set: { draft.notes = $0.components(separatedBy: "\n").compactMap { $0 }.filter { !$0.isEmpty } }
         )
     }
 
@@ -1570,14 +1572,17 @@ struct LinkedEmailHUD: View {
 
 struct PaymentMethodPickerView: View {
     let currentMethod: String
-    let companyId: String
+    let companyId: UUID
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
-    @Query private var allCompanies: [Company]
-    @Query private var allInstitutions: [Institution]
-    @Query private var allCards: [FinancialCard]
+    @Environment(AppState.self) private var appState
+    private var allCompanies: [Company] { appState.companies }
+    
+    private var allInstitutions: [Institution] { appState.institutions }
+    
+    private var allCards: [FinancialCard] { appState.cards }
 
     @State private var searchText = ""
     @AppStorage("userCustomPaymentMethods") private var storedCustomMethods: String = ""
@@ -1591,7 +1596,7 @@ struct PaymentMethodPickerView: View {
     struct AccountDisplay: Identifiable {
         let id = UUID()
         let instName: String
-        let companyId: String
+        let companyId: UUID
         let account: InstitutionAccount
     }
     
@@ -1615,12 +1620,12 @@ struct PaymentMethodPickerView: View {
 
     var filteredAccounts: [AccountDisplay] {
         if searchText.isEmpty { return accountDisplays }
-        return accountDisplays.filter { ($0.account.name + $0.account.type + $0.account.last4 + $0.instName).localizedCaseInsensitiveContains(searchText) }
+        return accountDisplays.filter { ($0.account.name + $0.account.type + ($0.account.last4 ?? "") + $0.instName).localizedCaseInsensitiveContains(searchText) }
     }
 
     var filteredCards: [FinancialCard] {
         if searchText.isEmpty { return effectiveCards }
-        return effectiveCards.filter { ($0.name + $0.type + $0.last4 + $0.institutionName).localizedCaseInsensitiveContains(searchText) }
+        return effectiveCards.filter { ($0.name + $0.type + ($0.last4 ?? "") + ($0.institutionName ?? "")).localizedCaseInsensitiveContains(searchText) }
     }
     
     var allCustomMethods: [String] {
@@ -1874,8 +1879,9 @@ struct PaymentMethodPickerView: View {
                                             .foregroundStyle(Color.zifrGreen)
                                     }
                                     
-                                    if let company = allCompanies.first(where: { $0.id == display.companyId }) {
-                                        Text(company.name.uppercased())
+                                    let compId = display.companyId
+                                    if let company = allCompanies.first(where: { $0.id == compId }) {
+                                        Text(company.name.isEmpty ? "" : company.name.uppercased())
                                             .font(.system(size: 10, weight: .semibold))
                                             .tracking(0.3)
                                             .foregroundStyle(Color(hex: "#2070BD"))
@@ -1911,14 +1917,14 @@ struct PaymentMethodPickerView: View {
                                         Text(card.name)
                                             .font(.system(size: 15, weight: .medium))
                                             .foregroundStyle(.white)
-                                        if !card.last4.isEmpty {
-                                            Text("•• \(card.last4)")
+                                        if !(card.last4 ?? "").isEmpty {
+                                            Text("•• \(card.last4 ?? "")")
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.5))
                                         }
                                     }
                                     HStack(spacing: 4) {
-                                        Text(card.institutionName)
+                                        Text(card.institutionName ?? "")
                                             .foregroundStyle(Color.white.opacity(0.5))
                                         Text("•")
                                             .foregroundStyle(Color.white.opacity(0.2))
@@ -1941,7 +1947,7 @@ struct PaymentMethodPickerView: View {
                                     }
                                     
                                     if let company = allCompanies.first(where: { $0.id == card.companyId }) {
-                                        Text(company.name.uppercased())
+                                        Text(company.name.isEmpty ? "" : company.name.uppercased())
                                             .font(.system(size: 10, weight: .semibold))
                                             .tracking(0.3)
                                             .foregroundStyle(Color(hex: "#2070BD"))

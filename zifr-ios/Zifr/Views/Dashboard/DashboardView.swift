@@ -1,14 +1,12 @@
 import SwiftUI
-import SwiftData
-
 struct DashboardView: View {
-    @Environment(\.modelContext) private var context
-    @Query(sort: \Company.lastViewed, order: .forward) private var companies: [Company]
-    @Query private var subscriptions: [Subscription]
-    @Query private var cards: [FinancialCard]
-    @Query private var institutions: [Institution]
-    @Query private var loans: [Loan]
-    @Query private var documents: [CompanyDocument]
+    @Environment(AppState.self) private var appState
+    private var companies: [Company] { appState.companies.sorted { $0.lastViewed > $1.lastViewed } }
+    private var subscriptions: [Subscription] { appState.subscriptions }
+    private var cards: [FinancialCard] { appState.cards }
+    private var institutions: [Institution] { appState.institutions }
+    private var loans: [Loan] { appState.loans }
+    private var documents: [CompanyDocument] { appState.documents }
 
     @Bindable var vm: AppViewModel
     @State private var showAddCompany = false
@@ -17,6 +15,7 @@ struct DashboardView: View {
     @State private var companyToDelete: Company? = nil
 
     @State private var dummyCompany = Company(
+        userId: UUID(),
         name: "Acme Holdings LLC",
         structure: "LLC"
     )
@@ -88,7 +87,7 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         vm.selectedCompany = company
                         vm.activeTab = .home
-                        vm.touchCompany(company, context: context)
+                        vm.touchCompany(company, appState: appState)
                         vm.path.append(company)
                     }
                     .listRowBackground(Color.clear)
@@ -171,7 +170,7 @@ struct DashboardView: View {
             ) { company in
                 Button("Delete \(company.name)", role: .destructive) {
                     withAnimation {
-                        vm.deleteCompany(company, context: context)
+                        vm.deleteCompany(company, appState: appState)
                     }
                     companyToDelete = nil
                 }
@@ -321,11 +320,11 @@ struct DashboardView: View {
     
     @ViewBuilder
     private func companyCardRow(for company: Company) -> some View {
-        let cCount = cards.filter { $0.company?.id == company.id }.count
-        let iCount = institutions.filter { $0.company?.id == company.id }.count
-        let lCount = loans.filter { $0.company?.id == company.id }.count
-        let sCount = subscriptions.filter { $0.company?.id == company.id }.count
-        let dCount = documents.filter { $0.company?.id == company.id }.count
+        let cCount = cards.filter { $0.companyId == company.id }.count
+        let iCount = institutions.filter { $0.companyId == company.id }.count
+        let lCount = loans.filter { $0.companyId == company.id }.count
+        let sCount = subscriptions.filter { $0.companyId == company.id }.count
+        let dCount = documents.filter { $0.companyId == company.id }.count
 
         CompanyCardView(
             company: company,
@@ -338,19 +337,19 @@ struct DashboardView: View {
             onViewSubscriptions: {
                 vm.selectedCompany = company
                 vm.activeTab = .subscriptions
-                vm.touchCompany(company, context: context)
+                vm.touchCompany(company, appState: appState)
                 vm.path.append(company)
             },
             onViewFinancials: {
                 vm.selectedCompany = company
                 vm.activeTab = .financial
-                vm.touchCompany(company, context: context)
+                vm.touchCompany(company, appState: appState)
                 vm.path.append(company)
             },
             onViewDocuments: {
                 vm.selectedCompany = company
                 vm.activeTab = .documents
-                vm.touchCompany(company, context: context)
+                vm.touchCompany(company, appState: appState)
                 vm.path.append(company)
             }
         )
@@ -360,19 +359,17 @@ struct DashboardView: View {
 
 // MARK: - Shared With Me View
 import SwiftUI
-import SwiftData
-
 struct SharedWithMeView: View {
     @Bindable var vm: AppViewModel
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
-    @Query(sort: \Company.name) private var allCompanies: [Company]
-    @Query private var allSubscriptions: [Subscription]
-    @Query private var allCards: [FinancialCard]
-    @Query private var allInstitutions: [Institution]
-    @Query private var allLoans: [Loan]
-    @Query private var allDocuments: [CompanyDocument]
+    private var allCompanies: [Company] { appState.companies.sorted { $0.name < $1.name } }
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
+    private var allCards: [FinancialCard] { appState.cards }
+    private var allInstitutions: [Institution] { appState.institutions }
+    private var allLoans: [Loan] { appState.loans }
+    private var allDocuments: [CompanyDocument] { appState.documents }
 
     var subscriptions: [Subscription] { allSubscriptions.filter { sub in !allCompanies.contains(where: { $0.id == sub.companyId }) } }
     var cards: [FinancialCard] { allCards.filter { card in !allCompanies.contains(where: { $0.id == card.companyId }) } }
@@ -380,7 +377,7 @@ struct SharedWithMeView: View {
     var loans: [Loan] { allLoans.filter { loan in !allCompanies.contains(where: { $0.id == loan.companyId }) } }
     var documents: [CompanyDocument] { allDocuments.filter { doc in !allCompanies.contains(where: { $0.id == doc.companyId }) } }
 
-    let sharedCompany = Company(id: "shared-with-me", name: "Shared with Me", structure: "Inbox", colorHex: "#3b82f6", website: "")
+    let sharedCompany = Company(id: UUID(), userId: UUID(), name: "Shared with Me", structure: "Inbox", colorHex: "#3b82f6", website: "")
 
     @State private var showCommandCenter = false
     @State private var showEditCompany = false

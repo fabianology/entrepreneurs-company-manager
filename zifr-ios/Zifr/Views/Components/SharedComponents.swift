@@ -375,15 +375,15 @@ extension View {
 }
 
 // MARK: - Tier 2 Autofill Smart Components
-import SwiftData
 
 struct SubscriptionAutofillBar: View {
     let typedName: String
-    let currentCompanyId: String
+    let currentCompanyId: UUID
     let onAutofill: (Subscription) -> Void
+    @Environment(AppState.self) private var appState
     
-    @Query private var allSubscriptions: [Subscription]
-    @Query private var allCompanies: [Company]
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
+    private var allCompanies: [Company] { appState.companies }
     
     var body: some View {
         if let match = findMatch() {
@@ -425,11 +425,12 @@ struct SubscriptionAutofillBar: View {
 
 struct InstitutionAutofillBar: View {
     let typedName: String
-    let currentCompanyId: String
+    let currentCompanyId: UUID
     let onAutofill: (Institution) -> Void
+    @Environment(AppState.self) private var appState
     
-    @Query private var allInstitutions: [Institution]
-    @Query private var allCompanies: [Company]
+    private var allInstitutions: [Institution] { appState.institutions }
+    private var allCompanies: [Company] { appState.companies }
     
     var body: some View {
         if let match = findMatch() {

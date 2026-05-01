@@ -1,9 +1,9 @@
 import SwiftUI
-import SwiftData
 import PhotosUI
 
 struct EditCompanySheet: View {
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authViewModel
     @Environment(\.dismiss) private var dismiss
     @Bindable var vm: AppViewModel
     var company: Company?
@@ -252,7 +252,7 @@ struct EditCompanySheet: View {
                                 titleVisibility: .visible
                             ) {
                                 Button("Delete Entity", role: .destructive) {
-                                    if let company { vm.deleteCompany(company, context: context) }
+                                    if let company { vm.deleteCompany(company, appState: appState) }
                                     dismiss()
                                 }
                                 Button("Cancel", role: .cancel) {}
@@ -309,17 +309,24 @@ struct EditCompanySheet: View {
         structure = c.structure
         entityCategory = (c.structure == "Individual" || c.structure == "Household") ? "Personal" : "Business"
         colorHex = c.colorHex
-        website = c.website
+        website = c.website ?? ""
         logoData = c.logoData
     }
 
     private func save() {
         if let c = company {
-            c.name = name; c.structure = structure; c.colorHex = colorHex
-            c.website = website; c.logoData = logoData
-            vm.updateCompany(c, context: context)
+            var updated = c
+            updated.name = name; updated.structure = structure; updated.colorHex = colorHex
+            updated.website = website; updated.logoData = logoData
+            vm.updateCompany(updated, appState: appState)
         } else {
-            vm.addCompany(context: context, name: name, structure: structure, colorHex: colorHex, logoData: logoData, website: website)
+            Task {
+                if let session = try? await SupabaseService.shared.client.auth.session {
+                    await MainActor.run {
+                        vm.addCompany(appState: appState, userId: session.user.id, name: name, structure: structure, colorHex: colorHex, logoData: logoData, website: website)
+                    }
+                }
+            }
         }
     }
 

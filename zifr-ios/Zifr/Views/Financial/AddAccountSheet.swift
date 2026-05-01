@@ -1,21 +1,21 @@
 import SwiftUI
-import SwiftData
 
 struct AddAccountSheet: View {
     let companyId: String
     let institutions: [Institution]
     @Bindable var vm: AppViewModel
     
-    @Environment(\.modelContext) private var context
+    @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authViewModel
     @Environment(\.dismiss) private var dismiss
     
-    @Query private var allSubscriptions: [Subscription]
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
     
     private var allLogins: [String] {
         let subLogins = allSubscriptions.map { $0.loginId }
-        let instUsers = institutions.map { $0.username }
-        let instEmails = institutions.map { $0.email }
-        return (subLogins + instUsers + instEmails).filter { !$0.isEmpty }
+        let instUsers = institutions.compactMap { $0.username }
+        let instEmails = institutions.compactMap { $0.email }
+        return (subLogins.compactMap { $0 } + instUsers + instEmails).filter { !$0.isEmpty }
     }
     
     // Account Draft
@@ -98,7 +98,7 @@ struct AddAccountSheet: View {
                             Divider()
                             ForEach(institutions) { inst in
                                 Button(inst.name.isEmpty ? "Unnamed Institution" : inst.name) {
-                                    selectedInstitutionId = inst.id
+                                    selectedInstitutionId = inst.id.uuidString
                                     populateInstitutionFields(from: inst)
                                 }
                             }
@@ -162,13 +162,13 @@ struct AddAccountSheet: View {
                                             HStack(spacing: 8) {
                                                 ForEach(matches.prefix(3)) { inst in
                                                     Button {
-                                                        selectedInstitutionId = inst.id
+                                                        selectedInstitutionId = inst.id.uuidString
                                                         institutionName = inst.name
-                                                        website = inst.loginUrl
-                                                        login = inst.username
-                                                        pass = inst.password
-                                                        email = inst.email
-                                                        twoFactor = inst.twoFactor
+                                                        website = inst.loginUrl ?? ""
+                                                        login = inst.username ?? ""
+                                                        pass = inst.password ?? ""
+                                                        email = inst.email ?? ""
+                                                        twoFactor = inst.twoFactor ?? ""
                                                         isEditingInstitution = false
                                                     } label: {
                                                         Text("Switch to \(inst.name)")
@@ -277,7 +277,7 @@ struct AddAccountSheet: View {
     private var selectedInstitutionName: String {
         if selectedInstitutionId == "new" {
             return "New Institution"
-        } else if let inst = institutions.first(where: { $0.id == selectedInstitutionId }) {
+        } else if let inst = institutions.first(where: { $0.id.uuidString == selectedInstitutionId }) {
             return inst.name.isEmpty ? "Unnamed Institution" : inst.name
         }
         return "Select Institution"
@@ -286,11 +286,11 @@ struct AddAccountSheet: View {
     private func populateInstitutionFields(from inst: Institution?) {
         if let inst = inst {
             institutionName = inst.name
-            website = inst.loginUrl
-            login = inst.username
-            pass = inst.password
-            email = inst.email
-            twoFactor = inst.twoFactor
+            website = inst.loginUrl ?? ""
+            login = inst.username ?? ""
+            pass = inst.password ?? ""
+            email = inst.email ?? ""
+            twoFactor = inst.twoFactor ?? ""
             isEditingInstitution = false
         } else {
             institutionName = ""
@@ -304,38 +304,42 @@ struct AddAccountSheet: View {
     }
     
     private func saveAccount() {
-        var targetInstitution: Institution
-        
-        if selectedInstitutionId == "new" {
-            let newInst = vm.addInstitution(context: context, companyId: companyId)
-            newInst.name = institutionName
-            newInst.loginUrl = website
-            newInst.username = login
-            newInst.email = email
-            newInst.password = pass
-            newInst.twoFactor = twoFactor
-            targetInstitution = newInst
-        } else if let existing = institutions.first(where: { $0.id == selectedInstitutionId }) {
-            targetInstitution = existing
-            targetInstitution.loginUrl = website
-            targetInstitution.username = login
-            targetInstitution.email = email
-            targetInstitution.password = pass
-            targetInstitution.twoFactor = twoFactor
-        } else {
-            return
+        Task {
+            guard let compId = UUID(uuidString: companyId), let session = try? await SupabaseService.shared.client.auth.session else { return }
+            await MainActor.run {
+                var targetInstitution: Institution
+                
+                if selectedInstitutionId == "new" {
+                    var newInst = vm.addInstitution(appState: appState, userId: session.user.id, companyId: compId)
+                    newInst.name = institutionName
+                    newInst.loginUrl = website
+                    newInst.username = login
+                    newInst.email = email
+                    newInst.password = pass
+                    newInst.twoFactor = twoFactor
+                    targetInstitution = newInst
+                } else if let existing = institutions.first(where: { $0.id.uuidString == selectedInstitutionId }) {
+                    targetInstitution = existing
+                    targetInstitution.loginUrl = website
+                    targetInstitution.username = login
+                    targetInstitution.email = email
+                    targetInstitution.password = pass
+                    targetInstitution.twoFactor = twoFactor
+                } else {
+                    return
+                }
+                
+                var account = InstitutionAccount()
+                account.name = accountName
+                account.type = accountType
+                
+                var accounts = targetInstitution.accounts
+                accounts.append(account)
+                targetInstitution.accounts = accounts
+                vm.saveInstitution(targetInstitution, appState: appState)
+                
+                dismiss()
+            }
         }
-        
-        var newAccount = InstitutionAccount()
-        newAccount.name = accountName
-        newAccount.type = accountType
-        
-        var accounts = targetInstitution.accounts
-        accounts.append(newAccount)
-        targetInstitution.accounts = accounts
-        
-        vm.saveInstitution(targetInstitution, context: context)
-        
-        dismiss()
     }
 }
