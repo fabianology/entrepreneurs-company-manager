@@ -22,6 +22,9 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift.git
     from: 2.4.0
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS.git
+    from: 7.1.0
 
 targets:
   Zifr:
@@ -31,9 +34,11 @@ targets:
       - path: Zifr
     dependencies:
       - package: Supabase
+      - package: GoogleSignIn
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vibing.miloom
         INFOPLIST_FILE: Zifr/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Zifr/Zifr.entitlements
     scheme:
       testTargets: []

@@ -2,6 +2,7 @@ import SwiftUI
 import Supabase
 import AuthenticationServices
 import CryptoKit
+import GoogleSignIn
 
 @Observable
 final class AuthViewModel: NSObject {
@@ -10,6 +11,7 @@ final class AuthViewModel: NSObject {
     var authError: String?
 
     private var currentNonce: String?
+    private var authorizationController: ASAuthorizationController?
 
     func checkSession() async {
         do {
@@ -35,6 +37,81 @@ final class AuthViewModel: NSObject {
         }
     }
     
+
+    // MARK: - Email / Password Auth
+    
+    func signInWithEmail(email: String, password: String) async {
+        await MainActor.run { self.isLoading = true; self.authError = nil }
+        do {
+            _ = try await SupabaseService.shared.client.auth.signIn(email: email, password: password)
+            await MainActor.run {
+                self.isAuthenticated = true
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.authError = error.localizedDescription
+                self.isLoading = false
+            }
+        }
+    }
+    
+    func signUpWithEmail(email: String, password: String) async {
+        await MainActor.run { self.isLoading = true; self.authError = nil }
+        do {
+            _ = try await SupabaseService.shared.client.auth.signUp(email: email, password: password)
+            await MainActor.run {
+                self.isAuthenticated = true
+                self.isLoading = false
+                // Depending on Supabase settings, email confirmation might be required
+            }
+        } catch {
+            await MainActor.run {
+                self.authError = error.localizedDescription
+                self.isLoading = false
+            }
+        }
+    }
+    
+    // MARK: - Sign in with Google
+    
+    func startSignInWithGoogleFlow() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.windows.first?.rootViewController else {
+            print("Could not find root view controller")
+            return
+        }
+        
+        let clientID = "473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f.apps.googleusercontent.com"
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+        
+        Task {
+            await MainActor.run { self.isLoading = true; self.authError = nil }
+            do {
+                let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
+                
+                guard let idToken = result.user.idToken?.tokenString else {
+                    throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "No ID token found"])
+                }
+                
+                _ = try await SupabaseService.shared.client.auth.signInWithIdToken(
+                    credentials: .init(provider: .google, idToken: idToken, nonce: nil)
+                )
+                
+                await MainActor.run {
+                    self.isAuthenticated = true
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.authError = error.localizedDescription
+                    self.isLoading = false
+                }
+                print("Google Sign In error: \(error)")
+            }
+        }
+    }
+
     // MARK: - Sign in with Apple
     
     func startSignInWithAppleFlow() {
@@ -45,10 +122,10 @@ final class AuthViewModel: NSObject {
         request.requestedScopes = [.fullName, .email]
         request.nonce = sha256(nonce)
 
-        let authorizationController = ASAuthorizationController(authorizationRequests: [request])
-        authorizationController.delegate = self
-        authorizationController.presentationContextProvider = self
-        authorizationController.performRequests()
+        self.authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        self.authorizationController?.delegate = self
+        self.authorizationController?.presentationContextProvider = self
+        self.authorizationController?.performRequests()
     }
     
     private func randomNonceString(length: Int = 32) -> String {

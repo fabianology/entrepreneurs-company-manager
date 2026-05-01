@@ -44,5 +44,18 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>CiFr uses your camera to scan and digitize important company documents.</string>
+	<key>GIDClientID</key>
+	<string>473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

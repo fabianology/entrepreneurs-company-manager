@@ -7,25 +7,27 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		039F785B3420E5ACA664F3B7 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCB3286F5FA5C455ADC4B6DD /* AuthViewModel.swift */; };
 		0BFFDDE1FF715E861E2482EB /* CompanyAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AFA05E28920F297646C677 /* CompanyAvatar.swift */; };
 		1220409E829B6826E5F98B62 /* make_symbol.py in Resources */ = {isa = PBXBuildFile; fileRef = 2F29D9FCB918B70318DBED51 /* make_symbol.py */; };
 		1236B3FD91C4A1A1168A6272 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2B6CE6B7CD844A5737460A2C /* Supabase */; };
+		12D549DB5F31C13636000491 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C3A8B1889223B777ECDA81B /* AuthViewModel.swift */; };
 		22D969D0670A82296E3CCE6B /* Loan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89FF19CB274064BB06D6017 /* Loan.swift */; };
+		24BD94852802E5649BA31668 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1FB05FF46D194404F4544A /* AppState.swift */; };
 		35D7AD052A31B0416172216F /* miloom.console.svg in Resources */ = {isa = PBXBuildFile; fileRef = 92717522EB1C824EB367EF4D /* miloom.console.svg */; };
 		371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C5A710215BBAF96C2E51F /* ZifrApp.swift */; };
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
 		406D74E6936B09401F18B8A8 /* patch_svg2.py in Resources */ = {isa = PBXBuildFile; fileRef = AF3E68AC8EB242191A2179B1 /* patch_svg2.py */; };
 		46CFAE72D8A339D9D82C3BFC /* FinancialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */; };
-		54D8EB4EEE62BE3617E8EF36 /* DataRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E59123DAD7DC1306BCEFCA97 /* DataRepository.swift */; };
+		5921C64C073EA205947D4777 /* DataRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E5CF10B11366A7F77DE656 /* DataRepository.swift */; };
 		5970666C186E2CA75860907F /* CompanyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */; };
+		5EBA22404FBAACD632D6D989 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0931BDA073A93591B071DF97 /* SupabaseService.swift */; };
 		656E6D3AAA4F61BC73C58401 /* CompanyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73663491A43CB99703F9853B /* CompanyCardView.swift */; };
-		663B304BBD1BFB91D5BAE859 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A910FB1678FABEB4898EA2A9 /* AppState.swift */; };
 		67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1CA7408BE63B84A63BABDB8 /* Date+Formatting.swift */; };
 		70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */; };
 		77DAA496C236F6E1F48B4E25 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48FACB377EF3DEDCA10F5A3E /* RootView.swift */; };
 		7C20858C14F22D7330FC76BE /* SharedComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB03F357FB890C8E4972D112 /* SharedComponents.swift */; };
 		7C8880D956CBD98BEEFA0F69 /* GlobalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0616C7556254F7EE8C39FF3 /* GlobalSearchView.swift */; };
+		7CCEAABFA9D6A6E79EE5F208 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A805E3AF7A5C2535E780EF24 /* LoginView.swift */; };
 		7F5587DB6B51FFC6F517FD51 /* SubscriptionListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E254651338FC3ED687C1BF3F /* SubscriptionListView.swift */; };
 		8FDA92009DE2B8708CCEC374 /* FinancialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F35D3D91F4D431D42B40709 /* FinancialCard.swift */; };
 		9102B68AD2A515E65924160E /* HomeRenewalParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D855706F59A3903694ED1DB /* HomeRenewalParser.swift */; };
@@ -39,15 +41,14 @@
 		B32A5DEDA68DB7F2A6A8D593 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F23A18826AE30784B43EF1 /* logo.png */; };
 		BA57027EA5350F4639B6C911 /* Company.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75FA7DD2F2423504DA06F6D9 /* Company.swift */; };
 		BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9602D7532DE04DFA8294ACAE /* DashboardView.swift */; };
+		C039D8C90239DB0F79A528D1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9C3A87C6A9399B175E90556D /* GoogleSignIn */; };
 		C0602B559E7624043CF0A151 /* Color+Zifr.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3141954F83AF71011D282471 /* Color+Zifr.swift */; };
 		C10B903BB4B80C2B86F6158B /* AddAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0252929399782D6B53FD8F78 /* AddAccountSheet.swift */; };
-		C7733AE3A640BF3B1ED6BC2C /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9CB07CECB1EAB43E6C7BC5 /* LoginView.swift */; };
 		C7C30C6E7A58FB2F27CD53A8 /* patch_svg.py in Resources */ = {isa = PBXBuildFile; fileRef = 0BC09D962F2587315597B9DD /* patch_svg.py */; };
 		CD0308E14A8A6FD71D3348AC /* CompanyMetaSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AA97D0931C9A2302F11955 /* CompanyMetaSheet.swift */; };
 		DEEB7F47CBCE5D07C0F17701 /* Institution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008FF13CD7DB43FB47297A75 /* Institution.swift */; };
 		E03225E193203FE61013AC61 /* HomeBillingTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ACE6215663A4836222052E /* HomeBillingTimeline.swift */; };
 		E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED204010D74AB9325095BD9A /* DocumentScannerService.swift */; };
-		EF4411F7DA2BA16CB796FA25 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E3C781858D4CBFA8CD6D184 /* SupabaseService.swift */; };
 		F2ECD35FF479C6DACC511E83 /* patch2.py in Resources */ = {isa = PBXBuildFile; fileRef = 0ACC52E30ED6C458351E1CC0 /* patch2.py */; };
 		F3D4FC31B24A27032848AF07 /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */; };
 		F583B5C82FBD983E6CA21FB5 /* DocumentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE716A0EE836D6C85D35CA28 /* DocumentListView.swift */; };
@@ -59,11 +60,11 @@
 		0252929399782D6B53FD8F78 /* AddAccountSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountSheet.swift; sourceTree = "<group>"; };
 		03CAB6D4DDF65D7F0680343C /* Zifr.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Zifr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		06F23A18826AE30784B43EF1 /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
+		0931BDA073A93591B071DF97 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		0ACC52E30ED6C458351E1CC0 /* patch2.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch2.py; sourceTree = "<group>"; };
 		0BC09D962F2587315597B9DD /* patch_svg.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch_svg.py; sourceTree = "<group>"; };
 		0F35D3D91F4D431D42B40709 /* FinancialCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialCard.swift; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
-		1E3C781858D4CBFA8CD6D184 /* SupabaseService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SupabaseService.swift; path = Zifr/Services/SupabaseService.swift; sourceTree = "<group>"; };
 		28AA97D0931C9A2302F11955 /* CompanyMetaSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyMetaSheet.swift; sourceTree = "<group>"; };
 		2CF48E4CD47CB8708C09D8A6 /* EntityHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityHomeView.swift; sourceTree = "<group>"; };
 		2E23D2AE452D41F40D63BCAE /* Zifr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zifr.entitlements; sourceTree = "<group>"; };
@@ -71,6 +72,7 @@
 		3141954F83AF71011D282471 /* Color+Zifr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Zifr.swift"; sourceTree = "<group>"; };
 		413C5A710215BBAF96C2E51F /* ZifrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZifrApp.swift; sourceTree = "<group>"; };
 		48FACB377EF3DEDCA10F5A3E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		4C3A8B1889223B777ECDA81B /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		556340A3A5DAA4657EC93B4C /* CompanyDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDetailView.swift; sourceTree = "<group>"; };
 		708E295DDABD085515D80626 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 		71651E9BD50563BBC43440CD /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -85,22 +87,21 @@
 		96AFA05E28920F297646C677 /* CompanyAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyAvatar.swift; sourceTree = "<group>"; };
 		99D7628D8C499839405F0CB0 /* EditSubscriptionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSubscriptionSheet.swift; sourceTree = "<group>"; };
 		9D855706F59A3903694ED1DB /* HomeRenewalParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRenewalParser.swift; sourceTree = "<group>"; };
-		A910FB1678FABEB4898EA2A9 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppState.swift; path = Zifr/ViewModels/AppState.swift; sourceTree = "<group>"; };
+		9E1FB05FF46D194404F4544A /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A805E3AF7A5C2535E780EF24 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		AC3CC8DCAA09EB5F037AA043 /* .svg */ = {isa = PBXFileReference; path = .svg; sourceTree = "<group>"; };
 		AF3E68AC8EB242191A2179B1 /* patch_svg2.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch_svg2.py; sourceTree = "<group>"; };
 		BB13F6178324168ED9317DB1 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
 		C1CA7408BE63B84A63BABDB8 /* Date+Formatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Formatting.swift"; sourceTree = "<group>"; };
 		C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDocument.swift; sourceTree = "<group>"; };
-		CF9CB07CECB1EAB43E6C7BC5 /* LoginView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LoginView.swift; path = Zifr/Views/Auth/LoginView.swift; sourceTree = "<group>"; };
+		C9E5CF10B11366A7F77DE656 /* DataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepository.swift; sourceTree = "<group>"; };
 		D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialView.swift; sourceTree = "<group>"; };
 		D89FF19CB274064BB06D6017 /* Loan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loan.swift; sourceTree = "<group>"; };
 		DCADE3750A4CFA0353D88977 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		DCB3286F5FA5C455ADC4B6DD /* AuthViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AuthViewModel.swift; path = Zifr/ViewModels/AuthViewModel.swift; sourceTree = "<group>"; };
 		DE716A0EE836D6C85D35CA28 /* DocumentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentListView.swift; sourceTree = "<group>"; };
 		E0616C7556254F7EE8C39FF3 /* GlobalSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchView.swift; sourceTree = "<group>"; };
 		E254651338FC3ED687C1BF3F /* SubscriptionListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionListView.swift; sourceTree = "<group>"; };
-		E59123DAD7DC1306BCEFCA97 /* DataRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DataRepository.swift; path = Zifr/Services/DataRepository.swift; sourceTree = "<group>"; };
 		E5ACE6215663A4836222052E /* HomeBillingTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeBillingTimeline.swift; sourceTree = "<group>"; };
 		ED204010D74AB9325095BD9A /* DocumentScannerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentScannerService.swift; sourceTree = "<group>"; };
 		FB03F357FB890C8E4972D112 /* SharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComponents.swift; sourceTree = "<group>"; };
@@ -112,6 +113,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1236B3FD91C4A1A1168A6272 /* Supabase in Frameworks */,
+				C039D8C90239DB0F79A528D1 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,7 +123,9 @@
 		3696D93244084E7BD912BD0C /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				9E1FB05FF46D194404F4544A /* AppState.swift */,
 				708E295DDABD085515D80626 /* AppViewModel.swift */,
+				4C3A8B1889223B777ECDA81B /* AuthViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -153,12 +157,15 @@
 			children = (
 				E5F79FFC0C21D2B1B768324F /* Zifr */,
 				C1137BCA9225C4E162AE5080 /* Products */,
-				DCB3286F5FA5C455ADC4B6DD /* AuthViewModel.swift */,
-				E59123DAD7DC1306BCEFCA97 /* DataRepository.swift */,
-				CF9CB07CECB1EAB43E6C7BC5 /* LoginView.swift */,
-				A910FB1678FABEB4898EA2A9 /* AppState.swift */,
-				1E3C781858D4CBFA8CD6D184 /* SupabaseService.swift */,
 			);
+			sourceTree = "<group>";
+		};
+		6C5BB7DDB1241705A4A8100C /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				A805E3AF7A5C2535E780EF24 /* LoginView.swift */,
+			);
+			path = Auth;
 			sourceTree = "<group>";
 		};
 		844F69209D6BBB439B442A96 /* Dashboard */ = {
@@ -181,8 +188,10 @@
 		9772A80219031D52B9EBF3E8 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				C9E5CF10B11366A7F77DE656 /* DataRepository.swift */,
 				ED204010D74AB9325095BD9A /* DocumentScannerService.swift */,
 				D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */,
+				0931BDA073A93591B071DF97 /* SupabaseService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -228,6 +237,7 @@
 			isa = PBXGroup;
 			children = (
 				48FACB377EF3DEDCA10F5A3E /* RootView.swift */,
+				6C5BB7DDB1241705A4A8100C /* Auth */,
 				44AC0B46B4B160D20BFFC1DD /* Company */,
 				B4C8B60BB13DEF6E8F895B5E /* Components */,
 				844F69209D6BBB439B442A96 /* Dashboard */,
@@ -303,6 +313,7 @@
 			name = Zifr;
 			packageProductDependencies = (
 				2B6CE6B7CD844A5737460A2C /* Supabase */,
+				9C3A87C6A9399B175E90556D /* GoogleSignIn */,
 			);
 			productName = Zifr;
 			productReference = 03CAB6D4DDF65D7F0680343C /* Zifr.app */;
@@ -332,6 +343,7 @@
 			mainGroup = 670704F428ABE79D32CC1C46;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				49F07709DBFD6F4EEE298D30 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				7B2B3636121D39BE37102BAE /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -368,7 +380,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				C10B903BB4B80C2B86F6158B /* AddAccountSheet.swift in Sources */,
+				24BD94852802E5649BA31668 /* AppState.swift in Sources */,
 				F705C282AF1344042610936A /* AppViewModel.swift in Sources */,
+				12D549DB5F31C13636000491 /* AuthViewModel.swift in Sources */,
 				3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */,
 				C0602B559E7624043CF0A151 /* Color+Zifr.swift in Sources */,
 				BA57027EA5350F4639B6C911 /* Company.swift in Sources */,
@@ -378,6 +392,7 @@
 				5970666C186E2CA75860907F /* CompanyDocument.swift in Sources */,
 				CD0308E14A8A6FD71D3348AC /* CompanyMetaSheet.swift in Sources */,
 				BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */,
+				5921C64C073EA205947D4777 /* DataRepository.swift in Sources */,
 				67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */,
 				F583B5C82FBD983E6CA21FB5 /* DocumentListView.swift in Sources */,
 				E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */,
@@ -392,17 +407,14 @@
 				9102B68AD2A515E65924160E /* HomeRenewalParser.swift in Sources */,
 				DEEB7F47CBCE5D07C0F17701 /* Institution.swift in Sources */,
 				22D969D0670A82296E3CCE6B /* Loan.swift in Sources */,
+				7CCEAABFA9D6A6E79EE5F208 /* LoginView.swift in Sources */,
 				77DAA496C236F6E1F48B4E25 /* RootView.swift in Sources */,
 				7C20858C14F22D7330FC76BE /* SharedComponents.swift in Sources */,
 				97F4951B0BB0D4281C26DBAE /* Subscription.swift in Sources */,
 				7F5587DB6B51FFC6F517FD51 /* SubscriptionListView.swift in Sources */,
+				5EBA22404FBAACD632D6D989 /* SupabaseService.swift in Sources */,
 				70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */,
 				371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */,
-				039F785B3420E5ACA664F3B7 /* AuthViewModel.swift in Sources */,
-				54D8EB4EEE62BE3617E8EF36 /* DataRepository.swift in Sources */,
-				C7733AE3A640BF3B1ED6BC2C /* LoginView.swift in Sources */,
-				663B304BBD1BFB91D5BAE859 /* AppState.swift in Sources */,
-				EF4411F7DA2BA16CB796FA25 /* SupabaseService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -413,6 +425,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Zifr/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -429,6 +442,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				INFOPLIST_FILE = Zifr/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -598,6 +612,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		49F07709DBFD6F4EEE298D30 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.1.0;
+			};
+		};
 		7B2B3636121D39BE37102BAE /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase/supabase-swift.git";
@@ -613,6 +635,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7B2B3636121D39BE37102BAE /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		9C3A87C6A9399B175E90556D /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 49F07709DBFD6F4EEE298D30 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
