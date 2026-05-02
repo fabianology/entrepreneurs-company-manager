@@ -1,0 +1,37 @@
+{
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-KDF.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KDF.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KDF.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KDF.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KDF.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KDF.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-KexKeyDerivation.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KexKeyDerivation.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KexKeyDerivation.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KexKeyDerivation.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KexKeyDerivation.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-KexKeyDerivation.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-LabeledExtract.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-LabeledExtract.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-LabeledExtract.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-LabeledExtract.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-LabeledExtract.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-LabeledExtract.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-Utils.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-Utils.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-Utils.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-Utils.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-Utils.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HPKE-Utils.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/KEM/Conformances/DHKEM.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/DHKEM.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/DHKEM.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/DHKEM.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/DHKEM.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/DHKEM.swiftdeps"
+  }
+}

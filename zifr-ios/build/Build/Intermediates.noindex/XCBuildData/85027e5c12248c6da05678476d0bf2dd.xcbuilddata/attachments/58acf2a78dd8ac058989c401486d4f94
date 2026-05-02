@@ -1,0 +1,95 @@
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/DerivedSources/resource_bundle_accessor.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/AEADs/AES/GCM/AES-GCM.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/AEADs/AES/GCM/BoringSSL/AES-GCM_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/AEADs/ChachaPoly/BoringSSL/ChaChaPoly_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/AEADs/ChachaPoly/ChaChaPoly.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/AEADs/Cipher.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/AEADs/Nonces.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/ASN1.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1Any.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1BitString.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1Boolean.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1Identifier.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1Integer.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1Null.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1OctetString.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ASN1Strings.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ArraySliceBigint.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/GeneralizedTime.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/Basic\ ASN1\ Types/ObjectIdentifier.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/ECDSASignature.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/PEMDocument.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/PKCS8PrivateKey.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/SEC1PrivateKey.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/ASN1/SubjectPublicKeyInfo.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/CryptoError_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/CryptoKitErrors.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/BoringSSL/Digest_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/Digest.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/Digests.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/HashFunctions.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/HashFunctions_SHA2.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/HashFunctions_SHA3.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Digests/XKCP/Digest_xkcp.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-AEAD.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-Ciphersuite.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-KDF.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-KexKeyDerivation.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-LabeledExtract.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/HPKE-Utils.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/KEM/Conformances/DHKEM.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/KEM/Conformances/HPKE-KEM-Curve25519.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/KEM/Conformances/HPKE-NIST-EC-KEMs.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Ciphersuite/KEM/HPKE-KEM.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/HPKE-Errors.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/HPKE.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Key\ Schedule/HPKE-Context.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Key\ Schedule/HPKE-KeySchedule.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/HPKE/Modes/HPKE-Modes.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Insecure/Insecure.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Insecure/Insecure_HashFunctions.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/BoringSSL/MLKEM_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/BoringSSL/MLKEM_wrapper.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/BoringSSL/XWing_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/KEM-Errors.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/KEM.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/MLKEM.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/KEM/XWing.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Agreement/BoringSSL/ECDH_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Agreement/DH.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Agreement/ECDH.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Derivation/ANSIx963.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Derivation/HKDF.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Wrapping/AESWrap.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Key\ Wrapping/BoringSSL/AESWrap_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/BoringSSL/Ed25519_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/BoringSSL/NISTCurvesKeys_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/BoringSSL/X25519Keys_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/Curve25519.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/Ed25519Keys.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/NISTCurvesKeys.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/X25519Keys.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/Symmetric/SymmetricKeys.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Message\ Authentication\ Codes/HMAC/HMAC.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Message\ Authentication\ Codes/MACFunctions.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Message\ Authentication\ Codes/MessageAuthenticationCode.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/PRF/AES.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/BoringSSL/ECDSASignature_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/BoringSSL/ECDSA_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/BoringSSL/EdDSA_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/BoringSSL/MLDSA_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/BoringSSL/MLDSA_wrapper.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/ECDSA.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/Ed25519.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/MLDSA.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Signatures/Signature.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/BoringSSL/CryptoKitErrors_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/BoringSSL/Optional+withUnsafeBytes_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/BoringSSL/RNG_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/BoringSSL/SafeCompare_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/BoringSSL/Zeroization_boring.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/BoringSSL/_CryptoModuleAnchor.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/PrettyBytes.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/SafeCompare.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/SecureBytes.swift
+/Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Util/Zeroization.swift

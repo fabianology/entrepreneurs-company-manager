@@ -1,0 +1,37 @@
+{
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/EC/X25519Keys.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/X25519Keys.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/X25519Keys.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/X25519Keys.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/X25519Keys.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/X25519Keys.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Keys/Symmetric/SymmetricKeys.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/SymmetricKeys.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/SymmetricKeys.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/SymmetricKeys.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/SymmetricKeys.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/SymmetricKeys.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Message Authentication Codes/HMAC/HMAC.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HMAC.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HMAC.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HMAC.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HMAC.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/HMAC.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Message Authentication Codes/MACFunctions.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MACFunctions.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MACFunctions.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MACFunctions.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MACFunctions.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MACFunctions.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/swift-crypto/Sources/Crypto/Message Authentication Codes/MessageAuthenticationCode.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MessageAuthenticationCode.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MessageAuthenticationCode.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MessageAuthenticationCode.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MessageAuthenticationCode.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/x86_64/MessageAuthenticationCode.swiftdeps"
+  }
+}

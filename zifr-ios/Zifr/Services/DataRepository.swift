@@ -103,4 +103,33 @@ class DataRepository {
     func deleteDocument(_ id: UUID) async throws {
         try await client.from("company_documents").delete().eq("id", value: id).execute()
     }
+    
+    // MARK: - Sharing
+    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String) async throws {
+        print("🚀 [Sharing] Initiating invitation for \(email) with role: \(role) to resource \(resourceType): \(resourceId)")
+        
+        guard let currentUser = try? await client.auth.session.user else {
+            print("❌ [Sharing] Failed to get current user session.")
+            throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not logged in."])
+        }
+        
+        print("✅ [Sharing] Current user identified: \(currentUser.id)")
+        
+        let invitation = ResourceInvitation(
+            resourceId: resourceId,
+            resourceType: resourceType,
+            email: email,
+            role: role,
+            invitedBy: currentUser.id
+        )
+        
+        do {
+            print("⏳ [Sharing] Inserting invitation record into 'resource_invitations' table...")
+            try await client.from("resource_invitations").insert(invitation).execute()
+            print("✅ [Sharing] Successfully inserted invitation record for \(email).")
+        } catch {
+            print("❌ [Sharing] Database insert failed: \(error.localizedDescription)")
+            throw error
+        }
+    }
 }

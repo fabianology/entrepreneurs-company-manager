@@ -13,6 +13,14 @@ struct DashboardView: View {
     @State private var showSharedWithMe = false
     @State private var editingCompany: Company? = nil
     @State private var companyToDelete: Company? = nil
+    @State private var companyToShare: Company? = nil
+    @State private var currentUserId: UUID?
+    
+    // Shared companies
+    private var sharedCompanies: [Company] {
+        guard let currentUserId = currentUserId else { return [] }
+        return appState.companies.filter { $0.userId != currentUserId }
+    }
 
     @State private var dummyCompany = Company(
         userId: UUID(),
@@ -34,19 +42,12 @@ struct DashboardView: View {
                         
                         // Share Button
                         Menu {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                // Future cloudkit sharing
-                            } label: {
-                                Label("Entire Portfolio", systemImage: "folder.badge.person.crop")
-                            }
-                            Divider()
                             ForEach(companies) { company in
                                 Button {
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    // Future cloudkit sharing for company
+                                    companyToShare = company
                                 } label: {
-                                    Label(company.name.isEmpty ? "Entity" : company.name, systemImage: "building.2")
+                                    Label("Share \(company.name.isEmpty ? "Entity" : company.name)", systemImage: "person.crop.circle.badge.plus")
                                 }
                             }
                         } label: {
@@ -183,8 +184,23 @@ struct DashboardView: View {
             .navigationDestination(for: Company.self) { company in
                 CompanyDetailView(company: company, vm: vm)
             }
+            .navigationDestination(for: AppViewModel.AppRoute.self) { route in
+                if route == .adminSettings {
+                    AdminSettingsView(vm: vm)
+                }
+            }
             .navigationDestination(isPresented: $showSharedWithMe) {
-                SharedWithMeView(vm: vm)
+                if let uid = currentUserId {
+                    SharedWithMeView(vm: vm, currentUserId: uid)
+                }
+            }
+            .task {
+                if let session = try? await SupabaseService.shared.client.auth.session {
+                    currentUserId = session.user.id
+                }
+            }
+            .sheet(item: $companyToShare) { company in
+                ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
             }
             .sheet(isPresented: $showAddCompany) {
                 EditCompanySheet(vm: vm, company: nil)
@@ -199,24 +215,43 @@ struct DashboardView: View {
                 )
             }
             .safeAreaInset(edge: .bottom) {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    vm.showSearch = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 15, weight: .medium))
+                HStack(spacing: 10) {
+                    Button {
+                        let generator = UIImpactFeedbackGenerator(style: .medium)
+                        generator.impactOccurred()
+                        vm.path.append(AppViewModel.AppRoute.adminSettings)
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 20, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text("Search")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                        Spacer()
+                            .frame(width: 44, height: 44)
+                            .background(Color(hex: "#1C1C1E"))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
                     }
-                    .padding(.horizontal, 16)
-                    .frame(height: 44)
-                    .liquidGlass(cornerRadius: 22)
+                    .buttonStyle(.plain)
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        vm.showSearch = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text("Search")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 44)
+                        .background(Color(hex: "#1C1C1E"))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
@@ -224,9 +259,12 @@ struct DashboardView: View {
     }
 
     private var filteredCompanies: [Company] {
-        guard !vm.searchQuery.isEmpty else { return companies }
+        let owned = companies.filter { $0.userId == currentUserId }
+        let baseList = currentUserId != nil ? owned : companies
+        
+        guard !vm.searchQuery.isEmpty else { return baseList }
         let q = vm.searchQuery.lowercased()
-        return companies.filter { $0.name.lowercased().contains(q) || $0.structure.lowercased().contains(q) }
+        return baseList.filter { $0.name.lowercased().contains(q) || $0.structure.lowercased().contains(q) }
     }
 
     @ViewBuilder
@@ -275,7 +313,7 @@ struct DashboardView: View {
         let hasInsts = institutions.contains(where: { inst in !companies.contains(where: { $0.id == inst.companyId }) })
         let hasLoans = loans.contains(where: { loan in !companies.contains(where: { $0.id == loan.companyId }) })
         let hasDocs = documents.contains(where: { doc in !companies.contains(where: { $0.id == doc.companyId }) })
-        return hasSubs || hasCards || hasInsts || hasLoans || hasDocs
+        return hasSubs || hasCards || hasInsts || hasLoans || hasDocs || !sharedCompanies.isEmpty
     }
 
     private var headerSection: some View {
@@ -363,21 +401,30 @@ struct SharedWithMeView: View {
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    
+    let currentUserId: UUID
 
-    private var allCompanies: [Company] { appState.companies.sorted { $0.name < $1.name } }
+    private var sharedCompanies: [Company] {
+        appState.companies.filter { $0.userId != currentUserId }
+    }
+    
+    private var sharedCompanyIds: Set<UUID> {
+        Set(sharedCompanies.map { $0.id })
+    }
+
     private var allSubscriptions: [Subscription] { appState.subscriptions }
     private var allCards: [FinancialCard] { appState.cards }
     private var allInstitutions: [Institution] { appState.institutions }
     private var allLoans: [Loan] { appState.loans }
     private var allDocuments: [CompanyDocument] { appState.documents }
 
-    var subscriptions: [Subscription] { allSubscriptions.filter { sub in !allCompanies.contains(where: { $0.id == sub.companyId }) } }
-    var cards: [FinancialCard] { allCards.filter { card in !allCompanies.contains(where: { $0.id == card.companyId }) } }
-    var institutions: [Institution] { allInstitutions.filter { inst in !allCompanies.contains(where: { $0.id == inst.companyId }) } }
-    var loans: [Loan] { allLoans.filter { loan in !allCompanies.contains(where: { $0.id == loan.companyId }) } }
-    var documents: [CompanyDocument] { allDocuments.filter { doc in !allCompanies.contains(where: { $0.id == doc.companyId }) } }
+    var subscriptions: [Subscription] { allSubscriptions.filter { sharedCompanyIds.contains($0.companyId) } }
+    var cards: [FinancialCard] { allCards.filter { sharedCompanyIds.contains($0.companyId) } }
+    var institutions: [Institution] { allInstitutions.filter { sharedCompanyIds.contains($0.companyId) } }
+    var loans: [Loan] { allLoans.filter { sharedCompanyIds.contains($0.companyId) } }
+    var documents: [CompanyDocument] { allDocuments.filter { sharedCompanyIds.contains($0.companyId) } }
 
-    let sharedCompany = Company(id: UUID(), userId: UUID(), name: "Shared with Me", structure: "Inbox", colorHex: "#3b82f6", website: "")
+    let sharedInboxCompany = Company(id: UUID(), userId: UUID(), name: "Shared with Me", structure: "Inbox", colorHex: "#3b82f6", website: "")
 
     @State private var showCommandCenter = false
     @State private var showEditCompany = false
@@ -404,25 +451,25 @@ struct SharedWithMeView: View {
             ZStack(alignment: .top) {
                 switch vm.activeTab {
                 case .subscriptions, .home:
-                    SubscriptionListView(company: sharedCompany, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
+                    SubscriptionListView(company: sharedInboxCompany, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
                 case .financial:
-                    FinancialView(company: sharedCompany, cards: cards, institutions: institutions, loans: loans, vm: vm)
+                    FinancialView(company: sharedInboxCompany, cards: cards, institutions: institutions, loans: loans, vm: vm)
                 case .documents:
-                    DocumentListView(company: sharedCompany, documents: documents, vm: vm)
+                    DocumentListView(company: sharedInboxCompany, documents: documents, vm: vm)
                 }
                 
                 if showCommandCenter {
                     EntityHomeView(
-                        company: sharedCompany,
+                        company: sharedInboxCompany,
                         subscriptions: subscriptions,
                         cards: cards,
                         institutions: institutions,
                         loans: loans,
                         documents: documents,
-                        allCompanies: allCompanies,
-                        allSubscriptions: allSubscriptions,
-                        allCards: allCards,
-                        allLoans: allLoans,
+                        allCompanies: sharedCompanies,
+                        allSubscriptions: subscriptions,
+                        allCards: cards,
+                        allLoans: loans,
                         vm: vm
                     )
                     .background(Color.black)
@@ -462,7 +509,9 @@ struct SharedWithMeView: View {
                                 Label("Dashboard", systemImage: "square.grid.2x2")
                             }
                             Button {
-                                // admin coming soon
+                                let generator = UIImpactFeedbackGenerator(style: .medium)
+                                generator.impactOccurred()
+                                vm.path.append(AppViewModel.AppRoute.adminSettings)
                             } label: {
                                 Label("Settings", systemImage: "gearshape")
                             }
@@ -565,7 +614,7 @@ struct SharedWithMeView: View {
     private var companyHeader: some View {
         HStack(alignment: .center, spacing: 12) {
             // Logo tile
-            CompanyAvatar(company: sharedCompany, size: 48)
+            CompanyAvatar(company: sharedInboxCompany, size: 48)
 
             VStack(alignment: .leading, spacing: 3) {
                 Button {
@@ -573,7 +622,7 @@ struct SharedWithMeView: View {
                     showCommandCenter.toggle()
                 } label: {
                     HStack(spacing: 8) {
-                        Text(sharedCompany.name)
+                        Text(sharedInboxCompany.name)
                             .font(.system(size: 28, weight: .bold))
                             .foregroundStyle(.white)
                             .lineLimit(1)

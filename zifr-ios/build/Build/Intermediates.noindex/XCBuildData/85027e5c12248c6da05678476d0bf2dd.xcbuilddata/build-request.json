@@ -1,0 +1,63 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "a089cdaab87e03b6e2e40cfcc23f7f5b685c0debd3974b922c5a9568cf35d150"
+    }
+  ],
+  "containerPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "build",
+    "activeArchitecture" : "undefined_arch",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : true,
+      "hostTargetedPlatform" : null,
+      "platform" : "iphonesimulator",
+      "sdk" : "iphonesimulator26.4",
+      "sdkVariant" : "iphonesimulator",
+      "supportedArchitectures" : [
+        "i386",
+        "x86_64"
+      ],
+      "targetArchitecture" : "undefined_arch"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Products",
+      "derivedDataPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build",
+      "indexDataStoreFolderPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Debug",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+          "SDKROOT" : "iphonesimulator26.4"
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ACTION" : "build",
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_XOJIT_PREVIEWS" : "YES"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "launch",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

@@ -1,0 +1,23 @@
+{
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Models/Loan.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/Loan.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/Loan.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/Loan.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/Loan.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/Loan.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Auth/LoginView.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/LoginView.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/LoginView.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/LoginView.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/LoginView.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/LoginView.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/RootView.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/RootView.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/RootView.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/RootView.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/RootView.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/RootView.swiftdeps"
+  }
+}

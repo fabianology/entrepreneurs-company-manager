@@ -1,0 +1,23 @@
+{
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Models/FinancialCard.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/FinancialCard.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/FinancialCard.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/FinancialCard.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/FinancialCard.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/FinancialCard.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/EntityHomeView.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EntityHomeView.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EntityHomeView.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EntityHomeView.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EntityHomeView.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EntityHomeView.swiftdeps"
+  },
+  "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift" : {
+    "const-values" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EditSubscriptionSheet.swiftconstvalues",
+    "dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EditSubscriptionSheet.d",
+    "diagnostics" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EditSubscriptionSheet.dia",
+    "object" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EditSubscriptionSheet.o",
+    "swift-dependencies" : "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/x86_64/EditSubscriptionSheet.swiftdeps"
+  }
+}

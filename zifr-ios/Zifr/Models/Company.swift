@@ -67,3 +67,81 @@ extension Company {
         "#3b82f6", "#8b5cf6", "#ec4899", "#64748b", "#000000"
     ]
 }
+
+// MARK: - Sharing Models
+
+struct ResourceInvitation: Identifiable, Codable, Hashable {
+    var id: UUID
+    var resourceId: UUID
+    var resourceType: String
+    var email: String
+    var role: String
+    var invitedBy: UUID
+    var createdAt: Date
+    var status: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case resourceId = "resource_id"
+        case resourceType = "resource_type"
+        case email
+        case role
+        case invitedBy = "invited_by"
+        case createdAt = "created_at"
+        case status
+    }
+    
+    init(
+        id: UUID = UUID(),
+        resourceId: UUID,
+        resourceType: String,
+        email: String,
+        role: String = "Viewer",
+        invitedBy: UUID,
+        createdAt: Date = Date(),
+        status: String = "Pending"
+    ) {
+        self.id = id
+        self.resourceId = resourceId
+        self.resourceType = resourceType
+        self.email = email
+        self.role = role
+        self.invitedBy = invitedBy
+        self.createdAt = createdAt
+        self.status = status
+    }
+}
+
+struct ResourceShare: Identifiable, Codable, Hashable {
+    var id: UUID
+    var resourceId: UUID
+    var resourceType: String
+    var userId: UUID
+    var role: String
+    var createdAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case resourceId = "resource_id"
+        case resourceType = "resource_type"
+        case userId = "user_id"
+        case role
+        case createdAt = "created_at"
+    }
+    
+    init(
+        id: UUID = UUID(),
+        resourceId: UUID,
+        resourceType: String,
+        userId: UUID,
+        role: String = "Viewer",
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.resourceId = resourceId
+        self.resourceType = resourceType
+        self.userId = userId
+        self.role = role
+        self.createdAt = createdAt
+    }
+}

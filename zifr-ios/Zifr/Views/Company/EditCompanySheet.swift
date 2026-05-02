@@ -16,6 +16,7 @@ struct EditCompanySheet: View {
     @State private var logoData: Data? = nil
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var showDeleteConfirm = false
+    @State private var showShareSheet = false
 
     var isEditing: Bool { company != nil }
 
@@ -209,8 +210,7 @@ struct EditCompanySheet: View {
                         if isEditing {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                // Placeholder for CloudKit sharing trigger
-                                print("Triggering CloudKit Sharing for \(company?.name ?? "")")
+                                showShareSheet = true
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "person.crop.circle.badge.plus")
@@ -288,6 +288,11 @@ struct EditCompanySheet: View {
             }
         }
         .onAppear { prefill() }
+        .sheet(isPresented: $showShareSheet) {
+            if let c = company {
+                ShareEntitySheet(resourceId: c.id, resourceType: "company", resourceTitle: c.name)
+            }
+        }
     }
 
     private var hasChanges: Bool {
@@ -357,4 +362,186 @@ struct EditCompanySheet: View {
 
 private func formSection<Content: View>(@ViewBuilder content: () -> Content) -> some View {
     VStack(spacing: 14) { content() }
+}
+
+// MARK: - Sharing UI
+
+struct ShareEntitySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let resourceId: UUID
+    let resourceType: String
+    let resourceTitle: String
+    
+    @State private var email: String = ""
+    @State private var role: String = "Viewer"
+    @State private var isSending = false
+    @State private var successMessage: String?
+    @State private var errorMessage: String?
+    
+    let roles = ["Viewer", "Editor", "Admin"]
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        // Header info
+                        VStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color(hex: "#4f46e5").opacity(0.2))
+                                    .frame(width: 80, height: 80)
+                                
+                                Image(systemName: iconForResourceType(resourceType))
+                                    .font(.system(size: 32, weight: .bold))
+                                    .foregroundStyle(Color(hex: "#4f46e5"))
+                            }
+                            
+                            VStack(spacing: 4) {
+                                Text("Share \(resourceTitle)")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(.white)
+                                
+                                Text("Invite collaborators to access this resource.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .multilineTextAlignment(.center)
+                            }
+                        }
+                        .padding(.top, 24)
+                        
+                        VStack(spacing: 20) {
+                            // Email Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Collaborator Email")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .textCase(.uppercase)
+                                
+                                HStack {
+                                    Image(systemName: "envelope.fill")
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    TextField("Enter email address", text: $email)
+                                        .keyboardType(.emailAddress)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(16)
+                                .background(Color(hex: "#1A1A1C"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                            }
+                            
+                            // Role Picker
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Permission Level")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .textCase(.uppercase)
+                                
+                                Picker("Role", selection: $role) {
+                                    ForEach(roles, id: \.self) { role in
+                                        Text(role).tag(role)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .colorScheme(.dark)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        // Error/Success Messages
+                        if let error = errorMessage {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                                .padding(.horizontal)
+                        }
+                        if let success = successMessage {
+                            Text(success)
+                                .font(.footnote)
+                                .foregroundStyle(.green)
+                                .padding(.horizontal)
+                        }
+                        
+                        Spacer(minLength: 40)
+                    }
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .foregroundStyle(Color.white.opacity(0.6))
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        sendInvite()
+                    } label: {
+                        if isSending {
+                            ProgressView()
+                                .tint(.zifrGreen)
+                        } else {
+                            Text("Send")
+                                .fontWeight(.bold)
+                                .foregroundStyle(email.isEmpty ? Color.white.opacity(0.3) : .zifrGreen)
+                        }
+                    }
+                    .disabled(email.isEmpty || isSending)
+                }
+            }
+        }
+    }
+    
+    private func sendInvite() {
+        guard !email.isEmpty else { return }
+        isSending = true
+        errorMessage = nil
+        successMessage = nil
+        
+        Task {
+            do {
+                try await DataRepository.shared.inviteUser(email: email, role: role, resourceId: resourceId, resourceType: resourceType)
+                await MainActor.run {
+                    isSending = false
+                    successMessage = "Invitation sent successfully!"
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    
+                    // Dismiss after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isSending = false
+                    errorMessage = error.localizedDescription
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
+    }
+}
+
+private func iconForResourceType(_ type: String) -> String {
+    switch type {
+    case "company": return "building.2.crop.circle"
+    case "all_subscriptions", "subscription": return "repeat.circle"
+    case "all_documents", "document": return "doc.text"
+    case "all_financials", "institution", "card", "loan": return "dollarsign.circle"
+    default: return "person.crop.circle.badge.plus"
+    }
 }

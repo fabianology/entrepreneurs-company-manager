@@ -1,0 +1,4 @@
+module AppAuth {
+umbrella "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuth"
+export *
+}

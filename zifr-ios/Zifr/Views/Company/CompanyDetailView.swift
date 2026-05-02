@@ -103,7 +103,9 @@ struct CompanyDetailView: View {
                         Menu {
                             ControlGroup {
                                 Button {
-                                    // admin coming soon
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                    vm.path.append(AppViewModel.AppRoute.adminSettings)
                                 } label: {
                                     Label("Admin", systemImage: "person.crop.circle")
                                 }

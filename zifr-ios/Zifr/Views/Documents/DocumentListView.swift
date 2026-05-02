@@ -13,6 +13,10 @@ struct DocumentListView: View {
     @State private var selectedType: String = "All"
     @State private var isScanning = false
     @State private var isProcessingScan = false
+    @State private var showShareSheet = false
+    @State private var shareResourceId: UUID = UUID()
+    @State private var shareResourceType: String = "all_documents"
+    @State private var shareResourceTitle: String = "All Documents"
 
     var grouped: [String: [CompanyDocument]] {
         Dictionary(grouping: documents, by: \.type)
@@ -28,20 +32,27 @@ struct DocumentListView: View {
                     Menu {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            print("Triggering CloudKit Sharing for All Documents")
+                            shareResourceId = company.id
+                            shareResourceType = "all_documents"
+                            shareResourceTitle = "All Documents"
+                            showShareSheet = true
                         } label: {
                             Label("All Documents", systemImage: "folder.badge.person.crop")
                         }
                         
                         if !documents.isEmpty {
-                            Divider()
-                            Section("Documents") {
-                                ForEach(documents) { doc in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        print("Triggering CloudKit Sharing for \(doc.name)")
-                                    } label: {
-                                        Label(doc.name.isEmpty ? "Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
+                            ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
+                                Section(category) {
+                                    ForEach(grouped[category] ?? []) { doc in
+                                        Button {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            shareResourceId = doc.id
+                                            shareResourceType = "document"
+                                            shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+                                            showShareSheet = true
+                                        } label: {
+                                            Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
+                                        }
                                     }
                                 }
                             }
@@ -236,6 +247,9 @@ struct DocumentListView: View {
         .sheet(item: $openURL) { wrapper in
             SafariView(url: wrapper.url)
         }
+        .sheet(isPresented: $showShareSheet) {
+            ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
+        }
     }
 
     @State private var dummyDoc = CompanyDocument(
@@ -384,6 +398,7 @@ struct EditDocumentSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
+    @State private var showShareSheet = false
     
     struct Snapshot: Equatable {
         var name, type, url, uploadDate, notes: String
@@ -431,8 +446,7 @@ struct EditDocumentSheet: View {
                         // Share Document
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            // Placeholder for CloudKit sharing trigger
-                            print("Triggering CloudKit Sharing for \(doc.name)")
+                            showShareSheet = true
                         } label: {
                             HStack {
                                 Spacer()
@@ -499,6 +513,9 @@ struct EditDocumentSheet: View {
                 }
             }
             .interactiveDismissDisabled(isNew)
+            .sheet(isPresented: $showShareSheet) {
+                ShareEntitySheet(resourceId: doc.id, resourceType: "document", resourceTitle: doc.name.isEmpty ? "Document" : doc.name)
+            }
         }
     }
 }

@@ -13,6 +13,10 @@ final class AppViewModel {
     var deepLinkModelId: UUID? = nil
     var path = NavigationPath()
 
+    enum AppRoute: Hashable {
+        case adminSettings
+    }
+
     enum CompanyTab: String, CaseIterable {
         case home = "Home"
         case subscriptions = "Services"

@@ -11,6 +11,8 @@ struct EditSubscriptionSheet: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @State private var showDelete = false
+    @State private var showShareSheet = false
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
@@ -615,8 +617,7 @@ struct EditSubscriptionSheet: View {
                         // Share Service
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            // Placeholder for CloudKit sharing trigger
-                            print("Triggering CloudKit Sharing for \(sub.name)")
+                            showShareSheet = true
                         } label: {
                             HStack {
                                 Spacer()
@@ -788,6 +789,9 @@ struct EditSubscriptionSheet: View {
                 .presentationDetents([.height(500)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
+            }
+            .sheet(isPresented: $showShareSheet) {
+                ShareEntitySheet(resourceId: sub.id, resourceType: "subscription", resourceTitle: sub.name.isEmpty ? "Subscription" : sub.name)
             }
         }
     }

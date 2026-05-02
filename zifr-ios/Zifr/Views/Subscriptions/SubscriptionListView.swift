@@ -10,6 +10,10 @@ struct SubscriptionListView: View {
 
     @State private var editingSub: Subscription? = nil
     @State private var newSub: Subscription? = nil
+    @State private var showShareSheet = false
+    @State private var shareResourceId: UUID = UUID()
+    @State private var shareResourceType: String = "all_subscriptions"
+    @State private var shareResourceTitle: String = "All Subscriptions"
 
 
 
@@ -24,20 +28,25 @@ struct SubscriptionListView: View {
                     Menu {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            print("Triggering CloudKit Sharing for All Subscriptions")
+                            shareResourceId = company.id
+                            shareResourceType = "all_subscriptions"
+                            shareResourceTitle = "All Subscriptions"
+                            showShareSheet = true
                         } label: {
                             Label("All Subscriptions", systemImage: "folder.badge.person.crop")
                         }
                         
                         if !subscriptions.isEmpty {
-                            Divider()
                             Section("Subscriptions") {
                                 ForEach(subscriptions) { sub in
                                     Button {
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        print("Triggering CloudKit Sharing for \(sub.name)")
+                                        shareResourceId = sub.id
+                                        shareResourceType = "subscription"
+                                        shareResourceTitle = sub.name.isEmpty ? "Service" : sub.name
+                                        showShareSheet = true
                                     } label: {
-                                        Label(sub.name.isEmpty ? "Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
+                                        Label(sub.name.isEmpty ? "Unnamed Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
                                     }
                                 }
                             }
@@ -105,6 +114,9 @@ struct SubscriptionListView: View {
         }
         .onAppear {
             handleDeepLink(id: vm.deepLinkModelId, proxy: proxy)
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
         }
     }
