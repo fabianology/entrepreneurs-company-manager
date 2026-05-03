@@ -307,7 +307,7 @@ struct EditInstitutionSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isNew ? "Add Account" : "Save") {
+                    Button("Save") {
                         vm.saveInstitution(institution, appState: appState)
                         dismiss()
                     }
@@ -332,6 +332,9 @@ struct EditInstitutionSheet: View {
                             accs.append(accountDraft)
                         }
                         institution.accounts = accs
+                        if !isNew {
+                            vm.saveInstitution(institution, appState: appState)
+                        }
                         showAccountHUD = false
                     },
                     onCancel: { showAccountHUD = false },
@@ -340,6 +343,9 @@ struct EditInstitutionSheet: View {
                             let acc = institution.accounts[idx]
                             vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
                             institution.accounts.remove(at: idx)
+                            if !isNew {
+                                vm.saveInstitution(institution, appState: appState)
+                            }
                         }
                         showAccountHUD = false
                     }

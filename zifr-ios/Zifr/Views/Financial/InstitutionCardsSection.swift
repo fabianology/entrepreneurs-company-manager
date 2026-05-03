@@ -43,7 +43,7 @@ struct InstitutionCardsSection: View {
                                             .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.45))
                                         Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
-                                        Text(card.network == "Amex" ? "••• \(card.last4)" : "•••• \(card.last4)")
+                                        Text(card.network == "Amex" ? "••• \(card.last4 ?? "")" : "•••• \(card.last4 ?? "")")
                                             .font(.system(size: 11, weight: .bold))
                                             .foregroundStyle(Color.white.opacity(0.45))
                                     }

@@ -139,6 +139,15 @@ struct AdminSettingsView: View {
             }
         }
         .navigationBarHidden(true)
+        .gesture(
+            DragGesture()
+                .onEnded { value in
+                    if value.translation.width > 50 && abs(value.translation.height) < 50 {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        dismiss()
+                    }
+                }
+        )
         .task {
             if let session = try? await SupabaseService.shared.client.auth.session {
                 await MainActor.run {

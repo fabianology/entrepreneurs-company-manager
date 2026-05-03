@@ -30,7 +30,7 @@ struct EditCardSheet: View {
     @State private var instEmail: String = ""
     @State private var instTwoFactor: String = ""
     @State private var showInstPassword = false
-    @State private var isEditingInstitution = true
+    @State private var isEditingInstitution = false
 
     private var allLogins: [String] {
         let subLogins = subscriptions.map { $0.loginId }
@@ -79,100 +79,42 @@ struct EditCardSheet: View {
     }
 
     @ViewBuilder private var institutionDetailsSection: some View {
-        VStack(spacing: 16) {
-            if !isNewInstitution {
-                HStack {
-                    Text("INSTITUTION DETAILS")
-                        .font(.system(size: 11, weight: .bold))
-                        .tracking(0.5)
-                        .foregroundStyle(Color.white.opacity(0.5))
-                    Spacer()
-                    Button {
-                        withAnimation { isEditingInstitution.toggle() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(isEditingInstitution ? "lock" : "edit")
-                                .font(.system(size: 10, weight: .bold))
-                                .textCase(.uppercase)
-                            Image(systemName: isEditingInstitution ? "lock.open.fill" : "lock.fill")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundStyle(.white)
-                    }
-                }
-                .padding(.bottom, 4)
-            }
-
-            Group {
-                if isNewInstitution {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: { card.institutionName ?? "" }, set: { card.institutionName = $0 }))
-                        
-                        let matches = institutions.filter { ($0.name ?? "").lowercased().contains((card.institutionName ?? "").lowercased()) && ($0.name ?? "").lowercased() != (card.institutionName ?? "").lowercased() }
-                        
-                        if !matches.isEmpty && !(card.institutionName ?? "").isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(matches.prefix(3)) { inst in
-                                        Button {
-                                            isNewInstitution = false
-                                            card.institutionName = inst.name
-                                            instWebsite = inst.loginUrl ?? ""
-                                            instLogin = inst.username ?? ""
-                                            instPass = inst.password ?? ""
-                                            instEmail = inst.email ?? ""
-                                            instTwoFactor = inst.twoFactor ?? ""
-                                            isEditingInstitution = false
-                                        } label: {
-                                            Text("Switch to \(inst.name)")
-                                                .font(.system(size: 12, weight: .semibold))
-                                                .foregroundStyle(Color.green)
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 6)
-                                                .background(Color.green.opacity(0.1))
-                                                .clipShape(Capsule())
-                                        }
+        if isNewInstitution {
+            VStack(alignment: .leading, spacing: 8) {
+                ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: { card.institutionName ?? "" }, set: { card.institutionName = $0 }))
+                
+                let matches = institutions.filter { ($0.name ?? "").lowercased().contains((card.institutionName ?? "").lowercased()) && ($0.name ?? "").lowercased() != (card.institutionName ?? "").lowercased() }
+                
+                if !matches.isEmpty && !(card.institutionName ?? "").isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(matches.prefix(3)) { inst in
+                                Button {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        isNewInstitution = false
+                                        card.institutionName = inst.name
+                                        instWebsite = inst.loginUrl ?? ""
+                                        instLogin = inst.username ?? ""
+                                        instPass = inst.password ?? ""
+                                        instEmail = inst.email ?? ""
+                                        instTwoFactor = inst.twoFactor ?? ""
+                                        isEditingInstitution = false
                                     }
+                                } label: {
+                                    Text("Switch to \(inst.name)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color.green)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.green.opacity(0.1))
+                                        .clipShape(Capsule())
                                 }
-                                .padding(.horizontal, 16)
                             }
                         }
+                        .padding(.horizontal, 16)
                     }
-                }
-                
-                ZifrField(label: "WEBSITE", placeholder: "chase.com", text: $instWebsite, keyboardType: .URL, textContentType: .URL)
-                    .textInputAutocapitalization(.never)
-                
-                HStack(spacing: 12) {
-                    ZifrAutocompleteField(label: "LOGIN ID", placeholder: "username", text: $instLogin, keyboardType: .emailAddress, textContentType: nil, suggestions: allLogins)
-                    
-                    ZStack(alignment: .bottomTrailing) {
-                        ZifrField(label: "PASSWORD", placeholder: "••••••••", text: $instPass, isSecure: !showInstPassword, textContentType: .password)
-                            .textInputAutocapitalization(.never)
-
-                        Button {
-                            showInstPassword.toggle()
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            Image(systemName: showInstPassword ? "eye.slash.fill" : "eye.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.4))
-                                .padding()
-                        }
-                        .padding(.bottom, 2)
-                        .disabled(!isEditingInstitution)
-                    }
-                }
-                
-                HStack(spacing: 12) {
-                    ZifrAutocompleteField(label: "EMAIL", placeholder: "name@company.com", text: $instEmail, keyboardType: .emailAddress, textContentType: .emailAddress, suggestions: allLogins)
-                        .textInputAutocapitalization(.never)
-
-                    ZifrField(label: "2FA", placeholder: "Phone or App", text: $instTwoFactor)
                 }
             }
-            .disabled(!isEditingInstitution)
-            .opacity(!isEditingInstitution ? 0.25 : 1.0)
         }
     }
 
@@ -239,7 +181,7 @@ struct EditCardSheet: View {
     }
 
     @ViewBuilder private var row2: some View {
-        VStack(spacing: 12) {
+        Group {
             ZifrField(label: "CARD NUMBER", placeholder: "0000 0000 0000 0000", text: Binding(get: { card.cardNumber ?? "" }, set: { card.cardNumber = $0 }), keyboardType: .numberPad)
                 .onChange(of: card.cardNumber) { old, new in
                     let newStr = new ?? ""
@@ -260,11 +202,13 @@ struct EditCardSheet: View {
                         card.last4 = filtered
                     }
                 }
+                .padding(.vertical, 4)
             
             HStack(spacing: 12) {
                 cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
                 cardPicker(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
             }
+            .padding(.vertical, 4)
         }
     }
 
@@ -469,11 +413,18 @@ struct EditCardSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if !isInstitutionContext {
+                    Section {
+                        institutionSelectorRow
+                            .padding(.vertical, 4)
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 0, trailing: 20))
+                    .listRowSeparator(.hidden)
+                }
+
                 Section {
-                    VStack(spacing: 12) {
-                        if !isInstitutionContext {
-                            institutionSelectorRow
-                        }
+                    Group {
                         row1
                         row2
                         if card.type.lowercased() != "debit" {
@@ -483,11 +434,11 @@ struct EditCardSheet: View {
                         row5
                         paysForRow
                     }
-                    .padding(.vertical, 4)
                 }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
                 .listRowSeparator(.hidden)
+
 
                 // MARK: - Financial Details
                 Section {

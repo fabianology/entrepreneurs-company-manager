@@ -82,6 +82,7 @@ struct DocumentListView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 15)
 
                 VStack(spacing: 12) {
                     // Category Dashboard Grid

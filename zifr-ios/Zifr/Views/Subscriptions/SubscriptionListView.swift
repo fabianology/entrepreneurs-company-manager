@@ -62,7 +62,7 @@ struct SubscriptionListView: View {
                     }
 
                     Button {
-                        newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+                        newSub = Subscription(userId: company.userId, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
                             Text("ADD SERVICE").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
@@ -76,6 +76,7 @@ struct SubscriptionListView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 15)
                 .padding(.bottom, 20)
 
                 if subscriptions.isEmpty {
@@ -92,6 +93,9 @@ struct SubscriptionListView: View {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 vm.activeTab = .financial
                                 vm.deepLinkModelId = id
+                            },
+                            onSave: { modifiedSub in
+                                vm.saveSub(modifiedSub, appState: appState)
                             }
                         )
                             .id(sub.id)
@@ -107,7 +111,8 @@ struct SubscriptionListView: View {
             EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
         }
         .sheet(item: $newSub) { sub in
-            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
+            AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
+                .presentationDetents([.fraction(0.9), .large])
         }
         .onChange(of: vm.deepLinkModelId) { _, newValue in
             handleDeepLink(id: newValue, proxy: proxy)
@@ -152,7 +157,7 @@ struct SubscriptionListView: View {
     private var emptyState: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+            newSub = Subscription(userId: company.userId, companyId: company.id)
         }) {
             ZStack {
                 SubscriptionCardView(
@@ -160,7 +165,10 @@ struct SubscriptionListView: View {
                     allSubscriptions: [],
                     institutions: [],
                     cards: [],
-                    onEdit: {}
+                    onEdit: {},
+                    onSave: { modifiedSub in
+                        dummyNetflix = modifiedSub
+                    }
                 )
                 .allowsHitTesting(false)
                 .blur(radius: 3)
@@ -187,12 +195,13 @@ struct SubscriptionListView: View {
 // MARK: - Subscription Card (exact CiFr layout)
 
 struct SubscriptionCardView: View {
-    @State var sub: Subscription
+    let sub: Subscription
     let allSubscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onEdit: () -> Void
     var onBankTapped: ((UUID) -> Void)? = nil
+    var onSave: ((Subscription) -> Void)? = nil
 
     @State private var expanded = false
     @State private var showSubServices = false
@@ -643,18 +652,24 @@ struct SubscriptionCardView: View {
                 institutions: institutions,
                 cards: cards,
                 onSave: {
-                    var services = sub.subServices
+                    var modifiedSub = sub
+                    var services = modifiedSub.subServices
                     if let idx = subDraftIndex {
                         services[idx] = subDraft
                     } else {
                         services.append(subDraft)
                     }
-                    sub.subServices = services
+                    modifiedSub.subServices = services
+                    onSave?(modifiedSub)
                     showSubServiceHUD = false
                 },
                 onCancel: { showSubServiceHUD = false },
                 onDelete: {
-                    if let idx = subDraftIndex { sub.subServices.remove(at: idx) }
+                    if let idx = subDraftIndex {
+                        var modifiedSub = sub
+                        modifiedSub.subServices.remove(at: idx)
+                        onSave?(modifiedSub)
+                    }
                     showSubServiceHUD = false
                 }
             )
@@ -669,18 +684,24 @@ struct SubscriptionCardView: View {
                 draft: $emailDraft,
                 isNew: isNewEmail,
                 onSave: {
-                    var emails = sub.linkedEmails
+                    var modifiedSub = sub
+                    var emails = modifiedSub.linkedEmails
                     if let idx = emailDraftIndex {
                         emails[idx] = emailDraft
                     } else {
                         emails.append(emailDraft)
                     }
-                    sub.linkedEmails = emails
+                    modifiedSub.linkedEmails = emails
+                    onSave?(modifiedSub)
                     showEmailHUD = false
                 },
                 onCancel: { showEmailHUD = false },
                 onDelete: {
-                    if let idx = emailDraftIndex { sub.linkedEmails.remove(at: idx) }
+                    if let idx = emailDraftIndex {
+                        var modifiedSub = sub
+                        modifiedSub.linkedEmails.remove(at: idx)
+                        onSave?(modifiedSub)
+                    }
                     showEmailHUD = false
                 }
             )

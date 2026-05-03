@@ -24,70 +24,71 @@ struct InstitutionAccountHUD: View {
         NavigationStack {
             Form {
                 Section {
-                    VStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("TYPE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            Picker("", selection: $draft.type) {
-                                ForEach(InstitutionAccount.allTypes, id: \.self) { t in
-                                    Text(t).tag(t)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TYPE")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        Picker("", selection: $draft.type) {
+                            ForEach(InstitutionAccount.allTypes, id: \.self) { t in
+                                Text(t).tag(t)
+                            }
+                        }
+                        .labelsHidden()
+                        .padding(.leading, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 44)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 4)
+
+                    ZifrField(
+                        label: "ACCOUNT NAME",
+                        placeholder: "e.g. Primary Checking",
+                        text: $draft.name
+                    )
+                    .padding(.vertical, 4)
+
+                    ZifrField(
+                        label: "ACCOUNT NUMBER",
+                        placeholder: "e.g. 1234567890",
+                        text: Binding(
+                            get: { draft.accountNumber ?? "" },
+                            set: { newValue in
+                                draft.accountNumber = newValue
+                                let filtered = newValue.filter { $0.isNumber }
+                                if filtered.count >= 4 {
+                                    draft.last4 = String(filtered.suffix(4))
+                                } else {
+                                    draft.last4 = filtered
                                 }
                             }
-                            .labelsHidden()
-                            .padding(.leading, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                            .contentShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        .buttonStyle(.borderless)
+                        ),
+                        keyboardType: .numberPad
+                    )
+                    .padding(.vertical, 4)
 
-                        ZifrField(
-                            label: "ACCOUNT NAME",
-                            placeholder: "e.g. Primary Checking",
-                            text: $draft.name
-                        )
-
-                        ZifrField(
-                            label: "ACCOUNT NUMBER",
-                            placeholder: "e.g. 1234567890",
-                            text: Binding(
-                                get: { draft.accountNumber ?? "" },
-                                set: { newValue in
-                                    draft.accountNumber = newValue
-                                    let filtered = newValue.filter { $0.isNumber }
-                                    if filtered.count >= 4 {
-                                        draft.last4 = String(filtered.suffix(4))
-                                    } else {
-                                        draft.last4 = filtered
-                                    }
-                                }
-                            ),
-                            keyboardType: .numberPad
-                        )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("BALANCE")
-                                .font(.system(size: 11, weight: .bold))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("BALANCE")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        HStack(spacing: 4) {
+                            Text("$")
+                                .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.5))
-                            HStack(spacing: 4) {
-                                Text("$")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                DoubleField(placeholder: "0.00", value: $draft.balance)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            DoubleField(placeholder: "0.00", value: $draft.balance)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
                         }
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: 44)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                     }
                     .padding(.vertical, 4)
                 }

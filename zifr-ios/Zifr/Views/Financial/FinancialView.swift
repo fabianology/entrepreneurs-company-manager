@@ -125,6 +125,7 @@ struct FinancialView: View {
                     }
                 }
                 .padding(.horizontal, 20)
+                .padding(.top, 15)
                 .padding(.bottom, 20)
                 
                 // ── Main Wallet Stack ──
@@ -522,7 +523,7 @@ struct FinancialCardVisual: View {
                             .foregroundStyle(primaryColor)
                         
                         if !(card.last4 ?? "").isEmpty {
-                            Text("•••• \(card.last4)")
+                            Text("•••• \(card.last4 ?? "")")
                                 .font(.system(size: isPopped ? 14 : 10, weight: .semibold))
                                 .foregroundStyle(secondaryColor)
                         }
@@ -981,7 +982,7 @@ struct FinancialCardView: View {
                             endPoint: .bottomTrailing
                         ))
                         .frame(width: 44, height: 28)
-                    Text(card.network == "Amex" ? "••• \(card.last4)" : "•••• \(card.last4)")
+                    Text(card.network == "Amex" ? "••• \(card.last4 ?? "")" : "•••• \(card.last4 ?? "")")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(card.cardGradientHex.first?.uppercased() == "#FFFFFF" ? .black : .white)
                 }

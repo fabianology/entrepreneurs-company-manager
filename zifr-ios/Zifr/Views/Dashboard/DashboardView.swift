@@ -445,7 +445,11 @@ struct SharedWithMeView: View {
             companyHeader
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-                .padding(.bottom, 24)
+                .padding(.bottom, 12)
+            
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(height: 1)
                 
             // ── Content ──────────────────────────────────────────────────
             ZStack(alignment: .top) {

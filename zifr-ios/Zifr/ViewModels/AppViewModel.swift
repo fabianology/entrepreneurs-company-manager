@@ -83,10 +83,11 @@ final class AppViewModel {
         mutableSub.lastUpdated = Date()
         if let idx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) {
             appState.subscriptions[idx] = mutableSub
+            Task { try? await DataRepository.shared.updateSubscription(mutableSub) }
         } else {
             appState.subscriptions.append(mutableSub)
+            Task { try? await DataRepository.shared.insertSubscription(mutableSub) }
         }
-        Task { try? await DataRepository.shared.updateSubscription(mutableSub) }
     }
 
     func deleteSub(_ sub: Subscription, appState: AppState) {

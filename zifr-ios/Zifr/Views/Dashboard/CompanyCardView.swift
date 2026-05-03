@@ -37,7 +37,7 @@ struct CompanyCardView: View {
                 
                 Image(systemName: "circle.grid.3x3.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(.white)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)

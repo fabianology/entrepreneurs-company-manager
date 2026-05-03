@@ -73,7 +73,7 @@ struct LoanPaymentHUD: View {
                                     }
                                     Section("Credit Cards") {
                                         ForEach(cards) { card in
-                                            let methodString = "\(card.name) ••••\(card.last4)"
+                                            let methodString = "\(card.name) ••••\(card.last4 ?? "")"
                                             Button(methodString) { draft.source = methodString }
                                         }
                                     }

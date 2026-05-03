@@ -108,7 +108,7 @@ struct EntityHomeView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 32) {
                     quickAddRow
-                        .padding(.top, 16)
+                        .padding(.top, 15)
                     
                     if isZeroState {
                         zeroStateBanner
@@ -495,7 +495,7 @@ struct EntityHomeView: View {
                     Text(card.name)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.white)
-                    Text("···\(card.last4) | \(card.cardHolder)")
+                    Text("···\(card.last4 ?? "") | \(card.cardHolder ?? "")")
                         .font(.system(size: 11, weight: .regular))
                         .foregroundStyle(Color.white.opacity(0.5))
                 }
