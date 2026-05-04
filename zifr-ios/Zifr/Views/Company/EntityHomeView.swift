@@ -253,7 +253,6 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
@@ -294,10 +293,14 @@ struct EntityHomeView: View {
                         }
                         .padding(.top, 12)
                     }
-                    .padding(.horizontal, 20)
                 }
             }
         }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .background(Color(hex: "#2c2c2c"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 20)
     }
     
     private func institutionRow(_ inst: Institution) -> some View {
@@ -376,7 +379,6 @@ struct EntityHomeView: View {
                 .padding(.top, 12)
             }
         }
-        .padding(.horizontal, 20)
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
     }
     
@@ -590,7 +592,6 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
@@ -600,8 +601,12 @@ struct EntityHomeView: View {
                     ExpandableSubscriptionCard(sub: sub, institutions: institutions, cards: cards, vm: vm)
                 }
             }
-            .padding(.horizontal, 20)
         }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .background(Color(hex: "#2c2c2c"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 20)
     }
     
     // Note: removed flat subscriptionCard as it is replaced by ExpandableSubscriptionCard
@@ -693,7 +698,6 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
@@ -705,8 +709,12 @@ struct EntityHomeView: View {
                     ExpandableDocumentCard(category: category, docsInCategory: docsInCategory, vm: vm)
                 }
             }
-            .padding(.horizontal, 20)
         }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .background(Color(hex: "#2c2c2c"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Helpers
@@ -825,7 +833,7 @@ struct ExpandableAccountCard: View {
                         Text(formatCurrency(acc.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#21437b"))
+                        .foregroundStyle(Color(hex: "#227b5f"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -891,7 +899,7 @@ struct ExpandableCardRow: View {
                         Text(formatCurrency(card.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#21437b"))
+                        .foregroundStyle(Color(hex: "#227b5f"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -945,7 +953,7 @@ struct ExpandableLoanRow: View {
                         Text(formatCurrency(loan.remainingBalance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#21437b"))
+                        .foregroundStyle(Color(hex: "#227b5f"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -1010,7 +1018,7 @@ struct ExpandableSubscriptionCard: View {
                         Text(sub.cost == 0 ? "Free" : "$\(String(format: "%.0f", sub.cost))").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#21437b"))
+                        .foregroundStyle(Color(hex: "#227b5f"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -1053,7 +1061,7 @@ struct ExpandableDocumentCard: View {
                     }
                     Spacer()
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#21437b"))
+                        .foregroundStyle(Color(hex: "#227b5f"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }

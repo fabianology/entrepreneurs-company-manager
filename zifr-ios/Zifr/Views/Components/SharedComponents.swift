@@ -771,7 +771,7 @@ struct DashboardActionButton: View {
                 Text(title)
             }
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Color(hex: "#21437b"))
+            .foregroundStyle(Color(hex: "#227b5f"))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
@@ -790,7 +790,7 @@ struct DashboardInnerRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "#21437b").opacity(0.8))
+                .foregroundStyle(Color(hex: "#227b5f").opacity(0.8))
                 .frame(width: 20)
             
             Text(label)
