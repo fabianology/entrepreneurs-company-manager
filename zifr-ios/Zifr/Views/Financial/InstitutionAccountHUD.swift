@@ -37,10 +37,10 @@ struct InstitutionAccountHUD: View {
                         .padding(.leading, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: 44)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                        .contentShape(RoundedRectangle(cornerRadius: 14))
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        .contentShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 4)
@@ -86,9 +86,9 @@ struct InstitutionAccountHUD: View {
                         .padding(.horizontal, 16)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(height: 44)
-                        .background(Color(hex: "#111111"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
                     .padding(.vertical, 4)
                 }
@@ -112,7 +112,7 @@ struct InstitutionAccountHUD: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
                     }
@@ -123,7 +123,7 @@ struct InstitutionAccountHUD: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
-            .background(Color(hex: "#171717"))
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .onAppear {
                 initialDraft = draft

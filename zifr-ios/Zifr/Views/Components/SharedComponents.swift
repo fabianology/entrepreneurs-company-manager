@@ -13,8 +13,9 @@ struct ZifrField: View {
         VStack(alignment: .leading, spacing: 4) {
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 11, weight: .bold)) // also made label slightly smaller and bolder for compact look
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.45))
+                    .textCase(.uppercase)
             }
             Group {
                 if isSecure {
@@ -28,13 +29,13 @@ struct ZifrField: View {
             }
             .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
             .autocorrectionDisabled()
-            .font(.system(size: 14, weight: .bold))
+            .font(.system(size: 14, weight: .regular))
             .foregroundStyle(.white)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 }
@@ -503,8 +504,9 @@ struct ZifrAutocompleteField: View {
         VStack(alignment: .leading, spacing: 4) {
             if !label.isEmpty {
                 Text(label)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.45))
+                    .textCase(.uppercase)
             }
             
             TextField(placeholder, text: $text)
@@ -512,13 +514,13 @@ struct ZifrAutocompleteField: View {
                 .textContentType(textContentType)
                 .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
                 .autocorrectionDisabled()
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 14, weight: .regular))
                 .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color(hex: "#111111"))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .padding(.horizontal, 12)
+                .frame(height: 44)
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                 .focused($isFocused)
             
             if isFocused && !filteredSuggestions.isEmpty {
@@ -550,6 +552,259 @@ struct ZifrAutocompleteField: View {
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
                 .padding(.top, 4)
+            }
+        }
+    }
+}
+
+// MARK: - Premium UI Components
+
+struct CustomSegmentedControl: View {
+    let options: [String]
+    @Binding var selection: String
+    @Namespace private var animation
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(options, id: \.self) { option in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        selection = option
+                    }
+                } label: {
+                    Text(option)
+                        .font(.system(size: 14, weight: selection == option ? .semibold : .medium))
+                        .foregroundStyle(selection == option ? Color.white : Color.white.opacity(0.65))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background {
+                            if selection == option {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing))
+                                    .matchedGeometryEffect(id: "SEGMENT", in: animation)
+                            }
+                        }
+                        .padding(2)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(height: 36)
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+struct PremiumInputField: View {
+    let label: String
+    let placeholder: String
+    @Binding var text: String
+    var isSecure: Bool = false
+    var keyboardType: UIKeyboardType = .default
+    var textContentType: UITextContentType? = nil
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
+                .textCase(.uppercase)
+            
+            Group {
+                if isSecure {
+                    SecureField(placeholder, text: $text)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
+            }
+            .keyboardType(keyboardType)
+            .textContentType(textContentType)
+            .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
+            .font(.system(size: 14, weight: .regular))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        }
+    }
+}
+
+struct PremiumDoubleField: View {
+    let label: String
+    let placeholder: String
+    let currency: String
+    @Binding var value: Double
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
+                .textCase(.uppercase)
+            
+            HStack(spacing: 4) {
+                Text(currency).foregroundStyle(Color.white.opacity(0.45))
+                DoubleField(placeholder: placeholder, value: $value)
+            }
+            .font(.system(size: 14, weight: .regular))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(height: 44)
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        }
+    }
+}
+
+struct PremiumToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(configuration.isOn ? Color(hex: "#30D158") : Color(hex: "#2C2C2E"))
+                    .frame(width: 50, height: 30)
+                    .shadow(color: configuration.isOn ? Color(hex: "#30D158").opacity(0.3) : .clear, radius: 4)
+                
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 26, height: 26)
+                    .offset(x: configuration.isOn ? 10 : -10)
+            }
+            .animation(.easeInOut(duration: 0.25), value: configuration.isOn)
+            .onTapGesture {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                configuration.isOn.toggle()
+            }
+        }
+    }
+}
+
+struct PremiumButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+struct PremiumRow<Left: View, Right: View>: View {
+    let left: Left
+    let right: Right
+    
+    init(@ViewBuilder left: () -> Left, @ViewBuilder right: () -> Right) {
+        self.left = left()
+        self.right = right()
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            left
+                .frame(maxWidth: .infinity, alignment: .leading)
+            right
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+// MARK: - Expandable Dashboard Cards
+struct ExpandableDashboardCard<CollapsedHeader: View, InnerRows: View, ActionButtons: View>: View {
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    @ViewBuilder let collapsedHeader: () -> CollapsedHeader
+    @ViewBuilder let innerRows: () -> InnerRows
+    @ViewBuilder let actionButtons: () -> ActionButtons
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onToggle()
+            }) {
+                collapsedHeader()
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    VStack(spacing: 12) {
+                        innerRows()
+                    }
+                    .padding(16)
+                    
+                    Divider().background(Color.white.opacity(0.06))
+                    
+                    HStack(spacing: 0) {
+                        actionButtons()
+                    }
+                    .frame(height: 44)
+                }
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
+        }
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+    }
+}
+
+struct DashboardActionButton: View {
+    let icon: String
+    let title: String
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Color(hex: "#21437b"))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PremiumButtonStyle())
+    }
+}
+
+struct DashboardInnerRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    var valueColor: Color = .white
+    var trailingView: AnyView? = nil
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(Color(hex: "#21437b").opacity(0.8))
+                .frame(width: 20)
+            
+            Text(label)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.6))
+            
+            Spacer()
+            
+            Text(value)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(valueColor)
+            
+            if let trailingView = trailingView {
+                trailingView
             }
         }
     }

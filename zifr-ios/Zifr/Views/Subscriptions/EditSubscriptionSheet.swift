@@ -150,9 +150,9 @@ struct EditSubscriptionSheet: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
+            .background(Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 
@@ -174,9 +174,9 @@ struct EditSubscriptionSheet: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
+            .background(Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 
@@ -202,9 +202,9 @@ struct EditSubscriptionSheet: View {
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
+            .background(Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 
@@ -213,7 +213,7 @@ struct EditSubscriptionSheet: View {
             Text("BILLING CYCLE")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.5))
-            Picker("Cycle", selection: Binding(
+            CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
                 get: { sub.billingCycle },
                 set: { (newCycle: String) in
                     if newCycle != sub.billingCycle {
@@ -227,11 +227,7 @@ struct EditSubscriptionSheet: View {
                     }
                     sub.billingCycle = newCycle
                 }
-            )) {
-                Text("Monthly").tag("Monthly")
-                Text("Yearly").tag("Yearly")
-            }
-            .pickerStyle(.segmented)
+            ))
         }
     }
 
@@ -251,9 +247,9 @@ struct EditSubscriptionSheet: View {
                 .padding(.leading, 6)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: 44)
-                .background(Color(hex: "#111111"))
+                .background(Color(hex: "#2C2C2E"))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             } else {
                 DatePicker("", selection: renewalDateBinding, displayedComponents: .date)
                     .labelsHidden()
@@ -261,9 +257,9 @@ struct EditSubscriptionSheet: View {
                     .padding(.leading, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 44)
-                    .background(Color(hex: "#111111"))
+                    .background(Color(hex: "#2C2C2E"))
                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
         }
     }
@@ -289,9 +285,9 @@ struct EditSubscriptionSheet: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 44)
-                .background(Color(hex: "#111111"))
+                .background(Color(hex: "#2C2C2E"))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
             .buttonStyle(.borderless)
         }
@@ -303,11 +299,7 @@ struct EditSubscriptionSheet: View {
 
                 // MARK: – Top Controls
                 VStack(spacing: 12) {
-                    Picker("Pricing", selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 })) {
-                        Text("Paid").tag("paid")
-                        Text("Free").tag("free")
-                    }
-                    .pickerStyle(.segmented)
+                    CustomSegmentedControl(options: ["paid", "free"], selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 }))
                     
                     Slider(value: detailSliderBinding, in: 0...1, step: 1) {
                         Text("Detail Level")
@@ -448,9 +440,9 @@ struct EditSubscriptionSheet: View {
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color(hex: "#111111"))
+                                .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     } header: { EmptyView() }
                     .listRowBackground(Color.clear)
@@ -539,9 +531,9 @@ struct EditSubscriptionSheet: View {
                                     .padding(.leading, 6)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .frame(height: 44)
-                                    .background(Color(hex: "#111111"))
+                                    .background(Color(hex: "#2C2C2E"))
                                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                                 }
 
                                 // Recovery TextField card
@@ -674,7 +666,7 @@ struct EditSubscriptionSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
-            .background(Color(hex: "#171717"))
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .onAppear {
                 if (sub.nextRenewal ?? "").isEmpty {
@@ -865,9 +857,9 @@ struct SubServicesSection: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color(hex: "#111111"))
+                        .background(Color(hex: "#2C2C2E"))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -955,9 +947,9 @@ struct SubServiceHUD: View {
                                     }
                                     .padding(.horizontal, 16)
                                     .frame(height: 44)
-                                    .background(Color(hex: "#111111"))
+                                    .background(Color(hex: "#2C2C2E"))
                                     .clipShape(RoundedRectangle(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -981,9 +973,9 @@ struct SubServiceHUD: View {
                                 .padding(.horizontal, 16)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .frame(height: 44)
-                                .background(Color(hex: "#111111"))
+                                .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
 
                             // Billing Cycle card
@@ -991,12 +983,10 @@ struct SubServiceHUD: View {
                                 Text("CYCLE")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(Color.white.opacity(0.5))
-                                Picker("", selection: $draft.billingCycle) {
-                                    Text("Monthly").tag(SubService.BillingCycle.monthly)
-                                    Text("Yearly").tag(SubService.BillingCycle.yearly)
-                                }
-                                .labelsHidden()
-                                .pickerStyle(.segmented)
+                                CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
+                                    get: { draft.billingCycle == .monthly ? "Monthly" : "Yearly" },
+                                    set: { draft.billingCycle = $0 == "Monthly" ? .monthly : .yearly }
+                                ))
                             }
                         }
 
@@ -1023,9 +1013,9 @@ struct SubServiceHUD: View {
                                 .padding(.horizontal, 12)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(Color(hex: "#111111"))
+                                .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
 
                             // Status card
@@ -1050,9 +1040,9 @@ struct SubServiceHUD: View {
                                 .padding(.horizontal, 12)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 44)
-                                .background(Color(hex: "#111111"))
+                                .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
                         }
 
@@ -1070,9 +1060,9 @@ struct SubServiceHUD: View {
                                 .autocorrectionDisabled()
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color(hex: "#111111"))
+                                .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     }
                     .padding(.vertical, 4)
@@ -1242,7 +1232,7 @@ struct LinkedEmailCardView: View {
                                         .background(Color.white.opacity(0.05))
                                         .foregroundStyle(Color.white.opacity(0.5))
                                         .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                        .overlay(Capsule().stroke(Color.white.opacity(0.06), lineWidth: 1))
                                 }
                             }
                         }
@@ -1255,9 +1245,9 @@ struct LinkedEmailCardView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(hex: "#111111"))
+            .background(Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -1409,9 +1399,9 @@ struct LinkedEmailHUD: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 44)
-                .background(Color(hex: "#111111"))
+                .background(Color(hex: "#2C2C2E"))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -1447,16 +1437,16 @@ struct LinkedEmailHUD: View {
                                 .background(Color.white.opacity(0.05))
                                 .foregroundStyle(Color.white.opacity(0.5))
                                 .clipShape(Capsule())
-                                .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(Capsule().stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     }
                     .padding(.horizontal, 12)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: 44)
-                .background(Color(hex: "#111111"))
+                .background(Color(hex: "#2C2C2E"))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
         }
     }
@@ -1517,9 +1507,9 @@ struct LinkedEmailHUD: View {
                                 .autocorrectionDisabled()
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color(hex: "#111111"))
+                                .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     }
                     .padding(.vertical, 4)
@@ -1725,15 +1715,10 @@ struct PaymentMethodPickerView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
 
-            Picker("Entity Scope", selection: $selectedScope) {
-                Label(currentCompanyName, systemImage: "building.2")
-                    .symbolRenderingMode(.monochrome)
-                    .tag("current")
-                Label("All entities", systemImage: "globe")
-                    .symbolRenderingMode(.monochrome)
-                    .tag("all")
-            }
-            .pickerStyle(.segmented)
+            CustomSegmentedControl(options: [currentCompanyName, "All Entities"], selection: Binding(
+                get: { selectedScope == "current" ? currentCompanyName : "All Entities" },
+                set: { selectedScope = $0 == currentCompanyName ? "current" : "all" }
+            ))
             .padding(.horizontal, 20)
             .padding(.bottom, 8)
 
@@ -1754,7 +1739,7 @@ struct PaymentMethodPickerView: View {
                         }
                     }
                 }
-                .listRowBackground(Color(hex: "#111111"))
+                .listRowBackground(Color(hex: "#2C2C2E"))
             }
 
             if !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !exactMatchExists {
@@ -1781,7 +1766,7 @@ struct PaymentMethodPickerView: View {
                             }
                         }
                     }
-                    .listRowBackground(Color(hex: "#111111"))
+                    .listRowBackground(Color(hex: "#2C2C2E"))
                 }
             }
             
@@ -1811,7 +1796,7 @@ struct PaymentMethodPickerView: View {
                                 }
                             }
                         }
-                        .listRowBackground(Color(hex: "#111111"))
+                        .listRowBackground(Color(hex: "#2C2C2E"))
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 deleteCustom(customMethod)
@@ -1896,7 +1881,7 @@ struct PaymentMethodPickerView: View {
                                 }
                             }
                         }
-                        .listRowBackground(Color(hex: "#111111"))
+                        .listRowBackground(Color(hex: "#2C2C2E"))
                     }
                 }
             }
@@ -1962,14 +1947,14 @@ struct PaymentMethodPickerView: View {
                                 }
                             }
                         }
-                        .listRowBackground(Color(hex: "#111111"))
+                        .listRowBackground(Color(hex: "#2C2C2E"))
                     }
                 }
             }
             }
             .scrollContentBackground(.hidden)
         }
-        .background(Color(hex: "#171717"))
+        .background(Color(hex: "#1C1C1E"))
         .navigationTitle("Paid From")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Edit Custom Entry", isPresented: $showEditAlert) {

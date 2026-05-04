@@ -89,8 +89,8 @@ struct EditLoanSheet: View {
                             .foregroundStyle(Color(hex: "#4f46e5"))
                             .padding(.vertical, 14)
                             .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
@@ -111,7 +111,7 @@ struct EditLoanSheet: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 8)
@@ -129,7 +129,7 @@ struct EditLoanSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
-            .background(Color(hex: "#171717"))
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .onAppear {
                 snapshot = currentSnapshot
@@ -259,9 +259,9 @@ struct EditLoanSheet: View {
             .padding(.leading, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -303,9 +303,9 @@ struct EditLoanSheet: View {
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 
@@ -325,9 +325,9 @@ struct EditLoanSheet: View {
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 
@@ -479,7 +479,7 @@ struct EditLoanSheet: View {
             }
         }
         .padding(24)
-        .background(Color(hex: "#111111"))
+        .background(Color(hex: "#2C2C2E"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
         .padding(.horizontal, 20)
@@ -502,12 +502,7 @@ struct EditLoanSheet: View {
     @ViewBuilder
     private func loanRoleSection() -> some View {
         if !isInstitutionContext {
-            Picker("Role", selection: $loan.role) {
-                ForEach(Loan.roles, id: \.self) { role in
-                    Text(role).tag(role)
-                }
-            }
-            .pickerStyle(.segmented)
+            CustomSegmentedControl(options: Loan.roles, selection: $loan.role)
             .frame(height: 44)
             .padding(.horizontal, 20)
             .disabled(!isNew)
@@ -556,9 +551,9 @@ struct EditLoanSheet: View {
                             .padding(.horizontal, 10)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     }
                     .frame(width: geo.size.width * 0.5 - 6)
@@ -618,9 +613,9 @@ struct EditLoanSheet: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.white)
                     .padding(12)
-                    .background(Color(hex: "#111111"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .background(Color(hex: "#2C2C2E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
             .padding(.top, 4)
         }

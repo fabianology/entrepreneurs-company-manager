@@ -70,7 +70,7 @@ struct SubscriptionListView: View {
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
-                        .background(Color(hex: "#171717"))
+                        .background(Color(hex: "#1C1C1E"))
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
                     }
@@ -444,11 +444,11 @@ struct SubscriptionCardView: View {
                             .padding(.horizontal, 24)
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "#111111"))
+                            .background(Color(hex: "#2C2C2E"))
                             .overlay(
                                 Rectangle()
                                     .frame(height: 1)
-                                    .foregroundStyle(Color.white.opacity(0.05)),
+                                    .foregroundStyle(Color.white.opacity(0.06)),
                                 alignment: .top
                             )
                         }
@@ -527,9 +527,9 @@ struct SubscriptionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
@@ -603,9 +603,9 @@ struct SubscriptionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
@@ -637,11 +637,11 @@ struct SubscriptionCardView: View {
             }
         }
         // ── Card container: #171717 + border 5% ─────────────────────────
-        .background(Color(hex: "#171717"))
+        .background(Color(hex: "#1C1C1E"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
             RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
         )
         // ── Sub-service HUD ───────────────────────────────────────────────
         .sheet(isPresented: $showSubServiceHUD) {
@@ -726,7 +726,7 @@ struct SubscriptionCardView: View {
 
     private func dividerLine() -> some View {
         Rectangle()
-            .fill(Color.white.opacity(0.05))
+            .fill(Color.white.opacity(0.06))
             .frame(width: 1)
             .padding(.vertical, 2)
     }
@@ -745,7 +745,7 @@ struct SubscriptionCardView: View {
 
     private func accordionDivider() -> some View {
         Rectangle()
-            .fill(Color.white.opacity(0.05))
+            .fill(Color.white.opacity(0.06))
             .frame(height: 1)
     }
 
@@ -815,7 +815,7 @@ struct SubscriptionCardView: View {
                 .padding(.vertical, 10)
                 .background(Color.black.opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
         }
     }

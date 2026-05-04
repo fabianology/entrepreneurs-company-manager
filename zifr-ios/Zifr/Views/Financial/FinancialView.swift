@@ -119,7 +119,7 @@ struct FinancialView: View {
                         }
                         .padding(.horizontal, 20)
                         .frame(height: 36)
-                        .background(Color(hex: "#171717"))
+                        .background(Color(hex: "#1C1C1E"))
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
                     }
@@ -298,7 +298,7 @@ struct FinancialView: View {
             }
             .padding(.horizontal, 18)
             .frame(height: 36)
-            .background(Color(hex: "#171717"))
+            .background(Color(hex: "#1C1C1E"))
             .clipShape(Capsule())
             .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
         }
@@ -457,7 +457,7 @@ struct WalletSleeveView: View {
             AggressiveSleeveShape()
                 .stroke(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.1), Color.clear],
+                        colors: [Color.white.opacity(0.06), Color.clear],
                         startPoint: .top,
                         endPoint: .bottom
                     ),
@@ -502,13 +502,13 @@ struct FinancialCardVisual: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(LinearGradient(
                     colors: card.cardGradientHex.map { Color(hex: $0) },
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(isPopped ? Color.white.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(isPopped ? Color.white.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1))
                 .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
             
             let isLight = card.cardGradientHex.first?.uppercased() == "#FFFFFF"
@@ -554,7 +554,7 @@ struct FinancialCardVisual: View {
                     
                     if hasFinancials || !(card.paidFrom ?? "").isEmpty || !services.isEmpty {
                         Divider()
-                            .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                            .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.06))
                             .padding(.bottom, 6)
                         
                         VStack(alignment: .leading, spacing: 6) {
@@ -573,7 +573,7 @@ struct FinancialCardVisual: View {
                                 
                                 if !(card.paidFrom ?? "").isEmpty || !services.isEmpty {
                                     Divider()
-                                        .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                                        .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.06))
                                 }
                             }
                             
@@ -591,7 +591,7 @@ struct FinancialCardVisual: View {
                             
                             if !(card.paidFrom ?? "").isEmpty && !services.isEmpty {
                                 Divider()
-                                    .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.1))
+                                    .background(isLight ? Color.black.opacity(0.1) : Color.white.opacity(0.06))
                             }
                             
                             if !services.isEmpty {
@@ -783,9 +783,9 @@ struct InstitutionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
@@ -823,9 +823,9 @@ struct InstitutionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
@@ -835,7 +835,7 @@ struct InstitutionCardView: View {
                 .clipped()
             }
         }
-        .background(Color(hex: "#171717"))
+        .background(Color(hex: "#1C1C1E"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
         .sheet(item: $editingAccount) { _ in
@@ -1015,7 +1015,7 @@ struct FinancialCardView: View {
                     .shadow(color: card.status.statusColor, radius: 4)
             }
             .padding(14)
-            .glassCard(cornerRadius: 18)
+            .background(Color(hex: "#2C2C2E")).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .proContextMenu(password: card.password, loginId: card.login, last4: card.last4)
@@ -1128,7 +1128,7 @@ struct LoanCardView: View {
                 }
             }
             .padding(16)
-            .glassCard(cornerRadius: 20)
+            .background(Color(hex: "#2C2C2E")).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -1174,7 +1174,7 @@ struct ZifrSwipeToDeleteModifier: ViewModifier {
                 }
             
             content
-                .background(Color(hex: "#111111"))
+                .background(Color(hex: "#2C2C2E"))
                 .offset(x: offset)
                 .gesture(
                     DragGesture()
@@ -1226,7 +1226,7 @@ struct ZifrSwipeActionsModifier: ViewModifier {
                 .opacity(offset < 0 ? 1 : 0)
             
             content
-                .background(Color(hex: "#111111"))
+                .background(Color(hex: "#2C2C2E"))
                 .offset(x: offset)
                 .gesture(
                     DragGesture()

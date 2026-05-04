@@ -239,8 +239,8 @@ struct EditInstitutionSheet: View {
                             .foregroundStyle(Color(hex: "#4f46e5"))
                             .padding(.vertical, 14)
                             .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         .padding(.bottom, 8)
@@ -260,7 +260,7 @@ struct EditInstitutionSheet: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
                         .confirmationDialog(
@@ -283,7 +283,7 @@ struct EditInstitutionSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
-            .background(Color(hex: "#171717"))
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .onAppear {
                 snapshot = currentSnapshot

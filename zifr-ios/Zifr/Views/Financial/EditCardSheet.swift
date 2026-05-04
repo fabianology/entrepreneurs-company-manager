@@ -127,11 +127,13 @@ struct EditCardSheet: View {
             
             VStack(spacing: 0) {
                 if !institutions.isEmpty {
-                    Picker("Institution Mode", selection: $isNewInstitution) {
-                        Text("Select Existing").tag(false)
-                        Text("Create New").tag(true)
-                    }
-                    .pickerStyle(.segmented)
+                    CustomSegmentedControl(
+                        options: ["Select Existing", "Create New"],
+                        selection: Binding(
+                            get: { isNewInstitution ? "Create New" : "Select Existing" },
+                            set: { isNewInstitution = $0 == "Create New" }
+                        )
+                    )
                     .padding(.bottom, 12)
                 }
                 
@@ -161,7 +163,7 @@ struct EditCardSheet: View {
                         .padding(.horizontal, 16)
                         .frame(height: 52)
                         .background(Color.white.opacity(0.05))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .padding(.bottom, 16)
                 }
@@ -224,7 +226,7 @@ struct EditCardSheet: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(Color.white)
                         Spacer()
-                        Toggle("", isOn: autoPayBinding)
+                        Toggle("", isOn: autoPayBinding).toggleStyle(PremiumToggleStyle())
                             .labelsHidden()
                             .tint(.green)
                             .scaleEffect(0.8)
@@ -232,9 +234,9 @@ struct EditCardSheet: View {
                     .padding(.horizontal, 16)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
-                    .background(Color(hex: "#111111"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .background(Color(hex: "#2C2C2E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                 }
                 .frame(width: (geo.size.width - 12) * 0.6)
 
@@ -256,9 +258,9 @@ struct EditCardSheet: View {
                     .padding(.leading, 6)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(height: 44)
-                    .background(Color(hex: "#111111"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .background(Color(hex: "#2C2C2E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .frame(width: (geo.size.width - 12) * 0.4)
@@ -289,9 +291,9 @@ struct EditCardSheet: View {
                 .padding(.horizontal, 10)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
-                .background(Color(hex: "#111111"))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
             .buttonStyle(.borderless)
         }
@@ -305,11 +307,10 @@ struct EditCardSheet: View {
                     .foregroundStyle(Color.white.opacity(0.5))
                 VStack(spacing: 0) {
                     Spacer()
-                    Picker("Role", selection: Binding(get: { card.cardHolderType }, set: { card.cardHolderType = $0 })) {
-                        Text("Mine").tag("Mine")
-                        Text("Assigned").tag("Assigned")
-                    }
-                    .pickerStyle(.segmented)
+                    CustomSegmentedControl(
+                        options: ["Mine", "Assigned"],
+                        selection: Binding(get: { card.cardHolderType ?? "Mine" }, set: { card.cardHolderType = $0 })
+                    )
                     .labelsHidden()
                     Spacer()
                 }
@@ -365,9 +366,9 @@ struct EditCardSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .frame(height: 50)
-                    .background(Color(hex: "#111111"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .background(Color(hex: "#2C2C2E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             } else {
                 ForEach(Array(services.enumerated()), id: \.offset) { index, svc in
                     HStack {
@@ -402,9 +403,9 @@ struct EditCardSheet: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
-                    .background(Color(hex: "#111111"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                    .background(Color(hex: "#2C2C2E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
                 }
             }
         }
@@ -504,9 +505,9 @@ struct EditCardSheet: View {
                             .font(.system(size: 14))
                             .foregroundStyle(.white)
                             .padding(12)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
                 } header: { EmptyView() }
                 .listRowBackground(Color.clear)
@@ -530,8 +531,8 @@ struct EditCardSheet: View {
                             .foregroundStyle(Color(hex: "#4f46e5"))
                             .padding(.vertical, 14)
                             .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         .padding(.bottom, 8)
@@ -551,7 +552,7 @@ struct EditCardSheet: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
                         .confirmationDialog("Delete Card?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
@@ -596,7 +597,7 @@ struct EditCardSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
-            .background(Color(hex: "#171717"))
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .onAppear {
                 if isNew {
@@ -692,9 +693,9 @@ struct EditCardSheet: View {
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 
@@ -718,9 +719,9 @@ struct EditCardSheet: View {
             .padding(.leading, 6)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -766,9 +767,9 @@ struct EditCardSheet: View {
             .padding(.horizontal, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
     }
 }

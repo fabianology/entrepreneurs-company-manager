@@ -23,23 +23,18 @@ struct AddSubscriptionWizard: View {
     @State private var emailDraftIndex: Int? = nil
     @State private var isNewEmail = false
     @State private var hasSkippedEmail = false
+    @State private var hasManuallyEditedWebsite = false
 
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "#171717").ignoresSafeArea()
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        // Pricing toggle always visible at the top
-                        Picker("Pricing Model", selection: $sub.pricingModel) {
-                            Text("Paid").tag("paid")
-                            Text("Free").tag("free")
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 16)
-                        
                         if !completedSteps.isEmpty {
                             collapsedStepsView
                                 .padding(.horizontal, 24)
@@ -60,12 +55,12 @@ struct AddSubscriptionWizard: View {
                                     vm.saveSub(sub, appState: appState)
                                     dismiss()
                                 } label: {
-                                    Text("Add Subscription")
+                                    Text("Done")
                                         .font(.system(size: 16, weight: .bold))
                                         .foregroundStyle(canSubmit ? .white : Color.white.opacity(0.3))
                                         .frame(maxWidth: .infinity)
                                         .frame(height: 54)
-                                        .background(canSubmit ? Color(hex: "#2B3A3B") : Color.white.opacity(0.1))
+                                        .background(canSubmit ? Color(hex: "#2F5051") : Color.white.opacity(0.1))
                                         .clipShape(RoundedRectangle(cornerRadius: 14))
                                 }
                                 .disabled(!canSubmit)
@@ -75,6 +70,10 @@ struct AddSubscriptionWizard: View {
                         }
                         .padding(.horizontal, 24)
                         .padding(.bottom, 60)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
                 }
                 .scrollDismissesKeyboard(.interactively)
@@ -86,8 +85,8 @@ struct AddSubscriptionWizard: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         dismiss()
                     }
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.65))
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -97,8 +96,8 @@ struct AddSubscriptionWizard: View {
                         vm.saveSub(sub, appState: appState)
                         dismiss()
                     }
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(canSave ? Color.zifrGreen : Color.white.opacity(0.3))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(canSave ? Color(hex: "#30D158") : Color.white.opacity(0.3))
                     .disabled(!canSave)
                 }
             }
@@ -195,15 +194,8 @@ struct AddSubscriptionWizard: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         completedSteps.insert(currentStep)
         
-        var nextStep = step
-        // If they chose free, and they hit next on step 1, jump to 3
-        if nextStep == 2 && sub.pricingModel == "free" {
-            nextStep = 3
-            completedSteps.insert(2) // Auto-complete skipped step
-        }
-        
         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-            currentStep = nextStep
+            currentStep = step
         }
     }
     
@@ -225,36 +217,45 @@ struct AddSubscriptionWizard: View {
                 case 1: return "Add a subscription"
                 case 2: return "Billing information"
                 case 3: return "Connect a secondary service"
-                case 4: return "What emails should we link"
-                default: return "All done"
+                case 4: return "What emails do you use"
+                default: return "\(sub.name.isEmpty ? "Subscription" : sub.name) added"
                 }
             }()
             let subtitle: String = {
                 switch currentStep {
                 case 1: return "Rich deep context across your org"
-                case 2: return "Track costs and renewals"
+                case 2: return "Track costs, renewals, and payment methods"
                 case 3: return "if you have a subscription within a subscription"
-                case 4: return "if you use various emails or just one"
+                case 4: return "Reasons and use for the emails"
                 default: return "more context for your org"
                 }
             }()
             
-            Text(title)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(.white)
-                .id("headerTitle-\(currentStep)")
-                .transition(.opacity)
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .id("headerTitle-\(currentStep)")
+                    .transition(.opacity)
+                
+                if currentStep >= 5 {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Color(hex: "#30D158"))
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
                 
             Text(subtitle)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.65))
                 .id("headerSubtitle-\(currentStep)")
                 .transition(.opacity)
                 
             HStack(spacing: 8) {
                 ForEach(1...4, id: \.self) { step in
                     Capsule()
-                        .fill(step <= currentStep ? Color(hex: "#2B3A3B") : Color.white.opacity(0.1))
+                        .fill(step <= currentStep ? Color(hex: "#2F5051") : Color.white.opacity(0.1))
                         .frame(width: step == currentStep ? 24 : 8, height: 8)
                         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentStep)
                 }
@@ -314,8 +315,21 @@ struct AddSubscriptionWizard: View {
         if currentStep == 1 {
             VStack(spacing: 12) {
                 HStack(spacing: 12) {
-                    ZifrField(label: "SERVICE NAME", placeholder: "e.g. Shopify", text: $sub.name)
-                    ZifrField(label: "WEBSITE", placeholder: "e.g. shopify.com", text: Binding(get: { sub.website ?? "" }, set: { sub.website = $0 }), keyboardType: .URL)
+                    ZifrField(label: "SERVICE NAME", placeholder: "e.g. Shopify", text: Binding(get: {
+                        sub.name
+                    }, set: { newName in
+                        sub.name = newName
+                        if !hasManuallyEditedWebsite {
+                            let cleanName = newName.lowercased().replacingOccurrences(of: " ", with: "")
+                            sub.website = cleanName.isEmpty ? "" : cleanName + ".com"
+                        }
+                    }))
+                    ZifrField(label: "WEBSITE", placeholder: "e.g. shopify.com", text: Binding(get: {
+                        sub.website ?? ""
+                    }, set: { newWebsite in
+                        sub.website = newWebsite
+                        hasManuallyEditedWebsite = true
+                    }), keyboardType: .URL)
                 }
                 
                 HStack(spacing: 12) {
@@ -348,115 +362,161 @@ struct AddSubscriptionWizard: View {
     @ViewBuilder
     private var stepTwoBilling: some View {
         if currentStep == 2 {
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("COST").zifrLabel()
-                        HStack(spacing: 4) {
-                            Text(sub.currency).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
-                            DoubleField(placeholder: "0.00", value: $sub.cost)
-                        }
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16).padding(.vertical, 12)
-                        .background(Color(hex: "#111111")).clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    }
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("PRICING MODEL")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.45))
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("AUTO PAY").zifrLabel()
-                        HStack {
-                            Text(sub.renew == "Auto" ? "Yes" : "No")
-                                .font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                            Spacer()
-                            Toggle("", isOn: Binding(get: { sub.renew == "Auto" }, set: { sub.renew = $0 ? "Auto" : "Manual" }))
-                                .labelsHidden()
-                                .tint(Color.zifrGreen)
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 8)
-                        .background(Color(hex: "#111111")).clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    }
+                    CustomSegmentedControl(options: ["paid", "free"], selection: $sub.pricingModel)
                 }
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("BILLING CYCLE").zifrLabel()
-                    Picker("Billing Cycle", selection: $sub.billingCycle) {
-                        Text("Monthly").tag("Monthly")
-                        Text("Yearly").tag("Yearly")
-                    }.pickerStyle(.segmented)
-                }
-                
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("RENEWS ON").zifrLabel()
-                        if sub.billingCycle == "Monthly" {
-                            Picker("", selection: dayBinding) {
-                                ForEach(1...31, id: \.self) { day in
-                                    Text(ordinal(day)).tag(day)
-                                }
+                if sub.pricingModel == "paid" {
+                    PremiumRow {
+                        PremiumDoubleField(label: "COST", placeholder: "0.00", currency: sub.currency, value: $sub.cost)
+                    } right: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("AUTO PAY")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                            
+                            HStack {
+                                Text(sub.renew == "Auto" ? "Yes" : "No")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Toggle("", isOn: Binding(get: { sub.renew == "Auto" }, set: { sub.renew = $0 ? "Auto" : "Manual" }))
+                                    .labelsHidden()
+                                    .toggleStyle(PremiumToggleStyle())
                             }
-                            .labelsHidden()
-                            .padding(.leading, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
                             .frame(height: 44)
-                            .background(Color(hex: "#111111"))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                        } else {
-                            DatePicker("", selection: renewalDateBinding, displayedComponents: .date)
-                                .labelsHidden()
-                                .datePickerStyle(.compact)
-                                .padding(.leading, 10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(height: 44)
-                                .background(Color(hex: "#111111"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     }
                     
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("STATUS").zifrLabel()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("BILLING CYCLE")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                        
+                        CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: $sub.billingCycle)
+                    }
+                    
+                    PremiumRow {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("RENEWS ON")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                            
+                            HStack {
+                                if sub.billingCycle == "Monthly" {
+                                    Picker("", selection: dayBinding) {
+                                        ForEach(1...31, id: \.self) { day in
+                                            Text(ordinal(day)).tag(day)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .padding(.leading, 6)
+                                } else {
+                                    DatePicker("", selection: renewalDateBinding, displayedComponents: .date)
+                                        .labelsHidden()
+                                        .datePickerStyle(.compact)
+                                        .padding(.leading, 10)
+                                }
+                                Spacer()
+                            }
+                            .frame(height: 44)
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        }
+                    } right: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("STATUS")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                            
+                            HStack {
+                                HStack(spacing: 6) {
+                                    Circle().fill(sub.status == "Active" ? Color(hex: "#30D158") : Color.gray)
+                                        .frame(width: 8, height: 8)
+                                    Text(sub.status)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(sub.status == "Active" ? Color(hex: "#30D158") : Color.white.opacity(0.65))
+                                }
+                                Spacer()
+                                Toggle("", isOn: Binding(get: { sub.status == "Active" }, set: { sub.status = $0 ? "Active" : "Paused" }))
+                                    .labelsHidden()
+                                    .toggleStyle(PremiumToggleStyle())
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("PAID FROM")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                        
+                        NavigationLink {
+                            PaymentMethodPickerView(
+                                currentMethod: sub.paymentMethod ?? "",
+                                companyId: sub.companyId,
+                                institutions: institutions,
+                                cards: cards,
+                                onSelect: { sub.paymentMethod = $0 }
+                            )
+                        } label: {
+                            HStack {
+                                Image(systemName: "creditcard.fill").foregroundStyle(Color.white.opacity(0.45))
+                                Text(sub.paymentMethod?.isEmpty == false ? sub.paymentMethod! : "Select Payment Method")
+                                    .font(.system(size: 14, weight: .regular))
+                                    .foregroundStyle(sub.paymentMethod?.isEmpty == false ? .white : Color.white.opacity(0.45))
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        }
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("STATUS")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                        
                         HStack {
-                            StatusDot(isGreen: sub.status == "Active", label: sub.status)
+                            HStack(spacing: 6) {
+                                Circle().fill(sub.status == "Active" ? Color(hex: "#30D158") : Color.gray)
+                                    .frame(width: 8, height: 8)
+                                Text(sub.status)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(sub.status == "Active" ? Color(hex: "#30D158") : Color.white.opacity(0.65))
+                            }
                             Spacer()
                             Toggle("", isOn: Binding(get: { sub.status == "Active" }, set: { sub.status = $0 ? "Active" : "Paused" }))
                                 .labelsHidden()
-                                .tint(Color.zifrGreen)
+                                .toggleStyle(PremiumToggleStyle())
                         }
-                        .padding(.horizontal, 16).padding(.vertical, 12)
-                        .background(Color(hex: "#111111")).clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .padding(.horizontal, 12)
+                        .frame(height: 44)
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
                 }
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("PAID FROM").zifrLabel()
-                    NavigationLink {
-                        PaymentMethodPickerView(
-                            currentMethod: sub.paymentMethod ?? "",
-                            companyId: sub.companyId,
-                            institutions: institutions,
-                            cards: cards,
-                            onSelect: { sub.paymentMethod = $0 }
-                        )
-                    } label: {
-                        HStack {
-                            Image(systemName: "creditcard.fill").foregroundStyle(Color.white.opacity(0.5))
-                            Text(sub.paymentMethod?.isEmpty == false ? sub.paymentMethod! : "Select Payment Method")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(sub.paymentMethod?.isEmpty == false ? .white : Color.white.opacity(0.3))
-                            Spacer()
-                            Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white.opacity(0.3))
-                        }
-                        .padding(.horizontal, 16).padding(.vertical, 14)
-                        .background(Color(hex: "#111111")).clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    }
-                }
-                
-                ZifrField(label: "NOTES", placeholder: "Any internal notes...", text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }))
+                PremiumInputField(label: "NOTES", placeholder: "Any internal notes...", text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }))
                 
                 nextButton(disabled: false) { advanceToStep(3) }
             }
@@ -468,6 +528,25 @@ struct AddSubscriptionWizard: View {
     private var stepThreeSupplemental: some View {
         if currentStep == 3 {
             VStack(spacing: 12) {
+                Button {
+                    subDraft = SubService()
+                    subDraftIndex = nil
+                    isNewSubService = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showSubServiceHUD = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("💾").font(.system(size: 14))
+                        Text("Add Supplemental Service")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                
                 ForEach(sub.subServices.indices, id: \.self) { i in
                     let ss = sub.subServices[i]
                     Button {
@@ -493,25 +572,6 @@ struct AddSubscriptionWizard: View {
                     }
                 }
                 
-                Button {
-                    subDraft = SubService()
-                    subDraftIndex = nil
-                    isNewSubService = true
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    showSubServiceHUD = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Text("💾").font(.system(size: 14))
-                        Text("Add Supplemental Service")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color(hex: "#223E5A"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
-                
                 nextButton(disabled: false) { advanceToStep(4) }
                 
                 Button {
@@ -533,6 +593,25 @@ struct AddSubscriptionWizard: View {
     private var stepFourEmails: some View {
         if currentStep == 4 {
             VStack(spacing: 12) {
+                Button {
+                    emailDraft = LinkedEmail()
+                    emailDraftIndex = nil
+                    isNewEmail = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showEmailHUD = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("✉️").font(.system(size: 14))
+                        Text("Add Linked Email")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in
                     let email = sub.linkedEmails[i]
                     Button {
@@ -558,24 +637,6 @@ struct AddSubscriptionWizard: View {
                     }
                 }
                 
-                Button {
-                    emailDraft = LinkedEmail()
-                    emailDraftIndex = nil
-                    isNewEmail = true
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    showEmailHUD = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Text("✉️").font(.system(size: 14))
-                        Text("Add Linked Email")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(Color(hex: "#223E5A"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
                 if !sub.linkedEmails.isEmpty {
                     nextButton(disabled: false) { advanceToStep(5) }
                 } else if sub.linkedEmails.isEmpty && !hasSkippedEmail {
@@ -602,15 +663,21 @@ struct AddSubscriptionWizard: View {
     private func nextButton(disabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text("Next")
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(disabled ? Color.white.opacity(0.3) : .white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
-                .background(Color.white.opacity(0.05))
+                .frame(height: 50)
+                .background {
+                    if !disabled {
+                        LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.white.opacity(0.05)
+                    }
+                }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
         }
         .disabled(disabled)
+        .buttonStyle(PremiumButtonStyle())
         .padding(.top, 8)
     }
 }
@@ -626,7 +693,7 @@ struct CollapsedSectionBar: View {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color.zifrGreen)
+                    .foregroundStyle(Color(hex: "#2F5051"))
                 
                 Text(icon)
                     .font(.system(size: 14))
@@ -650,9 +717,9 @@ struct CollapsedSectionBar: View {
             }
             .padding(.horizontal, 16)
             .frame(height: 44)
-            .background(Color(hex: "#111111"))
+            .background(Color(hex: "#050505"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#2F5051"), lineWidth: 1))
             .opacity(0.7)
         }
         .buttonStyle(.plain)

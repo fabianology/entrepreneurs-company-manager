@@ -284,32 +284,15 @@ struct EntityHomeView: View {
                         .background(darkSurface)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         
-                        VStack(spacing: 0) {
+                        VStack(spacing: 12) {
                             ForEach(orphanedCards) { card in
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    vm.activeTab = .financial
-                                } label: {
-                                    cardRow(card)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
-                                }
-                                .buttonStyle(.plain)
-                                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                                ExpandableCardRow(card: card, subscriptions: subscriptions, vm: vm)
                             }
                             ForEach(orphanedLoans) { loan in
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    vm.activeTab = .financial
-                                } label: {
-                                    loanRow(loan)
-                                        .padding(.horizontal, 16)
-                                        .padding(.vertical, 10)
-                                }
-                                .buttonStyle(.plain)
-                                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                                ExpandableLoanRow(loan: loan, subscriptions: subscriptions, vm: vm)
                             }
                         }
+                        .padding(.top, 12)
                     }
                     .padding(.horizontal, 20)
                 }
@@ -332,25 +315,9 @@ struct EntityHomeView: View {
                 else { expandedInstitutions.insert(inst.id.uuidString) }
             } label: {
                 HStack {
-                    if !(inst.loginUrl ?? "").isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(inst.loginUrl ?? "")&sz=128") {
-                        AsyncImage(url: url) { phase in
-                            switch phase {
-                            case .empty:
-                                ProgressView().frame(width: 32, height: 32)
-                            case .success(let image):
-                                image.resizable().aspectRatio(contentMode: .fill).frame(width: 32, height: 32).clipShape(Circle())
-                            case .failure:
-                                ZStack {
-                                    Circle().fill(finColor).frame(width: 32, height: 32)
-                                    Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
-                                }
-                            @unknown default:
-                                ZStack {
-                                    Circle().fill(finColor).frame(width: 32, height: 32)
-                                    Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
-                                }
-                            }
-                        }
+                    if !(inst.loginUrl ?? "").isEmpty {
+                        FaviconImage(website: inst.loginUrl ?? "", size: 32)
+                            .clipShape(Circle())
                     } else {
                         ZStack {
                             Circle().fill(finColor).frame(width: 32, height: 32)
@@ -388,56 +355,31 @@ struct EntityHomeView: View {
                 .padding(.vertical, 12)
                 .padding(.horizontal, 16)
                 .background(darkSurface)
-                .clipShape(RoundedRectangle(cornerRadius: isExpanded ? 0 : 14))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
             .buttonStyle(.plain)
+            .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil)
             
             if isExpanded {
-                VStack(spacing: 0) {
+                VStack(spacing: 12) {
                     ForEach(inst.accounts) { acc in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            vm.activeTab = .financial
-                        } label: {
-                            accountRow(acc)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                        Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                        ExpandableAccountCard(acc: acc, subscriptions: subscriptions, vm: vm)
                     }
                     ForEach(instCards) { card in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            vm.activeTab = .financial
-                        } label: {
-                            cardRow(card)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                        Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                        ExpandableCardRow(card: card, subscriptions: subscriptions, vm: vm)
                     }
                     ForEach(instLoans) { loan in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            vm.activeTab = .financial
-                        } label: {
-                            loanRow(loan)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-                        Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+                        ExpandableLoanRow(loan: loan, subscriptions: subscriptions, vm: vm)
                     }
                 }
-                .background(darkSurface)
-                .clipShape(RoundedCorner(radius: 14, corners: [.bottomLeft, .bottomRight]))
+                .padding(.top, 12)
             }
         }
         .padding(.horizontal, 20)
         .animation(.easeInOut(duration: 0.2), value: isExpanded)
     }
+    
     
     private func accountRow(_ acc: InstitutionAccount) -> some View {
         let nameToMatch = acc.name.isEmpty ? acc.type : acc.name
@@ -653,107 +595,16 @@ struct EntityHomeView: View {
             }
             .buttonStyle(.plain)
 
-            let chunkedSubs = activeSubscriptions.chunked(into: 4)
             VStack(spacing: 12) {
-                ForEach(Array(chunkedSubs.enumerated()), id: \.offset) { index, chunk in
-                    MarqueeRow(items: chunk, reverse: index % 2 != 0) { sub in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            vm.activeTab = .subscriptions
-                        } label: {
-                            subscriptionCard(sub)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                ForEach(activeSubscriptions) { sub in
+                    ExpandableSubscriptionCard(sub: sub, institutions: institutions, cards: cards, vm: vm)
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
-    private func subscriptionCard(_ sub: Subscription) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 6) {
-                if !(sub.website ?? "").isEmpty, let url = URL(string: "https://www.google.com/s2/favicons?domain=\(sub.website ?? "")&sz=128") {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView().frame(width: 28, height: 28)
-                        case .success(let image):
-                            image.resizable().aspectRatio(contentMode: .fill).frame(width: 28, height: 28).clipShape(RoundedRectangle(cornerRadius: 6))
-                        case .failure:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 28, height: 28)
-                                Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
-                            }
-                        @unknown default:
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 28, height: 28)
-                                Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
-                            }
-                        }
-                    }
-                } else {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 28, height: 28)
-                        Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
-                    }
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(sub.name)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                    Text(sub.cost == 0 ? "Free" : "$\(String(format: "%.0f", sub.cost))")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.7))
-                }
-                Spacer(minLength: 0)
-            }
-            
-            Divider().background(Color.white.opacity(0.1))
-            
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 0) {
-                    Text("Due: ")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.6))
-                    Text(formattedDueOn(sub))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
-                }
-                
-                let payStr = (sub.paymentMethod ?? "").isEmpty ? "None" : (sub.paymentMethod ?? "")
-                
-                let instName: String = {
-                    if let c = cards.first(where: { $0.name == sub.paymentMethod }), !(c.institutionName ?? "").isEmpty {
-                        return c.institutionName ?? ""
-                    }
-                    if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty {
-                        return inst.name
-                    }
-                    return ""
-                }()
-                
-                let fullPayStr = instName.isEmpty ? payStr : "\(instName) \(payStr)"
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Paid From:")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.6))
-                    Text(fullPayStr)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(darkSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
+    // Note: removed flat subscriptionCard as it is replaced by ExpandableSubscriptionCard
     
     private func formatDue(_ date: Date) -> String {
         let df = DateFormatter()
@@ -848,62 +699,10 @@ struct EntityHomeView: View {
             .buttonStyle(.plain)
 
             // Categories Accordion
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
                 ForEach(docCategories.filter { coveredCategories.contains($0) }, id: \.self) { category in
                     let docsInCategory = documents.filter { $0.type == category }
-                    let isExpanded = expandedCategories.contains(category)
-                    
-                    VStack(spacing: 0) {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            if isExpanded { expandedCategories.remove(category) }
-                            else { expandedCategories.insert(category) }
-                        } label: {
-                            HStack {
-                                Image(systemName: docsInCategory.isEmpty ? "circle" : "checkmark.circle.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(docsInCategory.isEmpty ? Color.white.opacity(0.2) : docsColor)
-                                Text(category)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Text("(\(docsInCategory.count))")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                Spacer()
-                                if !docsInCategory.isEmpty {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.3))
-                                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                                }
-                            }
-                            .padding(.vertical, 14)
-                            .padding(.horizontal, 16)
-                            .background(darkSurface)
-                            .clipShape(RoundedRectangle(cornerRadius: isExpanded && !docsInCategory.isEmpty ? 0 : 12))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(docsInCategory.isEmpty)
-                        
-                        if isExpanded && !docsInCategory.isEmpty {
-                            VStack(spacing: 0) {
-                                ForEach(docsInCategory) { doc in
-                                    HStack {
-                                        Text(doc.name)
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.8))
-                                        Spacer()
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
-                                }
-                            }
-                            .background(darkSurface)
-                            .clipShape(RoundedCorner(radius: 12, corners: [.bottomLeft, .bottomRight]))
-                        }
-                    }
-                    .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                    ExpandableDocumentCard(category: category, docsInCategory: docsInCategory, vm: vm)
                 }
             }
             .padding(.horizontal, 20)
@@ -996,5 +795,283 @@ struct MarqueeRow<Item: Identifiable & Equatable, Content: View>: View {
             }
             isAnimating = true
         }
+    }
+}
+
+// MARK: - Expandable Cards
+struct ExpandableAccountCard: View {
+    let acc: InstitutionAccount
+    let subscriptions: [Subscription]
+    let vm: AppViewModel
+    @State private var isExpanded = false
+    
+    var body: some View {
+        let nameToMatch = acc.name.isEmpty ? acc.type : acc.name
+        let paidSubs = subscriptions.filter { $0.paymentMethod == nameToMatch }
+        
+        ExpandableDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: { isExpanded.toggle() },
+            collapsedHeader: {
+                HStack {
+                    Text(accountEmoji(for: acc.type)).font(.system(size: 20))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(nameToMatch).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        Text("···\(acc.last4.isEmpty ? "0000" : acc.last4)").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Balance").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(acc.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    }
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color(hex: "#21437b"))
+                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                        .padding(.leading, 8)
+                }
+            },
+            innerRows: {
+                DashboardInnerRow(icon: "creditcard", label: "Account Type", value: acc.type)
+                DashboardInnerRow(icon: "number", label: "Account Number", value: "···\(acc.last4.isEmpty ? "0000" : acc.last4)")
+                if !paidSubs.isEmpty {
+                    DashboardInnerRow(icon: "link", label: "Pays for", value: paidSubs.map { $0.name }.joined(separator: ", "))
+                }
+            },
+            actionButtons: {
+                DashboardActionButton(icon: "list.bullet.rectangle.portrait", title: "View Details") { vm.activeTab = .financial }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "pencil", title: "Edit") { vm.activeTab = .financial }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "arrow.left.arrow.right", title: "Transactions") { vm.activeTab = .financial }
+            }
+        )
+    }
+    
+    private func accountEmoji(for type: String) -> String {
+        switch type {
+        case "Checking": return "🏦"
+        case "Savings": return "💰"
+        case "CD": return "📀"
+        case "Investing": return "📈"
+        case "401(k)", "Roth 401(k)", "IRA", "Roth IRA", "Rollover IRA", "SEP IRA": return "🪺"
+        case "529": return "🎓"
+        default: return "📋"
+        }
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        if value == 0 { return "$0" }
+        if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
+        return "$\(String(format: "%.0f", value))"
+    }
+}
+
+struct ExpandableCardRow: View {
+    let card: FinancialCard
+    let subscriptions: [Subscription]
+    let vm: AppViewModel
+    @State private var isExpanded = false
+    
+    var body: some View {
+        let paidSubs = subscriptions.filter { $0.paymentMethod == card.name }
+        
+        ExpandableDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: { isExpanded.toggle() },
+            collapsedHeader: {
+                HStack {
+                    Image(systemName: "creditcard.fill").font(.system(size: 20)).foregroundStyle(Color.white.opacity(0.8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(card.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        Text("···\(card.last4 ?? "")").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Balance").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(card.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    }
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color(hex: "#21437b"))
+                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                        .padding(.leading, 8)
+                }
+            },
+            innerRows: {
+                DashboardInnerRow(icon: "creditcard", label: "Card Type", value: card.type)
+                DashboardInnerRow(icon: "number", label: "Card Number", value: "···\(card.last4 ?? "")")
+                DashboardInnerRow(icon: "dollarsign.circle", label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
+                DashboardInnerRow(icon: "calendar", label: "Statement Date", value: "Unknown")
+                if !paidSubs.isEmpty {
+                    DashboardInnerRow(icon: "link", label: "Pays for", value: paidSubs.map { $0.name }.joined(separator: ", "))
+                }
+            },
+            actionButtons: {
+                DashboardActionButton(icon: "list.bullet.rectangle.portrait", title: "View Details") { vm.activeTab = .financial }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "pencil", title: "Edit") { vm.activeTab = .financial }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "arrow.left.arrow.right", title: "Transactions") { vm.activeTab = .financial }
+            }
+        )
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        if value == 0 { return "$0" }
+        if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
+        return "$\(String(format: "%.0f", value))"
+    }
+}
+
+struct ExpandableLoanRow: View {
+    let loan: Loan
+    let subscriptions: [Subscription]
+    let vm: AppViewModel
+    @State private var isExpanded = false
+    
+    var body: some View {
+        ExpandableDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: { isExpanded.toggle() },
+            collapsedHeader: {
+                HStack {
+                    Image(systemName: "doc.text.fill").font(.system(size: 20)).foregroundStyle(Color.white.opacity(0.8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(loan.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        Text("\(loan.term)").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Remaining").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(loan.remainingBalance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    }
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color(hex: "#21437b"))
+                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                        .padding(.leading, 8)
+                }
+            },
+            innerRows: {
+                DashboardInnerRow(icon: "dollarsign.circle", label: "Principal", value: formatCurrency(loan.principalAmount))
+                DashboardInnerRow(icon: "calendar", label: "Term", value: loan.term)
+            },
+            actionButtons: {
+                DashboardActionButton(icon: "list.bullet.rectangle.portrait", title: "View Details") { vm.activeTab = .financial }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "pencil", title: "Edit") { vm.activeTab = .financial }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "arrow.left.arrow.right", title: "Transactions") { vm.activeTab = .financial }
+            }
+        )
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        if value == 0 { return "$0" }
+        if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
+        return "$\(String(format: "%.0f", value))"
+    }
+}
+
+struct ExpandableSubscriptionCard: View {
+    let sub: Subscription
+    let institutions: [Institution]
+    let cards: [FinancialCard]
+    let vm: AppViewModel
+    @State private var isExpanded = false
+    
+    var body: some View {
+        let payStr = (sub.paymentMethod ?? "").isEmpty ? "None" : (sub.paymentMethod ?? "")
+        let instName: String = {
+            if let c = cards.first(where: { $0.name == sub.paymentMethod }), !(c.institutionName ?? "").isEmpty { return c.institutionName ?? "" }
+            if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty { return inst.name }
+            return ""
+        }()
+        let fullPayStr = instName.isEmpty ? payStr : "\(instName) \(payStr)"
+        
+        ExpandableDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: { isExpanded.toggle() },
+            collapsedHeader: {
+                HStack {
+                    if !(sub.website ?? "").isEmpty {
+                        FaviconImage(website: sub.website ?? "", size: 28).clipShape(RoundedRectangle(cornerRadius: 6))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6).fill(Color(hex: "#2070BD").opacity(0.2)).frame(width: 28, height: 28)
+                            Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(Color(hex: "#2070BD"))
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(sub.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        Text(sub.billingCycle).font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Cost").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        Text(sub.cost == 0 ? "Free" : "$\(String(format: "%.0f", sub.cost))").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                    }
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color(hex: "#21437b"))
+                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                        .padding(.leading, 8)
+                }
+            },
+            innerRows: {
+                DashboardInnerRow(icon: "bolt", label: "Status", value: sub.status, valueColor: sub.status == "Active" ? .green : .orange)
+                DashboardInnerRow(icon: "creditcard", label: "Paid From", value: fullPayStr)
+                DashboardInnerRow(icon: "calendar", label: "Next Renewal", value: sub.nextRenewal ?? "Unknown")
+                DashboardInnerRow(icon: "arrow.triangle.2.circlepath", label: "Auto-Renew", value: sub.isAutoRenew ? "Enabled" : "Disabled", valueColor: sub.isAutoRenew ? .green : .orange)
+            },
+            actionButtons: {
+                DashboardActionButton(icon: "list.bullet.rectangle.portrait", title: "View Details") { vm.activeTab = .subscriptions }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "pencil", title: "Edit") { vm.activeTab = .subscriptions }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "square.and.arrow.up", title: "Share") { }
+            }
+        )
+    }
+}
+
+struct ExpandableDocumentCard: View {
+    let category: String
+    let docsInCategory: [CompanyDocument]
+    let vm: AppViewModel
+    @State private var isExpanded = false
+    
+    var body: some View {
+        ExpandableDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: { isExpanded.toggle() },
+            collapsedHeader: {
+                HStack {
+                    Image(systemName: docsInCategory.isEmpty ? "circle" : "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(docsInCategory.isEmpty ? Color.white.opacity(0.2) : Color(hex: "#918457"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(category).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
+                        Text("\(docsInCategory.count) files").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color(hex: "#21437b"))
+                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
+                        .padding(.leading, 8)
+                }
+            },
+            innerRows: {
+                if docsInCategory.isEmpty {
+                    DashboardInnerRow(icon: "exclamationmark.triangle", label: "Missing", value: "No documents uploaded", valueColor: .orange)
+                } else {
+                    ForEach(docsInCategory) { doc in
+                        DashboardInnerRow(icon: "doc", label: doc.name, value: "")
+                    }
+                }
+            },
+            actionButtons: {
+                DashboardActionButton(icon: "archivebox", title: "View Vault") { vm.activeTab = .documents }
+                Divider().background(Color.white.opacity(0.1))
+                DashboardActionButton(icon: "plus", title: "Add Document") { vm.activeTab = .documents }
+            }
+        )
     }
 }
