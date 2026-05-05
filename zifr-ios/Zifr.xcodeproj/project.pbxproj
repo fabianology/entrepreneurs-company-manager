@@ -15,6 +15,7 @@
 		22D969D0670A82296E3CCE6B /* Loan.swift in Sources */ = {isa = PBXBuildFile; fileRef = D89FF19CB274064BB06D6017 /* Loan.swift */; };
 		24BD94852802E5649BA31668 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1FB05FF46D194404F4544A /* AppState.swift */; };
 		2DB99B06A5968BA6E7D2FD3C /* EditCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F278F29297842A207A99768 /* EditCardSheet.swift */; };
+		2F2E91EA37D398F2F05B35A9 /* PremiumSubscriptionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB71FA338FFE840CE143642F /* PremiumSubscriptionCard.swift */; };
 		35D7AD052A31B0416172216F /* miloom.console.svg in Resources */ = {isa = PBXBuildFile; fileRef = 92717522EB1C824EB367EF4D /* miloom.console.svg */; };
 		371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C5A710215BBAF96C2E51F /* ZifrApp.swift */; };
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
@@ -118,6 +119,7 @@
 		D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialView.swift; sourceTree = "<group>"; };
 		D89FF19CB274064BB06D6017 /* Loan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loan.swift; sourceTree = "<group>"; };
+		DB71FA338FFE840CE143642F /* PremiumSubscriptionCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PremiumSubscriptionCard.swift; sourceTree = "<group>"; };
 		DCADE3750A4CFA0353D88977 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		DE716A0EE836D6C85D35CA28 /* DocumentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentListView.swift; sourceTree = "<group>"; };
 		E0616C7556254F7EE8C39FF3 /* GlobalSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalSearchView.swift; sourceTree = "<group>"; };
@@ -233,6 +235,7 @@
 				99D7628D8C499839405F0CB0 /* EditSubscriptionSheet.swift */,
 				E254651338FC3ED687C1BF3F /* SubscriptionListView.swift */,
 				6A42EF98907D0E132AB8454B /* AddSubscriptionWizard.swift */,
+				DB71FA338FFE840CE143642F /* PremiumSubscriptionCard.swift */,
 			);
 			path = Subscriptions;
 			sourceTree = "<group>";
@@ -462,6 +465,7 @@
 				AD8D35C804B7819C466419E9 /* AdminSettingsView.swift in Sources */,
 				8A943024C75187F1CED81686 /* AddFinancialWizard.swift in Sources */,
 				EFC9779050BAA9201910A770 /* AddSubscriptionWizard.swift in Sources */,
+				2F2E91EA37D398F2F05B35A9 /* PremiumSubscriptionCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -2,7 +2,7 @@
 name: Cifr Entrepreneur Manager
 colors:
   primary: "#223e5a"
-  secondary: "#2B3A3B"
+  secondary: "#227b5f"
   tertiary: "#545454"
   text-muted: "#A2A2A2"
   background: "#000000"

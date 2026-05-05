@@ -736,7 +736,93 @@ struct ExpandableDashboardCard<CollapsedHeader: View, InnerRows: View, ActionBut
                     VStack(spacing: 12) {
                         innerRows()
                     }
-                    .padding(16)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    
+                    Divider().background(Color.white.opacity(0.06))
+                    
+                    HStack(spacing: 0) {
+                        actionButtons()
+                    }
+                    .frame(height: 44)
+                }
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                .padding(.top, 12)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
+            }
+        }
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+    }
+}
+
+// MARK: - Grouped Dashboard Cards
+struct InstitutionDashboardCard<CollapsedHeader: View, AccountsContent: View>: View {
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    @ViewBuilder let collapsedHeader: () -> CollapsedHeader
+    @ViewBuilder let accountsContent: () -> AccountsContent
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onToggle()
+            }) {
+                collapsedHeader()
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider().background(Color.white.opacity(0.1))
+                    accountsContent()
+                }
+            }
+        }
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
+    }
+}
+
+struct AccountNestedRow<CollapsedHeader: View, InnerRows: View, ActionButtons: View>: View {
+    let isExpanded: Bool
+    let onToggle: () -> Void
+    var isLast: Bool = false
+    @ViewBuilder let collapsedHeader: () -> CollapsedHeader
+    @ViewBuilder let innerRows: () -> InnerRows
+    @ViewBuilder let actionButtons: () -> ActionButtons
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Button(action: {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onToggle()
+            }) {
+                collapsedHeader()
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            if isExpanded {
+                VStack(spacing: 0) {
+                    VStack(spacing: 12) {
+                        innerRows()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
                     
                     Divider().background(Color.white.opacity(0.06))
                     
@@ -751,10 +837,11 @@ struct ExpandableDashboardCard<CollapsedHeader: View, InnerRows: View, ActionBut
                 .padding(.horizontal, 12)
                 .padding(.bottom, 12)
             }
+            
+            if !isLast {
+                Divider().background(Color.white.opacity(0.06)).padding(.horizontal, 16)
+            }
         }
-        .background(Color(hex: "#1C1C1E"))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
     }
 }
@@ -780,7 +867,7 @@ struct DashboardActionButton: View {
 }
 
 struct DashboardInnerRow: View {
-    let icon: String
+    var icon: String? = nil
     let label: String
     let value: String
     var valueColor: Color = .white
@@ -788,10 +875,12 @@ struct DashboardInnerRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "#227b5f").opacity(0.8))
-                .frame(width: 20)
+            if let icon = icon {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color(hex: "#227b5f").opacity(0.8))
+                    .frame(width: 20)
+            }
             
             Text(label)
                 .font(.system(size: 12, weight: .regular))
@@ -805,6 +894,90 @@ struct DashboardInnerRow: View {
             
             if let trailingView = trailingView {
                 trailingView
+            }
+        }
+    }
+}
+
+// MARK: - Miloom Global List Components
+
+struct MiloomListView<Content: View>: View {
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                content
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 100)
+        }
+        .background(Color.black.ignoresSafeArea())
+    }
+}
+
+struct MiloomListCard<Content: View>: View {
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+        }
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+    }
+}
+
+struct MiloomAccordion<Content: View>: View {
+    let title: String
+    let count: Int?
+    let expanded: Bool
+    let action: () -> Void
+    @ViewBuilder let content: Content
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+            
+            Button(action: action) {
+                HStack {
+                    if let count = count {
+                        Text("\(title) ")
+                            .font(.system(size: 14, weight: .semibold))
+                            .tracking(0.2)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        + Text("(\(count))")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.2))
+                    } else {
+                        Text(title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .tracking(0.2)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
+                    Spacer()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color(hex: "#227b5f"))
+                }
+                .padding(.horizontal, 24)
+                .frame(height: 47)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PremiumButtonStyle())
+            
+            if expanded {
+                content
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                    .clipped()
             }
         }
     }

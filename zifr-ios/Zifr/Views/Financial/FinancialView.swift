@@ -658,7 +658,7 @@ struct InstitutionCardView: View {
     @State private var accountDraft = InstitutionAccount()
 
     var body: some View {
-        VStack(spacing: 0) {
+        MiloomListCard {
             // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
@@ -744,17 +744,13 @@ struct InstitutionCardView: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PremiumButtonStyle())
 
             // ── Accordion ──────────────────────────────────────────────────
-            accordionDivider()
-            accordionToggle(label: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded) {
+            MiloomAccordion(title: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded, action: {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            }
-            .zIndex(1)
-            
-            if expanded {
+            }) {
                 VStack(spacing: 12) {
                     ForEach(institution.accounts) { acc in
                         Button {
@@ -785,9 +781,9 @@ struct InstitutionCardView: View {
                             .padding(.vertical, 12)
                             .background(Color(hex: "#2C2C2E"))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PremiumButtonStyle())
                     }
 
                     ForEach(loans) { loan in
@@ -825,19 +821,13 @@ struct InstitutionCardView: View {
                             .padding(.vertical, 12)
                             .background(Color(hex: "#2C2C2E"))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PremiumButtonStyle())
                     }
                 }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-                .clipped()
             }
         }
-        .background(Color(hex: "#1C1C1E"))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,
@@ -886,46 +876,16 @@ struct InstitutionCardView: View {
             .foregroundStyle(Color.white.opacity(0.2))
     }
 
-    private func accordionDivider() -> some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.05))
-            .frame(height: 1)
-    }
 
-    private func accordionToggle(label: String, count: Int? = nil, expanded: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                if let count = count, count > 0 {
-                    Text("\(label) ")
-                        .font(.system(size: 14, weight: .semibold))
-                        .tracking(0.2)
-                        .foregroundStyle(Color.white.opacity(0.5))
-                    + Text("(\(count))")
-                        .font(.system(size: 13))
-                        .foregroundStyle(Color.white.opacity(0.2))
-                } else {
-                    Text(label)
-                        .font(.system(size: 14, weight: .semibold))
-                        .tracking(0.2)
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                Spacer()
-                Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.4))
-            }
-            .padding(.horizontal, 24)
-            .frame(height: 47)
-        }
-    }
 
     private func copyableCredential(id: String, label: String, value: String, field: String, isPassword: Bool = false) -> some View {
         let isCopied = copiedField == field
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Text(isCopied ? "Copied ✓" : label)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(isCopied ? Color.orange : Color.white.opacity(0.5))
+                    .textCase(.uppercase)
                 if isPassword {
                     Button {
                         passwordRevealed.toggle()
@@ -956,11 +916,11 @@ struct InstitutionCardView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color.black.opacity(0.2))
+                .background(Color(hex: "#2C2C2E"))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PremiumButtonStyle())
             .proContextMenu(password: institution.password, loginId: (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? ""), last4: nil)
         }
     }

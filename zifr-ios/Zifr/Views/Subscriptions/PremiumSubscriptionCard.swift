@@ -1,195 +1,6 @@
 import SwiftUI
 
-struct SubscriptionListView: View {
-    let company: Company
-    let subscriptions: [Subscription]
-    let institutions: [Institution]
-    let cards: [FinancialCard]
-    @Bindable var vm: AppViewModel
-    @Environment(AppState.self) private var appState
-
-    @State private var editingSub: Subscription? = nil
-    @State private var newSub: Subscription? = nil
-    @State private var showShareSheet = false
-    @State private var shareResourceId: UUID = UUID()
-    @State private var shareResourceType: String = "all_subscriptions"
-    @State private var shareResourceTitle: String = "All Subscriptions"
-
-
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            MiloomListView {
-                // ── Action Bar ──
-                HStack(spacing: 8) {
-                    Spacer()
-
-                    Menu {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            shareResourceId = company.id
-                            shareResourceType = "all_subscriptions"
-                            shareResourceTitle = "All Subscriptions"
-                            showShareSheet = true
-                        } label: {
-                            Label("All Subscriptions", systemImage: "folder.badge.person.crop")
-                        }
-                        
-                        if !subscriptions.isEmpty {
-                            Section("Subscriptions") {
-                                ForEach(subscriptions) { sub in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        shareResourceId = sub.id
-                                        shareResourceType = "subscription"
-                                        shareResourceTitle = sub.name.isEmpty ? "Service" : sub.name
-                                        showShareSheet = true
-                                    } label: {
-                                        Label(sub.name.isEmpty ? "Unnamed Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.gray)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
-                    }
-
-                    Button {
-                        newSub = Subscription(userId: company.userId, companyId: company.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("ADD SERVICE").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Image(systemName: "plus").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
-                        }
-                        .padding(.horizontal, 20)
-                        .frame(height: 36)
-                        .background(Color(hex: "#1C1C1E"))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    }
-                }
-                .padding(.top, 15)
-                .padding(.bottom, 8)
-
-                if subscriptions.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(subscriptions) { sub in
-                        SubscriptionCardView(
-                            sub: sub, 
-                            allSubscriptions: subscriptions, 
-                            institutions: institutions, 
-                            cards: cards, 
-                            onEdit: { editingSub = sub },
-                            onBankTapped: { id in
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                vm.activeTab = .financial
-                                vm.deepLinkModelId = id
-                            },
-                            onSave: { modifiedSub in
-                                vm.saveSub(modifiedSub, appState: appState)
-                            }
-                        )
-                            .id(sub.id)
-                            
-                    }
-                }
-            }
-
-        .sheet(item: $editingSub) { sub in
-            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
-        }
-        .sheet(item: $newSub) { sub in
-            AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
-                .presentationDetents([.fraction(0.9), .large])
-        }
-        .onChange(of: vm.deepLinkModelId) { _, newValue in
-            handleDeepLink(id: newValue, proxy: proxy)
-        }
-        .onAppear {
-            handleDeepLink(id: vm.deepLinkModelId, proxy: proxy)
-        }
-        .sheet(isPresented: $showShareSheet) {
-            ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
-        }
-        }
-    }
-    
-    private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
-        guard let id = id else { return }
-        if let s = subscriptions.first(where: { $0.id == id }) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
-                    proxy.scrollTo(s.id, anchor: .center)
-                }
-            }
-            vm.deepLinkModelId = nil
-        }
-    }
-
-    @State private var dummyNetflix = Subscription(
-        userId: UUID(),
-        companyId: UUID(),
-        name: "Netflix",
-        cost: 22.99,
-        billingCycle: "Monthly",
-        paymentMethod: "Apple Card •••• 1234",
-        nextRenewal: "15",
-        status: "Active",
-        website: "netflix.com",
-        loginId: "founder@company.com",
-        password: "••••••••",
-        showSubServicesTab: false,
-        showLinkedEmailsTab: false
-    )
-
-    private var emptyState: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            newSub = Subscription(userId: company.userId, companyId: company.id)
-        }) {
-            ZStack {
-                SubscriptionCardView(
-                    sub: dummyNetflix,
-                    allSubscriptions: [],
-                    institutions: [],
-                    cards: [],
-                    onEdit: {},
-                    onSave: { modifiedSub in
-                        dummyNetflix = modifiedSub
-                    }
-                )
-                .allowsHitTesting(false)
-                .blur(radius: 3)
-                
-                VStack(spacing: 16) {
-                    Image(systemName: "square.3.layers.3d")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.white)
-                    Text("ADD YOUR FIRST SERVICE")
-                        .font(.system(size: 11, weight: .black))
-                        .textCase(.uppercase)
-                        .tracking(2)
-                        .foregroundStyle(.white)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 40)
-    }
-}
-
-// MARK: - Subscription Card (exact CiFr layout)
-
-struct SubscriptionCardView: View {
+struct PremiumSubscriptionCard: View {
     let sub: Subscription
     let allSubscriptions: [Subscription]
     let institutions: [Institution]
@@ -467,8 +278,6 @@ struct SubscriptionCardView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(PremiumButtonStyle())
-
-
 
             // ── Supplemental Services accordion ─────────────────────────
             if sub.showSubServicesTab {
@@ -827,3 +636,67 @@ struct SubscriptionCardView: View {
     }
 }
 
+struct DynamicLoginLabelView: View {
+    let loginId: String
+    var ignoreSubscriptionId: String? = nil
+    var ignoreInstitutionId: String? = nil
+    
+    @Environment(AppState.self) private var appState
+    private var allSubscriptions: [Subscription] { appState.subscriptions }
+    
+    private var allInstitutions: [Institution] { appState.institutions }
+    
+    var body: some View {
+        let normalizedLogin = loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if !normalizedLogin.isEmpty {
+            let subServices: [String] = allSubscriptions.compactMap { s in
+                if let ignoreId = ignoreSubscriptionId, s.id.uuidString == ignoreId { return nil }
+                
+                if (s.loginId ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
+                    return s.name.isEmpty ? "Unnamed Service" : s.name
+                } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin }) {
+                    return s.name.isEmpty ? "Unnamed Service" : s.name
+                }
+                return nil
+            }
+            
+            let instServices: [String] = allInstitutions.compactMap { i in
+                if let ignoreId = ignoreInstitutionId, i.id.uuidString == ignoreId { return nil }
+                
+                let instLogin = (i.username ?? "").isEmpty ? (i.email ?? "") : (i.username ?? "")
+                if instLogin.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
+                    return i.name.isEmpty ? "Unnamed Institution" : i.name
+                } else if (i.email ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin && !(i.email ?? "").isEmpty {
+                    return i.name.isEmpty ? "Unnamed Institution" : i.name
+                }
+                return nil
+            }
+            
+            let allTextTags = (subServices + instServices).reduce(into: [String]()) { result, name in
+                if !result.contains(name) { result.append(name) }
+            }
+            
+            if !allTextTags.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("LOGIN ALSO USED IN:")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .textCase(.uppercase)
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "link")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#227b5f"))
+                        
+                        Text(allTextTags.joined(separator: " | "))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color(hex: "#7D7D7D"))
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.bottom, -10)
+            }
+        }
+    }
+}

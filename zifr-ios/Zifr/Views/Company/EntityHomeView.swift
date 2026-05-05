@@ -24,6 +24,8 @@ struct EntityHomeView: View {
     @Environment(AppState.self) private var appState
 
     @State private var expandedInstitutions: Set<String> = []
+    @State private var expandedAccounts: Set<String> = []
+    @State private var expandedSubscriptions: Set<String> = []
     @State private var expandedCategories: Set<String> = []
     
     // Quick Add States
@@ -253,6 +255,7 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
+                .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
@@ -267,40 +270,168 @@ struct EntityHomeView: View {
                 let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
                 
                 if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Image(systemName: "building.columns")
-                                .font(.system(size: 20))
-                                .foregroundStyle(finColor)
-                                .frame(width: 32)
-                            Text("Other Accounts")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white)
-                            Spacer()
-                        }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 16)
-                        .background(darkSurface)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        
-                        VStack(spacing: 12) {
-                            ForEach(orphanedCards) { card in
-                                ExpandableCardRow(card: card, subscriptions: subscriptions, vm: vm)
+                    let isOrphanedExpanded = expandedInstitutions.contains("orphaned")
+                    let orphanedDebt = orphanedCards.reduce(0) { $0 + $1.balance } + orphanedLoans.reduce(0) { $0 + $1.remainingBalance }
+                    let orphanedCredit = orphanedCards.reduce(0) { $0 + $1.limit }
+                    
+                    InstitutionDashboardCard(
+                        isExpanded: isOrphanedExpanded,
+                        onToggle: {
+                            if isOrphanedExpanded { expandedInstitutions.remove("orphaned") }
+                            else { expandedInstitutions.insert("orphaned") }
+                        },
+                        collapsedHeader: {
+                            HStack {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8).fill(finColor).frame(width: 32, height: 32)
+                                    Image(systemName: "building.columns").font(.system(size: 14)).foregroundStyle(.white)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Other Accounts")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Text("\(orphanedCards.count + orphanedLoans.count) Accounts")
+                                        .font(.system(size: 11, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                .padding(.leading, 8)
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Debt")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                    Text(formatCurrency(orphanedDebt))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                                Divider().background(Color.white.opacity(0.2)).frame(height: 24).padding(.horizontal, 8)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Credit")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                    Text(formatCurrency(orphanedCredit))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                    .rotationEffect(.degrees(isOrphanedExpanded ? 0 : 180))
+                                    .padding(.leading, 8)
                             }
-                            ForEach(orphanedLoans) { loan in
-                                ExpandableLoanRow(loan: loan, subscriptions: subscriptions, vm: vm)
+                        },
+                        accountsContent: {
+                            VStack(spacing: 0) {
+                                ForEach(Array(orphanedCards.enumerated()), id: \.element.id) { idx, card in
+                                    let isAccExpanded = expandedAccounts.contains(card.id.uuidString)
+                                    let isLast = idx == orphanedCards.count - 1 && orphanedLoans.isEmpty
+                                    AccountNestedRow(
+                                        isExpanded: isAccExpanded,
+                                        onToggle: {
+                                            if isAccExpanded { expandedAccounts.remove(card.id.uuidString) }
+                                            else { expandedAccounts.insert(card.id.uuidString) }
+                                        },
+                                        isLast: isLast,
+                                        collapsedHeader: {
+                                            HStack {
+                                                ZStack {
+                                                    Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                                    Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                }
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(card.name)
+                                                        .font(.system(size: 14, weight: .bold))
+                                                        .foregroundStyle(.white)
+                                                    Text("•••• \(card.last4 ?? "0000")")
+                                                        .font(.system(size: 11, weight: .regular))
+                                                        .foregroundStyle(Color.white.opacity(0.5))
+                                                }
+                                                .padding(.leading, 8)
+                                                Spacer()
+                                                VStack(alignment: .trailing, spacing: 2) {
+                                                    Text("Balance")
+                                                        .font(.system(size: 10, weight: .bold))
+                                                        .foregroundStyle(Color.white.opacity(0.4))
+                                                    Text(formatCurrency(card.balance))
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        .foregroundStyle(.white)
+                                                }
+                                                Image(systemName: "chevron.up")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundStyle(Color.white.opacity(0.3))
+                                                    .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                                    .padding(.leading, 8)
+                                            }
+                                        },
+                                        innerRows: {
+                                            DashboardInnerRow(icon: nil, label: "Account Type", value: "Credit Card")
+                                            DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(card.last4 ?? "0000")")
+                                            DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
+                                        },
+                                        actionButtons: {
+                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                        }
+                                    )
+                                }
+                                
+                                ForEach(Array(orphanedLoans.enumerated()), id: \.element.id) { idx, loan in
+                                    let isAccExpanded = expandedAccounts.contains(loan.id.uuidString)
+                                    let isLast = idx == orphanedLoans.count - 1
+                                    AccountNestedRow(
+                                        isExpanded: isAccExpanded,
+                                        onToggle: {
+                                            if isAccExpanded { expandedAccounts.remove(loan.id.uuidString) }
+                                            else { expandedAccounts.insert(loan.id.uuidString) }
+                                        },
+                                        isLast: isLast,
+                                        collapsedHeader: {
+                                            HStack {
+                                                ZStack {
+                                                    Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                                    Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                }
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(loan.name)
+                                                        .font(.system(size: 14, weight: .bold))
+                                                        .foregroundStyle(.white)
+                                                    Text("Loan")
+                                                        .font(.system(size: 11, weight: .regular))
+                                                        .foregroundStyle(Color.white.opacity(0.5))
+                                                }
+                                                .padding(.leading, 8)
+                                                Spacer()
+                                                VStack(alignment: .trailing, spacing: 2) {
+                                                    Text("Remaining")
+                                                        .font(.system(size: 10, weight: .bold))
+                                                        .foregroundStyle(Color.white.opacity(0.4))
+                                                    Text(formatCurrency(loan.remainingBalance))
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        .foregroundStyle(.white)
+                                                }
+                                                Image(systemName: "chevron.up")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundStyle(Color.white.opacity(0.3))
+                                                    .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                                    .padding(.leading, 8)
+                                            }
+                                        },
+                                        innerRows: {
+                                            DashboardInnerRow(icon: nil, label: "Account Type", value: "Bank Loan")
+                                            DashboardInnerRow(icon: nil, label: "Interest Rate", value: "\(String(format: "%.1f", loan.interestRate))%")
+                                            DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
+                                        },
+                                        actionButtons: {
+                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                        }
+                                    )
+                                }
                             }
                         }
-                        .padding(.top, 12)
-                    }
+                    )
+                    .padding(.horizontal, 20)
                 }
             }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 16)
-        .background(Color(hex: "#2c2c2c"))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 20)
     }
     
     private func institutionRow(_ inst: Institution) -> some View {
@@ -311,24 +442,25 @@ struct EntityHomeView: View {
         let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
         let instCredit = instCards.reduce(0) { $0 + $1.limit }
         
-        return VStack(spacing: 0) {
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        return InstitutionDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: {
                 if isExpanded { expandedInstitutions.remove(inst.id.uuidString) }
                 else { expandedInstitutions.insert(inst.id.uuidString) }
-            } label: {
+            },
+            collapsedHeader: {
                 HStack {
                     if !(inst.loginUrl ?? "").isEmpty {
                         FaviconImage(website: inst.loginUrl ?? "", size: 32)
-                            .clipShape(Circle())
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
                         ZStack {
-                            Circle().fill(finColor).frame(width: 32, height: 32)
+                            RoundedRectangle(cornerRadius: 8).fill(finColor).frame(width: 32, height: 32)
                             Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
                         }
                     }
                     Text(inst.name)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .padding(.leading, 4)
                     Spacer()
@@ -349,39 +481,176 @@ struct EntityHomeView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
                     }
-                    Image(systemName: "chevron.right")
+                    Image(systemName: "chevron.up")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color.white.opacity(0.3))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .rotationEffect(.degrees(isExpanded ? 0 : 180))
                         .padding(.leading, 8)
                 }
-                .padding(.vertical, 12)
-                .padding(.horizontal, 16)
-                .background(darkSurface)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
-            }
-            .buttonStyle(.plain)
-            .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil)
-            
-            if isExpanded {
-                VStack(spacing: 12) {
-                    ForEach(inst.accounts) { acc in
-                        ExpandableAccountCard(acc: acc, subscriptions: subscriptions, vm: vm)
+            },
+            accountsContent: {
+                VStack(spacing: 0) {
+                    ForEach(Array(inst.accounts.enumerated()), id: \.element.id) { idx, acc in
+                        let nameToMatch = acc.name.isEmpty ? acc.type : acc.name
+                        let isAccExpanded = expandedAccounts.contains(acc.id)
+                        let isLast = idx == inst.accounts.count - 1 && instCards.isEmpty && instLoans.isEmpty
+                        AccountNestedRow(
+                            isExpanded: isAccExpanded,
+                            onToggle: {
+                                if isAccExpanded { expandedAccounts.remove(acc.id) }
+                                else { expandedAccounts.insert(acc.id) }
+                            },
+                            isLast: isLast,
+                            collapsedHeader: {
+                                HStack {
+                                    ZStack {
+                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                        Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(nameToMatch)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("•••• \(acc.last4.isEmpty ? "0000" : acc.last4)")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Balance")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                        Text(formatCurrency(acc.balance))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                        .padding(.leading, 8)
+                                }
+                            },
+                            innerRows: {
+                                DashboardInnerRow(icon: nil, label: "Account Type", value: acc.type)
+                                DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(acc.last4.isEmpty ? "0000" : acc.last4)")
+                            },
+                            actionButtons: {
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                            }
+                        )
                     }
-                    ForEach(instCards) { card in
-                        ExpandableCardRow(card: card, subscriptions: subscriptions, vm: vm)
+                    
+                    ForEach(Array(instCards.enumerated()), id: \.element.id) { idx, card in
+                        let isAccExpanded = expandedAccounts.contains(card.id.uuidString)
+                        let isLast = idx == instCards.count - 1 && instLoans.isEmpty
+                        AccountNestedRow(
+                            isExpanded: isAccExpanded,
+                            onToggle: {
+                                if isAccExpanded { expandedAccounts.remove(card.id.uuidString) }
+                                else { expandedAccounts.insert(card.id.uuidString) }
+                            },
+                            isLast: isLast,
+                            collapsedHeader: {
+                                HStack {
+                                    ZStack {
+                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                        Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(card.name)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("•••• \(card.last4 ?? "0000")")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Balance")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                        Text(formatCurrency(card.balance))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                        .padding(.leading, 8)
+                                }
+                            },
+                            innerRows: {
+                                DashboardInnerRow(icon: nil, label: "Account Type", value: "Credit Card")
+                                DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(card.last4 ?? "0000")")
+                                DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
+                            },
+                            actionButtons: {
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                            }
+                        )
                     }
-                    ForEach(instLoans) { loan in
-                        ExpandableLoanRow(loan: loan, subscriptions: subscriptions, vm: vm)
+                    
+                    ForEach(Array(instLoans.enumerated()), id: \.element.id) { idx, loan in
+                        let isAccExpanded = expandedAccounts.contains(loan.id.uuidString)
+                        let isLast = idx == instLoans.count - 1
+                        AccountNestedRow(
+                            isExpanded: isAccExpanded,
+                            onToggle: {
+                                if isAccExpanded { expandedAccounts.remove(loan.id.uuidString) }
+                                else { expandedAccounts.insert(loan.id.uuidString) }
+                            },
+                            isLast: isLast,
+                            collapsedHeader: {
+                                HStack {
+                                    ZStack {
+                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                        Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(loan.name)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("Loan")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Remaining")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                        Text(formatCurrency(loan.remainingBalance))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                        .padding(.leading, 8)
+                                }
+                            },
+                            innerRows: {
+                                DashboardInnerRow(icon: nil, label: "Account Type", value: "Bank Loan")
+                                DashboardInnerRow(icon: nil, label: "Interest Rate", value: "\(String(format: "%.1f", loan.interestRate))%")
+                                DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
+                            },
+                            actionButtons: {
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                            }
+                        )
                     }
                 }
-                .padding(.top, 12)
             }
-        }
-        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+        )
+        .padding(.horizontal, 20)
+        .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil)
     }
-    
     
     private func accountRow(_ acc: InstitutionAccount) -> some View {
         let nameToMatch = acc.name.isEmpty ? acc.type : acc.name
@@ -592,25 +861,98 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
+                .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
 
             VStack(spacing: 12) {
                 ForEach(activeSubscriptions) { sub in
-                    ExpandableSubscriptionCard(sub: sub, institutions: institutions, cards: cards, vm: vm)
+                    let isSubExpanded = expandedSubscriptions.contains(sub.id.uuidString)
+                    let payStr = (sub.paymentMethod ?? "").isEmpty ? "None" : (sub.paymentMethod ?? "")
+                    let instName: String = {
+                        if let c = cards.first(where: { $0.name == sub.paymentMethod }), !(c.institutionName ?? "").isEmpty {
+                            return c.institutionName ?? ""
+                        }
+                        if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty {
+                            return inst.name
+                        }
+                        return ""
+                    }()
+                    let fullPayStr = instName.isEmpty ? payStr : "\(instName) \(payStr)"
+                    
+                    ExpandableDashboardCard(
+                        isExpanded: isSubExpanded,
+                        onToggle: {
+                            if isSubExpanded { expandedSubscriptions.remove(sub.id.uuidString) }
+                            else { expandedSubscriptions.insert(sub.id.uuidString) }
+                        },
+                        collapsedHeader: {
+                            HStack {
+                                if !(sub.website ?? "").isEmpty {
+                                    FaviconImage(website: sub.website ?? "", size: 32)
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                                } else {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 8).fill(brandColor(sub.name).opacity(0.2)).frame(width: 32, height: 32)
+                                        Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
+                                    }
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(sub.name)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Text(sub.billingCycle)
+                                        .font(.system(size: 11, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                .padding(.leading, 8)
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Cost")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                    Text(sub.cost == 0 ? "Free" : formatCurrency(sub.cost))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                    .rotationEffect(.degrees(isSubExpanded ? 0 : 180))
+                                    .padding(.leading, 8)
+                            }
+                        },
+                        innerRows: {
+                            DashboardInnerRow(
+                                icon: "calendar",
+                                label: "Due Date",
+                                value: formattedDueOn(sub)
+                            )
+                            .padding(.vertical, 4)
+                            DashboardInnerRow(
+                                icon: "creditcard.fill",
+                                label: "Paid From",
+                                value: fullPayStr
+                            )
+                            .padding(.vertical, 4)
+                        },
+                        actionButtons: {
+                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") {
+                                vm.activeTab = .subscriptions
+                            }
+                            Divider().background(Color.white.opacity(0.06))
+                            DashboardActionButton(icon: "pencil", title: "Edit") {
+                                vm.activeTab = .subscriptions
+                            }
+                        }
+                    )
+                    .padding(.horizontal, 20)
+                    .proContextMenu(password: sub.password, loginId: sub.loginId, last4: nil)
                 }
-            }
+                }
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 16)
-        .background(Color(hex: "#2c2c2c"))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 20)
     }
-    
-    // Note: removed flat subscriptionCard as it is replaced by ExpandableSubscriptionCard
-    
     private func formatDue(_ date: Date) -> String {
         let df = DateFormatter()
         df.dateFormat = "MMM d"
@@ -698,23 +1040,66 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
+                .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
 
             // Categories Accordion
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 ForEach(docCategories.filter { coveredCategories.contains($0) }, id: \.self) { category in
                     let docsInCategory = documents.filter { $0.type == category }
-                    ExpandableDocumentCard(category: category, docsInCategory: docsInCategory, vm: vm)
+                    let isExpanded = expandedCategories.contains(category)
+                    
+                    ExpandableDashboardCard(
+                        isExpanded: isExpanded,
+                        onToggle: {
+                            if isExpanded { expandedCategories.remove(category) }
+                            else { expandedCategories.insert(category) }
+                        },
+                        collapsedHeader: {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(docsColor)
+                                Text(category)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Text("\(docsInCategory.count) Docs")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                    .rotationEffect(.degrees(isExpanded ? 0 : 180))
+                                    .padding(.leading, 8)
+                            }
+                        },
+                        innerRows: {
+                            ForEach(docsInCategory) { doc in
+                                DashboardInnerRow(
+                                    icon: "doc.text.fill",
+                                    label: doc.name,
+                                    value: ""
+                                )
+                                .padding(.vertical, 4)
+                            }
+                        },
+                        actionButtons: {
+                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") {
+                                vm.activeTab = .documents
+                            }
+                            Divider().background(Color.white.opacity(0.06))
+                            DashboardActionButton(icon: "plus", title: "Add Document") {
+                                newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                            }
+                        }
+                    )
                 }
             }
+            .padding(.horizontal, 20)
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 16)
-        .background(Color(hex: "#2c2c2c"))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 20)
     }
 
     // MARK: - Helpers
@@ -833,7 +1218,7 @@ struct ExpandableAccountCard: View {
                         Text(formatCurrency(acc.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#227b5f"))
+                        .foregroundStyle(Color(hex: "#5ED6C1"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -899,7 +1284,7 @@ struct ExpandableCardRow: View {
                         Text(formatCurrency(card.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#227b5f"))
+                        .foregroundStyle(Color(hex: "#5ED6C1"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -953,7 +1338,7 @@ struct ExpandableLoanRow: View {
                         Text(formatCurrency(loan.remainingBalance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
                     Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#227b5f"))
+                        .foregroundStyle(Color(hex: "#5ED6C1"))
                         .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
@@ -976,110 +1361,5 @@ struct ExpandableLoanRow: View {
         if value == 0 { return "$0" }
         if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
         return "$\(String(format: "%.0f", value))"
-    }
-}
-
-struct ExpandableSubscriptionCard: View {
-    let sub: Subscription
-    let institutions: [Institution]
-    let cards: [FinancialCard]
-    let vm: AppViewModel
-    @State private var isExpanded = false
-    
-    var body: some View {
-        let payStr = (sub.paymentMethod ?? "").isEmpty ? "None" : (sub.paymentMethod ?? "")
-        let instName: String = {
-            if let c = cards.first(where: { $0.name == sub.paymentMethod }), !(c.institutionName ?? "").isEmpty { return c.institutionName ?? "" }
-            if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty { return inst.name }
-            return ""
-        }()
-        let fullPayStr = instName.isEmpty ? payStr : "\(instName) \(payStr)"
-        
-        ExpandableDashboardCard(
-            isExpanded: isExpanded,
-            onToggle: { isExpanded.toggle() },
-            collapsedHeader: {
-                HStack {
-                    if !(sub.website ?? "").isEmpty {
-                        FaviconImage(website: sub.website ?? "", size: 28).clipShape(RoundedRectangle(cornerRadius: 6))
-                    } else {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6).fill(Color(hex: "#2070BD").opacity(0.2)).frame(width: 28, height: 28)
-                            Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(Color(hex: "#2070BD"))
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(sub.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                        Text(sub.billingCycle).font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Cost").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
-                        Text(sub.cost == 0 ? "Free" : "$\(String(format: "%.0f", sub.cost))").font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                    }
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#227b5f"))
-                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
-                        .padding(.leading, 8)
-                }
-            },
-            innerRows: {
-                DashboardInnerRow(icon: "bolt", label: "Status", value: sub.status, valueColor: sub.status == "Active" ? .green : .orange)
-                DashboardInnerRow(icon: "creditcard", label: "Paid From", value: fullPayStr)
-                DashboardInnerRow(icon: "calendar", label: "Next Renewal", value: sub.nextRenewal ?? "Unknown")
-                DashboardInnerRow(icon: "arrow.triangle.2.circlepath", label: "Auto-Renew", value: sub.isAutoRenew ? "Enabled" : "Disabled", valueColor: sub.isAutoRenew ? .green : .orange)
-            },
-            actionButtons: {
-                DashboardActionButton(icon: "list.bullet.rectangle.portrait", title: "View Details") { vm.activeTab = .subscriptions }
-                Divider().background(Color.white.opacity(0.1))
-                DashboardActionButton(icon: "pencil", title: "Edit") { vm.activeTab = .subscriptions }
-                Divider().background(Color.white.opacity(0.1))
-                DashboardActionButton(icon: "square.and.arrow.up", title: "Share") { }
-            }
-        )
-    }
-}
-
-struct ExpandableDocumentCard: View {
-    let category: String
-    let docsInCategory: [CompanyDocument]
-    let vm: AppViewModel
-    @State private var isExpanded = false
-    
-    var body: some View {
-        ExpandableDashboardCard(
-            isExpanded: isExpanded,
-            onToggle: { isExpanded.toggle() },
-            collapsedHeader: {
-                HStack {
-                    Image(systemName: docsInCategory.isEmpty ? "circle" : "checkmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(docsInCategory.isEmpty ? Color.white.opacity(0.2) : Color(hex: "#918457"))
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(category).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
-                        Text("\(docsInCategory.count) files").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.5))
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(hex: "#227b5f"))
-                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
-                        .padding(.leading, 8)
-                }
-            },
-            innerRows: {
-                if docsInCategory.isEmpty {
-                    DashboardInnerRow(icon: "exclamationmark.triangle", label: "Missing", value: "No documents uploaded", valueColor: .orange)
-                } else {
-                    ForEach(docsInCategory) { doc in
-                        DashboardInnerRow(icon: "doc", label: doc.name, value: "")
-                    }
-                }
-            },
-            actionButtons: {
-                DashboardActionButton(icon: "archivebox", title: "View Vault") { vm.activeTab = .documents }
-                Divider().background(Color.white.opacity(0.1))
-                DashboardActionButton(icon: "plus", title: "Add Document") { vm.activeTab = .documents }
-            }
-        )
     }
 }
