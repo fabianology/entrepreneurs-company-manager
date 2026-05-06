@@ -2,7 +2,7 @@ import SwiftUI
 
 extension Color {
     // MARK: - Brand Colors
-    static let zifrGreen  = Color(hex: "#1FE400")
+    static let zifrGreen  = Color(hex: "#1f7055")
     static let zifrGold   = Color(hex: "#EBC351")
     static let zifrBlue   = Color(hex: "#0091FF")
     static let zifrBG     = Color(hex: "#000000")

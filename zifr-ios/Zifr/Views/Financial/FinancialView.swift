@@ -681,7 +681,7 @@ struct InstitutionCardView: View {
                             HStack(spacing: 8) {
                                 HStack(spacing: 4) {
                                     Text("\(institution.accounts.count)").foregroundStyle(.white)
-                                    Text("Accounts").foregroundStyle(Color.white.opacity(0.4))
+                                    Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
                                 .font(.system(size: 12, weight: .semibold))
                                 .tracking(0.3)
@@ -690,7 +690,7 @@ struct InstitutionCardView: View {
                                 
                                 HStack(spacing: 4) {
                                     Text("\(cardCount)").foregroundStyle(.white)
-                                    Text("Cards").foregroundStyle(Color.white.opacity(0.4))
+                                    Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
                                 .font(.system(size: 12, weight: .semibold))
                                 .tracking(0.3)
@@ -699,7 +699,7 @@ struct InstitutionCardView: View {
                                 
                                 HStack(spacing: 4) {
                                     Text("\(loanCount)").foregroundStyle(.white)
-                                    Text("Loans").foregroundStyle(Color.white.opacity(0.4))
+                                    Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
                                 .font(.system(size: 12, weight: .semibold))
                                 .tracking(0.3)
@@ -866,7 +866,7 @@ struct InstitutionCardView: View {
                 .foregroundStyle(.white)
             Text(label)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .foregroundStyle(Color(hex: "#C1AA78"))
         }
     }
 

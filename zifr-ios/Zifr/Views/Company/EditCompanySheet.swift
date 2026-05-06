@@ -68,7 +68,7 @@ struct EditCompanySheet: View {
                         }
                         
                         formSection {
-                            ZifrField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
+                            PremiumInputField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
                         }
                     }
                     .padding(.top, 8)
@@ -76,7 +76,7 @@ struct EditCompanySheet: View {
                     // Website Row
                     HStack(spacing: 16) {
                         formSection {
-                            ZifrField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL, textContentType: .URL)
+                            PremiumInputField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL, textContentType: .URL)
                         }
                         
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
@@ -90,9 +90,9 @@ struct EditCompanySheet: View {
                             .foregroundStyle(Color.white.opacity(0.8))
                             .frame(width: 76)
                             .frame(maxHeight: .infinity) // fills height of HStack defined by formSection
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .onChange(of: selectedPhoto) { _, item in
                             Task {
@@ -111,11 +111,7 @@ struct EditCompanySheet: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                             .padding(.horizontal, 4)
                         
-                        Picker("", selection: $entityCategory) {
-                            Text("Personal").tag("Personal")
-                            Text("Business").tag("Business")
-                        }
-                        .pickerStyle(.segmented)
+                        CustomSegmentedControl(options: ["Personal", "Business"], selection: $entityCategory)
                         .onChange(of: entityCategory) { _, newValue in
                             // Reset structure when category changes
                             if newValue == "Personal" {
@@ -126,61 +122,29 @@ struct EditCompanySheet: View {
                         }
                     }
 
-                    // Structure & Tutorial side-by-side
-                    HStack(alignment: .bottom, spacing: 12) {
-                        // Structure picker
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("ENTITY STRUCTURE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                                .padding(.horizontal, 4)
-                            
-                            Picker("Select Structure", selection: $structure) {
-                                if entityCategory == "Personal" {
-                                    Text("Household").tag("Household")
-                                    Text("Individual").tag("Individual")
-                                } else {
-                                    ForEach(Company.structures.filter { $0 != "Personal" && $0 != "Household" && $0 != "Individual" }, id: \.self) { s in
-                                        Text(s).tag(s)
-                                    }
+                    // Structure Picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("ENTITY STRUCTURE")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .padding(.horizontal, 4)
+                        
+                        Picker("Select Structure", selection: $structure) {
+                            if entityCategory == "Personal" {
+                                Text("Household").tag("Household")
+                                Text("Individual").tag("Individual")
+                            } else {
+                                ForEach(Company.structures.filter { $0 != "Personal" && $0 != "Household" && $0 != "Individual" }, id: \.self) { s in
+                                    Text(s).tag(s)
                                 }
                             }
-                            .pickerStyle(.menu)
-                            .padding(.horizontal, 12)
-                            .frame(height: 44)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
                         }
+                        .pickerStyle(.wheel)
+                        .frame(height: 120)
                         .frame(maxWidth: .infinity)
-
-                        // Tutorial Button
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("HELP & GUIDE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                                .padding(.horizontal, 4)
-
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "play.circle")
-                                        .font(.system(size: 14))
-                                    Text("Tutorial")
-                                        .font(.system(size: 14, weight: .semibold))
-                                }
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color.black)
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .frame(maxWidth: .infinity)
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
 
                     VStack(spacing: 30) {
@@ -190,6 +154,25 @@ struct EditCompanySheet: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.5))
                                 .padding(.leading, 4)
+                            
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "play.circle")
+                                        .font(.system(size: 14))
+                                    Text("Help & Guide")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(Color.black)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.bottom, 4)
                             
                             HStack(spacing: 12) {
                                 navButton(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), text: "Subscriptions") {

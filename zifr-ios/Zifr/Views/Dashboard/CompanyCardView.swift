@@ -35,9 +35,18 @@ struct CompanyCardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
-                Image(systemName: "circle.grid.3x3.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.white)
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onEdit()
+                }) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(8)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .offset(x: 8, y: -8)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
@@ -79,9 +88,9 @@ struct CompanyCardView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background(Color(hex: "#121212"))
+            .background(Color(hex: "#1C1C1E"))
         }
-        .background(Color(hex: "#0A0A0A"))
+        .background(Color(hex: "#171717"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
     }
 

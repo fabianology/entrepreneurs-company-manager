@@ -397,7 +397,7 @@ struct SubscriptionCardView: View {
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
                                                 .font(.system(size: 10, weight: .semibold))
-                                                .foregroundStyle(Color(hex: "#7D7D7D"))
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
                                         }
                                     }
                                     .textCase(.uppercase)
@@ -428,7 +428,7 @@ struct SubscriptionCardView: View {
                                             }
                                             Text(accTuple.account)
                                                 .font(.system(size: 10, weight: .semibold))
-                                                .foregroundStyle(Color(hex: "#7D7D7D"))
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
                                         }
                                         .textCase(.uppercase)
                                         .tracking(0.3)
@@ -543,7 +543,7 @@ struct SubscriptionCardView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
-                        .background(LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing))
+                        .background(Color.zifrGreen)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(PremiumButtonStyle())
@@ -614,7 +614,7 @@ struct SubscriptionCardView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
-                        .background(LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing))
+                        .background(Color.zifrGreen)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(PremiumButtonStyle())
@@ -700,7 +700,7 @@ struct SubscriptionCardView: View {
                 .foregroundStyle(.white)
             Text(label)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.4))
+                .foregroundStyle(Color(hex: "#C1AA78"))
         }
     }
 
@@ -778,7 +778,7 @@ struct SubscriptionCardView: View {
                 .foregroundStyle(Color.white.opacity(0.5))
             Text(value)
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color(hex: "#C1AA78"))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -808,13 +808,13 @@ struct SubscriptionCardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("LINKED TO:")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.4))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
                         .textCase(.uppercase)
                     
                     HStack(spacing: 4) {
                         Image(systemName: "link")
                             .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#227b5f"))
+                            .foregroundStyle(Color.zifrGreen)
                         
                         Text(allTextTags.joined(separator: " | "))
                             .font(.system(size: 13, weight: .medium))
