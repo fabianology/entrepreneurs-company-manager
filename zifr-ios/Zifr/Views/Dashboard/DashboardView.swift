@@ -30,7 +30,13 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack(path: $vm.path) {
-            List {
+            ZStack(alignment: .top) {
+                Color.black.ignoresSafeArea()
+                
+                AnimatedHeaderBackground()
+                    .ignoresSafeArea(edges: .top)
+
+                List {
                 // Header Group
                 VStack(spacing: 0) {
                     headerSection
@@ -65,7 +71,7 @@ struct DashboardView: View {
                             showAddCompany = true
                         } label: {
                             HStack(spacing: 6) {
-                                Text("ADD ENTITY").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
+                                Text("ADD ENTITY").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(.white)
                                 Image(systemName: "plus").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                             }
                             .padding(.horizontal, 20)
@@ -161,7 +167,7 @@ struct DashboardView: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .background(Color.black)
+            .background(Color.clear)
             .scrollIndicators(.hidden)
             .confirmationDialog(
                 "Delete Company",
@@ -255,6 +261,7 @@ struct DashboardView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
+            } // End ZStack
         }
     }
 
@@ -323,6 +330,12 @@ struct DashboardView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 50)
+                    .background(
+                        Ellipse()
+                            .fill(Color.black.opacity(0.5))
+                            .frame(width: 180, height: 80)
+                            .blur(radius: 24)
+                    )
             }
 
             if !vm.quote.isEmpty {

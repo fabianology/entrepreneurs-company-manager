@@ -352,6 +352,9 @@ struct AddSubscriptionWizard: View {
                 
                 DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                     .padding(.top, 4)
+                    .padding(.bottom, 12)
+                
+                PremiumInputField(label: "PURPOSE & NOTES", placeholder: "e.g. Design tool used by marketing...", text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }))
                 
                 nextButton(disabled: sub.name.isEmpty) { advanceToStep(2) }
             }
@@ -515,9 +518,6 @@ struct AddSubscriptionWizard: View {
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
                 }
-                
-                PremiumInputField(label: "NOTES", placeholder: "Any internal notes...", text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }))
-                
                 nextButton(disabled: false) { advanceToStep(3) }
             }
             .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity.combined(with: .scale(scale: 0.9))))

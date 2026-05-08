@@ -677,11 +677,12 @@ struct DynamicLoginLabelView: View {
             }
             
             if !allTextTags.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .center, spacing: 6) {
                     Text("LOGIN ALSO USED IN:")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(Color(hex: "#C1AA78"))
                         .textCase(.uppercase)
+                        .layoutPriority(1)
                     
                     HStack(spacing: 4) {
                         Image(systemName: "link")
@@ -691,9 +692,10 @@ struct DynamicLoginLabelView: View {
                         Text(allTextTags.joined(separator: " | "))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color(hex: "#7D7D7D"))
-                            .lineLimit(2)
+                            .lineLimit(1)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.top, 12)
                 .padding(.bottom, -10)
             }

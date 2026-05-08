@@ -55,16 +55,18 @@ struct CompanyDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // ── CiFr-style company header ────────────────────────────────
-            companyHeader
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
             
-            Rectangle()
-                .fill(Color.white.opacity(0.1))
-                .frame(height: 1)
+            AnimatedHeaderBackground()
+                .ignoresSafeArea(edges: .top)
+
+            VStack(spacing: 0) {
+                // ── Entity Command Plate ─────────────────────────────────────
+                companyHeader
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
                 
             // ── Content ──────────────────────────────────────────────────
             ZStack(alignment: .top) {
@@ -92,7 +94,6 @@ struct CompanyDetailView: View {
                 }
             }
         }
-        .background(Color.black)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
@@ -250,17 +251,17 @@ struct CompanyDetailView: View {
         .navigationBarBackButtonHidden(true)
 
     }
+        }
 
-    // MARK: - Company Header (mirrors CiFr's CompanyHeader.tsx)
+    // MARK: - Entity Command Plate
     private var companyHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // Logo tile — 48×48 rounded-12 (matches CiFr exactly)
+        HStack(alignment: .center, spacing: 14) {
             CompanyAvatar(company: company, size: 48)
 
-            VStack(alignment: .leading, spacing: 3) {
-                // Company name — 28pt bold, matches CiFr
+            VStack(alignment: .leading, spacing: 4) {
+                // Company name
                 Text(company.name.isEmpty ? "Company" : company.name)
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
 
@@ -269,16 +270,29 @@ struct CompanyDetailView: View {
             }
             Spacer()
         }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
     }
 
     @ViewBuilder
     private var metricSubLine: some View {
         switch vm.activeTab {
         case .home:
-            Text("COMMAND CENTER")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.6))
-                .tracking(2)
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(tabColor(.home))
+                Text("COMMAND CENTER")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+                    .tracking(2)
+            }
 
         case .subscriptions:
             let active = subscriptions.filter { $0.status == "Active" }
@@ -287,14 +301,12 @@ struct CompanyDetailView: View {
             let moCount = active.filter { $0.billingCycle == "Monthly" }.count
             let yrCount = active.filter { $0.billingCycle == "Yearly" }.count
 
-            HStack(spacing: 4) {
-                Text("💵🔥 ")
-                    .font(.system(size: 17))
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(tabColor(.subscriptions))
                 metricPair(label: "mo.", value: moTotal, count: moCount)
-                Divider()
-                    .frame(width: 1, height: 12)
-                    .background(Color.white.opacity(0.1))
-                    .padding(.horizontal, 10)
+                Text("•").font(.system(size: 13, weight: .black)).foregroundStyle(Color.white.opacity(0.2))
                 metricPair(label: "yr.", value: yrTotal, count: yrCount)
             }
 
@@ -303,18 +315,23 @@ struct CompanyDetailView: View {
             let totalDebt = loans.filter { $0.role == "Bank Loan" }.reduce(0.0) { $0 + $1.remainingBalance } + creditCards.reduce(0.0) { $0 + $1.balance }
             let totalCredit = creditCards.reduce(0.0) { $0 + $1.limit }
 
-            HStack(spacing: 10) {
-                financialMetricPair(emoji: "💸", label: "Debt", value: totalDebt)
-                financialMetricPair(emoji: "💰", label: "Credit", value: totalCredit)
+            HStack(spacing: 8) {
+                Image(systemName: "chart.pie.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(tabColor(.financial))
+                financialMetricPair(label: "Debt", value: totalDebt)
+                Text("•").font(.system(size: 13, weight: .black)).foregroundStyle(Color.white.opacity(0.2))
+                financialMetricPair(label: "Credit", value: totalCredit)
             }
 
         case .documents:
-            HStack(spacing: 8) {
-                Text("📑")
-                    .font(.system(size: 17))
+            HStack(spacing: 6) {
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(tabColor(.documents))
                 Text("Document Vault")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
             }
         }
     }
@@ -323,39 +340,27 @@ struct CompanyDetailView: View {
         HStack(spacing: 4) {
             Text(label)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .foregroundStyle(Color(hex: "#C1AA78"))
             Text("$\(String(format: "%.0f", value))")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
             Text("(\(count))")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .foregroundStyle(Color(hex: "#C1AA78"))
         }
     }
 
-    private func emojiCount(_ emoji: String, _ n: Int) -> some View {
-        HStack(spacing: 6) {
-            Text(emoji).font(.system(size: 17))
-            Text("(\(n))")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.5))
+    private func financialMetricPair(label: String, value: Double) -> some View {
+        HStack(spacing: 3) {
+            Text(label)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+            Text("$\(String(format: "%.0f", value))")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
         }
-    }
-
-    private func financialMetricPair(emoji: String, label: String, value: Double) -> some View {
-        HStack(spacing: 4) {
-            Text(emoji).font(.system(size: 17))
-            HStack(spacing: 3) {
-                Text(label)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
-                Text("$\(String(format: "%.0f", value))")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
     }
 
 

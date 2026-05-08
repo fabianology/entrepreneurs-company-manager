@@ -429,10 +429,10 @@ struct EditSubscriptionSheet: View {
                     // MARK: – Notes (before Security)
                     Section {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("NOTES")
+                            Text("PURPOSE & NOTES")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.5))
-                            TextField("Add a note…",
+                            TextField("e.g. Design tool used by marketing...",
                                       text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }),
                                       axis: .vertical)
                                 .lineLimit(3...6)

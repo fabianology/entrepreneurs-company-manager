@@ -130,7 +130,7 @@ struct EntityHomeView: View {
                 }
             }
         }
-        .background(Color.black)
+        .background(Color.clear)
         .sheet(item: $newSub) { sub in
             EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
         }

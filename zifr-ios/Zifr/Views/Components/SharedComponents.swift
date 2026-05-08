@@ -909,11 +909,66 @@ struct MiloomListView<Content: View>: View {
             LazyVStack(spacing: 12) {
                 content
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
             .padding(.top, 16)
             .padding(.bottom, 100)
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(Color.clear)
+    }
+}
+
+// MARK: - Premium Animated Header Background
+struct AnimatedHeaderBackground: View {
+    @State private var animate = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            
+            ZStack {
+                // Base background color
+                Color.black.ignoresSafeArea()
+
+                // Deep Indigo
+                Circle()
+                    .fill(Color(hex: "#221C4A").opacity(0.9))
+                    .frame(width: w * 1.6, height: w * 1.6)
+                    .blur(radius: 100)
+                    .offset(x: animate ? -w * 0.2 : w * 0.1, y: animate ? -h * 0.35 : -h * 0.45)
+                
+                // Vibrant Purple
+                Circle()
+                    .fill(Color(hex: "#46246B").opacity(0.7))
+                    .frame(width: w * 1.3, height: w * 1.3)
+                    .blur(radius: 90)
+                    .offset(x: animate ? w * 0.25 : -w * 0.2, y: animate ? -h * 0.45 : -h * 0.3)
+                
+                // Teal Splash (Reduced)
+                Circle()
+                    .fill(Color(hex: "#1E8C8C").opacity(0.35))
+                    .frame(width: w * 0.7, height: w * 0.7)
+                    .blur(radius: 80)
+                    .offset(x: animate ? -w * 0.15 : w * 0.3, y: animate ? -h * 0.3 : -h * 0.4)
+                
+                // Black bleed from sides
+                HStack(spacing: 0) {
+                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 60)
+                    Spacer()
+                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                        .frame(width: 60)
+                }
+            }
+            .frame(width: w, height: h)
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
+                animate = true
+            }
+        }
     }
 }
 

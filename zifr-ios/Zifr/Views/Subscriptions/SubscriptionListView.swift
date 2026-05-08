@@ -21,7 +21,17 @@ struct SubscriptionListView: View {
         ScrollViewReader { proxy in
             MiloomListView {
                 // ── Action Bar ──
-                HStack(spacing: 8) {
+                HStack(spacing: 0) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.3.layers.3d")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                        Text("Subscriptions")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                    }
+                    .padding(.leading, 16)
+
                     Spacer()
 
                     Menu {
@@ -52,29 +62,34 @@ struct SubscriptionListView: View {
                         }
                     } label: {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.gray)
-                            .frame(width: 36, height: 36)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 1, height: 20)
 
                     Button {
                         newSub = Subscription(userId: company.userId, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
-                            Text("ADD SERVICE").font(.system(size: 12, weight: .semibold)).tracking(1).foregroundStyle(Color(hex: "#A2A2A2"))
-                            Image(systemName: "plus").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                            Text("ADD SERVICE").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
+                            Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
                         }
-                        .padding(.horizontal, 20)
-                        .frame(height: 36)
-                        .background(Color(hex: "#1C1C1E"))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        .frame(width: 164, height: 44)
+                        .contentShape(Rectangle())
                     }
                 }
-                .padding(.top, 15)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "#1C1C1E").opacity(0.70))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .padding(.top, -10)
                 .padding(.bottom, 8)
 
                 if subscriptions.isEmpty {
