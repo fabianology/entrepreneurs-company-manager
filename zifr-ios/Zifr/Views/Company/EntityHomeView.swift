@@ -110,7 +110,8 @@ struct EntityHomeView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 32) {
                     quickAddRow
-                        .padding(.top, 15)
+                        .padding(.top, 6)
+                        .padding(.bottom, 8)
                     
                     if isZeroState {
                         zeroStateBanner
@@ -144,20 +145,37 @@ struct EntityHomeView: View {
 
     // MARK: - Shared Views
     private var quickAddRow: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 0) {
             quickAddButton(icon: "square.3.layers.3d", title: "Add Service", color: subsColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
             }
+            
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 1, height: 24)
+            
             quickAddButton(icon: "dollarsign.bank.building", title: "Add Account", color: finColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
             }
+            
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(width: 1, height: 24)
+            
             quickAddButton(icon: "doc.text", title: "Add Doc", color: docsColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
             }
         }
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .padding(.horizontal, 20)
     }
     
@@ -172,13 +190,8 @@ struct EntityHomeView: View {
                     .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color(hex: "#111111"))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
