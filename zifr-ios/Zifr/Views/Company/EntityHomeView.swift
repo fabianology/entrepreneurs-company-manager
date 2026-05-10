@@ -32,6 +32,16 @@ struct EntityHomeView: View {
     @State private var newSub: Subscription? = nil
     @State private var newCard: FinancialCard? = nil
     @State private var newDoc: CompanyDocument? = nil
+    
+    // Prototype States
+    @State private var sheetSub: Subscription? = nil
+    @State private var expandedHeroSubId: UUID? = nil
+    @Namespace private var heroAnimation
+    
+    @State private var flippedHeroIndex: Int? = nil
+    @Namespace private var flipAnimation
+    @State private var showReceiptReport = false
+    @State private var coverFlowSnappedIndex: Int = 0
 
     // MARK: - Computed Metrics (Subscriptions)
     private var activeSubscriptions: [Subscription] { subscriptions.filter { $0.status == "Active" } }
@@ -140,6 +150,114 @@ struct EntityHomeView: View {
         }
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
+        }
+        .sheet(item: $sheetSub) { sub in
+            VStack {
+                HStack {
+                    Text(sub.name).font(.title.bold()).foregroundStyle(.white)
+                    Spacer()
+                    Button("Close") { sheetSub = nil }
+                }
+                .padding()
+                DashboardInnerRow(icon: "calendar", label: "Due Date", value: sub.nextRenewal ?? "—")
+                DashboardInnerRow(icon: "creditcard.fill", label: "Paid From", value: sub.paymentMethod ?? "—")
+                DashboardInnerRow(icon: "dollarsign.circle", label: "Cost", value: "$\(String(format: "%.2f", sub.cost))")
+                Spacer()
+            }
+            .padding()
+            .background(Color(hex: "#1C1C1E"))
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .overlay {
+            if let heroId = expandedHeroSubId, let sub = activeSubscriptions.first(where: { $0.id == heroId }) {
+                ZStack {
+                    Color.black.opacity(0.6)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                expandedHeroSubId = nil
+                            }
+                        }
+                    
+                    VStack(spacing: 16) {
+                        HStack {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 8).fill(Color(hue: 0.6, saturation: 0.6, brightness: 0.8).opacity(0.2)).frame(width: 48, height: 48)
+                                Text(sub.name.prefix(1).uppercased()).font(.system(size: 20, weight: .black)).foregroundStyle(Color(hue: 0.6, saturation: 0.6, brightness: 0.8))
+                                    .matchedGeometryEffect(id: "logo-\(sub.id)", in: heroAnimation)
+                            }
+                            VStack(alignment: .leading) {
+                                Text(sub.name).font(.title2.bold()).foregroundStyle(.white)
+                                    .matchedGeometryEffect(id: "title-\(sub.id)", in: heroAnimation)
+                                Text("$\(String(format: "%.2f", sub.cost))/mo").font(.subheadline).foregroundStyle(.gray)
+                                    .matchedGeometryEffect(id: "cost-\(sub.id)", in: heroAnimation)
+                            }
+                            Spacer()
+                        }
+                        
+                        Divider().background(Color.white.opacity(0.2))
+                        
+                        DashboardInnerRow(icon: "calendar", label: "Due Date", value: sub.nextRenewal ?? "—")
+                        DashboardInnerRow(icon: "creditcard.fill", label: "Paid From", value: sub.paymentMethod ?? "—")
+                        
+                        Button {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                                expandedHeroSubId = nil
+                            }
+                        } label: {
+                            Text("Close Details")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .padding(.top, 8)
+                    }
+                    .padding(20)
+                    .background(Color(hex: "#1C1C1E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .matchedGeometryEffect(id: "bg-\(sub.id)", in: heroAnimation)
+                    .padding(24)
+                }
+            }
+            if let heroIndex = flippedHeroIndex {
+                let infiniteSubs = Array(repeating: activeSubscriptions, count: 100).flatMap { $0 }
+                if heroIndex < infiniteSubs.count {
+                    let sub = infiniteSubs[heroIndex]
+                    ZStack {
+                        Color.black.opacity(0.6)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    flippedHeroIndex = nil
+                                }
+                            }
+                        
+                        DemoFlipCardExpanded(
+                            sub: sub,
+                            index: heroIndex,
+                            animation: flipAnimation,
+                            flippedHeroIndex: $flippedHeroIndex,
+                            totalMonthlyBurn: monthlyBurn,
+                            institutions: institutions,
+                            cards: cards,
+                            onEdit: {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    flippedHeroIndex = nil
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    vm.activeTab = .subscriptions
+                                    vm.deepLinkModelId = sub.id
+                                }
+                            }
+                        )
+                    }
+                    .zIndex(2)
+                }
+            }
         }
     }
 
@@ -268,7 +386,8 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
@@ -441,10 +560,18 @@ struct EntityHomeView: View {
                             }
                         }
                     )
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 16)
                 }
             }
         }
+        .padding(.bottom, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
     }
     
     private func institutionRow(_ inst: Institution) -> some View {
@@ -661,7 +788,7 @@ struct EntityHomeView: View {
                 }
             }
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil)
     }
     
@@ -874,96 +1001,103 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
 
-            VStack(spacing: 12) {
-                ForEach(activeSubscriptions) { sub in
-                    let isSubExpanded = expandedSubscriptions.contains(sub.id.uuidString)
-                    let payStr = (sub.paymentMethod ?? "").isEmpty ? "None" : (sub.paymentMethod ?? "")
-                    let instName: String = {
-                        if let c = cards.first(where: { $0.name == sub.paymentMethod }), !(c.institutionName ?? "").isEmpty {
-                            return c.institutionName ?? ""
-                        }
-                        if let inst = institutions.first(where: { inst in inst.accounts.contains(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) }), !inst.name.isEmpty {
-                            return inst.name
-                        }
-                        return ""
-                    }()
-                    let fullPayStr = instName.isEmpty ? payStr : "\(instName) \(payStr)"
-                    
-                    ExpandableDashboardCard(
-                        isExpanded: isSubExpanded,
-                        onToggle: {
-                            if isSubExpanded { expandedSubscriptions.remove(sub.id.uuidString) }
-                            else { expandedSubscriptions.insert(sub.id.uuidString) }
-                        },
-                        collapsedHeader: {
-                            HStack {
-                                if !(sub.website ?? "").isEmpty {
-                                    FaviconImage(website: sub.website ?? "", size: 32)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                } else {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 8).fill(brandColor(sub.name).opacity(0.2)).frame(width: 32, height: 32)
-                                        Text(sub.name.prefix(1).uppercased()).font(.system(size: 14, weight: .black)).foregroundStyle(brandColor(sub.name))
+            VStack(spacing: 0) {
+                if activeSubscriptions.isEmpty {
+                    Text("No subscriptions")
+                        .foregroundStyle(.gray)
+                        .padding(.vertical, 20)
+                } else {
+                    // Simple slider – center card scales up, side cards slightly smaller & behind
+                    let cardWidth: CGFloat = 170
+                    let cardSpacing: CGFloat = -34 // 20% overlap
+                    let loopCount = max(5, 150 / max(1, activeSubscriptions.count))
+                    let infiniteSubs = Array(repeating: activeSubscriptions, count: loopCount).flatMap { $0 }
+                    let startIndex = (loopCount / 2) * activeSubscriptions.count
+                    ScrollViewReader { proxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: cardSpacing) {
+                                ForEach(Array(infiniteSubs.enumerated()), id: \.offset) { index, sub in
+                                    GeometryReader { geo in
+                                        let midX = geo.frame(in: .global).midX
+                                        let screenMid = UIScreen.main.bounds.width / 2
+                                        let signedDist = midX - screenMid
+                                        let distance = abs(signedDist)
+                                        let scale = max(0.85, 1.0 - distance / 600)
+                                        let shadowOpacity = distance < 30 ? 0.35 : 0.0
+                                        // Gentle tilt — max ±25° for a subtle cover flow feel
+                                        let rotation = min(25, max(-25, Double(-signedDist) / 8))
+                                        DemoFlipCard(sub: sub, index: index, flippedHeroIndex: $flippedHeroIndex, animation: flipAnimation)
+                                            .frame(width: cardWidth, height: 120)
+                                            .rotation3DEffect(
+                                                .degrees(rotation),
+                                                axis: (x: 0, y: 1, z: 0),
+                                                perspective: 0.3
+                                            )
+                                            .scaleEffect(scale)
+                                            .shadow(color: Color(hex: "#C1AA78").opacity(shadowOpacity), radius: 12, y: 4)
+                                            .id(index)
+                                            .preference(key: CoverFlowCenterPreference.self,
+                                                        value: [CoverFlowItem(index: index, distance: distance)])
                                     }
+                                    .frame(width: cardWidth, height: 130)
+                                    // Center card on top — distance from snapped index determines layer
+                                    .zIndex(index == coverFlowSnappedIndex ? 100 : 0)
                                 }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(sub.name)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                    Text(sub.billingCycle)
-                                        .font(.system(size: 11, weight: .regular))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                }
-                                .padding(.leading, 8)
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("Cost")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.4))
-                                    Text(sub.cost == 0 ? "Free" : formatCurrency(sub.cost))
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                }
-                                Image(systemName: "chevron.up")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.3))
-                                    .rotationEffect(.degrees(isSubExpanded ? 0 : 180))
-                                    .padding(.leading, 8)
                             }
-                        },
-                        innerRows: {
-                            DashboardInnerRow(
-                                icon: "calendar",
-                                label: "Due Date",
-                                value: formattedDueOn(sub)
-                            )
-                            .padding(.vertical, 4)
-                            DashboardInnerRow(
-                                icon: "creditcard.fill",
-                                label: "Paid From",
-                                value: fullPayStr
-                            )
-                            .padding(.vertical, 4)
-                        },
-                        actionButtons: {
-                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") {
-                                vm.activeTab = .subscriptions
-                            }
-                            Divider().background(Color.white.opacity(0.06))
-                            DashboardActionButton(icon: "pencil", title: "Edit") {
-                                vm.activeTab = .subscriptions
+                            .scrollTargetLayout()
+                            .padding(.horizontal, (UIScreen.main.bounds.width - cardWidth) / 2)
+                        }
+                        .scrollTargetBehavior(.viewAligned)
+                        .frame(height: 150)
+                        .onPreferenceChange(CoverFlowCenterPreference.self) { items in
+                            guard let closest = items.min(by: { $0.distance < $1.distance }) else { return }
+                            if closest.index != coverFlowSnappedIndex {
+                                coverFlowSnappedIndex = closest.index
+                                UISelectionFeedbackGenerator().selectionChanged()
                             }
                         }
-                    )
-                    .padding(.horizontal, 20)
-                    .proContextMenu(password: sub.password, loginId: sub.loginId, last4: nil)
+                        .onAppear {
+                            proxy.scrollTo(startIndex, anchor: .center)
+                            coverFlowSnappedIndex = startIndex
+                        }
+                    }
                 }
+            }
+            
+            Button {
+                showReceiptReport = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                    Text("Generate Report")
                 }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+        }
+        .padding(.bottom, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .zIndex(1)
+        .sheet(isPresented: $showReceiptReport) {
+            SubscriptionReceiptView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards)
         }
     }
     private func formatDue(_ date: Date) -> String {
@@ -1053,7 +1187,8 @@ struct EntityHomeView: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
                 .padding(.bottom, 12)
             }
             .buttonStyle(.plain)
@@ -1111,8 +1246,16 @@ struct EntityHomeView: View {
                     )
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
         }
+        .padding(.bottom, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Helpers
@@ -1120,6 +1263,397 @@ struct EntityHomeView: View {
         if value == 0 { return "$0" }
         if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
         return "$\(String(format: "%.0f", value))"
+    }
+}
+
+// MARK: - Prototypes
+
+struct CoverFlowItem: Equatable {
+    let index: Int
+    let distance: CGFloat
+}
+
+struct CoverFlowCenterPreference: PreferenceKey {
+    static var defaultValue: [CoverFlowItem] = []
+    static func reduce(value: inout [CoverFlowItem], nextValue: () -> [CoverFlowItem]) {
+        value.append(contentsOf: nextValue())
+    }
+}
+
+struct DemoFlipCard: View {
+    let sub: Subscription
+    let index: Int
+    @Binding var flippedHeroIndex: Int?
+    var animation: Namespace.ID
+    
+    var body: some View {
+        ZStack {
+            VStack(spacing: 8) {
+                if let website = sub.website, !website.isEmpty {
+                    FaviconImage(website: website, size: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10).fill(getBrandColor(sub.name).opacity(0.2)).frame(width: 40, height: 40)
+                        Text(sub.name.prefix(1).uppercased()).font(.system(size: 16, weight: .black)).foregroundStyle(getBrandColor(sub.name))
+                    }
+                }
+                Text(sub.name)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                if secondaryTotal > 0 {
+                    Text("$\(String(format: "%.0f", primaryTotal)) | $\(String(format: "%.0f", secondaryTotal))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                } else {
+                    Text("$\(String(format: "%.0f", primaryTotal))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(12)
+            .background(Color(hex: "#1C1C1E"))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+        .matchedGeometryEffect(id: "flipBg-\(index)", in: animation)
+        .onTapGesture {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                flippedHeroIndex = index
+            }
+        }
+    }
+    
+    private func getBrandColor(_ name: String) -> Color {
+        let hash = abs(name.unicodeScalars.reduce(0) { ($0 << 5) &+ $0 &+ Int($1.value) })
+        let hue = Double(hash % 360) / 360.0
+        return Color(hue: hue, saturation: 0.65, brightness: 0.75)
+    }
+    
+    var primaryTotal: Double {
+        sub.billingCycle == "Monthly" ? sub.monthlyTotal : sub.yearlyTotal
+    }
+    var secondaryTotal: Double {
+        sub.billingCycle == "Monthly" ? sub.yearlyTotal : sub.monthlyTotal
+    }
+}
+
+struct DemoFlipCardExpanded: View {
+    let sub: Subscription
+    let index: Int
+    var animation: Namespace.ID
+    @Binding var flippedHeroIndex: Int?
+    let totalMonthlyBurn: Double
+    let institutions: [Institution]
+    let cards: [FinancialCard]
+    var onEdit: () -> Void
+    
+    @State private var isFlipped = false
+    
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                // Front
+                VStack(spacing: 8) {
+                    if let website = sub.website, !website.isEmpty {
+                        FaviconImage(website: website, size: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10).fill(getBrandColor(sub.name).opacity(0.2)).frame(width: 40, height: 40)
+                            Text(sub.name.prefix(1).uppercased()).font(.system(size: 16, weight: .black)).foregroundStyle(getBrandColor(sub.name))
+                        }
+                    }
+                    Text(sub.name)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                    Text("$\(String(format: "%.0f", sub.cost))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(12)
+                .background(Color(hex: "#1C1C1E"))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .opacity(isFlipped ? 0 : 1)
+                
+                // Back
+                VStack(spacing: 0) {
+                    // Logo + Name + Cost row
+                    HStack(alignment: .top, spacing: 16) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.clear)
+                                .frame(width: 48, height: 48)
+                            if let website = sub.website, !website.isEmpty {
+                                FaviconImage(website: website, size: 32)
+                            } else {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 14).fill(getBrandColor(sub.name).opacity(0.2)).frame(width: 48, height: 48)
+                                    Text(sub.name.prefix(1).uppercased()).font(.system(size: 20, weight: .black)).foregroundStyle(getBrandColor(sub.name))
+                                }
+                            }
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(sub.name.isEmpty ? "Service" : sub.name)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                            
+                            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                (Text("(\(primaryCount))")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                + Text("$\(String(format: "%.0f", primaryTotal))")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white))
+                                Text(primaryLabel)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color(hex: "#C1AA78"))
+                                
+                                if secondaryTotal > 0 {
+                                    Text("•")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                    (Text("(\(secondaryCount))")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    + Text("$\(String(format: "%.0f", secondaryTotal))")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white))
+                                    Text(secondaryLabel)
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Color(hex: "#C1AA78"))
+                                }
+                            }
+                        }
+                        .padding(.top, 6)
+                        Spacer(minLength: 0)
+                        
+                        Button {
+                            onEdit()
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.6))
+                                .padding(8)
+                        }
+                        .padding(.top, 4)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 16)
+                    
+                    Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.06))
+                        .padding(.horizontal, 20)
+                    
+                    // Quick Glance Info
+                    let bankTuple = getBankAccountTuple()
+                    
+                    VStack(spacing: 12) {
+                        HStack(spacing: 12) {
+                            glanceBox(title: "ACTIVE", value: shortDueOn)
+                            glanceBox(title: "PAID FROM", value: bankTuple?.bank ?? (sub.paymentMethod?.isEmpty == false ? sub.paymentMethod! : "—"))
+                            glanceBox(title: "NEXT DUE", value: sub.nextRenewal ?? "—")
+                        }
+                        HStack(spacing: 12) {
+                            glanceBox(title: "AUTO-PAY", value: sub.renew == "Manual" ? "NO" : "YES", highlight: sub.renew != "Manual")
+                            glanceBox(title: "SERVICES", value: "\(sub.subServices.count)", highlight: !sub.subServices.isEmpty)
+                            glanceBox(title: "EMAILS", value: "\(sub.linkedEmails.count)", highlight: !sub.linkedEmails.isEmpty)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(hex: "#1C1C1E"))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+                .opacity(isFlipped ? 1 : 0)
+            }
+            .matchedGeometryEffect(id: "flipBg-\(index)", in: animation)
+            .frame(width: geo.size.width * 0.85, height: 230)
+            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
+            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                        isFlipped = true
+                    }
+                }
+            }
+            .onTapGesture {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    isFlipped = false
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        flippedHeroIndex = nil
+                    }
+                }
+            }
+        }
+    }
+    
+    private func glanceBox(title: String, value: String, highlight: Bool = false) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.4))
+            Text(value)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(highlight ? Color(hex: "#C1AA78") : .white)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Computed Properties for Formatting
+    var primaryTotal: Double {
+        sub.billingCycle == "Monthly" ? sub.monthlyTotal : sub.yearlyTotal
+    }
+    var primaryCount: Int {
+        let baseCount = 1
+        let extraCount = sub.subServices.filter { $0.status != .paused && $0.billingCycle.rawValue == sub.billingCycle }.count
+        return baseCount + extraCount
+    }
+    var primaryLabel: String { sub.billingCycle == "Monthly" ? "mo" : "yr" }
+    
+    var secondaryTotal: Double {
+        sub.billingCycle == "Monthly" ? sub.yearlyTotal : sub.monthlyTotal
+    }
+    var secondaryCount: Int {
+        let otherCycle = sub.billingCycle == "Monthly" ? "Yearly" : "Monthly"
+        return sub.subServices.filter { $0.status != .paused && $0.billingCycle.rawValue == otherCycle }.count
+    }
+    var secondaryLabel: String { sub.billingCycle == "Monthly" ? "yr" : "mo" }
+    
+    var shortDueOn: String {
+        guard !(sub.nextRenewal ?? "").isEmpty else { return "—" }
+        func ordinal(_ n: Int) -> String {
+            let tens = (n % 100) / 10
+            if tens == 1 { return "\(n)th" }
+            switch n % 10 {
+            case 1: return "\(n)st"
+            case 2: return "\(n)nd"
+            case 3: return "\(n)rd"
+            default: return "\(n)th"
+            }
+        }
+        if sub.billingCycle == "Monthly" {
+            if let day = Int(sub.nextRenewal ?? "") { return ordinal(day) }
+            return (sub.nextRenewal ?? "")
+        } else {
+            let parts = (sub.nextRenewal ?? "").split(separator: " ")
+            if parts.count == 2, let day = Int(parts[1]) {
+                return "\(parts[0]) \(ordinal(day))"
+            }
+            return (sub.nextRenewal ?? "")
+        }
+    }
+
+    private func getBankAccountTuple() -> (bank: String, account: String)? {
+        if (sub.paymentMethod ?? "").isEmpty { return nil }
+        
+        if let card = cards.first(where: { $0.name == sub.paymentMethod }) {
+            let inst = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
+            let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4 ?? "")"
+            return (inst, "\(card.name)\(suffix)")
+        }
+        
+        for inst in institutions {
+            if let acc = inst.accounts.first(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) {
+                let instName = inst.name.isEmpty ? "Paid From" : inst.name
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+                return (instName, "\(accName)\(suffix)")
+            }
+        }
+        return nil
+    }
+
+    private func getBrandColor(_ name: String) -> Color {
+        let hash = abs(name.unicodeScalars.reduce(0) { ($0 << 5) &+ $0 &+ Int($1.value) })
+        let hue = Double(hash % 360) / 360.0
+        return Color(hue: hue, saturation: 0.65, brightness: 0.75)
+    }
+}
+
+struct DemoHeroCard: View {
+    let sub: Subscription
+    @Binding var expandedHeroSubId: UUID?
+    var animation: Namespace.ID
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10).fill(Color(hue: 0.6, saturation: 0.6, brightness: 0.8).opacity(0.2)).frame(width: 40, height: 40)
+                Text(sub.name.prefix(1).uppercased()).font(.system(size: 16, weight: .black)).foregroundStyle(Color(hue: 0.6, saturation: 0.6, brightness: 0.8))
+                    .matchedGeometryEffect(id: "logo-\(sub.id)", in: animation)
+            }
+            Text(sub.name)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .matchedGeometryEffect(id: "title-\(sub.id)", in: animation)
+            Text("$\(String(format: "%.0f", sub.cost))")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+                .matchedGeometryEffect(id: "cost-\(sub.id)", in: animation)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E"))
+                .matchedGeometryEffect(id: "bg-\(sub.id)", in: animation)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .frame(height: 110)
+        .onTapGesture {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
+                expandedHeroSubId = sub.id
+            }
+        }
+    }
+}
+
+struct DemoSheetCard: View {
+    let sub: Subscription
+    @Binding var sheetSub: Subscription?
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 10).fill(Color(hue: 0.6, saturation: 0.6, brightness: 0.8).opacity(0.2)).frame(width: 40, height: 40)
+                Text(sub.name.prefix(1).uppercased()).font(.system(size: 16, weight: .black)).foregroundStyle(Color(hue: 0.6, saturation: 0.6, brightness: 0.8))
+            }
+            Text(sub.name)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Text("$\(String(format: "%.0f", sub.cost))")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(12)
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .frame(height: 110)
+        .onTapGesture {
+            sheetSub = sub
+        }
     }
 }
 
