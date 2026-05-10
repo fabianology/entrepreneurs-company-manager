@@ -1405,7 +1405,7 @@ struct DemoFlipCardExpanded: View {
                                 .foregroundStyle(.white)
                             
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                                (Text("(\(primaryCount))")
+                                (Text(primaryExtraCount > 0 ? "(\(primaryCount)) " : "")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundStyle(Color.white.opacity(0.5))
                                 + Text("$\(String(format: "%.0f", primaryTotal))")
@@ -1419,7 +1419,7 @@ struct DemoFlipCardExpanded: View {
                                     Text("•")
                                         .font(.system(size: 10))
                                         .foregroundStyle(Color.white.opacity(0.3))
-                                    (Text("(\(secondaryCount))")
+                                    (Text(secondaryCount > 0 ? "(\(secondaryCount)) " : "")
                                         .font(.system(size: 11, weight: .bold))
                                         .foregroundStyle(Color.white.opacity(0.5))
                                     + Text("$\(String(format: "%.0f", secondaryTotal))")
@@ -1522,9 +1522,11 @@ struct DemoFlipCardExpanded: View {
         sub.billingCycle == "Monthly" ? sub.monthlyTotal : sub.yearlyTotal
     }
     var primaryCount: Int {
-        let baseCount = 1
-        let extraCount = sub.subServices.filter { $0.status != .paused && $0.billingCycle.rawValue == sub.billingCycle }.count
-        return baseCount + extraCount
+        let baseCount = sub.cost > 0 ? 1 : 0
+        return baseCount + primaryExtraCount
+    }
+    var primaryExtraCount: Int {
+        sub.subServices.filter { $0.status != .paused && $0.billingCycle.rawValue == sub.billingCycle && $0.cost > 0 }.count
     }
     var primaryLabel: String { sub.billingCycle == "Monthly" ? "mo" : "yr" }
     
@@ -1533,7 +1535,7 @@ struct DemoFlipCardExpanded: View {
     }
     var secondaryCount: Int {
         let otherCycle = sub.billingCycle == "Monthly" ? "Yearly" : "Monthly"
-        return sub.subServices.filter { $0.status != .paused && $0.billingCycle.rawValue == otherCycle }.count
+        return sub.subServices.filter { $0.status != .paused && $0.billingCycle.rawValue == otherCycle && $0.cost > 0 }.count
     }
     var secondaryLabel: String { sub.billingCycle == "Monthly" ? "yr" : "mo" }
     
