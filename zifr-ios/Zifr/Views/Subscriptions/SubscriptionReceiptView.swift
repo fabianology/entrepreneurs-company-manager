@@ -146,7 +146,7 @@ struct SubscriptionReceiptView: View {
                     }
                     HStack(alignment: .top) {
                         Text("NEXT DUE:").frame(width: 80, alignment: .leading)
-                        Text(sub.nextRenewal ?? "—")
+                        Text(sub.nextRenewal?.withOrdinal ?? "—")
                     }
                 }
                 .font(.system(size: 10, design: .monospaced))

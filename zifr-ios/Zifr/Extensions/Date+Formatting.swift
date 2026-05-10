@@ -35,3 +35,35 @@ extension Double {
         return "$\(f.string(from: NSNumber(value: self)) ?? "0.00")"
     }
 }
+import Foundation
+
+extension String {
+    var withOrdinal: String {
+        let components = self.components(separatedBy: " ")
+        guard let last = components.last, let number = Int(last) else {
+            return self
+        }
+        
+        let tens = (number % 100) / 10
+        let suffix: String
+        if tens == 1 {
+            suffix = "th"
+        } else {
+            switch number % 10 {
+            case 1: suffix = "st"
+            case 2: suffix = "nd"
+            case 3: suffix = "rd"
+            default: suffix = "th"
+            }
+        }
+        
+        let ordinalString = "\(number)\(suffix)"
+        
+        if components.count > 1 {
+            let prefix = components.dropLast().joined(separator: " ")
+            return "\(prefix) \(ordinalString)"
+        } else {
+            return ordinalString
+        }
+    }
+}

@@ -112,6 +112,9 @@ struct EditCompanySheet: View {
                             .padding(.horizontal, 4)
                         
                         CustomSegmentedControl(options: ["Personal", "Business"], selection: $entityCategory)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        })
                         .onChange(of: entityCategory) { _, newValue in
                             // Reset structure when category changes
                             if newValue == "Personal" {
@@ -145,6 +148,9 @@ struct EditCompanySheet: View {
                         .background(Color(hex: "#2C2C2E"))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        .simultaneousGesture(DragGesture().onChanged { _ in
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        })
                     }
 
                     VStack(spacing: 30) {
@@ -249,7 +255,14 @@ struct EditCompanySheet: View {
                 .padding(20)
                 .padding(.bottom, 40)
             }
-            .background(Color(hex: "#171717"))
+            .scrollDismissesKeyboard(.interactively)
+            .background(
+                Color(hex: "#171717")
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+            )
             .navigationTitle(isEditing ? "Edit Entity" : "New Entity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
