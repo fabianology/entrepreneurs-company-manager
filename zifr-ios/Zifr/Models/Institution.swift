@@ -6,6 +6,7 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
     var type: String = "Checking"
     var last4: String = ""
     var accountNumber: String? = nil
+    var routingNumber: String? = nil
     var balance: Double = 0
     var currency: String = "USD"
     var cardHolder: String = ""

@@ -60,7 +60,13 @@ struct AddSubscriptionWizard: View {
                                         .foregroundStyle(canSubmit ? .white : Color.white.opacity(0.3))
                                         .frame(maxWidth: .infinity)
                                         .frame(height: 54)
-                                        .background(canSubmit ? Color(hex: "#2F5051") : Color.white.opacity(0.1))
+                                        .background {
+                                            if canSubmit {
+                                                LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing)
+                                            } else {
+                                                Color.white.opacity(0.1)
+                                            }
+                                        }
                                         .clipShape(RoundedRectangle(cornerRadius: 14))
                                 }
                                 .disabled(!canSubmit)

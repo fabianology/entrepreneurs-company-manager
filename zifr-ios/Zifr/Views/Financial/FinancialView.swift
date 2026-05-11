@@ -14,6 +14,8 @@ struct FinancialView: View {
     @State private var newCard: FinancialCard? = nil
     @State private var newInst: Institution? = nil
     @State private var newLoan: Loan? = nil
+    @State private var showWizard = false
+    @State private var wizardInstitution: Institution? = nil
     @State private var shareResourceId: UUID = UUID()
     @State private var shareResourceType: String = "all_financials"
     @State private var shareResourceTitle: String = "All Financials"
@@ -108,7 +110,8 @@ struct FinancialView: View {
 
                     Menu {
                         Button {
-                            newInst = vm.addInstitution(appState: appState, userId: company.userId, companyId: company.id)
+                            wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                            showWizard = true
                         } label: {
                             Label("Add Account", systemImage: "building.columns")
                         }
@@ -177,7 +180,8 @@ struct FinancialView: View {
                         
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            newInst = vm.addInstitution(appState: appState, userId: company.userId, companyId: company.id)
+                            wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                            showWizard = true
                         } label: {
                             ZStack {
                                 // Dummy wallet stack
@@ -260,6 +264,11 @@ struct FinancialView: View {
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
+        .sheet(isPresented: $showWizard) {
+            if let inst = wizardInstitution {
+                AddFinancialWizard(institution: inst, vm: vm)
+            }
+        }
         .sheet(item: $newInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: true) }
         .sheet(item: $editingInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false) }
         .sheet(item: $newCard) { c in EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: true) }
@@ -328,36 +337,54 @@ struct FinancialView: View {
         ZStack(alignment: .top) {
             if !instCards.isEmpty {
                 ForEach(Array(instCards.enumerated()), id: \.element.id) { index, card in
-                        let isPopped = poppedCardId == card.id.uuidString
-                        let yOffset = isPopped ? 16.0 : -(peekOffset + CGFloat(index) * peekOffset)
-                        let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
-                        
-                        FinancialCardVisual(card: card, isPopped: isPopped)
-                            .id(card.id)
-                            .frame(height: isPopped ? fullCardH : cardH)
-                            .scaleEffect(scale)
-                            .offset(y: yOffset)
-                            .zIndex(isPopped ? 25 : Double(instCards.count - index))
-                            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isPopped)
-                            .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
-                            .onTapGesture {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }
-                            }
-                            .onLongPressGesture {
-                                editingCard = card
-                            }
-                            .highPriorityGesture(
-                                DragGesture(minimumDistance: 10)
-                                    .onEnded { value in
-                                        if isPopped && value.translation.height < -10 {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            poppedCardId = nil
-                                        }
-                                    },
-                                including: isPopped ? .gesture : .none
-                            )
-                    }
+                    let isPopped = poppedCardId == card.id.uuidString
+                    let yOffset = isPopped ? 16.0 : -(peekOffset + CGFloat(index) * peekOffset)
+                    let scale = isPopped ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
+                    let rotationAngle: Double = isPopped ? 0 : -4 - Double(index) * 1.5
+                    let shadowRadius: CGFloat = isPopped ? 20 : 4
+                    let shadowOpacity: Double = isPopped ? 0.5 : 0.15
+                    
+                    FinancialCardVisual(card: card, isPopped: isPopped)
+                        .id(card.id)
+                        .frame(height: isPopped ? fullCardH : cardH)
+                        .scaleEffect(scale, anchor: .bottom)
+                        .rotation3DEffect(
+                            .degrees(rotationAngle),
+                            axis: (x: 1, y: 0, z: 0),
+                            anchor: .bottom,
+                            perspective: 0.3
+                        )
+                        .offset(y: yOffset)
+                        .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, y: isPopped ? 12 : 2)
+                        .zIndex(isPopped ? 25 : Double(instCards.count - index))
+                        .animation(
+                            isPopped
+                                ? .spring(response: 0.55, dampingFraction: 0.78, blendDuration: 0.1)
+                                : .spring(response: 0.4, dampingFraction: 0.82, blendDuration: 0.05),
+                            value: isPopped
+                        )
+                        .animation(
+                            .spring(response: 0.5, dampingFraction: 0.8),
+                            value: poppedCardId
+                        )
+                        .onTapGesture {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }
+                        }
+                        .onLongPressGesture {
+                            editingCard = card
+                        }
+                        .highPriorityGesture(
+                            DragGesture(minimumDistance: 10)
+                                .onEnded { value in
+                                    if isPopped && value.translation.height < -10 {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        poppedCardId = nil
+                                    }
+                                },
+                            including: isPopped ? .gesture : .none
+                        )
+                }
             }
             
             InstitutionCardView(
@@ -387,16 +414,34 @@ struct FinancialView: View {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                     let isPopped = poppedCardId == card.id.uuidString
                     let yOffset = isPopped ? 0.0 : -(CGFloat(index) * peekOffset)
-                    let scale = isPopped ? 1.0 : max(0.85, 1.0 - CGFloat(index) * 0.03)
+                    let scale = isPopped ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
+                    let rotationAngle: Double = isPopped ? 0 : -3 - Double(index) * 1.0
+                    let shadowRadius: CGFloat = isPopped ? 20 : 4
+                    let shadowOpacity: Double = isPopped ? 0.5 : 0.15
                     
                     FinancialCardVisual(card: card, isPopped: isPopped)
                         .id(card.id)
                         .frame(height: fullCardH)
-                        .scaleEffect(scale)
+                        .scaleEffect(scale, anchor: .bottom)
+                        .rotation3DEffect(
+                            .degrees(rotationAngle),
+                            axis: (x: 1, y: 0, z: 0),
+                            anchor: .bottom,
+                            perspective: 0.3
+                        )
                         .offset(y: yOffset)
+                        .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, y: isPopped ? 12 : 2)
                         .zIndex(isPopped ? 150 : Double(cards.count - index))
-                        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: isPopped)
-                        .animation(.spring(response: 0.4, dampingFraction: 0.75), value: poppedCardId)
+                        .animation(
+                            isPopped
+                                ? .spring(response: 0.55, dampingFraction: 0.78, blendDuration: 0.1)
+                                : .spring(response: 0.4, dampingFraction: 0.82, blendDuration: 0.05),
+                            value: isPopped
+                        )
+                        .animation(
+                            .spring(response: 0.5, dampingFraction: 0.8),
+                            value: poppedCardId
+                        )
                         .onTapGesture {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }

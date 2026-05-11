@@ -71,6 +71,17 @@ struct InstitutionAccountHUD: View {
                     )
                     .padding(.vertical, 4)
 
+                    ZifrField(
+                        label: "ROUTING NUMBER",
+                        placeholder: "e.g. 021000021",
+                        text: Binding(
+                            get: { draft.routingNumber ?? "" },
+                            set: { draft.routingNumber = $0 }
+                        ),
+                        keyboardType: .numberPad
+                    )
+                    .padding(.vertical, 4)
+
                     VStack(alignment: .leading, spacing: 4) {
                         Text("BALANCE")
                             .font(.system(size: 11, weight: .bold))

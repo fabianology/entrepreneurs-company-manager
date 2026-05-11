@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		045C4E2431062D71CBD69194 /* FinancialCardVisual.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04A44B0A90A773692B81E68F /* FinancialCardVisual.swift */; };
+		FC1122334455667788990011 /* FinancialCardHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1122334455667788990012 /* FinancialCardHUD.swift */; };
+		FC1122334455667788990021 /* LoanHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC1122334455667788990022 /* LoanHUD.swift */; };
 		06543549117BA76071E9B44D /* LoanPaymentHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FD4EABAD89D6144A593926 /* LoanPaymentHUD.swift */; };
 		0BFFDDE1FF715E861E2482EB /* CompanyAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AFA05E28920F297646C677 /* CompanyAvatar.swift */; };
 		11D649522E80C53E5D24487C /* InstitutionCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B87F20E20906AF7EBA04FEF /* InstitutionCardView.swift */; };
@@ -75,6 +77,8 @@
 /* Begin PBXFileReference section */
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
 		03CAB6D4DDF65D7F0680343C /* Zifr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Zifr.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC1122334455667788990012 /* FinancialCardHUD.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FinancialCardHUD.swift; sourceTree = "<group>"; };
+		FC1122334455667788990022 /* LoanHUD.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoanHUD.swift; sourceTree = "<group>"; };
 		04A44B0A90A773692B81E68F /* FinancialCardVisual.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FinancialCardVisual.swift; sourceTree = "<group>"; };
 		06F23A18826AE30784B43EF1 /* logo.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo.png; sourceTree = "<group>"; };
 		0931BDA073A93591B071DF97 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
@@ -180,6 +184,8 @@
 		659E8EBED03990059CDE9CEC /* Financial */ = {
 			isa = PBXGroup;
 			children = (
+				FC1122334455667788990012 /* FinancialCardHUD.swift */,
+				FC1122334455667788990022 /* LoanHUD.swift */,
 				D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */,
 				6DF5521EEEDE1CBC5B4F255D /* EditInstitutionSheet.swift */,
 				89E7FD2275C7CDA3D2473C71 /* InstitutionAccountsSection.swift */,
@@ -433,6 +439,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FC1122334455667788990011 /* FinancialCardHUD.swift in Sources */,
+				FC1122334455667788990021 /* LoanHUD.swift in Sources */,
 				24BD94852802E5649BA31668 /* AppState.swift in Sources */,
 				F705C282AF1344042610936A /* AppViewModel.swift in Sources */,
 				12D549DB5F31C13636000491 /* AuthViewModel.swift in Sources */,

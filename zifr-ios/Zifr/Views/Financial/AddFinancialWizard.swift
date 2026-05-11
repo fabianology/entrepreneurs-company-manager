@@ -1,1 +1,628 @@
-// Placeholder
+import SwiftUI
+
+struct AddFinancialWizard: View {
+    @State var institution: Institution
+    @State var accounts: [InstitutionAccount] = []
+    @State var cards: [FinancialCard] = []
+    @State var loans: [Loan] = []
+    @Bindable var vm: AppViewModel
+    
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+
+    @State private var currentStep: Int = 1
+    @State private var completedSteps: Set<Int> = []
+    
+    // HUD states
+    @State private var showAccountHUD = false
+    @State private var accountDraft = InstitutionAccount()
+    @State private var accountDraftIndex: Int? = nil
+    @State private var isNewAccount = false
+
+    @State private var showCardHUD = false
+    @State private var cardDraft = FinancialCard(userId: UUID(), companyId: UUID())
+    @State private var cardDraftIndex: Int? = nil
+    @State private var isNewCard = false
+
+    @State private var showLoanHUD = false
+    @State private var loanDraft = Loan(userId: UUID(), companyId: UUID())
+    @State private var loanDraftIndex: Int? = nil
+    @State private var isNewLoan = false
+
+    @State private var hasManuallyEditedWebsite = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                
+                ScrollView {
+                    VStack(spacing: 24) {
+                        if !completedSteps.isEmpty {
+                            collapsedStepsView
+                                .padding(.horizontal, 24)
+                        }
+                        
+                        headerView
+                        
+                        VStack(spacing: 16) {
+                            stepOneInstitution
+                            stepTwoAccounts
+                            stepThreeCards
+                            stepFourLoans
+                            
+                            if currentStep >= 5 {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                    saveAllAndDismiss()
+                                } label: {
+                                    Text("Done")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 54)
+                                        .background {
+                                            LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing)
+                                        }
+                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                }
+                                .padding(.top, 16)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 60)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+                .scrollDismissesKeyboard(.interactively)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        dismiss()
+                    }
+                    .font(.system(size: 16, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.65))
+                }
+                
+                ToolbarItem(placement: .topBarTrailing) {
+                    let canSave = completedSteps.contains(1)
+                    Button("Save") {
+                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                        saveAllAndDismiss()
+                    }
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(canSave ? Color(hex: "#30D158") : Color.white.opacity(0.3))
+                    .disabled(!canSave)
+                }
+            }
+            .sheet(isPresented: $showAccountHUD) {
+                InstitutionAccountHUD(
+                    draft: $accountDraft,
+                    isNew: isNewAccount,
+                    institutionName: institution.name.isEmpty ? "New Institution" : institution.name,
+                    onSave: {
+                        if let idx = accountDraftIndex {
+                            accounts[idx] = accountDraft
+                        } else {
+                            accounts.append(accountDraft)
+                        }
+                        showAccountHUD = false
+                    },
+                    onCancel: { showAccountHUD = false },
+                    onDelete: {
+                        if let idx = accountDraftIndex {
+                            accounts.remove(at: idx)
+                        }
+                        showAccountHUD = false
+                    }
+                )
+                .presentationDetents([.height(480)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
+            .sheet(isPresented: $showCardHUD) {
+                FinancialCardHUD(
+                    draft: $cardDraft,
+                    isNew: isNewCard,
+                    institutionName: institution.name.isEmpty ? "New Institution" : institution.name,
+                    onSave: {
+                        if let idx = cardDraftIndex {
+                            cards[idx] = cardDraft
+                        } else {
+                            cards.append(cardDraft)
+                        }
+                        showCardHUD = false
+                    },
+                    onCancel: { showCardHUD = false },
+                    onDelete: {
+                        if let idx = cardDraftIndex {
+                            cards.remove(at: idx)
+                        }
+                        showCardHUD = false
+                    }
+                )
+                .presentationDetents([.height(720), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
+            .sheet(isPresented: $showLoanHUD) {
+                LoanHUD(
+                    draft: $loanDraft,
+                    isNew: isNewLoan,
+                    institutionName: institution.name.isEmpty ? "New Institution" : institution.name,
+                    onSave: {
+                        if let idx = loanDraftIndex {
+                            loans[idx] = loanDraft
+                        } else {
+                            loans.append(loanDraft)
+                        }
+                        showLoanHUD = false
+                    },
+                    onCancel: { showLoanHUD = false },
+                    onDelete: {
+                        if let idx = loanDraftIndex {
+                            loans.remove(at: idx)
+                        }
+                        showLoanHUD = false
+                    }
+                )
+                .presentationDetents([.height(550)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
+        }
+    }
+
+    // MARK: - Navigation Logic
+    private func advanceToStep(_ step: Int) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        completedSteps.insert(currentStep)
+        
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            currentStep = step
+        }
+    }
+    
+    private func expandStep(_ step: Int) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+            currentStep = step
+            completedSteps = completedSteps.filter { $0 < step }
+        }
+    }
+
+    private func saveAllAndDismiss() {
+        // Prepare the institution and its accounts
+        var instToSave = institution
+        instToSave.accountsData = accounts
+        
+        // Prepare cards and loans with the correct association
+        var finalCards = cards
+        for i in 0..<finalCards.count {
+            finalCards[i].institutionName = instToSave.name
+            finalCards[i].companyId = instToSave.companyId
+            finalCards[i].userId = instToSave.userId
+        }
+        
+        var finalLoans = loans
+        for i in 0..<finalLoans.count {
+            finalLoans[i].lender = instToSave.name
+            finalLoans[i].companyId = instToSave.companyId
+            finalLoans[i].userId = instToSave.userId
+        }
+        
+        // Use VM to persist everything
+        vm.saveFinancialInstitutionCascade(institution: instToSave, cards: finalCards, loans: finalLoans, appState: appState)
+        dismiss()
+    }
+
+    // MARK: - Header
+    private var headerView: some View {
+        VStack(spacing: 8) {
+            let title: String = {
+                switch currentStep {
+                case 1: return "Add an Institution"
+                case 2: return "Add Bank Accounts"
+                case 3: return "Add Credit & Debit Cards"
+                case 4: return "Add Loans"
+                default: return "\(institution.name.isEmpty ? "Institution" : institution.name) added"
+                }
+            }()
+            let subtitle: String = {
+                switch currentStep {
+                case 1: return "Securely store login and high-level details"
+                case 2: return "Checking, Savings, and Investing"
+                case 3: return "Manage lines of credit and cards"
+                case 4: return "Track your liabilities and terms"
+                default: return "Financial setup complete"
+                }
+            }()
+            
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .id("headerTitle-\(currentStep)")
+                    .transition(.opacity)
+                
+                if currentStep >= 5 {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(Color(hex: "#30D158"))
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+                
+            Text(subtitle)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.65))
+                .id("headerSubtitle-\(currentStep)")
+                .transition(.opacity)
+                
+            HStack(spacing: 8) {
+                ForEach(1...4, id: \.self) { step in
+                    Capsule()
+                        .fill(step <= currentStep ? Color(hex: "#2F5051") : Color.white.opacity(0.1))
+                        .frame(width: step == currentStep ? 24 : 8, height: 8)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: currentStep)
+                }
+            }
+            .padding(.top, 8)
+        }
+    }
+    
+    // MARK: - Collapsed Bars
+    
+    @ViewBuilder
+    private var collapsedStepsView: some View {
+        VStack(spacing: 12) {
+            if completedSteps.contains(1) {
+                CollapsedSectionBar(
+                    icon: "🏦",
+                    label: "Institution",
+                    summary: "\(institution.name.isEmpty ? "Unnamed" : institution.name) · \(institution.username?.isEmpty == false ? institution.username! : "No ID")",
+                    onExpand: { expandStep(1) }
+                )
+                .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+            }
+            if completedSteps.contains(2) {
+                CollapsedSectionBar(
+                    icon: "💰",
+                    label: "Accounts",
+                    summary: accounts.isEmpty ? "Skipped" : "\(accounts.count) accounts",
+                    onExpand: { expandStep(2) }
+                )
+                .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+            }
+            if completedSteps.contains(3) {
+                CollapsedSectionBar(
+                    icon: "💳",
+                    label: "Cards",
+                    summary: cards.isEmpty ? "Skipped" : "\(cards.count) cards",
+                    onExpand: { expandStep(3) }
+                )
+                .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+            }
+            if completedSteps.contains(4) {
+                CollapsedSectionBar(
+                    icon: "📉",
+                    label: "Loans",
+                    summary: loans.isEmpty ? "Skipped" : "\(loans.count) loans",
+                    onExpand: { expandStep(4) }
+                )
+                .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .top)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+            }
+        }
+    }
+    
+    // MARK: - Steps
+    
+    @ViewBuilder
+    private var stepOneInstitution: some View {
+        if currentStep == 1 {
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
+                    ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: {
+                        institution.name
+                    }, set: { newName in
+                        institution.name = newName
+                        if !hasManuallyEditedWebsite {
+                            let cleanName = newName.lowercased().replacingOccurrences(of: " ", with: "")
+                            institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
+                        }
+                    }))
+                    ZifrField(
+                        label: "WEBSITE URL",
+                        placeholder: "e.g. chase.com",
+                        text: Binding(get: {
+                            institution.loginUrl ?? ""
+                        }, set: { newUrl in
+                            institution.loginUrl = newUrl
+                            hasManuallyEditedWebsite = true
+                        }),
+                        keyboardType: .URL
+                    )
+                }
+                
+                HStack(spacing: 12) {
+                    ZifrAutocompleteField(
+                        label: "LOGIN ID",
+                        placeholder: "email or username",
+                        text: Binding(get: { institution.username ?? "" }, set: { institution.username = $0 }),
+                        keyboardType: .emailAddress,
+                        textContentType: .username,
+                        suggestions: Array(Set(appState.institutions.compactMap(\.username))).sorted()
+                    )
+                    ZifrField(
+                        label: "PASSWORD",
+                        placeholder: "••••••••",
+                        text: Binding(get: { institution.password ?? "" }, set: { institution.password = $0 }),
+                        isSecure: true,
+                        textContentType: .password
+                    )
+                }
+                
+                DynamicLoginLabelView(loginId: institution.username ?? "", ignoreSubscriptionId: "")
+                    .padding(.top, 4)
+                    .padding(.bottom, 12)
+                
+                PremiumInputField(
+                    label: "TWO FACTOR / NOTES",
+                    placeholder: "e.g. 2FA is set to 123-456-7890",
+                    text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
+                )
+                
+                nextButton(disabled: institution.name.isEmpty) { advanceToStep(2) }
+            }
+            .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+        }
+    }
+    
+    @ViewBuilder
+    private var stepTwoAccounts: some View {
+        if currentStep == 2 {
+            VStack(spacing: 12) {
+                Button {
+                    accountDraft = InstitutionAccount()
+                    accountDraftIndex = nil
+                    isNewAccount = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showAccountHUD = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("💰").font(.system(size: 14))
+                        Text("Add an Account")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                
+                ForEach(accounts.indices, id: \.self) { i in
+                    let acc = accounts[i]
+                    Button {
+                        accountDraft = acc
+                        accountDraftIndex = i
+                        isNewAccount = false
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showAccountHUD = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(acc.name.isEmpty ? "Unnamed" : acc.name)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("••••\(acc.last4)")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+                            Spacer()
+                            Text("$\(String(format: "%.2f", acc.balance))")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                    }
+                }
+                
+                if !accounts.isEmpty {
+                    nextButton(disabled: false) { advanceToStep(3) }
+                } else {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        advanceToStep(3)
+                    } label: {
+                        Text("Skip")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                    }
+                }
+            }
+            .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+        }
+    }
+    
+    @ViewBuilder
+    private var stepThreeCards: some View {
+        if currentStep == 3 {
+            VStack(spacing: 12) {
+                Button {
+                    cardDraft = FinancialCard(userId: institution.userId, companyId: institution.companyId)
+                    cardDraftIndex = nil
+                    isNewCard = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showCardHUD = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("💳").font(.system(size: 14))
+                        Text("Add a Card")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                
+                ForEach(cards.indices, id: \.self) { i in
+                    let card = cards[i]
+                    Button {
+                        cardDraft = card
+                        cardDraftIndex = i
+                        isNewCard = false
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showCardHUD = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(card.name.isEmpty ? "Unnamed" : card.name)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("\(card.network) ••••\(card.last4 ?? "N/A")")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+                            Spacer()
+                            Text("$\(String(format: "%.2f", card.balance))")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                    }
+                }
+                
+                if !cards.isEmpty {
+                    nextButton(disabled: false) { advanceToStep(4) }
+                } else {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        advanceToStep(4)
+                    } label: {
+                        Text("Skip")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                    }
+                }
+            }
+            .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+        }
+    }
+    
+    @ViewBuilder
+    private var stepFourLoans: some View {
+        if currentStep == 4 {
+            VStack(spacing: 12) {
+                Button {
+                    loanDraft = Loan(userId: institution.userId, companyId: institution.companyId)
+                    loanDraftIndex = nil
+                    isNewLoan = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showLoanHUD = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("📉").font(.system(size: 14))
+                        Text("Add a Loan")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(Color(hex: "#223E5A"))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                
+                ForEach(loans.indices, id: \.self) { i in
+                    let loan = loans[i]
+                    Button {
+                        loanDraft = loan
+                        loanDraftIndex = i
+                        isNewLoan = false
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showLoanHUD = true
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(loan.name.isEmpty ? "Unnamed" : loan.name)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Text("\(loan.termYears)Y \(loan.termMonths)M @ \(String(format: "%.2f", loan.interestRate))%")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+                            Spacer()
+                            Text("$\(String(format: "%.0f", loan.principalAmount))")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .background(Color(hex: "#111111"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.05), lineWidth: 1))
+                    }
+                }
+                
+                if !loans.isEmpty {
+                    nextButton(disabled: false) { advanceToStep(5) }
+                } else {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        advanceToStep(5)
+                    } label: {
+                        Text("Skip")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                    }
+                }
+            }
+            .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity.combined(with: .scale(scale: 0.9))))
+        }
+    }
+    
+    // MARK: - Helpers
+    private func nextButton(disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text("Next")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(disabled ? Color.white.opacity(0.3) : .white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background {
+                    if !disabled {
+                        LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing)
+                    } else {
+                        Color.white.opacity(0.05)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .disabled(disabled)
+        .buttonStyle(PremiumButtonStyle())
+        .padding(.top, 8)
+    }
+}
