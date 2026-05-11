@@ -655,8 +655,8 @@ struct EditCardSheet: View {
                         companyId: card.companyId,
                         institutions: institutions,
                         cards: cards
-                    ) { method in
-                        card.paidFrom = method
+                    ) { _, name in
+                        card.paidFrom = name
                     }
                 }
             }

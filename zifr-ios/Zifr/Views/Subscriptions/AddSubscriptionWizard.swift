@@ -480,7 +480,10 @@ struct AddSubscriptionWizard: View {
                                 companyId: sub.companyId,
                                 institutions: institutions,
                                 cards: cards,
-                                onSelect: { sub.paymentMethod = $0 }
+                                onSelect: { id, name in
+                                    sub.paymentMethodId = id
+                                    sub.paymentMethod = name
+                                }
                             )
                         } label: {
                             HStack {

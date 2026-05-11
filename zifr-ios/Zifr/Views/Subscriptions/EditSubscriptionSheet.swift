@@ -691,7 +691,10 @@ struct EditSubscriptionSheet: View {
                     companyId: sub.companyId,
                     institutions: institutions,
                     cards: cards,
-                    onSelect: { sub.paymentMethod = $0 }
+                    onSelect: { id, name in
+                        sub.paymentMethodId = id
+                        sub.paymentMethod = name
+                    }
                 )
             }
             .toolbar {
@@ -1117,7 +1120,10 @@ struct SubServiceHUD: View {
                     companyId: companyId,
                     institutions: institutions,
                     cards: cards,
-                    onSelect: { draft.paymentMethod = $0 }
+                    onSelect: { id, name in
+                        draft.paymentMethodId = id
+                        draft.paymentMethod = name
+                    }
                 )
                 .presentationDetents([.height(550)])
                 .presentationDragIndicator(.visible)
@@ -1566,10 +1572,11 @@ struct LinkedEmailHUD: View {
 
 struct PaymentMethodPickerView: View {
     let currentMethod: String
+    let currentMethodId: UUID? = nil
     let companyId: UUID
     let institutions: [Institution]
     let cards: [FinancialCard]
-    let onSelect: (String) -> Void
+    let onSelect: (UUID?, String) -> Void
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     private var allCompanies: [Company] { appState.companies }
@@ -1653,12 +1660,12 @@ struct PaymentMethodPickerView: View {
                 storedCustomMethods = methods.joined(separator: ",")
             }
         }
-        onSelect(method)
+        onSelect(nil, method)
         dismiss()
     }
 
-    private func selectStandard(_ method: String) {
-        onSelect(method)
+    private func selectStandard(id: UUID?, name: String) {
+        onSelect(id, name)
         dismiss()
     }
 
@@ -1668,7 +1675,7 @@ struct PaymentMethodPickerView: View {
             methods.remove(at: idx)
             storedCustomMethods = methods.joined(separator: ",")
             if currentMethod == method {
-                onSelect("")
+                onSelect(nil, "")
             }
         }
     }
@@ -1686,7 +1693,7 @@ struct PaymentMethodPickerView: View {
             }
             storedCustomMethods = methods.joined(separator: ",")
             if currentMethod == oldName {
-                onSelect(trimmedNewName)
+                onSelect(nil, trimmedNewName)
             }
         }
     }
@@ -1725,7 +1732,7 @@ struct PaymentMethodPickerView: View {
             List {
             Section {
                 Button {
-                    selectStandard("")
+                    selectStandard(id: nil, name: "")
                 } label: {
                     HStack {
                         Text("N/A")
@@ -1827,7 +1834,7 @@ struct PaymentMethodPickerView: View {
                         let acc = display.account
                         let name = acc.name.isEmpty ? acc.type : acc.name
                         Button {
-                            selectStandard(name)
+                            selectStandard(id: UUID(uuidString: acc.id), name: name)
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {
@@ -1890,7 +1897,7 @@ struct PaymentMethodPickerView: View {
                 Section("Cards") {
                     ForEach(filteredCards) { card in
                         Button {
-                            selectStandard(card.name)
+                            selectStandard(id: card.id, name: card.name)
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {

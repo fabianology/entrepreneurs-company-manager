@@ -6,6 +6,7 @@ struct SubService: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var name: String = ""
     var paymentMethod: String = ""
+    var paymentMethodId: UUID? = nil
     var cost: Double = 0
     var billingCycle: BillingCycle = .monthly
     var purpose: String = ""
@@ -39,6 +40,7 @@ struct Subscription: Identifiable, Codable, Hashable {
     var currency: String
     var billingCycle: String
     var paymentMethod: String?
+    var paymentMethodId: UUID?
     var nextRenewal: String?
     var renew: String
     var status: String
@@ -64,6 +66,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         case currency
         case billingCycle = "billing_cycle"
         case paymentMethod = "payment_method"
+        case paymentMethodId = "payment_method_id"
         case nextRenewal = "next_renewal"
         case renew
         case status
@@ -90,6 +93,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         currency: String = "USD",
         billingCycle: String = "Monthly",
         paymentMethod: String? = nil,
+        paymentMethodId: UUID? = nil,
         nextRenewal: String? = nil,
         renew: String = "Auto",
         status: String = "Active",
@@ -114,6 +118,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.currency = currency
         self.billingCycle = billingCycle
         self.paymentMethod = paymentMethod
+        self.paymentMethodId = paymentMethodId
         self.nextRenewal = nextRenewal
         self.renew = renew
         self.status = status

@@ -95,16 +95,16 @@ struct PremiumSubscriptionCard: View {
     }
     
     var bankAccountTuple: (bank: String, account: String, type: String, modelId: UUID?)? {
-        if (sub.paymentMethod ?? "").isEmpty { return nil }
+        if (sub.paymentMethod ?? "").isEmpty && sub.paymentMethodId == nil { return nil }
         
-        if let card = cards.first(where: { $0.name == sub.paymentMethod }) {
+        if let card = cards.first(where: { sub.paymentMethodId == $0.id || (sub.paymentMethodId == nil && $0.name == sub.paymentMethod) }) {
             let inst = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
             let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4 ?? "")"
             return (inst, "\(card.name)\(suffix)", card.type, card.id)
         }
         
         for inst in institutions {
-            if let acc = inst.accounts.first(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) {
+            if let acc = inst.accounts.first(where: { sub.paymentMethodId == UUID(uuidString: $0.id) || (sub.paymentMethodId == nil && ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod) }) {
                 let instName = inst.name.isEmpty ? "Paid From" : inst.name
                 let accName = acc.name.isEmpty ? acc.type : acc.name
                 let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"

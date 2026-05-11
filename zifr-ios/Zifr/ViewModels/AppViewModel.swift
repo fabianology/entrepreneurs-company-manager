@@ -137,6 +137,16 @@ final class AppViewModel {
         }
     }
 
+    func saveFinancialInstitutionCascade(institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState) {
+        saveInstitution(institution, appState: appState)
+        for card in cards {
+            saveCard(card, appState: appState)
+        }
+        for loan in loans {
+            saveLoan(loan, appState: appState)
+        }
+    }
+
     func deleteInstitution(_ inst: Institution, appState: AppState) {
         let instName = inst.name
         let instCompanyId = inst.companyId
@@ -353,7 +363,7 @@ final class AppViewModel {
         
         for card in cards {
             let companyName = companies.first { $0.id == card.companyId }?.name ?? ""
-            let paysForMatch = subscriptions.contains { $0.paymentMethod == card.name && matches($0.name + " " + ($0.loginId ?? "")) }
+            let paysForMatch = subscriptions.contains { ($0.paymentMethodId == card.id || ($0.paymentMethodId == nil && $0.paymentMethod == card.name)) && matches($0.name + " " + ($0.loginId ?? "")) }
             
             var payloadArr = [card.name, card.institutionName ?? "", card.network, card.last4 ?? "", card.type, card.status, card.paidFrom ?? "", card.cardHolder ?? "", card.notes ?? "", companyName, card.type + " card", card.type + " cards"]
             payloadArr.append("apr \(card.apr)% \(card.apr)")
@@ -369,14 +379,14 @@ final class AppViewModel {
             if isBankQuery || isCardQuery || paysForMatch || matches(payload) {
                 let company = companies.first { $0.id == card.companyId }
                 let inst = institutions.first { $0.name.lowercased() == (card.institutionName?.lowercased() ?? "") }
-                results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password, loginId: card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl, status: card.status, last4: card.last4, network: card.network, paysFor: subscriptions.filter { $0.paymentMethod == card.name }.map { $0.name }, cardType: card.type))
+                results.append(.init(type: .financial, title: card.name, subtitle: company?.name ?? "", companyId: card.companyId, modelId: card.id, tab: .financial, password: card.password, loginId: card.login, logoData: company?.logoData, externalWebsite: inst?.loginUrl, status: card.status, last4: card.last4, network: card.network, paysFor: subscriptions.filter { $0.paymentMethodId == card.id || ($0.paymentMethodId == nil && $0.paymentMethod == card.name) }.map { $0.name }, cardType: card.type))
             }
         }
         
         for inst in institutions {
-            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }) && matches(sub.name + " " + (sub.loginId ?? "")) }
+            let paysForMatch = subscriptions.contains { sub in (sub.paymentMethodId == inst.id || inst.accounts.contains { acc in sub.paymentMethodId == UUID(uuidString: acc.id) } || (sub.paymentMethodId == nil && (sub.paymentMethod == inst.name || inst.accounts.contains { $0.name == sub.paymentMethod }))) && matches(sub.name + " " + (sub.loginId ?? "")) }
             let companyName = companies.first { $0.id == inst.companyId }?.name ?? ""
-            let cardPaysForMatch = cards.contains { card in card.institutionName?.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in sub.paymentMethod == card.name && matches(sub.name + " " + (sub.loginId ?? "")) } }
+            let cardPaysForMatch = cards.contains { card in card.institutionName?.lowercased() == inst.name.lowercased() && subscriptions.contains { sub in (sub.paymentMethodId == card.id || (sub.paymentMethodId == nil && sub.paymentMethod == card.name)) && matches(sub.name + " " + (sub.loginId ?? "")) } }
             
             var payloadArr = [inst.name, inst.username ?? "", inst.email ?? "", inst.loginUrl ?? "", companyName]
             payloadArr.append(contentsOf: inst.accounts.map { $0.name })
@@ -389,7 +399,7 @@ final class AppViewModel {
             if isBankQuery || paysForMatch || cardPaysForMatch || matches(payload) {
                 let company = companies.first { $0.id == inst.companyId }
                 let loginId = !(inst.username?.isEmpty ?? true) ? inst.username : (!(inst.email?.isEmpty ?? true) ? inst.email : nil)
-                results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl, paysFor: subscriptions.filter { sub in inst.accounts.contains { acc in sub.paymentMethod == acc.name } || sub.paymentMethod == inst.name }.map { $0.name }))
+                results.append(.init(type: .financial, title: inst.name, subtitle: company?.name ?? "", companyId: inst.companyId, modelId: inst.id, tab: .financial, password: inst.password, loginId: loginId, logoData: company?.logoData, externalWebsite: inst.loginUrl, paysFor: subscriptions.filter { sub in sub.paymentMethodId == inst.id || inst.accounts.contains { acc in sub.paymentMethodId == UUID(uuidString: acc.id) } || (sub.paymentMethodId == nil && (inst.accounts.contains { acc in sub.paymentMethod == acc.name } || sub.paymentMethod == inst.name)) }.map { $0.name }))
             }
         }
         
