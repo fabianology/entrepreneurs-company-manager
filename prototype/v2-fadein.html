@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Zifr Financial Wizard v2 — Fade-In</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v2-fadein.css">
+</head>
+<body>
+<div class="phone">
+  <!-- Progress bar -->
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+
+  <div class="scroll-area" id="scrollArea">
+    <!-- SECTION 1: Type Selection -->
+    <div class="section" id="sec-type" data-step="1">
+      <div class="section-header">
+        <div class="title">What would you like<br>to add?</div>
+        <div class="subtitle">Choose the type of financial item you want to track.</div>
+      </div>
+      <div class="section-body" id="typeBody">
+        <div class="choice-grid">
+          <div class="choice-btn" onclick="pickType('account')">
+            <div class="choice-icon">🏦</div>
+            <div class="choice-text"><h3>Bank Account</h3><p>Checking · Savings · Investing · 401(k)</p></div>
+          </div>
+          <div class="choice-btn" onclick="pickType('card')">
+            <div class="choice-icon">💳</div>
+            <div class="choice-text"><h3>Card</h3><p>Credit Card · Debit Card</p></div>
+          </div>
+          <div class="choice-btn" onclick="pickType('loan')">
+            <div class="choice-icon">💰</div>
+            <div class="choice-text"><h3>Loan</h3><p>I owe money · I'm lending money</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="collapse-bar hidden" id="collapse-type" onclick="expandSection('type')">
+        <span class="collapse-icon" id="collapseTypeIcon">🏦</span>
+        <span class="collapse-label" id="collapseTypeLabel">Bank Account</span>
+        <span class="collapse-check">✓</span>
+        <span class="collapse-chevron">▸</span>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Bank Name -->
+    <div class="section hidden-section" id="sec-bank" data-step="2">
+      <div class="section-header">
+        <div class="title" id="bankTitle">Which bank is your account with?</div>
+        <div class="subtitle">We'll organize everything under this bank for you.</div>
+      </div>
+      <div class="section-body" id="bankBody">
+        <div class="field-group">
+          <div class="field-label">BANK NAME</div>
+          <input class="field-input" id="bankInput" placeholder="e.g. Chase, Wells Fargo" oninput="onBankInput(this.value)">
+          <div class="suggestions" id="bankSuggestions"></div>
+        </div>
+      </div>
+      <div class="collapse-bar hidden" id="collapse-bank" onclick="expandSection('bank')">
+        <span class="collapse-icon">🏦</span>
+        <span class="collapse-label" id="collapseBankLabel">Chase</span>
+        <span class="collapse-check">✓</span>
+        <span class="collapse-chevron">▸</span>
+      </div>
+    </div>
+
+    <!-- SECTION 3: Details -->
+    <div class="section hidden-section" id="sec-details" data-step="3">
+      <div class="section-header">
+        <div class="title" id="detailsTitle">Set up your account</div>
+        <div class="subtitle" id="detailsSub">Fill in the basics — you can always add more later.</div>
+      </div>
+      <div class="section-body" id="detailsBody"></div>
+    </div>
+
+    <!-- SECTION 4: Success -->
+    <div class="section hidden-section" id="sec-success" data-step="4">
+      <div class="success-check"><span>✓</span></div>
+      <div class="success-title" id="successTitle">Account added!</div>
+      <div class="success-sub" id="successSub">Your Chase account is ready to go.</div>
+      <button class="success-btn primary" onclick="alert('Opens full edit sheet')">✏️ Add More Details<br><span style="font-size:12px;color:rgba(255,255,255,0.3)">Passwords, APR, limits, payment info</span></button>
+      <button class="success-btn primary" id="addAnotherBtn" onclick="addAnother()">➕ Add Another at Chase</button>
+      <button class="success-btn done" onclick="resetAll()">Done</button>
+    </div>
+
+    <div style="height:60px"></div>
+  </div>
+
+  <!-- Sticky Save Button -->
+  <div class="save-bar hidden" id="saveBar">
+    <button class="save-btn" id="saveBtn" onclick="doSave()">Save</button>
+  </div>
+
+  <!-- Top nav -->
+  <div class="top-nav">
+    <button class="nav-cancel" onclick="resetAll()">Cancel</button>
+  </div>
+</div>
+
+<script src="v2-fadein.js"></script>
+</body>
+</html>

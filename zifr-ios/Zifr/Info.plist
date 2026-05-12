@@ -44,6 +44,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>CiFr uses your camera to scan and digitize important company documents.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Miloom needs microphone access so you can talk to your AI Executive Assistant.</string>
 	<key>GIDClientID</key>
 	<string>473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Zifr Financial Wizard v2</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="phone">
+
+<!-- SCREEN 1: What are you adding? -->
+<div class="screen active" id="s1">
+  <div class="nav"><button class="nav-btn cancel" onclick="resetAll()">Cancel</button><div></div></div>
+  <div class="progress"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="title">What would you like<br>to add?</div>
+  <div class="subtitle">Choose the type of financial item you want to track.</div>
+  <div class="choice-grid">
+    <div class="choice-btn" onclick="pickType('account')">
+      <div class="choice-icon acct">🏦</div>
+      <div class="choice-text"><h3>Bank Account</h3><p>Checking · Savings · Investing · 401(k)</p></div>
+    </div>
+    <div class="choice-btn" onclick="pickType('card')">
+      <div class="choice-icon card">💳</div>
+      <div class="choice-text"><h3>Card</h3><p>Credit Card · Debit Card</p></div>
+    </div>
+    <div class="choice-btn" onclick="pickType('loan')">
+      <div class="choice-icon loan">💰</div>
+      <div class="choice-text"><h3>Loan</h3><p>I owe money · I'm lending money</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 2: Which bank? -->
+<div class="screen hidden-right" id="s2">
+  <div class="nav"><button class="nav-btn" onclick="goTo(1)">‹ Back</button><div></div></div>
+  <div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+  <div class="title" id="bankTitle">Which bank is your account with?</div>
+  <div class="subtitle">We'll organize everything under this bank for you.</div>
+  <div class="field-group visible">
+    <div class="field-label">BANK NAME</div>
+    <input class="field-input" id="bankInput" placeholder="e.g. Chase, Wells Fargo" oninput="onBankInput(this.value)">
+    <div class="suggestions" id="bankSuggestions"></div>
+  </div>
+  <button class="next-btn" id="bankNext" onclick="goTo(3)">Next</button>
+</div>
+
+<!-- SCREEN 3: Details -->
+<div class="screen hidden-right" id="s3">
+  <div class="nav"><button class="nav-btn" onclick="goTo(2)">‹ Back</button><button class="nav-btn save" id="saveBtn" onclick="goTo(4)">Save</button></div>
+  <div class="progress"><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div></div>
+  <div class="title" id="detailsTitle">Set up your account</div>
+  <div class="subtitle" id="detailsSub">Fill in the basics — you can always add more later.</div>
+  <div id="detailsContent"></div>
+</div>
+
+<!-- SCREEN 4: Success -->
+<div class="screen hidden-right" id="s4">
+  <div class="success-check"><span>✓</span></div>
+  <div class="success-title" id="successTitle">Account added!</div>
+  <div class="success-sub" id="successSub">Your account is ready.</div>
+  <button class="success-btn primary" onclick="alert('Opens full Edit Sheet with all advanced fields')">✏️ Add More Details<br><span style="font-size:11px;color:rgba(255,255,255,.25)">Promo APR, payment schedule, notes</span></button>
+  <button class="success-btn primary" id="addAnotherBtn" onclick="addAnother()">➕ Add Another</button>
+  <button class="success-btn done" onclick="resetAll()">Done</button>
+</div>
+
+</div>
+<script src="wizard.js"></script>
+</body>
+</html>

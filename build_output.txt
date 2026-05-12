@@ -1,0 +1,781 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild -project zifr-ios/Zifr.xcodeproj -scheme Zifr -sdk iphonesimulator -destination "platform=iOS Simulator,name=iPhone 15,OS=17.5" build
+
+Build settings from command line:
+    SDKROOT = iphonesimulator26.4
+
+Resolve Package Graph
+
+
+Resolved source packages:
+  swift-http-types: https://github.com/apple/swift-http-types.git @ 1.5.1
+  GTMAppAuth: https://github.com/google/GTMAppAuth.git @ 4.1.1
+  swift-crypto: https://github.com/apple/swift-crypto.git @ 4.5.0
+  xctest-dynamic-overlay: https://github.com/pointfreeco/xctest-dynamic-overlay @ 1.9.0
+  AppAuth: https://github.com/openid/AppAuth-iOS.git @ 1.7.6
+  swift-clocks: https://github.com/pointfreeco/swift-clocks @ 1.0.6
+  swift-concurrency-extras: https://github.com/pointfreeco/swift-concurrency-extras @ 1.3.2
+  GTMSessionFetcher: https://github.com/google/gtm-session-fetcher.git @ 3.5.0
+  GoogleSignIn: https://github.com/google/GoogleSignIn-iOS.git @ 7.1.0
+  swift-asn1: https://github.com/apple/swift-asn1.git @ 1.7.0
+  Supabase: https://github.com/supabase/supabase-swift.git @ 2.46.0
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, arch:arm64, id:9C4DC96C-CCF1-4670-AD84-762A3EB83AFF, OS:17.5, name:iPhone 15 }
+{ platform:iOS Simulator, arch:x86_64, id:9C4DC96C-CCF1-4670-AD84-762A3EB83AFF, OS:17.5, name:iPhone 15 }
+ComputePackagePrebuildTargetDependencyGraph
+
+Prepare packages
+
+CreateBuildRequest
+
+SendProjectDescription
+
+CreateBuildOperation
+
+ComputeTargetDependencyGraph
+note: Building targets in dependency order
+note: Target dependency graph (38 targets)
+    Target 'Zifr' in project 'Zifr'
+        ➜ Explicit dependency on target 'Supabase' in project 'Supabase'
+        ➜ Explicit dependency on target 'GoogleSignIn' in project 'GoogleSignIn'
+    Target 'GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'GoogleSignIn_GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'GoogleSignIn_GoogleSignIn' in project 'GoogleSignIn'
+        ➜ Explicit dependency on target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth_GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMAppAuth_GTMAppAuth' in project 'GTMAppAuth'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuthCore' in project 'AppAuth'
+    Target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'GTMSessionFetcher_GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+        ➜ Explicit dependency on target 'GTMSessionFetcher_GTMSessionFetcherCore' in project 'GTMSessionFetcher'
+    Target 'GTMSessionFetcher_GTMSessionFetcherCore' in project 'GTMSessionFetcher' (no dependencies)
+    Target 'GTMAppAuth_GTMAppAuth' in project 'GTMAppAuth' (no dependencies)
+    Target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuth' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuthCore' in project 'AppAuth'
+    Target 'AppAuthCore' in project 'AppAuth'
+        ➜ Explicit dependency on target 'AppAuth_AppAuthCore' in project 'AppAuth'
+    Target 'AppAuth_AppAuthCore' in project 'AppAuth' (no dependencies)
+    Target 'AppAuth_AppAuth' in project 'AppAuth' (no dependencies)
+    Target 'GoogleSignIn_GoogleSignIn' in project 'GoogleSignIn' (no dependencies)
+    Target 'Supabase' in project 'Supabase'
+        ➜ Explicit dependency on target 'Supabase' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'Auth' in project 'Supabase'
+        ➜ Explicit dependency on target 'Functions' in project 'Supabase'
+        ➜ Explicit dependency on target 'PostgREST' in project 'Supabase'
+        ➜ Explicit dependency on target 'Realtime' in project 'Supabase'
+        ➜ Explicit dependency on target 'Storage' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'Crypto' in project 'swift-crypto'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'Supabase' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'Auth' in project 'Supabase'
+        ➜ Explicit dependency on target 'Functions' in project 'Supabase'
+        ➜ Explicit dependency on target 'PostgREST' in project 'Supabase'
+        ➜ Explicit dependency on target 'Realtime' in project 'Supabase'
+        ➜ Explicit dependency on target 'Storage' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'Crypto' in project 'swift-crypto'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'Storage' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+    Target 'Realtime' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'PostgREST' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+    Target 'Functions' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+    Target 'Auth' in project 'Supabase'
+        ➜ Explicit dependency on target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'Crypto' in project 'swift-crypto'
+    Target 'Crypto' in project 'swift-crypto'
+        ➜ Explicit dependency on target 'Crypto' in project 'swift-crypto'
+        ➜ Explicit dependency on target 'swift-crypto_Crypto' in project 'swift-crypto'
+    Target 'Crypto' in project 'swift-crypto'
+        ➜ Explicit dependency on target 'swift-crypto_Crypto' in project 'swift-crypto'
+    Target 'swift-crypto_Crypto' in project 'swift-crypto' (no dependencies)
+    Target 'Helpers' in project 'Supabase'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+    Target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReportingPackageSupport' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'XCTestDynamicOverlay' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReportingPackageSupport' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'Clocks' in project 'swift-clocks'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+    Target 'IssueReporting' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReporting' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReportingPackageSupport' in project 'xctest-dynamic-overlay'
+    Target 'IssueReporting' in project 'xctest-dynamic-overlay'
+        ➜ Explicit dependency on target 'IssueReportingPackageSupport' in project 'xctest-dynamic-overlay'
+    Target 'IssueReportingPackageSupport' in project 'xctest-dynamic-overlay' (no dependencies)
+    Target 'HTTPTypes' in project 'swift-http-types'
+        ➜ Explicit dependency on target 'HTTPTypes' in project 'swift-http-types'
+    Target 'HTTPTypes' in project 'swift-http-types' (no dependencies)
+    Target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+        ➜ Explicit dependency on target 'ConcurrencyExtras' in project 'swift-concurrency-extras'
+    Target 'ConcurrencyExtras' in project 'swift-concurrency-extras' (no dependencies)
+
+GatherProvisioningInputs
+
+CreateBuildDescription
+
+ClangStatCache /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk /Users/yager/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.4-23E237-686eebb5dc1d8ecb277353a59184f4aa.sdkstatcache
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr.xcodeproj
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang-stat-cache /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk -o /Users/yager/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.4-23E237-686eebb5dc1d8ecb277353a59184f4aa.sdkstatcache
+
+SwiftDriver Zifr normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-SwiftDriver -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Zifr -Onone @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.SwiftFileList -DDEBUG -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/AppAuth.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/AppAuthCore.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/GTMSessionFetcherCore.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/GoogleSignIn.modulemap -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -c -j18 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.4-23E237-686eebb5dc1d8ecb277353a59184f4aa.sdkstatcache -output-file-map /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr_const_extract_protocols.json -Xcc -iquote -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-generated-files.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-own-target-headers.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr-a089cdaab87e03b6e2e40cfcc23f7f5b-VFS-iphonesimulator/all-product-headers.yaml -Xcc -iquote -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-project-headers.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuth -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/gtm-session-fetcher/Sources/Core/Public -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources-normal/arm64 -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources/arm64 -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-Swift.h -working-directory /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios -experimental-emit-module-separately -disable-cmo
+
+SwiftCompile normal arm64 Compiling\ CompanyCardView.swift,\ CompanyDetailView.swift,\ CompanyDocument.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Dashboard/CompanyCardView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/CompanyDocument.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Dashboard/CompanyCardView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift:20:43: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.loginId ?? "").lowercased().contains(q) || ($0.paymentMethod ?? "").lowercased().contains(q) }
+                                  ~~~~~~~~^~~~~
+                                         
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift:26:43: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.institutionName ?? "").lowercased().contains(q) || ($0.network ?? "").lowercased().contains(q) || ($0.last4 ?? "").lowercased().contains(q) }
+                                  ~~~~~~~~^~~~~
+                                         
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift:26:145: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.institutionName ?? "").lowercased().contains(q) || ($0.network ?? "").lowercased().contains(q) || ($0.last4 ?? "").lowercased().contains(q) }
+                                                                                                                                     ~~~~~~~~~~~^~~~~
+                                                                                                                                               
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift:32:43: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.username ?? "").lowercased().contains(q) || ($0.email ?? "").lowercased().contains(q) }
+                                  ~~~~~~~~^~~~~
+                                         
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/CompanyDetailView.swift:38:43: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        return filtered.filter { ($0.name ?? "").lowercased().contains(q) || ($0.lender ?? "").lowercased().contains(q) }
+                                  ~~~~~~~~^~~~~
+                                         
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/CompanyDocument.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ Date+Formatting.swift,\ DocumentListView.swift,\ DocumentScannerService.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Extensions/Date+Formatting.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Documents/DocumentListView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/DocumentScannerService.swift (in target 'Zifr' from project 'Zifr')
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Extensions/Date+Formatting.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Documents/DocumentListView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/DocumentScannerService.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ CompanyMetaSheet.swift,\ DashboardView.swift,\ DataRepository.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/CompanyMetaSheet.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Dashboard/DashboardView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/DataRepository.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/CompanyMetaSheet.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Dashboard/DashboardView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/DataRepository.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ FinancialCard.swift,\ FinancialView.swift,\ GeminiService.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/FinancialCard.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/GeminiService.swift (in target 'Zifr' from project 'Zifr')
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/FinancialCard.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/FinancialView.swift:238:101: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                        let standaloneCards = cards.filter { c in !institutions.contains { ($0.name ?? "").lowercased() == (c.institutionName ?? "").lowercased() } }
+                                                                                            ~~~~~~~~^~~~~
+                                                                                                   
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/FinancialView.swift:239:101: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                        let standaloneLoans = loans.filter { l in !institutions.contains { ($0.name ?? "").lowercased() == (l.lender ?? "").lowercased() } }
+                                                                                            ~~~~~~~~^~~~~
+                                                                                                   
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/GeminiService.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ AppViewModel.swift,\ AuthViewModel.swift,\ CloudSharingView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ViewModels/AppViewModel.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ViewModels/AuthViewModel.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Components/CloudSharingView.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ViewModels/AppViewModel.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ViewModels/AuthViewModel.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/ViewModels/AuthViewModel.swift:18:17: warning: initialization of immutable value 'session' was never used; consider replacing with assignment to '_' or removing it
+            let session = try await SupabaseService.shared.client.auth.session
+            ~~~~^~~~~~~
+            _
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Components/CloudSharingView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ GlobalSearchView.swift,\ HomeBillingTimeline.swift,\ LoginView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Search/GlobalSearchView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/HomeBillingTimeline.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Auth/LoginView.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Search/GlobalSearchView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/HomeBillingTimeline.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Auth/LoginView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ FinancialCardHUD.swift,\ LoanHUD.swift,\ AppState.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardHUD.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanHUD.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ViewModels/AppState.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardHUD.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardHUD.swift:73:84: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                                    selection: Binding(get: { draft.cardHolderType ?? "Mine" }, set: { draft.cardHolderType = $0 })
+                                                              ~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~
+                                                                                  
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanHUD.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ViewModels/AppState.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ EditCompanySheet.swift,\ EditSubscriptionSheet.swift,\ EntityHomeView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EditCompanySheet.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHomeView.swift (in target 'Zifr' from project 'Zifr')
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EditCompanySheet.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift:50:88: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+            name: sub.name, website: sub.website ?? "", pricingModel: sub.pricingModel ?? "", status: sub.status ?? "",
+                                                                      ~~~~~~~~~~~~~~~~~^~~~~
+                                                                                      
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift:50:114: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+            name: sub.name, website: sub.website ?? "", pricingModel: sub.pricingModel ?? "", status: sub.status ?? "",
+                                                                                                      ~~~~~~~~~~~^~~~~
+                                                                                                                
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift:51:44: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+            billingCycle: sub.billingCycle ?? "", nextRenewal: sub.nextRenewal ?? "", paymentMethod: sub.paymentMethod ?? "",
+                          ~~~~~~~~~~~~~~~~~^~~~~
+                                          
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift:53:46: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+            twoFactorAuth: sub.twoFactorAuth ?? "", recoveryMethod: sub.recoveryMethod ?? "", notes: sub.notes ?? "",
+                           ~~~~~~~~~~~~~~~~~~^~~~~
+                                            
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/EditSubscriptionSheet.swift:1624:96: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        return accountDisplays.filter { ($0.account.name + $0.account.type + ($0.account.last4 ?? "") + $0.instName).localizedCaseInsensitiveContains(searchText) }
+                                                                              ~~~~~~~~~~~~~~~~~^~~~~
+                                                                                              
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHomeView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/EntityHomeView.swift:616:41: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/EntityHomeView.swift:616:89: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+
+SwiftCompile normal arm64 Compiling\ RootView.swift,\ SharedComponents.swift,\ Subscription.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/RootView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Components/SharedComponents.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Subscription.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/RootView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Components/SharedComponents.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Components/SharedComponents.swift:187:14: warning: 'onChange(of:perform:)' was deprecated in iOS 17.0: Use `onChange` with a two or zero parameter action closure instead.
+            .onChange(of: text) { newValue in
+             ^
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Components/SharedComponents.swift:190:14: warning: 'onChange(of:perform:)' was deprecated in iOS 17.0: Use `onChange` with a two or zero parameter action closure instead.
+            .onChange(of: value) { _ in
+             ^
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Subscription.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ InstitutionCardsSection.swift,\ InstitutionLoansSection.swift,\ InstitutionAccountHUD.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionCardsSection.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionLoansSection.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionAccountHUD.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionCardsSection.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionLoansSection.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionLoansSection.swift:37:53: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                                    Text((loan.name ?? "").isEmpty ? "Unnamed Loan" : loan.name)
+                                          ~~~~~~~~~~^~~~~
+                                                   
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionAccountHUD.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ SubscriptionListView.swift,\ SupabaseService.swift,\ View+Glass.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/SubscriptionListView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/SupabaseService.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Extensions/View+Glass.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/SubscriptionListView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/SubscriptionListView.swift:314:41: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/SubscriptionListView.swift:314:89: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/SubscriptionListView.swift:1148:41: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/SubscriptionListView.swift:1148:89: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Services/SupabaseService.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Extensions/View+Glass.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ ZifrApp.swift,\ EditInstitutionSheet.swift,\ InstitutionAccountsSection.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ZifrApp.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionAccountsSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/ZifrApp.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift:28:41: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        Snapshot(name: institution.name ?? "", loginUrl: institution.loginUrl ?? "", username: institution.username ?? "", email: institution.email ?? "", password: institution.password ?? "", twoFactor: institution.twoFactor ?? "")
+                       ~~~~~~~~~~~~~~~~~^~~~~
+                                       
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift:37:85: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        cards.filter { ($0.institutionName ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
+                                                                   ~~~~~~~~~~~~~~~~~^~~~~
+                                                                                   
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift:37:127: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        cards.filter { ($0.institutionName ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
+                                                                                                             ~~~~~~~~~~~~~~~~~^~~~~
+                                                                                                                             
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift:40:76: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        loans.filter { ($0.lender ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
+                                                          ~~~~~~~~~~~~~~~~~^~~~~
+                                                                          
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift:40:118: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        loans.filter { ($0.lender ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
+                                                                                                    ~~~~~~~~~~~~~~~~~^~~~~
+                                                                                                                    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditInstitutionSheet.swift:360:107: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                EditCardSheet(card: cd, vm: vm, institutions: institutions, cards: cards, isNew: (cd.name ?? "").isEmpty && (cd.last4 ?? "").isEmpty, isInstitutionContext: true)
+                                                                                                  ~~~~~~~~^~~~~
+                                                                                                         
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionAccountsSection.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ InstitutionCardView.swift,\ FinancialCardView.swift,\ EntityFinancialSection.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionCardView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntityFinancialSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionCardView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/InstitutionCardView.swift:157:53: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                                    Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                                          ~~~~~~~~~~^~~~~
+                                                   
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntityFinancialSection.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftEmitModule normal arm64 Emitting\ module\ for\ Zifr (in target 'Zifr' from project 'Zifr')
+
+EmitSwiftModule normal arm64 (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ FinancialReceiptView.swift,\ EntityDocumentSection.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/FinancialReceiptView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntityDocumentSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/FinancialReceiptView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/FinancialReceiptView.swift:445:29: warning: initialization of immutable value 'totalYearlyCount' was never used; consider replacing with assignment to '_' or removing it
+                        let totalYearlyCount = yearlySubsCount + yearlyExtrasCount
+                        ~~~~^~~~~~~~~~~~~~~~
+                        _
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/FinancialReceiptView.swift:449:29: warning: initialization of immutable value 'totalMonthlyCount' was never used; consider replacing with assignment to '_' or removing it
+                        let totalMonthlyCount = monthlySubsCount + monthlyExtrasCount
+                        ~~~~^~~~~~~~~~~~~~~~~
+                        _
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntityDocumentSection.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ AddSubscriptionWizard.swift,\ PremiumSubscriptionCard.swift,\ FinancialCardVisual.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/AddSubscriptionWizard.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/PremiumSubscriptionCard.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardVisual.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/AddSubscriptionWizard.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Subscriptions/PremiumSubscriptionCard.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/PremiumSubscriptionCard.swift:110:41: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Subscriptions/PremiumSubscriptionCard.swift:110:89: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardVisual.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/FinancialCardVisual.swift:77:42: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                if (subSvc.paymentMethod ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+                    ~~~~~~~~~~~~~~~~~~~~~^~~~~
+                                        
+
+SwiftCompile normal arm64 Compiling\ EntityHomeViewModel.swift,\ EntitySubscriptionSection.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntityHomeViewModel.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntitySubscriptionSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntityHomeViewModel.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/EntityHome/EntitySubscriptionSection.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ LoanPaymentsLedgerView.swift,\ AdminSettingsView.swift,\ AddFinancialWizard.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanPaymentsLedgerView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/AdminSettingsView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/AddFinancialWizard.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanPaymentsLedgerView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/AdminSettingsView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/AddFinancialWizard.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ LoanPaymentHUD.swift,\ EditCardSheet.swift,\ EditLoanSheet.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanPaymentHUD.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/EditLoanSheet.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanPaymentHUD.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:73:34: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        Snapshot(name: card.name ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
+                       ~~~~~~~~~~^~~~~
+                                
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:73:88: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        Snapshot(name: card.name ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
+                                                                          ~~~~~~~~~~~~~^~~~~
+                                                                                      
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:73:111: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        Snapshot(name: card.name ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
+                                                                                                    ~~~~~~~~~~^~~~~
+                                                                                                             
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:73:212: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+        Snapshot(name: card.name ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
+                                                                                                                                                                                               ~~~~~~~~~~~~~~~~~~~~^~~~~
+                                                                                                                                                                                                                  
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:86:62: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let matches = institutions.filter { ($0.name ?? "").lowercased().contains((card.institutionName ?? "").lowercased()) && ($0.name ?? "").lowercased() != (card.institutionName ?? "").lowercased() }
+                                                     ~~~~~~~~^~~~~
+                                                            
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:86:146: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                let matches = institutions.filter { ($0.name ?? "").lowercased().contains((card.institutionName ?? "").lowercased()) && ($0.name ?? "").lowercased() != (card.institutionName ?? "").lowercased() }
+                                                                                                                                         ~~~~~~~~^~~~~
+                                                                                                                                                
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:180:108: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+            ZifrField(label: "CARD NICKNAME", placeholder: "e.g. Sapphire", text: Binding(get: { card.name ?? "" }, set: { card.name = $0 }))
+                                                                                                 ~~~~~~~~~~^~~~~
+                                                                                                          
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:312:71: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                        selection: Binding(get: { card.cardHolderType ?? "Mine" }, set: { card.cardHolderType = $0 })
+                                                  ~~~~~~~~~~~~~~~~~~~~^~~~~~~~~
+                                                                     
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditCardSheet.swift:346:42: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                if (subSvc.paymentMethod ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == cardName {
+                    ~~~~~~~~~~~~~~~~~~~~~^~~~~
+                                        
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/EditLoanSheet.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditLoanSheet.swift:34:29: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+            name: loan.name ?? "",
+                  ~~~~~~~~~~^~~~~
+                           
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditLoanSheet.swift:107:59: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                                Text("Delete \((loan.name ?? "").isEmpty ? "Loan" : loan.name)")
+                                                ~~~~~~~~~~^~~~~
+                                                         
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditLoanSheet.swift:341:37: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                    Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                          ~~~~~~~~~~^~~~~
+                                   
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/EditLoanSheet.swift:524:52: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                    text: Binding(get: { loan.name ?? "" }, set: { loan.name = $0 })
+                                         ~~~~~~~~~~^~~~~
+                                                  
+
+SwiftDriverJobDiscovery normal arm64 Emitting module for Zifr (in target 'Zifr' from project 'Zifr')
+
+SwiftDriver\ Compilation\ Requirements Zifr normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-Swift-Compilation-Requirements -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Zifr -Onone @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.SwiftFileList -DDEBUG -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/AppAuth.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/AppAuthCore.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/GTMSessionFetcherCore.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/GoogleSignIn.modulemap -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -c -j18 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.4-23E237-686eebb5dc1d8ecb277353a59184f4aa.sdkstatcache -output-file-map /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr_const_extract_protocols.json -Xcc -iquote -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-generated-files.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-own-target-headers.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr-a089cdaab87e03b6e2e40cfcc23f7f5b-VFS-iphonesimulator/all-product-headers.yaml -Xcc -iquote -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-project-headers.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuth -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/gtm-session-fetcher/Sources/Core/Public -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources-normal/arm64 -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources/arm64 -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-Swift.h -working-directory /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios -experimental-emit-module-separately -disable-cmo
+
+SwiftDriverJobDiscovery normal arm64 Compiling InstitutionCardsSection.swift, InstitutionLoansSection.swift, InstitutionAccountHUD.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftMergeGeneratedHeaders /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources/Zifr-Swift.h /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-Swift.h (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-swiftHeaderTool -arch arm64 /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-Swift.h -o /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources/Zifr-Swift.h
+
+Copy /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/arm64-apple-ios-simulator.swiftmodule /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftmodule (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftmodule /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/arm64-apple-ios-simulator.swiftmodule
+
+Copy /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/arm64-apple-ios-simulator.swiftdoc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftdoc (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftdoc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/arm64-apple-ios-simulator.swiftdoc
+
+Copy /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/arm64-apple-ios-simulator.abi.json /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.abi.json (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.abi.json /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/arm64-apple-ios-simulator.abi.json
+
+Copy /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftsourceinfo (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-copy -exclude .DS_Store -exclude CVS -exclude .svn -exclude .git -exclude .hg -resolve-src-symlinks -rename /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftsourceinfo /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.swiftmodule/Project/arm64-apple-ios-simulator.swiftsourceinfo
+
+SwiftDriverJobDiscovery normal arm64 Compiling CompanyCardView.swift, CompanyDetailView.swift, CompanyDocument.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling EntityHomeViewModel.swift, EntitySubscriptionSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling AppViewModel.swift, AuthViewModel.swift, CloudSharingView.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling ZifrApp.swift, EditInstitutionSheet.swift, InstitutionAccountsSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling GlobalSearchView.swift, HomeBillingTimeline.swift, LoginView.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling RootView.swift, SharedComponents.swift, Subscription.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling FinancialCardHUD.swift, LoanHUD.swift, AppState.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling LoanPaymentsLedgerView.swift, AdminSettingsView.swift, AddFinancialWizard.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling CompanyMetaSheet.swift, DashboardView.swift, DataRepository.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling SubscriptionListView.swift, SupabaseService.swift, View+Glass.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling Date+Formatting.swift, DocumentListView.swift, DocumentScannerService.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling FinancialCard.swift, FinancialView.swift, GeminiService.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling AddSubscriptionWizard.swift, PremiumSubscriptionCard.swift, FinancialCardVisual.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling FinancialReceiptView.swift, EntityDocumentSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling InstitutionCardView.swift, FinancialCardView.swift, EntityFinancialSection.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling LoanPaymentHUD.swift, EditCardSheet.swift, EditLoanSheet.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling EditCompanySheet.swift, EditSubscriptionSheet.swift, EntityHomeView.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 Compiling\ Institution.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Institution.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Institution.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ LoanCardView.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanCardView.swift (in target 'Zifr' from project 'Zifr')
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Financial/LoanCardView.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/Financial/LoanCardView.swift:14:41: warning: left side of nil coalescing operator '??' has non-optional type 'String', so the right side is never used
+                        Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                              ~~~~~~~~~~^~~~~
+                                       
+
+SwiftCompile normal arm64 Compiling\ CompanyAvatar.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Components/CompanyAvatar.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Components/CompanyAvatar.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ Company.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Company.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Company.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ Loan.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Loan.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Models/Loan.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftCompile normal arm64 Compiling\ HomeRenewalParser.swift /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/HomeRenewalParser.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftCompile normal arm64 /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios/Zifr/Views/Company/HomeRenewalParser.swift (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+
+SwiftDriverJobDiscovery normal arm64 Compiling HomeRenewalParser.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling CompanyAvatar.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling Institution.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling Company.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling Loan.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriverJobDiscovery normal arm64 Compiling LoanCardView.swift (in target 'Zifr' from project 'Zifr')
+
+SwiftDriver\ Compilation Zifr normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-Swift-Compilation -- /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Zifr -Onone @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.SwiftFileList -DDEBUG -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/AppAuth.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/AppAuthCore.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/GTMSessionFetcherCore.modulemap -Xcc -fmodule-map-file\=/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GeneratedModuleMaps-iphonesimulator/GoogleSignIn.modulemap -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk -target arm64-apple-ios17.0-simulator -g -module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -Xfrontend -serialize-debugging-options -enable-testing -index-store-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Index.noindex/DataStore -Xcc -D_LIBCPP_HARDENING_MODE\=_LIBCPP_HARDENING_MODE_DEBUG -swift-version 5 -I /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -c -j18 -enable-batch-mode -incremental -Xcc -ivfsstatcache -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphonesimulator26.4-23E237-686eebb5dc1d8ecb277353a59184f4aa.sdkstatcache -output-file-map /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -explicit-module-build -module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/SwiftExplicitPrecompiledModules -clang-scanner-module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -sdk-module-cache-path /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/yager/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr_const_extract_protocols.json -Xcc -iquote -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-generated-files.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-own-target-headers.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-all-non-framework-target-headers.hmap -Xcc -ivfsoverlay -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr-a089cdaab87e03b6e2e40cfcc23f7f5b-VFS-iphonesimulator/all-product-headers.yaml -Xcc -iquote -Xcc /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-project-headers.hmap -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuth -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/AppAuth-iOS/Sources/AppAuthCore -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/gtm-session-fetcher/Sources/Core/Public -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/SourcePackages/checkouts/GoogleSignIn-iOS/GoogleSignIn/Sources/Public -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/include -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources-normal/arm64 -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources/arm64 -Xcc -I/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/DerivedSources -Xcc -DDEBUG\=1 -emit-objc-header -emit-objc-header-path /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-Swift.h -working-directory /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios -experimental-emit-module-separately -disable-cmo
+
+Ld /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib normal (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios17.0-simulator -dynamiclib -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk -O0 -L/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -filelist /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.LinkFileList -install_name @rpath/Zifr.debug.dylib -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -Xlinker -rpath -Xlinker @executable_path/Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr_dependency_info.dat -fobjc-link-runtime -L/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr-linker-args.resp -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -Wl,-no_warn_duplicate_libraries -framework CoreGraphics -framework CoreText -framework Foundation -framework LocalAuthentication -framework Security -framework UIKit -framework Security -Xlinker -alias -Xlinker _main -Xlinker ___debug_main_executable_dylib_entry_point -Xlinker -no_adhoc_codesign -o /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Supabase.build/Objects-normal/arm64/Supabase.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Supabase.build/Objects-normal/arm64/Supabase-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-concurrency-extras.build/Debug-iphonesimulator/ConcurrencyExtras.build/Objects-normal/arm64/ConcurrencyExtras.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-concurrency-extras.build/Debug-iphonesimulator/ConcurrencyExtras.build/Objects-normal/arm64/ConcurrencyExtras-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-http-types.build/Debug-iphonesimulator/HTTPTypes.build/Objects-normal/arm64/HTTPTypes.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-http-types.build/Debug-iphonesimulator/HTTPTypes.build/Objects-normal/arm64/HTTPTypes-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-clocks.build/Debug-iphonesimulator/Clocks.build/Objects-normal/arm64/Clocks.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-clocks.build/Debug-iphonesimulator/Clocks.build/Objects-normal/arm64/Clocks-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/xctest-dynamic-overlay.build/Debug-iphonesimulator/IssueReporting.build/Objects-normal/arm64/IssueReporting.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/xctest-dynamic-overlay.build/Debug-iphonesimulator/IssueReporting.build/Objects-normal/arm64/IssueReporting-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/xctest-dynamic-overlay.build/Debug-iphonesimulator/IssueReportingPackageSupport.build/Objects-normal/arm64/IssueReportingPackageSupport.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/xctest-dynamic-overlay.build/Debug-iphonesimulator/IssueReportingPackageSupport.build/Objects-normal/arm64/IssueReportingPackageSupport-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/xctest-dynamic-overlay.build/Debug-iphonesimulator/XCTestDynamicOverlay.build/Objects-normal/arm64/XCTestDynamicOverlay.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/xctest-dynamic-overlay.build/Debug-iphonesimulator/XCTestDynamicOverlay.build/Objects-normal/arm64/XCTestDynamicOverlay-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Helpers.build/Objects-normal/arm64/Helpers.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Helpers.build/Objects-normal/arm64/Helpers-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/arm64/Crypto.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/swift-crypto.build/Debug-iphonesimulator/Crypto.build/Objects-normal/arm64/Crypto-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Auth.build/Objects-normal/arm64/Auth.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Auth.build/Objects-normal/arm64/Auth-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Functions.build/Objects-normal/arm64/Functions.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Functions.build/Objects-normal/arm64/Functions-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/PostgREST.build/Objects-normal/arm64/PostgREST.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/PostgREST.build/Objects-normal/arm64/PostgREST-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Realtime.build/Objects-normal/arm64/Realtime.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Realtime.build/Objects-normal/arm64/Realtime-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Storage.build/Objects-normal/arm64/Storage.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Supabase.build/Debug-iphonesimulator/Storage.build/Objects-normal/arm64/Storage-linker-args.resp -Xlinker -add_ast_path -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth.swiftmodule @/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/GTMAppAuth.build/Debug-iphonesimulator/GTMAppAuth.build/Objects-normal/arm64/GTMAppAuth-linker-args.resp
+
+ConstructStubExecutorLinkFileList /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-ExecutorLinkFileList-normal-arm64.txt (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    construct-stub-executor-link-file-list /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libPreviewsJITStubExecutor_no_swift_entry_point.a /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/usr/lib/libPreviewsJITStubExecutor.a --output /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-ExecutorLinkFileList-normal-arm64.txt
+note: Using stub executor library with Swift entry point. (in target 'Zifr' from project 'Zifr')
+
+Ld /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr normal (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios17.0-simulator -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk -O0 -L/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -F/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator -Xlinker -rpath -Xlinker @executable_path -Xlinker -rpath -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/PackageFrameworks -Xlinker -rpath -Xlinker @executable_path/Frameworks -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -e ___debug_blank_executor_main -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_dylib -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-DebugDylibPath-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __debug_instlnm -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-DebugDylibInstallName-normal-arm64.txt -Xlinker -filelist -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr-ExecutorLinkFileList-normal-arm64.txt -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr.app-Simulated.xcent -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __ents_der -Xlinker /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr.app-Simulated.xcent.der /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib -Xlinker -no_adhoc_codesign -o /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr
+
+CopySwiftLibs /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-swiftStdLibTool --copy --verbose --sign - --scan-executable /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib --scan-folder /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Frameworks --scan-folder /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/PlugIns --scan-folder /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/SystemExtensions --scan-folder /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Extensions --platform iphonesimulator --toolchain /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --destination /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Frameworks --strip-bitcode --strip-bitcode-tool /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/bitcode_strip --emit-dependency-info /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/SwiftStdLibToolInputDependencies.dep --filter-for-swift-os --back-deploy-swift-span
+
+ExtractAppIntentsMetadata (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/appintentsmetadataprocessor --toolchain-dir /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain --module-name Zifr --sdk-root /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.4.sdk --xcode-version 17E192 --platform-family iOS --deployment-target 17.0 --bundle-identifier com.vibing.miloom --output /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app --target-triple arm64-apple-ios17.0-simulator --binary-file /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr --dependency-file /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr_dependency_info.dat --stringsdata-file /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/ExtractedAppShortcutsMetadata.stringsdata --source-file-list /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.SwiftFileList --metadata-file-list /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr.DependencyMetadataFileList --static-metadata-file-list /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr.DependencyStaticMetadataFileList --swift-const-vals-list /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Objects-normal/arm64/Zifr.SwiftConstValuesFileList --compile-time-extraction --deployment-aware-processing --validate-assistant-intents --no-app-shortcuts-localization
+2026-05-11 00:39:22.654 appintentsmetadataprocessor[36088:21124236] Starting appintentsmetadataprocessor export
+2026-05-11 00:39:22.656 appintentsmetadataprocessor[36088:21124236] warning: Metadata extraction skipped. No AppIntents.framework dependency found.
+
+CodeSign /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/Zifr.debug.dylib
+
+CodeSign /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/__preview.dylib (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --timestamp\=none --generate-entitlement-der /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/__preview.dylib
+/Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app/__preview.dylib: replacing existing signature
+
+CodeSign /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    
+    Signing Identity:     "Sign to Run Locally"
+    
+    /usr/bin/codesign --force --sign - --entitlements /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Intermediates.noindex/Zifr.build/Debug-iphonesimulator/Zifr.build/Zifr.app.xcent --timestamp\=none --generate-entitlement-der /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app
+
+Validate /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app (in target 'Zifr' from project 'Zifr')
+    cd /Users/yager/Downloads/cifr---entrepreneur\'s-company-manager/zifr-ios
+    builtin-validationUtility /Users/yager/Library/Developer/Xcode/DerivedData/Zifr-fgsdpidufyotergogqlewsatypik/Build/Products/Debug-iphonesimulator/Zifr.app -shallow-bundle -infoplist-subpath Info.plist
+
+** BUILD SUCCEEDED **
+

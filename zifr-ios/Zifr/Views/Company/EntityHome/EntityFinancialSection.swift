@@ -1,0 +1,503 @@
+import SwiftUI
+
+struct EntityFinancialSection: View {
+    let company: Company
+    let institutions: [Institution]
+    let cards: [FinancialCard]
+    let loans: [Loan]
+    let subscriptions: [Subscription]
+    @Bindable var vm: AppViewModel
+    
+    @Binding var expandedInstitutions: Set<String>
+    @Binding var expandedAccounts: Set<String>
+    @Binding var showFinancialReceiptReport: Bool
+    
+    let totalDebt: Double
+    let totalCreditLimit: Double
+    let availableCredit: Double
+    
+    private let finColor = Color(hex: "#1A7077")
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                vm.activeTab = .financial
+            } label: {
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "dollarsign.bank.building")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(finColor)
+                        Text("FINANCIAL")
+                            .font(.system(size: 13, weight: .black))
+                            .tracking(1.5)
+                            .foregroundStyle(.white)
+                        Spacer()
+                        
+                        HStack(spacing: 8) {
+                            Text(formatCurrency(totalDebt)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" debt").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                            
+                            Text(formatCurrency(availableCredit)).font(.system(size: 14, weight: .bold)).foregroundStyle(.white) +
+                            Text(" avail").font(.system(size: 12, weight: .medium)).foregroundStyle(Color.white.opacity(0.5))
+                        }
+                        
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .padding(.leading, 4)
+                    }
+                    
+                    let debtRatio = totalCreditLimit > 0 ? min(1.0, totalDebt / totalCreditLimit) : 0
+                    let percentage = totalCreditLimit > 0 ? Int((totalDebt / totalCreditLimit) * 100) : 0
+                    HStack(spacing: 8) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Color.white.opacity(0.1))
+                                Capsule().fill(finColor)
+                                    .frame(width: geo.size.width * CGFloat(debtRatio))
+                            }
+                        }
+                        .frame(height: 4)
+                        
+                        Text("\(percentage)% DTC")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+            }
+            .buttonStyle(.plain)
+
+            // Institutions
+            VStack(spacing: 12) {
+                ForEach(institutions) { inst in
+                    institutionRow(inst)
+                }
+                // Orphaned cards
+                let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == (card.institutionName ?? "").lowercased() } }
+                let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
+                
+                if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
+                    let isOrphanedExpanded = expandedInstitutions.contains("orphaned")
+                    let orphanedDebt = orphanedCards.reduce(0) { $0 + $1.balance } + orphanedLoans.reduce(0) { $0 + $1.remainingBalance }
+                    let orphanedCredit = orphanedCards.reduce(0) { $0 + $1.limit }
+                    
+                    InstitutionDashboardCard(
+                        isExpanded: isOrphanedExpanded,
+                        onToggle: {
+                            if isOrphanedExpanded { expandedInstitutions.remove("orphaned") }
+                            else { expandedInstitutions.insert("orphaned") }
+                        },
+                        collapsedHeader: {
+                            HStack {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8).fill(finColor).frame(width: 32, height: 32)
+                                    Image(systemName: "building.columns").font(.system(size: 14)).foregroundStyle(.white)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Other Accounts")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Text("\(orphanedCards.count + orphanedLoans.count) Accounts")
+                                        .font(.system(size: 11, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                .padding(.leading, 8)
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Debt")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                    Text(formatCurrency(orphanedDebt))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                                Divider().background(Color.white.opacity(0.2)).frame(height: 24).padding(.horizontal, 8)
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Credit")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                    Text(formatCurrency(orphanedCredit))
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                }
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                                    .rotationEffect(.degrees(isOrphanedExpanded ? 0 : 180))
+                                    .padding(.leading, 8)
+                            }
+                        },
+                        accountsContent: {
+                            VStack(spacing: 0) {
+                                ForEach(Array(orphanedCards.enumerated()), id: \.element.id) { idx, card in
+                                    let isAccExpanded = expandedAccounts.contains(card.id.uuidString)
+                                    let isLast = idx == orphanedCards.count - 1 && orphanedLoans.isEmpty
+                                    AccountNestedRow(
+                                        isExpanded: isAccExpanded,
+                                        onToggle: {
+                                            if isAccExpanded { expandedAccounts.remove(card.id.uuidString) }
+                                            else { expandedAccounts.insert(card.id.uuidString) }
+                                        },
+                                        isLast: isLast,
+                                        collapsedHeader: {
+                                            HStack {
+                                                ZStack {
+                                                    Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                                    Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                }
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(card.name)
+                                                        .font(.system(size: 14, weight: .bold))
+                                                        .foregroundStyle(.white)
+                                                    Text("•••• \(card.last4 ?? "0000")")
+                                                        .font(.system(size: 11, weight: .regular))
+                                                        .foregroundStyle(Color.white.opacity(0.5))
+                                                }
+                                                .padding(.leading, 8)
+                                                Spacer()
+                                                VStack(alignment: .trailing, spacing: 2) {
+                                                    Text("Balance")
+                                                        .font(.system(size: 10, weight: .bold))
+                                                        .foregroundStyle(Color.white.opacity(0.4))
+                                                    Text(formatCurrency(card.balance))
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        .foregroundStyle(.white)
+                                                }
+                                                Image(systemName: "chevron.up")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundStyle(Color.white.opacity(0.3))
+                                                    .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                                    .padding(.leading, 8)
+                                            }
+                                        },
+                                        innerRows: {
+                                            DashboardInnerRow(icon: nil, label: "Account Type", value: "Credit Card")
+                                            DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(card.last4 ?? "0000")")
+                                            DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
+                                        },
+                                        actionButtons: {
+                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                        }
+                                    )
+                                }
+                                
+                                ForEach(Array(orphanedLoans.enumerated()), id: \.element.id) { idx, loan in
+                                    let isAccExpanded = expandedAccounts.contains(loan.id.uuidString)
+                                    let isLast = idx == orphanedLoans.count - 1
+                                    AccountNestedRow(
+                                        isExpanded: isAccExpanded,
+                                        onToggle: {
+                                            if isAccExpanded { expandedAccounts.remove(loan.id.uuidString) }
+                                            else { expandedAccounts.insert(loan.id.uuidString) }
+                                        },
+                                        isLast: isLast,
+                                        collapsedHeader: {
+                                            HStack {
+                                                ZStack {
+                                                    Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                                    Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                }
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(loan.name)
+                                                        .font(.system(size: 14, weight: .bold))
+                                                        .foregroundStyle(.white)
+                                                    Text("Loan")
+                                                        .font(.system(size: 11, weight: .regular))
+                                                        .foregroundStyle(Color.white.opacity(0.5))
+                                                }
+                                                .padding(.leading, 8)
+                                                Spacer()
+                                                VStack(alignment: .trailing, spacing: 2) {
+                                                    Text("Remaining")
+                                                        .font(.system(size: 10, weight: .bold))
+                                                        .foregroundStyle(Color.white.opacity(0.4))
+                                                    Text(formatCurrency(loan.remainingBalance))
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        .foregroundStyle(.white)
+                                                }
+                                                Image(systemName: "chevron.up")
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundStyle(Color.white.opacity(0.3))
+                                                    .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                                    .padding(.leading, 8)
+                                            }
+                                        },
+                                        innerRows: {
+                                            DashboardInnerRow(icon: nil, label: "Account Type", value: "Bank Loan")
+                                            DashboardInnerRow(icon: nil, label: "Interest Rate", value: "\(String(format: "%.1f", loan.interestRate))%")
+                                            DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
+                                        },
+                                        actionButtons: {
+                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+            
+            financialReportButton
+        }
+        .padding(.bottom, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
+    }
+    
+    private var financialReportButton: some View {
+        Button {
+            showFinancialReceiptReport = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "sparkles")
+                Text("Generate Report")
+            }
+            .font(.system(size: 12, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 4)
+    }
+    
+    private func institutionRow(_ inst: Institution) -> some View {
+        let isExpanded = expandedInstitutions.contains(inst.id.uuidString)
+        let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == (inst.name).lowercased() }
+        let instLoans = loans.filter { $0.role == "Bank Loan" && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
+        
+        let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
+        let instCredit = instCards.reduce(0) { $0 + $1.limit }
+        
+        return InstitutionDashboardCard(
+            isExpanded: isExpanded,
+            onToggle: {
+                if isExpanded { expandedInstitutions.remove(inst.id.uuidString) }
+                else { expandedInstitutions.insert(inst.id.uuidString) }
+            },
+            collapsedHeader: {
+                HStack {
+                    if !(inst.loginUrl ?? "").isEmpty {
+                        FaviconImage(website: inst.loginUrl ?? "", size: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8).fill(finColor).frame(width: 32, height: 32)
+                            Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(.white)
+                        }
+                    }
+                    Text(inst.name)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.leading, 4)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Debt")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(instDebt))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    Divider().background(Color.white.opacity(0.2)).frame(height: 24).padding(.horizontal, 8)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("Credit")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                        Text(formatCurrency(instCredit))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.3))
+                        .rotationEffect(.degrees(isExpanded ? 0 : 180))
+                        .padding(.leading, 8)
+                }
+            },
+            accountsContent: {
+                VStack(spacing: 0) {
+                    ForEach(Array(inst.accounts.enumerated()), id: \.element.id) { idx, acc in
+                        let nameToMatch = acc.name.isEmpty ? acc.type : acc.name
+                        let isAccExpanded = expandedAccounts.contains(acc.id)
+                        let isLast = idx == inst.accounts.count - 1 && instCards.isEmpty && instLoans.isEmpty
+                        AccountNestedRow(
+                            isExpanded: isAccExpanded,
+                            onToggle: {
+                                if isAccExpanded { expandedAccounts.remove(acc.id) }
+                                else { expandedAccounts.insert(acc.id) }
+                            },
+                            isLast: isLast,
+                            collapsedHeader: {
+                                HStack {
+                                    ZStack {
+                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                        Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(nameToMatch)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("•••• \(acc.last4.isEmpty ? "0000" : acc.last4)")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Balance")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                        Text(formatCurrency(acc.balance))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                        .padding(.leading, 8)
+                                }
+                            },
+                            innerRows: {
+                                DashboardInnerRow(icon: nil, label: "Account Type", value: acc.type)
+                                DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(acc.last4.isEmpty ? "0000" : acc.last4)")
+                            },
+                            actionButtons: {
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                            }
+                        )
+                    }
+                    
+                    ForEach(Array(instCards.enumerated()), id: \.element.id) { idx, card in
+                        let isAccExpanded = expandedAccounts.contains(card.id.uuidString)
+                        let isLast = idx == instCards.count - 1 && instLoans.isEmpty
+                        AccountNestedRow(
+                            isExpanded: isAccExpanded,
+                            onToggle: {
+                                if isAccExpanded { expandedAccounts.remove(card.id.uuidString) }
+                                else { expandedAccounts.insert(card.id.uuidString) }
+                            },
+                            isLast: isLast,
+                            collapsedHeader: {
+                                HStack {
+                                    ZStack {
+                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                        Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(card.name)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("•••• \(card.last4 ?? "0000")")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Balance")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                        Text(formatCurrency(card.balance))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                        .padding(.leading, 8)
+                                }
+                            },
+                            innerRows: {
+                                DashboardInnerRow(icon: nil, label: "Account Type", value: "Credit Card")
+                                DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(card.last4 ?? "0000")")
+                                DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
+                            },
+                            actionButtons: {
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                            }
+                        )
+                    }
+                    
+                    ForEach(Array(instLoans.enumerated()), id: \.element.id) { idx, loan in
+                        let isAccExpanded = expandedAccounts.contains(loan.id.uuidString)
+                        let isLast = idx == instLoans.count - 1
+                        AccountNestedRow(
+                            isExpanded: isAccExpanded,
+                            onToggle: {
+                                if isAccExpanded { expandedAccounts.remove(loan.id.uuidString) }
+                                else { expandedAccounts.insert(loan.id.uuidString) }
+                            },
+                            isLast: isLast,
+                            collapsedHeader: {
+                                HStack {
+                                    ZStack {
+                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                        Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    }
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(loan.name)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("Loan")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.leading, 8)
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("Remaining")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                        Text(formatCurrency(loan.remainingBalance))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    Image(systemName: "chevron.up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
+                                        .padding(.leading, 8)
+                                }
+                            },
+                            innerRows: {
+                                DashboardInnerRow(icon: nil, label: "Account Type", value: "Bank Loan")
+                                DashboardInnerRow(icon: nil, label: "Interest Rate", value: "\(String(format: "%.1f", loan.interestRate))%")
+                                DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
+                            },
+                            actionButtons: {
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                            }
+                        )
+                    }
+                }
+            }
+        )
+        .padding(.horizontal, 16)
+        .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil)
+    }
+
+    private func formatCurrency(_ value: Double) -> String {
+        if value == 0 { return "$0" }
+        if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
+        return "$\(String(format: "%.0f", value))"
+    }
+}

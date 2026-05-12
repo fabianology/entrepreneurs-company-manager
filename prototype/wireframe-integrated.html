@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Zifr Wizard — Integrated Wireframe</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="wireframe-integrated.css">
+</head>
+<body>
+<div class="device">
+  <!-- App background (Financial Tab) -->
+  <div class="app-bg" id="appBg">
+    <div class="app-title">FINANCIAL</div>
+    <div class="app-header">
+      <button class="share-btn">↑</button>
+      <button class="add-btn" id="openWizard" onclick="openSheet()">ADD ACCOUNT <span style="font-size:10px;color:rgba(255,255,255,.3)">▾</span></button>
+    </div>
+    <div class="wallet-area">
+      <div class="card-peek"><div class="card-peek-text"><span>Sapphire Preferred</span><span>•••• 4821 · Visa Credit</span></div></div>
+      <div class="card-peek"><div class="card-peek-text"><span>Freedom Unlimited</span><span>•••• 9102 · Visa Credit</span></div></div>
+      <div class="inst-card">
+        <div class="inst-header">
+          <div class="inst-icon">🏦</div>
+          <div><div class="inst-name">Chase</div>
+          <div class="inst-meta"><span>2</span> Accounts · <span>2</span> Cards · <span>0</span> Loans</div></div>
+        </div>
+        <div class="inst-creds">
+          <div class="cred-box"><div class="cred-label">LOGIN ID</div><div class="cred-val">founder@co.com</div></div>
+          <div class="cred-box"><div class="cred-label">PASSWORD</div><div class="cred-val">••••••••</div></div>
+        </div>
+      </div>
+    </div>
+    <!-- Toast notification -->
+    <div class="toast" id="toast"><span class="toast-check">✓</span><span class="toast-text" id="toastText">Sapphire Reserve added</span></div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <div class="tab-item"><div class="tab-icon">⊞</div><div class="tab-label">Home</div></div>
+    <div class="tab-item"><div class="tab-icon">◈</div><div class="tab-label">Services</div></div>
+    <div class="tab-item"><div style="display:flex;flex-direction:column;align-items:center"><div class="tab-indicator"></div><div class="tab-icon active">🏛</div><div class="tab-label active">Financial</div></div></div>
+    <div class="tab-item"><div class="tab-icon">📄</div><div class="tab-label">Docs</div></div>
+  </div>
+
+  <!-- ═══ WIZARD SHEET ═══ -->
+  <div class="sheet-overlay" id="sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-progress"><div class="sheet-progress-fill" id="progressFill"></div></div>
+
+    <div class="sheet-scroll" id="sheetScroll">
+      <div class="sheet-top"><button class="sheet-cancel" onclick="closeSheet()">Cancel</button></div>
+
+      <!-- SEC 1: Type -->
+      <div class="section" id="sec-type">
+        <div class="section-header" id="hdr-type">
+          <div class="title">What would you like<br>to add?</div>
+          <div class="subtitle">Choose the type of financial item you want to track.</div>
+        </div>
+        <div class="section-body" id="body-type">
+          <div class="choice-grid">
+            <div class="choice-btn" onclick="pickType('account',this)"><div class="choice-icon">🏦</div><div class="choice-text"><h3>Bank Account</h3><p>Checking · Savings · Investing · 401(k)</p></div></div>
+            <div class="choice-btn" onclick="pickType('card',this)"><div class="choice-icon">💳</div><div class="choice-text"><h3>Card</h3><p>Credit Card · Debit Card</p></div></div>
+            <div class="choice-btn" onclick="pickType('loan',this)"><div class="choice-icon">💰</div><div class="choice-text"><h3>Loan</h3><p>I owe money · I'm lending money</p></div></div>
+          </div>
+        </div>
+        <div class="collapse-bar hidden" id="col-type" onclick="expand('type')">
+          <span class="collapse-field-label">Type:</span><span class="collapse-icon" id="colTypeIcon">🏦</span>
+          <span class="collapse-label" id="colTypeLabel">Bank Account</span>
+          <span class="collapse-check">✓</span><span class="collapse-chevron">▸</span>
+        </div>
+      </div>
+
+      <!-- SEC 2: Bank -->
+      <div class="section hidden-section" id="sec-bank">
+        <div class="section-header" id="hdr-bank">
+          <div class="title" id="bankTitle">Which bank?</div>
+          <div class="subtitle">We'll organize everything under this bank for you.</div>
+        </div>
+        <div class="section-body" id="body-bank">
+          <div class="field-group visible">
+            <div class="field-label">BANK NAME</div>
+            <input class="field-input" id="bankInput" placeholder="e.g. Chase, Wells Fargo" oninput="onBankInput(this.value)">
+            <div class="suggestions" id="bankSugg"></div>
+          </div>
+        </div>
+        <div class="collapse-bar hidden" id="col-bank" onclick="expand('bank')">
+          <span class="collapse-field-label">Bank:</span><span class="collapse-icon">🏦</span>
+          <span class="collapse-label" id="colBankLabel">Chase</span>
+          <span class="collapse-check">✓</span><span class="collapse-chevron">▸</span>
+        </div>
+      </div>
+
+      <!-- SEC 3: Details -->
+      <div class="section hidden-section" id="sec-details">
+        <div class="section-header" id="hdr-details">
+          <div class="title" id="detTitle">Set up your account</div>
+          <div class="subtitle" id="detSub">Fill in the basics — you can always add more later.</div>
+        </div>
+        <div class="section-body" id="detBody"></div>
+      </div>
+
+      <!-- SEC 4: Success -->
+      <div class="section hidden-section" id="sec-success">
+        <div class="success-check"><span>✓</span></div>
+        <div class="success-title" id="sucTitle">Added!</div>
+        <div class="success-sub" id="sucSub">Your account is ready.</div>
+        <button class="success-btn primary" onclick="alert('Opens EditCardSheet / EditInstitutionSheet / EditLoanSheet')">✏️ Add More Details<br><span style="font-size:11px;color:rgba(255,255,255,.3)">Promo APR, autopay, card color, notes</span></button>
+        <button class="success-btn primary" id="addAnotherBtn" onclick="addAnother()">➕ Add Another at Chase</button>
+        <button class="success-btn done" onclick="closeSheet()">Done</button>
+      </div>
+
+      <div style="height:80px"></div>
+    </div>
+
+    <!-- Save bar -->
+    <div class="save-bar hidden" id="saveBar"><button class="save-btn" id="saveBtn" onclick="doSave()">Save</button></div>
+  </div>
+</div>
+
+<script>
+const T={account:{icon:'🏦',label:'Bank Account',bankQ:'Which bank is your account with?'},card:{icon:'💳',label:'Card',bankQ:'Which bank issued your card?'},loan:{icon:'💰',label:'Loan',bankQ:'Who is the lender?'}};
+const banks=['Chase','Wells Fargo','Bank of America','Citibank','Capital One','American Express','US Bank','PNC'];
+let chosenType='',bankName='',step=0;
+
+function openSheet(){document.getElementById('sheet').classList.add('open');document.getElementById('appBg').classList.add('blurred');step=1;}
+function closeSheet(){
+  document.getElementById('sheet').classList.remove('open');
+  document.getElementById('appBg').classList.remove('blurred');
+  if(step>=4){showToast();updateWallet();}
+  resetWizard();
+}
+
+function setProgress(p){document.getElementById('progressFill').style.width=p+'%';}
+function scrollTo(id){setTimeout(()=>{const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});},120);}
+function revealFields(containerId){document.querySelectorAll('#'+containerId+' .field-group').forEach((g,i)=>setTimeout(()=>g.classList.add('visible'),80*(i+1)));}
+
+function collapse(sec){
+  const h=document.getElementById('hdr-'+sec),b=document.getElementById('body-'+sec),c=document.getElementById('col-'+sec),s=document.getElementById('sec-'+sec);
+  if(h)h.style.display='none';if(b)b.style.display='none';c.classList.remove('hidden');s.classList.add('dimmed');
+}
+function expand(sec){
+  const h=document.getElementById('hdr-'+sec),b=document.getElementById('body-'+sec),c=document.getElementById('col-'+sec),s=document.getElementById('sec-'+sec);
+  if(h)h.style.display='';if(b)b.style.display='';c.classList.add('hidden');s.classList.remove('dimmed');scrollTo('sec-'+sec);
+}
+function showSection(sec){const el=document.getElementById('sec-'+sec);el.classList.remove('hidden-section');el.style.opacity='0';el.style.transform='translateY(16px)';el.style.transition='all 350ms cubic-bezier(.32,.72,0,1)';requestAnimationFrame(()=>requestAnimationFrame(()=>{el.style.opacity='1';el.style.transform='translateY(0)';}));}
+
+// ── TYPE ──
+function pickType(t,el){
+  chosenType=t;document.querySelectorAll('.choice-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');
+  document.getElementById('colTypeIcon').textContent=T[t].icon;
+  document.getElementById('colTypeLabel').textContent=T[t].label;
+  document.getElementById('bankTitle').textContent=T[t].bankQ;
+  setTimeout(()=>{collapse('type');setProgress(25);showSection('bank');scrollTo('sec-bank');setTimeout(()=>document.getElementById('bankInput').focus(),400);step=2;},280);
+}
+
+// ── BANK ──
+function onBankInput(v){
+  bankName=v;const c=document.getElementById('bankSugg');
+  if(v.length<1){c.innerHTML='';return;}
+  const m=banks.filter(b=>b.toLowerCase().includes(v.toLowerCase()));
+  c.innerHTML=m.slice(0,3).map(b=>`<div class="sug-chip" onclick="selectBank('${b}')">${b}</div>`).join('');
+}
+function selectBank(b){bankName=b;document.getElementById('bankInput').value=b;document.getElementById('colBankLabel').textContent=b;goDetails();}
+document.addEventListener('DOMContentLoaded',()=>{document.getElementById('bankInput').addEventListener('keydown',e=>{if(e.key==='Enter'&&bankName.trim()){document.getElementById('colBankLabel').textContent=bankName;goDetails();}});});
+
+function goDetails(){
+  setTimeout(()=>{collapse('bank');setProgress(50);buildDetails();showSection('details');scrollTo('sec-details');setTimeout(()=>revealFields('detBody'),300);document.getElementById('saveBar').classList.remove('hidden');step=3;},280);
+}
+
+// ── DETAILS ──
+function buildDetails(){
+  const bn=bankName||'your bank',c=document.getElementById('detBody');
+  const labels={account:'account',card:'card',loan:'loan'};
+  document.getElementById('detTitle').textContent=`Set up your ${bn} ${labels[chosenType]}`;
+  document.getElementById('detSub').textContent='Fill in the basics — you can always add more later.';
+  if(chosenType==='account')c.innerHTML=acctHTML();
+  else if(chosenType==='card')c.innerHTML=cardHTML();
+  else c.innerHTML=loanHTML();
+}
+
+function acctHTML(){return `
+<div class="field-group"><div class="field-label">ACCOUNT NAME</div><input class="field-input" placeholder="e.g. Primary Checking" oninput="checkSave()"></div>
+<div class="field-group"><div class="field-label">TYPE</div><div class="seg-row"><button class="seg-btn selected" onclick="pickSeg(this)">Checking</button><button class="seg-btn" onclick="pickSeg(this)">Savings</button><button class="seg-btn more-btn" onclick="pickSeg(this)">Other ▾</button></div></div>
+<div class="field-group"><div class="field-label">BALANCE <span class="optional">optional</span></div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div><div class="field-hint">Just an estimate — update anytime</div></div>
+<div class="field-group"><div class="divider-row"><div class="divider-line"></div><div class="divider-text">OPTIONAL</div><div class="divider-line"></div></div></div>
+<div class="field-group"><div class="field-label">ACCOUNT NUMBER <span class="optional">optional</span></div><input class="field-input" placeholder="e.g. 1234567890" inputmode="numeric"></div>
+${vaultHTML()}`;}
+
+function cardHTML(){return `
+<div class="field-group"><div class="field-label">CARD NICKNAME</div><input class="field-input" placeholder="e.g. Sapphire Reserve" oninput="checkSave()"></div>
+<div class="field-group"><div class="field-label">CARD NUMBER <span class="optional">or just last 4</span></div><input class="field-input" placeholder="0000 0000 0000 0000" inputmode="numeric" oninput="onCardNum(this.value)"></div>
+<div class="field-group"><div class="field-label">NETWORK <span id="autoLabel" style="display:none" class="optional">· auto-detected</span></div><div class="network-row" id="netRow"><div class="net-pill" onclick="pickNet(this)">Visa</div><div class="net-pill" onclick="pickNet(this)">Mastercard</div><div class="net-pill" onclick="pickNet(this)">Amex</div><div class="net-pill" onclick="pickNet(this)">Discover</div></div></div>
+<div class="field-group"><div class="field-label">TYPE</div><div class="seg-row"><button class="seg-btn selected" onclick="pickSeg(this)">Credit</button><button class="seg-btn" onclick="pickSeg(this)">Debit</button></div></div>
+<div class="field-group"><div class="divider-row"><div class="divider-line"></div><div class="divider-text">FINANCIALS</div><div class="divider-line"></div></div></div>
+<div class="field-group"><div class="hstack"><div><div class="field-label">BALANCE</div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div></div><div><div class="field-label">CREDIT LIMIT</div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div></div></div></div>
+<div class="field-group"><div class="hstack"><div><div class="field-label">APR %</div><input class="field-input" placeholder="0.00" inputmode="decimal"></div><div><div class="field-label">EXPIRES</div><input class="field-input" placeholder="MM/YY" inputmode="numeric"></div></div></div>
+${vaultHTML()}`;}
+
+function loanHTML(){return `
+<div class="field-group"><div class="field-label">LOAN NAME</div><input class="field-input" placeholder="e.g. Equipment Loan" oninput="checkSave()"></div>
+<div class="field-group"><div class="field-label">ROLE</div><div class="seg-row"><button class="seg-btn selected" onclick="pickSeg(this)">I Owe</button><button class="seg-btn" onclick="pickSeg(this)">I'm Lending</button></div></div>
+<div class="field-group"><div class="field-label">PRINCIPAL AMOUNT</div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div></div>
+<div class="field-group"><div class="field-label">INTEREST RATE</div><input class="field-input" placeholder="0.00 %" inputmode="decimal"></div>
+<div class="field-group"><div class="divider-row"><div class="divider-line"></div><div class="divider-text">OPTIONAL</div><div class="divider-line"></div></div></div>
+<div class="field-group"><div class="hstack"><div><div class="field-label">TERM (YEARS)</div><input class="field-input" placeholder="e.g. 5" inputmode="numeric"></div><div><div class="field-label">TERM (MONTHS)</div><input class="field-input" placeholder="e.g. 0" inputmode="numeric"></div></div></div>
+${vaultHTML()}`;}
+
+function vaultHTML(){return `
+<div class="field-group"><div class="divider-row"><div class="divider-line"></div><div class="divider-text">SECURE LOGIN</div><div class="divider-line"></div></div></div>
+<div class="field-group"><div class="vault-card">
+  <div class="vault-header"><div class="vault-icon">🔒</div><div><div class="vault-title">Bank Login Details</div><div class="vault-sub">Stored securely on your device</div></div></div>
+  <div class="vault-field"><div class="field-label">LOGIN ID <span class="optional">email or username</span></div><input class="field-input" placeholder="you@email.com" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06)"></div>
+  <div class="vault-field"><div class="field-label">PASSWORD</div><input class="field-input" type="password" placeholder="••••••••" style="background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.06)"></div>
+  <div class="vault-field"><div class="field-label">TWO-FACTOR AUTH <span class="optional">optional</span></div><div class="tfa-row"><div class="tfa-pill" onclick="pickTfa(this)">📱 SMS</div><div class="tfa-pill" onclick="pickTfa(this)">🔐 App</div><div class="tfa-pill" onclick="pickTfa(this)">📧 Email</div><div class="tfa-pill" onclick="pickTfa(this)">None</div></div></div>
+  <div class="vault-badge">🔑 Works with iCloud Keychain · End-to-end encrypted</div>
+</div></div>`;}
+
+// ── HELPERS ──
+function pickSeg(el){el.parentElement.querySelectorAll('.seg-btn').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');}
+function pickNet(el){el.parentElement.querySelectorAll('.net-pill').forEach(b=>{b.classList.remove('selected','auto');});el.classList.add('selected');}
+function pickTfa(el){el.parentElement.querySelectorAll('.tfa-pill').forEach(b=>b.classList.remove('selected'));el.classList.add('selected');}
+function onCardNum(v){
+  const d=v.replace(/\D/g,''),nr=document.getElementById('netRow');if(!nr)return;
+  const pills=nr.querySelectorAll('.net-pill'),al=document.getElementById('autoLabel');
+  pills.forEach(p=>{p.classList.remove('selected','auto');});
+  if(d.length>=1){let n='';if(d[0]==='4')n='Visa';else if(d[0]==='5')n='Mastercard';else if(d[0]==='3')n='Amex';else if(d[0]==='6')n='Discover';
+    if(n){pills.forEach(p=>{if(p.textContent===n)p.classList.add('selected','auto');});al.style.display='inline';}else al.style.display='none';
+  }else al.style.display='none';checkSave();
+}
+function checkSave(){const btn=document.getElementById('saveBtn'),inputs=document.querySelectorAll('#detBody .field-input');btn.className=inputs[0]&&inputs[0].value.trim()?'save-btn active':'save-btn';}
+
+// ── SAVE ──
+function doSave(){
+  const btn=document.getElementById('saveBtn');if(!btn.classList.contains('active'))return;
+  document.getElementById('saveBar').classList.add('hidden');setProgress(100);
+  const bn=bankName||'Your',labels={account:'account',card:'card',loan:'loan'};
+  const ni=document.querySelector('#detBody .field-input'),name=ni?ni.value||labels[chosenType]:labels[chosenType];
+  document.getElementById('sucTitle').textContent=`${name} added!`;
+  document.getElementById('sucSub').textContent=`Your ${bn} ${labels[chosenType]} is ready to go.`;
+  document.getElementById('addAnotherBtn').innerHTML=`➕ Add Another at ${bn}`;
+  // Collapse details
+  const h=document.getElementById('hdr-details'),b=document.getElementById('body-details');
+  if(h)h.style.display='none';
+  document.getElementById('detBody').style.display='none';
+  document.getElementById('sec-details').classList.add('dimmed');
+  setTimeout(()=>{showSection('success');scrollTo('sec-success');step=4;},280);
+}
+
+function addAnother(){
+  document.getElementById('sec-success').classList.add('hidden-section');
+  document.getElementById('sec-details').classList.add('hidden-section');
+  document.getElementById('sec-details').classList.remove('dimmed');
+  const h=document.getElementById('hdr-details'),b=document.getElementById('detBody');
+  if(h)h.style.display='';if(b)b.style.display='';
+  expand('type');setProgress(25);step=1;scrollTo('sec-type');
+}
+
+function showToast(){
+  const labels={account:'account',card:'card',loan:'loan'};
+  const ni=document.querySelector('#detBody .field-input');
+  document.getElementById('toastText').textContent=`${ni&&ni.value?ni.value:labels[chosenType]} added`;
+  const t=document.getElementById('toast');t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);
+}
+function updateWallet(){/* In real app: AppState reactivity handles this */}
+
+function resetWizard(){
+  chosenType='';bankName='';step=0;setProgress(0);
+  ['type','bank','details','success'].forEach(s=>{
+    const sec=document.getElementById('sec-'+s),h=document.getElementById('hdr-'+s),b=document.getElementById('body-'+s)||document.getElementById('detBody'),c=document.getElementById('col-'+s);
+    if(s!=='type')sec.classList.add('hidden-section');
+    sec.classList.remove('dimmed');if(h)h.style.display='';if(b)b.style.display='';if(c)c.classList.add('hidden');
+  });
+  document.querySelectorAll('.choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('bankInput').value='';document.getElementById('bankSugg').innerHTML='';
+  document.getElementById('saveBar').classList.add('hidden');
+  document.getElementById('sheetScroll').scrollTop=0;
+}
+</script>
+</body>
+</html>

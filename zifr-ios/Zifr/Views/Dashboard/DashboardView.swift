@@ -15,7 +15,7 @@ struct DashboardView: View {
     @State private var companyToDelete: Company? = nil
     @State private var companyToShare: Company? = nil
     @State private var currentUserId: UUID?
-    
+    @State private var showAssistant = false    
     // Shared companies
     private var sharedCompanies: [Company] {
         guard let currentUserId = currentUserId else { return [] }
@@ -235,6 +235,10 @@ struct DashboardView: View {
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
             }
+            .fullScreenCover(isPresented: $showAssistant) {
+                AssistantOnboardingView(vm: vm)
+                    .environment(appState)
+            }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 10) {
                     Button {
@@ -270,6 +274,26 @@ struct DashboardView: View {
                         .background(Color(hex: "#1C1C1E"))
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showAssistant = true
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [Color(hex: "#5AC8FA"), Color(hex: "#0A84FF")]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .clipShape(Circle())
+                            .shadow(color: Color(hex: "#0A84FF").opacity(0.6), radius: 8, x: 0, y: 0)
                     }
                     .buttonStyle(.plain)
                 }

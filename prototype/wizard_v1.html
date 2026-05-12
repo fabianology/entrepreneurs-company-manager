@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Zifr Financial Wizard Prototype</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:#0a0a0a; color:#fff; min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:20px; }
+.phone { width:390px; height:844px; background:#171717; border-radius:44px; overflow:hidden; position:relative; border:2px solid #333; box-shadow:0 20px 60px rgba(0,0,0,0.8); }
+.screen { position:absolute; inset:0; padding:60px 24px 40px; display:flex; flex-direction:column; transition:transform 0.45s cubic-bezier(0.32,0.72,0,1), opacity 0.35s ease; will-change:transform,opacity; overflow-y:auto; }
+.screen.hidden-right { transform:translateX(100%); opacity:0; pointer-events:none; }
+.screen.hidden-left { transform:translateX(-100%); opacity:0; pointer-events:none; }
+.screen.active { transform:translateX(0); opacity:1; }
+
+/* Nav bar */
+.nav { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; min-height:36px; }
+.nav-btn { background:none; border:none; color:#fff; font-size:15px; font-weight:600; cursor:pointer; padding:8px 0; opacity:0.6; transition:opacity 0.2s; }
+.nav-btn:hover { opacity:1; }
+.nav-btn.save { color:#22c55e; opacity:0.3; pointer-events:none; transition:all 0.3s; }
+.nav-btn.save.active { opacity:1; pointer-events:auto; }
+.nav-btn.cancel { color:#999; }
+
+/* Typography */
+.title { font-size:26px; font-weight:800; line-height:1.2; margin-bottom:8px; }
+.subtitle { font-size:14px; font-weight:500; color:rgba(255,255,255,0.4); margin-bottom:32px; line-height:1.4; }
+
+/* Choice buttons */
+.choice-grid { display:flex; flex-direction:column; gap:14px; }
+.choice-btn { background:#111; border:1px solid rgba(255,255,255,0.06); border-radius:16px; padding:20px 22px; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:16px; }
+.choice-btn:hover { background:#1a1a1a; border-color:rgba(255,255,255,0.12); transform:scale(1.01); }
+.choice-btn:active { transform:scale(0.98); }
+.choice-icon { font-size:28px; width:44px; text-align:center; }
+.choice-text h3 { font-size:16px; font-weight:700; margin-bottom:3px; }
+.choice-text p { font-size:12px; font-weight:500; color:rgba(255,255,255,0.35); }
+
+/* Input fields */
+.field-group { margin-bottom:20px; opacity:0; transform:translateY(12px); transition:all 0.4s cubic-bezier(0.32,0.72,0,1); }
+.field-group.visible { opacity:1; transform:translateY(0); }
+.field-label { font-size:11px; font-weight:700; letter-spacing:0.5px; color:rgba(255,255,255,0.45); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.field-label .optional { font-weight:500; color:rgba(255,255,255,0.2); font-size:10px; }
+.field-input { width:100%; background:#111; border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:0 16px; height:50px; color:#fff; font-size:16px; font-weight:500; font-family:'Inter',sans-serif; outline:none; transition:border-color 0.2s; }
+.field-input:focus { border-color:rgba(255,255,255,0.2); }
+.field-input::placeholder { color:rgba(255,255,255,0.2); }
+.field-hint { font-size:11px; color:rgba(255,255,255,0.25); margin-top:5px; font-weight:500; }
+
+/* Money field */
+.money-wrap { position:relative; }
+.money-wrap .currency { position:absolute; left:16px; top:50%; transform:translateY(-50%); font-size:14px; font-weight:700; color:rgba(255,255,255,0.4); }
+.money-wrap .field-input { padding-left:32px; }
+
+/* Segmented buttons */
+.seg-row { display:flex; gap:8px; }
+.seg-btn { flex:1; height:46px; background:#111; border:1px solid rgba(255,255,255,0.08); border-radius:12px; color:rgba(255,255,255,0.5); font-size:14px; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:'Inter',sans-serif; }
+.seg-btn.selected { background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.4); color:#22c55e; }
+.seg-btn:hover:not(.selected) { background:#1a1a1a; }
+.seg-btn.more-btn { flex:0.6; font-size:12px; }
+
+/* Network pills */
+.network-row { display:flex; gap:6px; flex-wrap:wrap; }
+.net-pill { padding:10px 16px; background:#111; border:1px solid rgba(255,255,255,0.08); border-radius:10px; color:rgba(255,255,255,0.5); font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.net-pill.selected { background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.4); color:#22c55e; }
+.net-pill.auto { position:relative; }
+.net-pill.auto::after { content:'auto'; position:absolute; top:-6px; right:-4px; font-size:8px; background:#22c55e; color:#000; padding:1px 4px; border-radius:4px; font-weight:800; }
+
+/* Suggestion chips */
+.suggestions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.sug-chip { padding:6px 14px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:20px; color:#22c55e; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.sug-chip:hover { background:rgba(34,197,94,0.15); }
+
+/* Divider */
+.divider-row { display:flex; align-items:center; gap:12px; margin:24px 0 20px; opacity:0; transform:translateY(8px); transition:all 0.4s; }
+.divider-row.visible { opacity:1; transform:translateY(0); }
+.divider-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
+.divider-text { font-size:10px; font-weight:700; color:rgba(255,255,255,0.2); letter-spacing:1.5px; }
+
+/* Next button */
+.next-btn { margin-top:auto; padding:16px; background:#22c55e; border:none; border-radius:14px; color:#000; font-size:16px; font-weight:700; cursor:pointer; transition:all 0.2s; font-family:'Inter',sans-serif; opacity:0.3; pointer-events:none; }
+.next-btn.active { opacity:1; pointer-events:auto; }
+.next-btn:hover.active { background:#16a34a; }
+.next-btn:active.active { transform:scale(0.98); }
+
+/* Success screen */
+.success-check { width:80px; height:80px; border-radius:50%; background:rgba(34,197,94,0.12); display:flex; align-items:center; justify-content:center; margin:40px auto 24px; animation:pop 0.5s cubic-bezier(0.32,0.72,0,1); }
+.success-check span { font-size:36px; color:#22c55e; }
+.success-title { text-align:center; font-size:22px; font-weight:800; margin-bottom:6px; }
+.success-sub { text-align:center; font-size:14px; color:rgba(255,255,255,0.4); margin-bottom:40px; }
+.success-btn { width:100%; padding:16px; border-radius:14px; border:none; font-size:15px; font-weight:600; cursor:pointer; margin-bottom:10px; font-family:'Inter',sans-serif; transition:all 0.2s; }
+.success-btn.primary { background:#111; color:#fff; border:1px solid rgba(255,255,255,0.08); }
+.success-btn.done { background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.3); }
+.success-btn:hover { transform:scale(1.01); }
+
+/* Progress dots */
+.progress { display:flex; gap:6px; justify-content:center; margin-bottom:24px; }
+.dot { width:8px; height:8px; border-radius:4px; background:rgba(255,255,255,0.1); transition:all 0.3s; }
+.dot.active { background:#22c55e; width:24px; }
+.dot.done { background:rgba(34,197,94,0.4); }
+
+/* HStack fields */
+.hstack { display:flex; gap:10px; }
+.hstack > * { flex:1; }
+
+@keyframes pop { 0%{transform:scale(0)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+
+/* Toggle */
+.toggle-wrap { display:flex; align-items:center; justify-content:space-between; background:#111; border:1px solid rgba(255,255,255,0.08); border-radius:14px; padding:0 16px; height:50px; }
+.toggle-label { font-size:14px; font-weight:600; color:#fff; }
+.toggle { width:44px; height:26px; border-radius:13px; background:rgba(255,255,255,0.15); cursor:pointer; position:relative; transition:background 0.2s; }
+.toggle.on { background:#22c55e; }
+.toggle::after { content:''; position:absolute; width:22px; height:22px; border-radius:11px; background:#fff; top:2px; left:2px; transition:transform 0.2s; }
+.toggle.on::after { transform:translateX(18px); }
+
+/* Scrollbar */
+.screen::-webkit-scrollbar { width:0; }
+</style>
+</head>
+<body>
+<div class="phone">
+
+<!-- SCREEN 1: What are you adding? -->
+<div class="screen active" id="s1">
+  <div class="nav"><button class="nav-btn cancel" onclick="resetAll()">Cancel</button><div></div></div>
+  <div class="progress"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+  <div class="title">What would you like<br>to add?</div>
+  <div class="subtitle">Choose the type of financial item you want to track.</div>
+  <div class="choice-grid">
+    <div class="choice-btn" onclick="pickType('account')"><div class="choice-icon">🏦</div><div class="choice-text"><h3>Bank Account</h3><p>Checking · Savings · Investing · 401(k)</p></div></div>
+    <div class="choice-btn" onclick="pickType('card')"><div class="choice-text"><h3>💳 Card</h3><p>Credit Card · Debit Card</p></div></div>
+    <div class="choice-btn" onclick="pickType('loan')"><div class="choice-icon">💰</div><div class="choice-text"><h3>Loan</h3><p>I owe money · I'm lending money</p></div></div>
+  </div>
+</div>
+
+<!-- SCREEN 2: Which bank? -->
+<div class="screen hidden-right" id="s2">
+  <div class="nav"><button class="nav-btn" onclick="goTo(1)">‹ Back</button><div></div></div>
+  <div class="progress"><div class="dot done"></div><div class="dot active"></div><div class="dot"></div></div>
+  <div class="title" id="bankTitle">Which bank is your account with?</div>
+  <div class="subtitle">We'll organize everything under this bank for you.</div>
+  <div class="field-group visible">
+    <div class="field-label">BANK NAME</div>
+    <input class="field-input" id="bankInput" placeholder="e.g. Chase, Wells Fargo" oninput="onBankInput(this.value)">
+    <div class="suggestions" id="bankSuggestions"></div>
+  </div>
+  <button class="next-btn" id="bankNext" onclick="goTo(3)">Next</button>
+</div>
+
+<!-- SCREEN 3: Details (dynamic based on type) -->
+<div class="screen hidden-right" id="s3">
+  <div class="nav"><button class="nav-btn" onclick="goTo(2)">‹ Back</button><button class="nav-btn save" id="saveBtn" onclick="goTo(4)">Save</button></div>
+  <div class="progress"><div class="dot done"></div><div class="dot done"></div><div class="dot active"></div></div>
+  <div class="title" id="detailsTitle">Set up your account</div>
+  <div class="subtitle" id="detailsSub">Fill in the basics — you can always add more later.</div>
+  <div id="detailsContent"></div>
+</div>
+
+<!-- SCREEN 4: Success -->
+<div class="screen hidden-right" id="s4">
+  <div class="success-check"><span>✓</span></div>
+  <div class="success-title" id="successTitle">Account added!</div>
+  <div class="success-sub" id="successSub">Your Chase checking account is ready.</div>
+  <button class="success-btn primary" onclick="alert('Would open full EditCardSheet / EditInstitutionSheet')">✏️ Add More Details<br><span style="font-size:12px;color:rgba(255,255,255,0.3)">Passwords, APR, limits, payment info</span></button>
+  <button class="success-btn primary" id="addAnotherBtn" onclick="addAnother()">➕ Add Another at Chase</button>
+  <button class="success-btn done" onclick="resetAll()">Done</button>
+</div>
+
+</div>
+
+<script>
+let currentScreen = 1;
+let chosenType = '';
+let bankName = '';
+const banks = ['Chase','Wells Fargo','Bank of America','Citibank','Capital One','American Express','US Bank','PNC'];
+const screens = {1:'s1',2:'s2',3:'s3',4:'s4'};
+
+function goTo(n) {
+  const cur = document.getElementById(screens[currentScreen]);
+  const nxt = document.getElementById(screens[n]);
+  if (n > currentScreen) {
+    cur.className = 'screen hidden-left';
+    nxt.className = 'screen active';
+  } else {
+    cur.className = 'screen hidden-right';
+    nxt.className = 'screen active';
+  }
+  currentScreen = n;
+  if (n === 3) buildDetails();
+  if (n === 4) buildSuccess();
+}
+
+function pickType(t) {
+  chosenType = t;
+  const labels = {account:'account',card:'card',loan:'loan'};
+  const titles = {account:'Which bank is your account with?',card:'Which bank issued your card?',loan:'Who is the lender?'};
+  document.getElementById('bankTitle').textContent = titles[t];
+  goTo(2);
+  setTimeout(() => document.getElementById('bankInput').focus(), 500);
+}
+
+function onBankInput(v) {
+  bankName = v;
+  const btn = document.getElementById('bankNext');
+  btn.className = v.trim() ? 'next-btn active' : 'next-btn';
+  const cont = document.getElementById('bankSuggestions');
+  if (v.length < 1) { cont.innerHTML = ''; return; }
+  const matches = banks.filter(b => b.toLowerCase().includes(v.toLowerCase()));
+  cont.innerHTML = matches.slice(0,3).map(b => `<div class="sug-chip" onclick="selectBank('${b}')">${b}</div>`).join('');
+}
+
+function selectBank(b) {
+  bankName = b;
+  document.getElementById('bankInput').value = b;
+  document.getElementById('bankNext').className = 'next-btn active';
+  goTo(3);
+}
+
+function buildDetails() {
+  const c = document.getElementById('detailsContent');
+  const bn = bankName || 'your bank';
+  const labels = {account:'account',card:'card',loan:'loan'};
+  document.getElementById('detailsTitle').textContent = `Set up your ${bn} ${labels[chosenType]}`;
+  document.getElementById('detailsSub').textContent = `Fill in the basics — you can always add more later.`;
+
+  if (chosenType === 'account') c.innerHTML = accountFields();
+  else if (chosenType === 'card') c.innerHTML = cardFields();
+  else c.innerHTML = loanFields();
+
+  // Progressive reveal
+  setTimeout(() => revealFields(), 100);
+}
+
+function accountFields() {
+  return `
+    <div class="field-group" data-reveal="1"><div class="field-label">ACCOUNT NAME</div><input class="field-input" placeholder="e.g. Primary Checking" oninput="checkSave()"></div>
+    <div class="field-group" data-reveal="2"><div class="field-label">TYPE</div><div class="seg-row">
+      <button class="seg-btn selected" onclick="pickSeg(this)">Checking</button>
+      <button class="seg-btn" onclick="pickSeg(this)">Savings</button>
+      <button class="seg-btn more-btn" onclick="pickSeg(this)">Other ▾</button>
+    </div></div>
+    <div class="field-group" data-reveal="3"><div class="field-label">BALANCE <span class="optional">optional</span></div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" type="text" inputmode="decimal"></div><div class="field-hint">Just an estimate — update anytime</div></div>
+    <div class="divider-row" data-reveal="4"><div class="divider-line"></div><div class="divider-text">OPTIONAL</div><div class="divider-line"></div></div>
+    <div class="field-group" data-reveal="5"><div class="field-label">ACCOUNT NUMBER <span class="optional">optional</span></div><input class="field-input" placeholder="e.g. 1234567890" inputmode="numeric"></div>
+  `;
+}
+
+function cardFields() {
+  return `
+    <div class="field-group" data-reveal="1"><div class="field-label">CARD NICKNAME</div><input class="field-input" placeholder="e.g. Sapphire Reserve" oninput="checkSave()" id="cardName"></div>
+    <div class="field-group" data-reveal="2"><div class="field-label">CARD NUMBER <span class="optional">or just last 4</span></div><input class="field-input" id="cardNum" placeholder="0000 0000 0000 0000" inputmode="numeric" oninput="onCardNum(this.value)"></div>
+    <div class="field-group" data-reveal="3"><div class="field-label">NETWORK <span id="autoLabel" style="display:none" class="optional">· auto-detected</span></div><div class="network-row" id="netRow">
+      <div class="net-pill" onclick="pickNet(this)">Visa</div>
+      <div class="net-pill" onclick="pickNet(this)">Mastercard</div>
+      <div class="net-pill" onclick="pickNet(this)">Amex</div>
+      <div class="net-pill" onclick="pickNet(this)">Discover</div>
+    </div></div>
+    <div class="field-group" data-reveal="4"><div class="field-label">TYPE</div><div class="seg-row">
+      <button class="seg-btn selected" onclick="pickSeg(this)">Credit</button>
+      <button class="seg-btn" onclick="pickSeg(this)">Debit</button>
+    </div></div>
+    <div class="divider-row" data-reveal="5"><div class="divider-line"></div><div class="divider-text">FINANCIALS</div><div class="divider-line"></div></div>
+    <div class="field-group" data-reveal="6"><div class="hstack"><div><div class="field-label">BALANCE</div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div></div><div><div class="field-label">CREDIT LIMIT</div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div></div></div></div>
+    <div class="field-group" data-reveal="7"><div class="hstack"><div><div class="field-label">APR %</div><input class="field-input" placeholder="0.00" inputmode="decimal"></div><div><div class="field-label">EXPIRES</div><input class="field-input" placeholder="MM/YY" inputmode="numeric"></div></div></div>
+    <div class="field-group" data-reveal="8"><div class="field-label">NAME ON CARD <span class="optional">optional</span></div><input class="field-input" placeholder="e.g. Jane Doe"></div>
+    <div class="divider-row" data-reveal="9"><div class="divider-line"></div><div class="divider-text">PAYMENT</div><div class="divider-line"></div></div>
+    <div class="field-group" data-reveal="10"><div class="field-label">AUTOPAY</div><div class="toggle-wrap"><span class="toggle-label">Autopay enabled</span><div class="toggle on" onclick="this.classList.toggle('on')"></div></div></div>
+  `;
+}
+
+function loanFields() {
+  return `
+    <div class="field-group" data-reveal="1"><div class="field-label">LOAN NAME</div><input class="field-input" placeholder="e.g. Equipment Loan" oninput="checkSave()"></div>
+    <div class="field-group" data-reveal="2"><div class="field-label">ROLE</div><div class="seg-row">
+      <button class="seg-btn selected" onclick="pickSeg(this)">I Owe</button>
+      <button class="seg-btn" onclick="pickSeg(this)">I'm Lending</button>
+    </div></div>
+    <div class="field-group" data-reveal="3"><div class="field-label">PRINCIPAL AMOUNT</div><div class="money-wrap"><span class="currency">$</span><input class="field-input" placeholder="0.00" inputmode="decimal"></div></div>
+    <div class="field-group" data-reveal="4"><div class="field-label">INTEREST RATE</div><input class="field-input" placeholder="0.00 %" inputmode="decimal"></div>
+    <div class="divider-row" data-reveal="5"><div class="divider-line"></div><div class="divider-text">OPTIONAL</div><div class="divider-line"></div></div>
+    <div class="field-group" data-reveal="6"><div class="hstack"><div><div class="field-label">TERM (YEARS)</div><input class="field-input" placeholder="e.g. 5" inputmode="numeric"></div><div><div class="field-label">TERM (MONTHS)</div><input class="field-input" placeholder="e.g. 0" inputmode="numeric"></div></div></div>
+    <div class="field-group" data-reveal="7"><div class="field-label">NOTES <span class="optional">optional</span></div><input class="field-input" placeholder="Add notes..." style="height:80px;padding-top:14px;" ></div>
+  `;
+}
+
+function revealFields() {
+  const groups = document.querySelectorAll('#detailsContent [data-reveal]');
+  groups.forEach((g, i) => {
+    setTimeout(() => g.classList.add('visible'), 80 * (i + 1));
+  });
+}
+
+function pickSeg(el) {
+  el.parentElement.querySelectorAll('.seg-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function pickNet(el) {
+  el.parentElement.querySelectorAll('.net-pill').forEach(b => { b.classList.remove('selected'); b.classList.remove('auto'); });
+  el.classList.add('selected');
+}
+
+function onCardNum(v) {
+  const digits = v.replace(/\D/g, '');
+  const netRow = document.getElementById('netRow');
+  const pills = netRow.querySelectorAll('.net-pill');
+  const autoLabel = document.getElementById('autoLabel');
+
+  pills.forEach(p => { p.classList.remove('selected'); p.classList.remove('auto'); });
+
+  if (digits.length >= 1) {
+    let net = '';
+    if (digits[0] === '4') net = 'Visa';
+    else if (digits[0] === '5') net = 'Mastercard';
+    else if (digits[0] === '3') net = 'Amex';
+    else if (digits[0] === '6') net = 'Discover';
+
+    if (net) {
+      pills.forEach(p => { if (p.textContent === net) { p.classList.add('selected','auto'); }});
+      autoLabel.style.display = 'inline';
+    } else { autoLabel.style.display = 'none'; }
+  } else { autoLabel.style.display = 'none'; }
+  checkSave();
+}
+
+function checkSave() {
+  const btn = document.getElementById('saveBtn');
+  const inputs = document.querySelectorAll('#detailsContent .field-input');
+  const hasName = inputs[0] && inputs[0].value.trim().length > 0;
+  btn.className = hasName ? 'nav-btn save active' : 'nav-btn save';
+}
+
+function buildSuccess() {
+  const labels = {account:'account',card:'card',loan:'loan'};
+  const bn = bankName || 'Your';
+  const nameInput = document.querySelector('#detailsContent .field-input');
+  const itemName = nameInput ? nameInput.value || labels[chosenType] : labels[chosenType];
+  document.getElementById('successTitle').textContent = `${itemName} added!`;
+  document.getElementById('successSub').textContent = `Your ${bn} ${labels[chosenType]} is ready to go.`;
+  document.getElementById('addAnotherBtn').innerHTML = `➕ Add Another at ${bn}`;
+}
+
+function addAnother() {
+  goTo(1);
+}
+
+function resetAll() {
+  chosenType = '';
+  bankName = '';
+  document.getElementById('bankInput').value = '';
+  document.getElementById('bankSuggestions').innerHTML = '';
+  document.getElementById('bankNext').className = 'next-btn';
+  Object.values(screens).forEach(id => {
+    document.getElementById(id).className = id === 's1' ? 'screen active' : 'screen hidden-right';
+  });
+  currentScreen = 1;
+}
+</script>
+</body>
+</html>
