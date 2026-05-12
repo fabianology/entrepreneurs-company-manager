@@ -68,9 +68,10 @@ struct CompanyCardView: View {
             .padding(.bottom, 16)
 
             }
+            .background(Color(hex: "#1C1C1E").opacity(0.70))
             .overlay(
                 UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
             .zIndex(1)
 
@@ -90,7 +91,6 @@ struct CompanyCardView: View {
             .padding(.vertical, 12)
             .background(Color(hex: "#1C1C1E"))
         }
-        .background(Color(hex: "#171717"))
         .clipShape(RoundedRectangle(cornerRadius: 24))
     }
 

@@ -34,6 +34,24 @@ struct LiquidGlassModifier: ViewModifier {
     }
 }
 
+// MARK: - Masonry Glass Modifier (70% Opacity)
+struct MasonryGlassModifier: ViewModifier {
+    var cornerRadius: CGFloat = 12
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color(hex: "#1C1C1E").opacity(0.70))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+    }
+}
+
 // MARK: - CiFr Modal Field style
 struct CifrFieldModifier: ViewModifier {
     func body(content: Content) -> some View {
@@ -55,6 +73,10 @@ extension View {
 
     func liquidGlass(cornerRadius: CGFloat = 24) -> some View {
         modifier(LiquidGlassModifier(cornerRadius: cornerRadius))
+    }
+
+    func masonryGlass(cornerRadius: CGFloat = 12) -> some View {
+        modifier(MasonryGlassModifier(cornerRadius: cornerRadius))
     }
 
     func cifrField() -> some View {

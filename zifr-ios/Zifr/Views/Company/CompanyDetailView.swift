@@ -247,17 +247,15 @@ struct CompanyDetailView: View {
                             // Swipe Left to Right (Go Back)
                             if vm.activeTab == .home {
                                 dismiss()
-                            } else if vm.activeTab == .subscriptions {
+                            } else {
+                                // From financial, subscription, and docs page, swiping right goes directly to command center
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .home }
-                            } else if vm.activeTab == .financial {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
-                            } else if vm.activeTab == .documents {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
                             }
                         } else {
                             // Swipe Right to Left (Go Forward)
                             if vm.activeTab == .home {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
+                                // Swiping left from the command center goes to the dashboard
+                                dismiss()
                             } else if vm.activeTab == .subscriptions {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
                             } else if vm.activeTab == .financial {

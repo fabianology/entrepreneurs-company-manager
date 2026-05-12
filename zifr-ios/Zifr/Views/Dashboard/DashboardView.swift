@@ -644,16 +644,14 @@ struct SharedWithMeView: View {
                             // Swipe Left to Right
                             if showCommandCenter {
                                 dismiss()
-                            } else if vm.activeTab == .subscriptions {
+                            } else {
+                                // From financial, subscription, and docs page, swiping right goes directly to command center
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = true }
-                            } else if vm.activeTab == .financial {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .subscriptions }
-                            } else if vm.activeTab == .documents {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
                             }
                         } else {
                             // Swipe Right to Left (Go Forward)
                             if showCommandCenter {
+                                // Swiping left from the command center goes to the dashboard
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showCommandCenter = false }
                             } else if vm.activeTab == .subscriptions {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
