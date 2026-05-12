@@ -15,6 +15,12 @@ class GeminiLiveClient {
     private let tools: [Tool]
     private let onLog: ((String) -> Void)?
     
+    // Auto-reconnect state
+    private var intentionalDisconnect = false
+    private var reconnectAttempts = 0
+    private let maxReconnectAttempts = 5
+    private var pingTimer: Timer?
+    
     init(systemInstruction: String, tools: [Tool], onLog: ((String) -> Void)? = nil) {
         self.systemInstruction = systemInstruction
         self.tools = tools
@@ -26,29 +32,42 @@ class GeminiLiveClient {
         onLog?(message)
     }
     
-    // Gemini API key
-    private static let apiKey = "AIzaSyDjMa5RCyBu5-IlNPNCs8JZhdRmXjkCBqk"
+    // Gemini API key — loaded from Info.plist to avoid leak detection
+    private static var apiKey: String {
+        Bundle.main.object(forInfoDictionaryKey: "GeminiAPIKey") as? String ?? ""
+    }
     
     func connect() async throws {
+        intentionalDisconnect = false
+        reconnectAttempts = 0
+        try await establishConnection()
+    }
+    
+    private func establishConnection() async throws {
         let wsString = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=\(Self.apiKey)"
         
         guard let url = URL(string: wsString) else {
             throw NSError(domain: "GeminiLiveClient", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
         }
         
+        // Clean up any existing socket
+        webSocket?.cancel(with: .goingAway, reason: nil)
+        
         webSocket = self.session.webSocketTask(with: url)
         webSocket?.resume()
         isConnected = true
         log("WebSocket connected to Gemini directly")
         
+        startPinging()
+        
         // Start listening
         receiveMessages()
         
         // Send Setup Message
-        try await sendSetup()
+        sendSetup()
     }
     
-    private func sendSetup() async throws {
+    private func sendSetup() {
         let speechConfig = SpeechConfig(
             voiceConfig: VoiceConfig(
                 prebuiltVoiceConfig: PrebuiltVoiceConfig(voiceName: "Aoede")
@@ -67,27 +86,48 @@ class GeminiLiveClient {
         
         let clientMsg = ClientMessage(setup: setup)
         log("Sending setup...")
-        try await send(clientMsg)
+        send(clientMsg)
     }
     
-    func sendAudio(pcmBufferData: Data) async throws {
+    func sendAudio(pcmBufferData: Data) {
         let base64 = pcmBufferData.base64EncodedString()
         let chunk = MediaChunk(mimeType: "audio/pcm;rate=16000", data: base64)
         let msg = ClientMessage(realtimeInput: RealtimeInput(mediaChunks: [chunk]))
-        try await send(msg)
+        send(msg)
     }
     
-    func sendToolResponse(response: FunctionResponse) async throws {
+    func sendToolResponse(response: FunctionResponse) {
         let msg = ClientMessage(toolResponse: ToolResponseWrapper(functionResponses: [response]))
-        try await send(msg)
+        send(msg)
     }
     
-    private func send(_ message: ClientMessage) async throws {
+    private var messageQueue: [ClientMessage] = []
+    private var isSending = false
+
+    private func send(_ message: ClientMessage) {
         guard isConnected else { return }
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(message)
-        let string = String(data: data, encoding: .utf8)!
-        try await webSocket?.send(.string(string))
+        messageQueue.append(message)
+        processQueue()
+    }
+
+    private func processQueue() {
+        guard !isSending, !messageQueue.isEmpty, isConnected else { return }
+        isSending = true
+        let message = messageQueue.removeFirst()
+        
+        Task {
+            do {
+                let encoder = JSONEncoder()
+                let data = try encoder.encode(message)
+                let string = String(data: data, encoding: .utf8)!
+                try await self.webSocket?.send(.string(string))
+            } catch {
+                self.log("Send error: \(error.localizedDescription)")
+            }
+            
+            self.isSending = false
+            self.processQueue()
+        }
     }
     
     private func receiveMessages() {
@@ -96,6 +136,9 @@ class GeminiLiveClient {
             
             switch result {
             case .success(let message):
+                // Reset reconnect counter on successful receive
+                self.reconnectAttempts = 0
+                
                 switch message {
                 case .string(let text):
                     self.handleServerMessage(jsonString: text)
@@ -113,7 +156,7 @@ class GeminiLiveClient {
                 }
             case .failure(let error):
                 self.log("WebSocket receive error: \(error)")
-                self.disconnect()
+                self.handleDisconnect()
             }
         }
     }
@@ -155,13 +198,68 @@ class GeminiLiveClient {
                 self.log("Received message without audio/tools")
             }
         } catch {
-            self.log("Decode error: \(error.localizedDescription)\nPreview: \(String(jsonString.prefix(100)))")
+            self.log("Decode error: \(error.localizedDescription)\nPreview: \(String(jsonString.prefix(200)))")
         }
     }
     
-    func disconnect() {
+    // MARK: - Connection Lifecycle
+    
+    /// Called when the connection drops unexpectedly. Attempts auto-reconnect.
+    private func handleDisconnect() {
         isConnected = false
+        pingTimer?.invalidate()
+        pingTimer = nil
         webSocket?.cancel(with: .goingAway, reason: nil)
         webSocket = nil
+        
+        // Don't reconnect if the user intentionally disconnected
+        guard !intentionalDisconnect else { return }
+        
+        reconnectAttempts += 1
+        guard reconnectAttempts <= maxReconnectAttempts else {
+            log("❌ Max reconnect attempts (\(maxReconnectAttempts)) reached. Giving up.")
+            return
+        }
+        
+        // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+        let delay = pow(2.0, Double(reconnectAttempts - 1))
+        log("🔄 Connection lost. Reconnecting in \(Int(delay))s (attempt \(reconnectAttempts)/\(maxReconnectAttempts))...")
+        
+        DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self = self, !self.intentionalDisconnect else { return }
+            Task {
+                do {
+                    try await self.establishConnection()
+                    self.log("✅ Reconnected successfully!")
+                } catch {
+                    self.log("❌ Reconnect failed: \(error.localizedDescription)")
+                    self.handleDisconnect()
+                }
+            }
+        }
+    }
+    
+    /// Intentionally disconnect (user closed the assistant).
+    func disconnect() {
+        intentionalDisconnect = true
+        isConnected = false
+        pingTimer?.invalidate()
+        pingTimer = nil
+        webSocket?.cancel(with: .goingAway, reason: nil)
+        webSocket = nil
+    }
+    
+    private func startPinging() {
+        DispatchQueue.main.async {
+            self.pingTimer?.invalidate()
+            self.pingTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
+                guard self?.isConnected == true else { return }
+                self?.webSocket?.sendPing { error in
+                    if let error = error {
+                        self?.log("Ping error: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
     }
 }

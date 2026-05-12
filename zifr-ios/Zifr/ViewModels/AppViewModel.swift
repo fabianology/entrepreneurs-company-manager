@@ -426,24 +426,44 @@ final class AppViewModel {
         return results
     }
 
-    // MARK: - AI Search
-    func askGeminiSearch(query: String, companies: [Company], subscriptions: [Subscription], cards: [FinancialCard], institutions: [Institution]) async -> String {
+    // MARK: - AI Search & Context
+    func generateMinifiedPortfolio(appState: AppState) -> String {
         var minifiedData = ""
-        for company in companies {
+        for company in appState.companies {
             minifiedData += "Company: \(company.name)\n"
-            let coSubs = subscriptions.filter { $0.companyId == company.id }
+            
+            let coSubs = appState.subscriptions.filter { $0.companyId == company.id }
             if !coSubs.isEmpty {
-                minifiedData += "- Subs: " + coSubs.map { "\($0.name)($\($0.cost)/\($0.billingCycle) renews \($0.nextRenewal ?? "") login: \(($0.loginId?.isEmpty ?? true) ? "none" : ($0.loginId ?? "")))" }.joined(separator: ", ") + "\n"
+                minifiedData += "- Subs: " + coSubs.map { sub in
+                    let paymentInfo = sub.paymentMethodId != nil ? (appState.cards.first { $0.id == sub.paymentMethodId }?.name ?? sub.paymentMethod ?? "unknown card") : (sub.paymentMethod ?? "unknown card")
+                    return "\(sub.name)($\(sub.cost)/\(sub.billingCycle) renews \(sub.nextRenewal ?? "") paid with: \(paymentInfo))"
+                }.joined(separator: ", ") + "\n"
             }
-            let coCards = cards.filter { $0.companyId == company.id }
+            
+            let coCards = appState.cards.filter { $0.companyId == company.id }
             if !coCards.isEmpty {
-                minifiedData += "- Cards: " + coCards.map { "\($0.name)(ends \($0.last4 ?? ""))" }.joined(separator: ", ") + "\n"
+                minifiedData += "- Cards: " + coCards.map { "\($0.name)(ends \($0.last4 ?? ""), balance: $\($0.balance))" }.joined(separator: ", ") + "\n"
             }
-            let coInst = institutions.filter { $0.companyId == company.id }
+            
+            let coInst = appState.institutions.filter { $0.companyId == company.id }
             if !coInst.isEmpty {
                 minifiedData += "- Banks: " + coInst.map { "\($0.name)(user: \(($0.username?.isEmpty ?? true) ? "none" : ($0.username ?? "")) email: \(($0.email?.isEmpty ?? true) ? "none" : ($0.email ?? "")))" }.joined(separator: ", ") + "\n"
             }
+            
+            let coLoans = appState.loans.filter { $0.companyId == company.id }
+            if !coLoans.isEmpty {
+                let loansString = coLoans.map { loan in
+                    let lender = loan.lender ?? "none"
+                    return "\(loan.name)(lender: \(lender), balance: $\(loan.remainingBalance), monthly payment: $\(loan.monthlyPayment))"
+                }.joined(separator: ", ")
+                minifiedData += "- Loans: \(loansString)\n"
+            }
         }
+        return minifiedData
+    }
+
+    func askGeminiSearch(query: String, appState: AppState) async -> String {
+        let minifiedData = generateMinifiedPortfolio(appState: appState)
         return await GeminiService.shared.askPortfolioQuestion(data: minifiedData, question: query)
     }
 }

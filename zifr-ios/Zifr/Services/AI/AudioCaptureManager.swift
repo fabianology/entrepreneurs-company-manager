@@ -12,6 +12,10 @@ class AudioCaptureManager: ObservableObject {
     private let playbackFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 24000, channels: 1, interleaved: false)!
     private var isRecording = false
     
+    // Half-duplex: mute mic while assistant speaks to prevent echo feedback
+    private var isMuted = false
+    private var unmuteTimer: Timer?
+    
     func start() async {
         guard !isRecording else { return }
         
@@ -58,6 +62,9 @@ class AudioCaptureManager: ObservableObject {
             // Calculate Volume for the Orb
             self.calculateVolume(buffer: buffer)
             
+            // Don't send audio to Gemini while assistant is speaking (prevents echo feedback)
+            guard !self.isMuted else { return }
+            
             // Convert to 16kHz
             let capacity = AVAudioFrameCount(outputFormat.sampleRate * 0.1) // 100ms
             guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
@@ -103,9 +110,14 @@ class AudioCaptureManager: ObservableObject {
         playerNode.stop()
         engine.stop()
         isRecording = false
+        unmuteTimer?.invalidate()
+        unmuteTimer = nil
     }
     
     func schedule(audioData: Data) {
+        // Mute mic while we play assistant audio to prevent echo
+        muteInput()
+        
         let frameCount = UInt32(audioData.count / MemoryLayout<Int16>.size)
         guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: playbackFormat, frameCapacity: AVAudioFrameCount(frameCount)) else { return }
         pcmBuffer.frameLength = AVAudioFrameCount(frameCount)
@@ -116,6 +128,23 @@ class AudioCaptureManager: ObservableObject {
         }
         
         playerNode.scheduleBuffer(pcmBuffer)
+    }
+    
+    // MARK: - Half-Duplex Mic Control
+    
+    /// Mutes the microphone input stream to Gemini.
+    /// Each call resets the unmute timer so the mic stays muted while audio chunks keep arriving.
+    private func muteInput() {
+        isMuted = true
+        
+        // Reset the unmute timer — unmute 600ms after the last audio chunk arrives.
+        // This gives a natural pause after the assistant finishes speaking.
+        DispatchQueue.main.async {
+            self.unmuteTimer?.invalidate()
+            self.unmuteTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
+                self?.isMuted = false
+            }
+        }
     }
     
     private func calculateVolume(buffer: AVAudioPCMBuffer) {

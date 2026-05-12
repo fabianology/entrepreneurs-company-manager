@@ -16,10 +16,6 @@ struct AssistantOnboardingView: View {
     @State private var activeToolCall: FunctionCall? = nil
     @State private var pendingCompany: Company? = nil
     
-    private let systemInstruction = """
-    You are Miloom, an elite AI Executive Assistant for the Miloom app. Your job is to help the user onboard and manage their companies and finances.
-    When the user asks to add a company, gather the necessary information. Once you have the name and structure, trigger the draftCompany tool. Do not ask for details unless they are missing. Be brief, professional, and conversational.
-    """
     
     private let tools = [
         Tool(functionDeclarations: [
@@ -174,7 +170,18 @@ struct AssistantOnboardingView: View {
     @State private var cancellables = Set<AnyCancellable>()
     
     private func setupConnection() {
-        client = GeminiLiveClient(systemInstruction: systemInstruction, tools: tools) { log in
+        let minifiedData = vm.generateMinifiedPortfolio(appState: appState)
+        let dynamicInstruction = """
+        You are Miloom, an elite AI Executive Assistant for the Miloom app. Your job is to help the user onboard and manage their companies and finances.
+        When the user asks to add a company, gather the necessary information. Once you have the name and structure, trigger the draftCompany tool. Do not ask for details unless they are missing. Be brief, professional, and conversational.
+        
+        Here is the exact current state of the user's finances and entities:
+        \(minifiedData)
+        
+        Use this data to answer their questions about their portfolio directly. Do not make up any information.
+        """
+        
+        client = GeminiLiveClient(systemInstruction: dynamicInstruction, tools: tools) { log in
             DispatchQueue.main.async {
                 self.debugLog = log
             }
@@ -203,7 +210,7 @@ struct AssistantOnboardingView: View {
                 // Send audio to Gemini
                 captureManager.audioDataPublisher
                     .sink { data in
-                        Task { try? await client?.sendAudio(pcmBufferData: data) }
+                        client?.sendAudio(pcmBufferData: data)
                     }
                     .store(in: &cancellables)
                 
@@ -274,21 +281,19 @@ struct AssistantOnboardingView: View {
             response: ["success": AnyCodable(success)]
         )
         
-        Task {
-            try? await client?.sendToolResponse(response: response)
+        client?.sendToolResponse(response: response)
             
-            DispatchQueue.main.async {
-                withAnimation {
-                    self.pendingCompany = nil
-                    self.activeToolCall = nil
-                }
-                // Resume mic
-                Task { await self.captureManager.start() }
-                
-                // Show permission alert if needed
-                if self.captureManager.permissionDenied {
-                    showPermissionAlert = true
-                }
+        DispatchQueue.main.async {
+            withAnimation {
+                self.pendingCompany = nil
+                self.activeToolCall = nil
+            }
+            // Resume mic
+            Task { await self.captureManager.start() }
+            
+            // Show permission alert if needed
+            if self.captureManager.permissionDenied {
+                self.showPermissionAlert = true
             }
         }
     }

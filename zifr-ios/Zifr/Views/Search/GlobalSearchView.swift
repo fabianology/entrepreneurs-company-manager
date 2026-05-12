@@ -10,6 +10,7 @@ struct GlobalSearchView: View {
     let documents: [CompanyDocument]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     @FocusState private var searchFocused: Bool
     @State private var visiblePasswords: Set<UUID> = []
     @State private var isThinking = false
@@ -96,7 +97,7 @@ struct GlobalSearchView: View {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 Task {
                                     isThinking = true
-                                    aiResponse = await vm.askGeminiSearch(query: vm.searchQuery, companies: companies, subscriptions: subscriptions, cards: cards, institutions: institutions)
+                                    aiResponse = await vm.askGeminiSearch(query: vm.searchQuery, appState: appState)
                                     isThinking = false
                                 }
                             } label: {
