@@ -597,6 +597,7 @@
 /* Begin XCBuildConfiguration section */
 		336C97334D573DA73038B0E7 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 797AE05279D7D14F7410992C /* Secrets.local.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
@@ -615,6 +616,7 @@
 		};
 		382625644CADD92E53878E37 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 797AE05279D7D14F7410992C /* Secrets.local.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
@@ -633,6 +635,7 @@
 		};
 		5612E3DDD1D04219D9FB3244 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 797AE05279D7D14F7410992C /* Secrets.local.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -703,6 +706,7 @@
 		};
 		D465BEEA0C5F9C74BE561CF3 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 797AE05279D7D14F7410992C /* Secrets.local.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

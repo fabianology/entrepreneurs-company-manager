@@ -62,9 +62,6 @@ class AudioCaptureManager: ObservableObject {
             // Calculate Volume for the Orb
             self.calculateVolume(buffer: buffer)
             
-            // Don't send audio to Gemini while assistant is speaking (prevents echo feedback)
-            guard !self.isMuted else { return }
-            
             // Convert to 16kHz
             let capacity = AVAudioFrameCount(outputFormat.sampleRate * 0.1) // 100ms
             guard let pcmBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: capacity) else { return }
@@ -86,7 +83,16 @@ class AudioCaptureManager: ObservableObject {
             
             if status == .haveData || status == .endOfStream, let channelData = pcmBuffer.int16ChannelData {
                 let dataSize = Int(pcmBuffer.frameLength) * MemoryLayout<Int16>.size
-                let data = Data(bytes: channelData[0], count: dataSize)
+                let data: Data
+                
+                // If muted (assistant is speaking), send pure silence to keep the WebSocket 
+                // alive without triggering Gemini's Voice Activity Detection echo.
+                if self.isMuted {
+                    data = Data(count: dataSize) // Zero-filled buffer
+                } else {
+                    data = Data(bytes: channelData[0], count: dataSize)
+                }
+                
                 self.audioDataPublisher.send(data)
             }
         }

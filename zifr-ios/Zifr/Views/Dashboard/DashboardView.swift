@@ -596,19 +596,23 @@ struct SharedWithMeView: View {
 
                     // Tab Controls (Pages icons) aligned to the right
                     HStack(spacing: 28) { // Distributed equally
-                        ForEach(AppViewModel.CompanyTab.allCases.filter { $0 != .home }, id: \.self) { tab in
+                        let visibleTabs: [AppViewModel.CompanyTab] = vm.activeTab == .home ? [.home] : [vm.activeTab, .home]
+                        ForEach(visibleTabs, id: \.self) { tab in
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                vm.activeTab = tab
-                                showCommandCenter = false
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    vm.activeTab = tab
+                                    showCommandCenter = (tab == .home)
+                                }
                                 tabBounces[tab, default: 0] += 1
                             } label: {
                                 Image(systemName: tab.icon)
                                     .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                    .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                    .foregroundStyle(vm.activeTab == tab ? (tab == .home ? .white : tabColor(tab)) : .secondary)
                                     .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
                                     .frame(width: 32, height: 44)
                             }
+                            .transition(.scale.combined(with: .opacity))
                         }
                     }
                     .padding(.trailing, 12)

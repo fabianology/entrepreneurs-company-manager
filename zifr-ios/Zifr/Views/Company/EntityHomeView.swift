@@ -135,6 +135,23 @@ struct EntityHomeView: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showReceiptReport) {
+            SubscriptionReceiptView(
+                company: company,
+                subscriptions: subscriptions,
+                institutions: institutions,
+                cards: cards
+            )
+        }
+        .sheet(isPresented: $showFinancialReceiptReport) {
+            FinancialReceiptView(
+                company: company,
+                institutions: institutions,
+                cards: cards,
+                loans: loans,
+                subscriptions: subscriptions
+            )
+        }
         .overlay {
             if let heroId = expandedHeroSubId, let sub = model.activeSubscriptions.first(where: { $0.id == heroId }) {
                 ZStack {

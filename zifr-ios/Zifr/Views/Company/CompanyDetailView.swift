@@ -126,23 +126,6 @@ struct CompanyDetailView: View {
                                 }
                             }
                             
-                            if !allCompanies.isEmpty {
-                                Section("Jump to Entity") {
-                                    ForEach(allCompanies) { c in
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            company = c
-                                            vm.touchCompany(c, appState: appState)
-                                        } label: {
-                                            if c.id == company.id {
-                                                Label(c.name, systemImage: "checkmark")
-                                            } else {
-                                                Text(c.name)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                         } label: {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 20, weight: .medium))
@@ -168,32 +151,71 @@ struct CompanyDetailView: View {
 
                     // Tab Controls (Pages icons) aligned to the right
                     HStack(spacing: 28) { // Distributed equally
-                        ForEach(AppViewModel.CompanyTab.allCases, id: \.self) { tab in
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                vm.activeTab = tab
-                                tabBounces[tab, default: 0] += 1
-                            } label: {
-                                if tab == .financial {
-                                    Image(systemName: tab.icon)
-                                        .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                        .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
-                                        .frame(width: 32, height: 44)
-                                } else if tab == .home {
-                                    Image(systemName: tab.icon)
-                                        .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                        .foregroundStyle(vm.activeTab == tab ? .white : .secondary)
-                                        .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                        .frame(width: 32, height: 44)
+                        let visibleTabs: [AppViewModel.CompanyTab] = vm.activeTab == .home ? [.home] : [vm.activeTab, .home]
+                        ForEach(visibleTabs, id: \.self) { tab in
+                            Group {
+                                if tab == .home {
+                                    Menu {
+                                        if !allCompanies.isEmpty {
+                                            Section("Jump to Entity") {
+                                                ForEach(allCompanies) { c in
+                                                    Button {
+                                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                        company = c
+                                                        vm.touchCompany(c, appState: appState)
+                                                    } label: {
+                                                        if c.id == company.id {
+                                                            Label(c.name, systemImage: "checkmark")
+                                                        } else {
+                                                            Text(c.name)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                            .foregroundStyle(vm.activeTab == tab ? .white : .secondary)
+                                            .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                            .frame(width: 32, height: 44)
+                                    } primaryAction: {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            vm.activeTab = tab
+                                        }
+                                        tabBounces[tab, default: 0] += 1
+                                    }
+                                    .simultaneousGesture(
+                                        LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                        }
+                                    )
                                 } else {
-                                    Image(systemName: tab.icon)
-                                        .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                        .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                        .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                        .frame(width: 32, height: 44)
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            vm.activeTab = tab
+                                        }
+                                        tabBounces[tab, default: 0] += 1
+                                    } label: {
+                                        if tab == .financial {
+                                            Image(systemName: tab.icon)
+                                                .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                                .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                                .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
+                                                .frame(width: 32, height: 44)
+                                        } else {
+                                            Image(systemName: tab.icon)
+                                                .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                                .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                                .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                                .frame(width: 32, height: 44)
+                                        }
+                                    }
                                 }
                             }
+                            .transition(.scale.combined(with: .opacity))
                         }
                     }
                     .padding(.trailing, 12)
