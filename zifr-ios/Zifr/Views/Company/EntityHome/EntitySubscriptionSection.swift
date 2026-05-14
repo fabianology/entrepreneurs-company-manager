@@ -18,7 +18,7 @@ struct EntitySubscriptionSection: View {
     private let subsColor = Color(hex: "#2070BD")
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 16) {
             // Header
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -68,9 +68,14 @@ struct EntitySubscriptionSection: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.top, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
+                .background(Color.black.opacity(0.3))
+                .overlay(
+                    Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
+                    alignment: .bottom
+                )
             }
             .buttonStyle(.plain)
 
@@ -107,7 +112,7 @@ struct EntitySubscriptionSection: View {
                                                 perspective: 0.3
                                             )
                                             .scaleEffect(scale)
-                                            .shadow(color: Color(hex: "#C1AA78").opacity(shadowOpacity), radius: 12, y: 4)
+                                            .shadow(color: Color(hex: "#46246B").opacity(shadowOpacity), radius: 12, y: 4)
                                             .id(index)
                                             .preference(key: CoverFlowCenterPreference.self,
                                                         value: [CoverFlowItem(index: index, distance: distance)])
@@ -153,7 +158,6 @@ struct EntitySubscriptionSection: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
             }
             .padding(.horizontal, 16)
-            .padding(.top, 4)
         }
         .padding(.bottom, 16)
         .background(

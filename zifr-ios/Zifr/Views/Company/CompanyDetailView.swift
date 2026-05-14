@@ -49,6 +49,13 @@ struct CompanyDetailView: View {
     @State private var tabBounces: [AppViewModel.CompanyTab: Int] = [:]
     @State private var searchBounce: Int = 0
 
+    @State private var newSub: Subscription? = nil
+    @State private var newCard: FinancialCard? = nil
+    @State private var newDoc: CompanyDocument? = nil
+    @State private var newLoan: Loan? = nil
+    @State private var showFinancialWizard = false
+    @State private var wizardInstitution: Institution? = nil
+
     
     private var currentTabIndex: Int {
         AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
@@ -97,6 +104,24 @@ struct CompanyDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
+        }
+        .sheet(item: $newSub) { sub in
+            AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
+                .presentationDetents([.fraction(0.9), .large])
+        }
+        .sheet(item: $newCard) { c in
+            EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: true)
+        }
+        .sheet(item: $newDoc) { doc in
+            EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
+        }
+        .sheet(isPresented: $showFinancialWizard) {
+            if let inst = wizardInstitution {
+                AddFinancialWizard(institution: inst, vm: vm)
+            }
+        }
+        .sheet(item: $newLoan) { l in
+            EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards)
         }
         // Popover moved to the button
         .safeAreaInset(edge: .bottom) {
@@ -191,28 +216,84 @@ struct CompanyDetailView: View {
                                             UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                                         }
                                     )
+                                } else if tab == .financial {
+                                    Menu {
+                                        Button {
+                                            wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                                            showFinancialWizard = true
+                                        } label: {
+                                            Label("Add Account", systemImage: "building.columns")
+                                        }
+                                        if !institutions.isEmpty {
+                                            Button {
+                                                newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                                            } label: {
+                                                Label("Add Card", systemImage: "creditcard")
+                                            }
+                                            Button {
+                                                newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
+                                            } label: {
+                                                Label("Add Loan", systemImage: "dollarsign.circle")
+                                            }
+                                        }
+                                    } label: {
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                            .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                            .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
+                                            .frame(width: 32, height: 44)
+                                    } primaryAction: {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                            if vm.activeTab == tab {
+                                                vm.activeTab = .documents
+                                            } else {
+                                                vm.activeTab = tab
+                                            }
+                                        }
+                                        tabBounces[tab, default: 0] += 1
+                                    }
+                                    .simultaneousGesture(
+                                        LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                        }
+                                    )
                                 } else {
                                     Button {
                                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            vm.activeTab = tab
+                                            if vm.activeTab == tab {
+                                                if tab == .subscriptions {
+                                                    vm.activeTab = .financial
+                                                } else if tab == .documents {
+                                                    vm.activeTab = .subscriptions
+                                                } else {
+                                                    vm.activeTab = tab
+                                                }
+                                            } else {
+                                                vm.activeTab = tab
+                                            }
                                         }
                                         tabBounces[tab, default: 0] += 1
                                     } label: {
-                                        if tab == .financial {
-                                            Image(systemName: tab.icon)
-                                                .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                                .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                                .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
-                                                .frame(width: 32, height: 44)
-                                        } else {
-                                            Image(systemName: tab.icon)
-                                                .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                                .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                                .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                                .frame(width: 32, height: 44)
-                                        }
+                                        Image(systemName: tab.icon)
+                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
+                                            .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
+                                            .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                            .frame(width: 32, height: 44)
                                     }
+                                    .simultaneousGesture(
+                                        LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                            if vm.activeTab == tab {
+                                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                                if tab == .subscriptions {
+                                                    newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+                                                } else if tab == .documents {
+                                                    newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                                                }
+                                            }
+                                        }
+                                    )
                                 }
                             }
                             .transition(.scale.combined(with: .opacity))

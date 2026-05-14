@@ -44,6 +44,12 @@ struct EntityHomeView: View {
     @State private var showFinancialReceiptReport = false
     @State private var coverFlowSnappedIndex: Int = 0
 
+    // Edit Item States
+    @State private var editingCard: FinancialCard? = nil
+    @State private var editingInst: Institution? = nil
+    @State private var editingLoan: Loan? = nil
+    @State private var editingDoc: CompanyDocument? = nil
+
     // MARK: - ViewModel
     private var model: EntityHomeViewModel {
         EntityHomeViewModel(company: company, subscriptions: subscriptions, cards: cards, institutions: institutions, loans: loans, documents: documents)
@@ -74,6 +80,9 @@ struct EntityHomeView: View {
                         expandedInstitutions: $expandedInstitutions,
                         expandedAccounts: $expandedAccounts,
                         showFinancialReceiptReport: $showFinancialReceiptReport,
+                        editingCard: $editingCard,
+                        editingInst: $editingInst,
+                        editingLoan: $editingLoan,
                         totalDebt: model.totalDebt,
                         totalCreditLimit: model.totalCreditLimit,
                         availableCredit: model.availableCredit
@@ -100,7 +109,8 @@ struct EntityHomeView: View {
                         documents: documents,
                         vm: vm,
                         expandedCategories: $expandedCategories,
-                        newDoc: $newDoc
+                        newDoc: $newDoc,
+                        editingDoc: $editingDoc
                     )
                     
                     Spacer().frame(height: 40)
@@ -118,22 +128,19 @@ struct EntityHomeView: View {
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
         .sheet(item: $sheetSub) { sub in
-            VStack {
-                HStack {
-                    Text(sub.name).font(.title.bold()).foregroundStyle(.white)
-                    Spacer()
-                    Button("Close") { sheetSub = nil }
-                }
-                .padding()
-                DashboardInnerRow(icon: "calendar", label: "Due Date", value: sub.nextRenewal ?? "—")
-                DashboardInnerRow(icon: "creditcard.fill", label: "Paid From", value: sub.paymentMethod ?? "—")
-                DashboardInnerRow(icon: "dollarsign.circle", label: "Cost", value: "$\(String(format: "%.2f", sub.cost))")
-                Spacer()
-            }
-            .padding()
-            .background(Color(hex: "#1C1C1E"))
-            .presentationDetents([.medium])
-            .presentationDragIndicator(.visible)
+            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
+        }
+        .sheet(item: $editingCard) { c in
+            EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: false)
+        }
+        .sheet(item: $editingInst) { i in
+            EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false)
+        }
+        .sheet(item: $editingLoan) { l in
+            EditLoanSheet(loan: l, vm: vm, isNew: false, institutions: institutions, cards: cards)
+        }
+        .sheet(item: $editingDoc) { doc in
+            EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: company.structure)
         }
         .sheet(isPresented: $showReceiptReport) {
             SubscriptionReceiptView(
@@ -228,12 +235,12 @@ struct EntityHomeView: View {
                             institutions: institutions,
                             cards: cards,
                             onEdit: {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                     flippedHeroIndex = nil
                                 }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                    vm.activeTab = .subscriptions
-                                    vm.deepLinkModelId = sub.id
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                                    sheetSub = sub
                                 }
                             }
                         )

@@ -143,15 +143,10 @@ struct DashboardView: View {
                             ZStack {
                                 CompanyCardView(
                                     company: dummyCompany,
-                                    cardsCount: 0,
                                     institutionsCount: 0,
-                                    loansCount: 0,
                                     subscriptionsCount: 0,
                                     docsCount: 0,
-                                    onEdit: {},
-                                    onViewSubscriptions: {},
-                                    onViewFinancials: {},
-                                    onViewDocuments: {}
+                                    onEdit: {}
                                 )
                                 .allowsHitTesting(false)
                                 .blur(radius: 3)
@@ -410,38 +405,16 @@ struct DashboardView: View {
     
     @ViewBuilder
     private func companyCardRow(for company: Company) -> some View {
-        let cCount = cards.filter { $0.companyId == company.id }.count
         let iCount = institutions.filter { $0.companyId == company.id }.count
-        let lCount = loans.filter { $0.companyId == company.id }.count
         let sCount = subscriptions.filter { $0.companyId == company.id }.count
         let dCount = documents.filter { $0.companyId == company.id }.count
 
         CompanyCardView(
             company: company,
-            cardsCount: cCount,
             institutionsCount: iCount,
-            loansCount: lCount,
             subscriptionsCount: sCount,
             docsCount: dCount,
-            onEdit: { editingCompany = company },
-            onViewSubscriptions: {
-                vm.selectedCompany = company
-                vm.activeTab = .subscriptions
-                vm.touchCompany(company, appState: appState)
-                vm.path.append(company)
-            },
-            onViewFinancials: {
-                vm.selectedCompany = company
-                vm.activeTab = .financial
-                vm.touchCompany(company, appState: appState)
-                vm.path.append(company)
-            },
-            onViewDocuments: {
-                vm.selectedCompany = company
-                vm.activeTab = .documents
-                vm.touchCompany(company, appState: appState)
-                vm.path.append(company)
-            }
+            onEdit: { editingCompany = company }
         )
     }
 }

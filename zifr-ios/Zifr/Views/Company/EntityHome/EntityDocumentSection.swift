@@ -8,6 +8,7 @@ struct EntityDocumentSection: View {
     
     @Binding var expandedCategories: Set<String>
     @Binding var newDoc: CompanyDocument?
+    @Binding var editingDoc: CompanyDocument?
 
     private let docsColor = Color(hex: "#23414B")
 
@@ -20,7 +21,7 @@ struct EntityDocumentSection: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 16) {
             // Header
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -69,9 +70,14 @@ struct EntityDocumentSection: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.top, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
+                .background(Color.black.opacity(0.3))
+                .overlay(
+                    Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
+                    alignment: .bottom
+                )
             }
             .buttonStyle(.plain)
 
@@ -114,6 +120,10 @@ struct EntityDocumentSection: View {
                                     value: ""
                                 )
                                 .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    editingDoc = doc
+                                }
                             }
                         },
                         actionButtons: {
@@ -127,6 +137,23 @@ struct EntityDocumentSection: View {
                         }
                     )
                 }
+            }
+            .padding(.horizontal, 16)
+            
+            Button {
+                // Future: show document report
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                    Text("Generate Report")
+                }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
             }
             .padding(.horizontal, 16)
         }

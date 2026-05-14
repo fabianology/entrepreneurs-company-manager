@@ -3,24 +3,17 @@ import SwiftUI
 /// The company card displayed on the Dashboard — mirrors CiFr mobile app layout exactly.
 struct CompanyCardView: View {
     let company: Company
-    let cardsCount: Int
     let institutionsCount: Int
-    let loansCount: Int
     let subscriptionsCount: Int
     let docsCount: Int
     let onEdit: () -> Void
-    let onViewSubscriptions: () -> Void
-    let onViewFinancials: () -> Void
-    let onViewDocuments: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            // ── Top Section ───────────────────────────────────────────────
-            VStack(spacing: 0) {
-                // ── Top Row ─────────────────────────────────────────────────
-            HStack(alignment: .top, spacing: 0) {
+            // ── Top Row ─────────────────────────────────────────────────
+            HStack(alignment: .center, spacing: 0) {
                 // Logo
-                CompanyAvatar(company: company, size: 56)
+                CompanyAvatar(company: company, size: 48)
                     .padding(.trailing, 14)
 
                 // Name + Structure
@@ -40,90 +33,62 @@ struct CompanyCardView: View {
                     onEdit()
                 }) {
                     Image(systemName: "pencil")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .contentShape(Rectangle())
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .frame(width: 32, height: 32)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.borderless)
-                .offset(x: 8, y: -8)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
-
-            // Count Data Grid (5 Columns)
-            HStack {
-                countColumn(title: "Cards", count: cardsCount)
-                Spacer()
-                countColumn(title: "Inst", count: institutionsCount)
-                Spacer()
-                countColumn(title: "Loans", count: loansCount)
-                Spacer()
-                countColumn(title: "Subs", count: subscriptionsCount)
-                Spacer()
-                countColumn(title: "Docs", count: docsCount)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 16)
-
-            }
-            .background(Color(hex: "#1C1C1E").opacity(0.70))
-            .overlay(
-                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-            .zIndex(1)
-
-            // ── Bottom Section ───────────────────────────────────────────────
-            VStack(spacing: 0) {
-                // Icon shortcuts (Full Width)
-                HStack(spacing: 0) {
-                    shortcutBtn(icon: "square.3.layers.3d", label: "Subscriptions", color: Color(hex: "#2070BD"), action: onViewSubscriptions)
-                    Divider().background(Color.white.opacity(0.1))
-                    shortcutBtn(icon: "dollarsign.bank.building", label: "Institutions", color: Color(hex: "#1A7077"), action: onViewFinancials)
-                    Divider().background(Color.white.opacity(0.1))
-                    shortcutBtn(icon: "doc.text", label: "Documents", color: Color(hex: "#918457"), action: onViewDocuments)
-                }
-                .frame(height: 48)
-            }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(hex: "#1C1C1E"))
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black.opacity(0.3))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 16)
+
+            // ── Status Row ───────────────────────────────────────────────
+            HStack {
+                statusItem(icon: "square.3.layers.3d", title: "Subscriptions", count: subscriptionsCount, color: Color(hex: "#2070BD"))
+                Spacer()
+                statusItem(icon: "building.columns", title: "Institutions", count: institutionsCount, color: Color(hex: "#1A7077"))
+                Spacer()
+                statusItem(icon: "doc.text", title: "Documents", count: docsCount, color: Color(hex: "#918457"))
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 20)
         }
+        .background(Color(hex: "#1C1C1E").opacity(0.70))
         .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
     }
 
-    private func countColumn(title: String, count: Int) -> some View {
+    private func statusItem(icon: String, title: String, count: Int, color: Color) -> some View {
         VStack(spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(color)
+                
+                Text("\(count)")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.4))
-            
-            Text("\(count)")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
         }
-    }
-
-    private func shortcutBtn(icon: String, label: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-            action()
-        }) {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundStyle(color)
-                
-                Text(label.uppercased())
-                    .font(.system(size: 8, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundStyle(Color.white.opacity(0.4))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
     }
 }

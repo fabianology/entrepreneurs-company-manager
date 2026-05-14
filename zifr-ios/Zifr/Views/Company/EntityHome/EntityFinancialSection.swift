@@ -11,6 +11,9 @@ struct EntityFinancialSection: View {
     @Binding var expandedInstitutions: Set<String>
     @Binding var expandedAccounts: Set<String>
     @Binding var showFinancialReceiptReport: Bool
+    @Binding var editingCard: FinancialCard?
+    @Binding var editingInst: Institution?
+    @Binding var editingLoan: Loan?
     
     let totalDebt: Double
     let totalCreditLimit: Double
@@ -19,7 +22,7 @@ struct EntityFinancialSection: View {
     private let finColor = Color(hex: "#1A7077")
     
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 16) {
             // Header
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -67,9 +70,14 @@ struct EntityFinancialSection: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 20)
                 .padding(.top, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
+                .background(Color.black.opacity(0.3))
+                .overlay(
+                    Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
+                    alignment: .bottom
+                )
             }
             .buttonStyle(.plain)
 
@@ -182,7 +190,7 @@ struct EntityFinancialSection: View {
                                             DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
                                         },
                                         actionButtons: {
-                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingCard = card }
                                         }
                                     )
                                 }
@@ -234,7 +242,7 @@ struct EntityFinancialSection: View {
                                             DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
                                         },
                                         actionButtons: {
-                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingLoan = loan }
                                         }
                                     )
                                 }
@@ -274,7 +282,6 @@ struct EntityFinancialSection: View {
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
         .padding(.horizontal, 16)
-        .padding(.top, 4)
     }
     
     private func institutionRow(_ inst: Institution) -> some View {
@@ -380,7 +387,7 @@ struct EntityFinancialSection: View {
                                 DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(acc.last4.isEmpty ? "0000" : acc.last4)")
                             },
                             actionButtons: {
-                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingInst = inst }
                             }
                         )
                     }
@@ -432,7 +439,7 @@ struct EntityFinancialSection: View {
                                 DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
                             },
                             actionButtons: {
-                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingCard = card }
                             }
                         )
                     }
@@ -484,7 +491,7 @@ struct EntityFinancialSection: View {
                                 DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
                             },
                             actionButtons: {
-                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { vm.activeTab = .financial }
+                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingLoan = loan }
                             }
                         )
                     }
