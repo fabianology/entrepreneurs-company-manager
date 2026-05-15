@@ -140,7 +140,7 @@ struct InstitutionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#2C2C2E"))
+                            .background(Color.white.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
@@ -180,7 +180,7 @@ struct InstitutionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#2C2C2E"))
+                            .background(Color.white.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
@@ -189,6 +189,7 @@ struct InstitutionCardView: View {
                 }
             }
         }
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,
@@ -277,7 +278,7 @@ struct InstitutionCardView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(hex: "#2C2C2E"))
+                .background(Color.white.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }

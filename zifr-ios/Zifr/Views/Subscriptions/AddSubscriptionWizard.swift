@@ -57,19 +57,11 @@ struct AddSubscriptionWizard: View {
                                 } label: {
                                     Text("Done")
                                         .font(.system(size: 16, weight: .bold))
-                                        .foregroundStyle(canSubmit ? .white : Color.white.opacity(0.3))
                                         .frame(maxWidth: .infinity)
                                         .frame(height: 54)
-                                        .background {
-                                            if canSubmit {
-                                                LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing)
-                                            } else {
-                                                Color.white.opacity(0.1)
-                                            }
-                                        }
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
                                 }
                                 .disabled(!canSubmit)
+                                .buttonStyle(MiloomPrimaryButtonStyle())
                                 .padding(.top, 16)
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
@@ -549,12 +541,10 @@ struct AddSubscriptionWizard: View {
                         Text("Add Supplemental Service")
                             .font(.system(size: 14, weight: .bold))
                     }
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(Color(hex: "#223E5A"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
+                .buttonStyle(MiloomSecondaryButtonStyle())
                 
                 ForEach(sub.subServices.indices, id: \.self) { i in
                     let ss = sub.subServices[i]
@@ -614,12 +604,10 @@ struct AddSubscriptionWizard: View {
                         Text("Add Linked Email")
                             .font(.system(size: 14, weight: .bold))
                     }
-                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(Color(hex: "#223E5A"))
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
+                .buttonStyle(MiloomSecondaryButtonStyle())
                 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in
                     let email = sub.linkedEmails[i]
@@ -673,20 +661,11 @@ struct AddSubscriptionWizard: View {
         Button(action: action) {
             Text("Next")
                 .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(disabled ? Color.white.opacity(0.3) : .white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background {
-                    if !disabled {
-                        LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing)
-                    } else {
-                        Color.white.opacity(0.05)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .disabled(disabled)
-        .buttonStyle(PremiumButtonStyle())
+        .buttonStyle(MiloomPrimaryButtonStyle())
         .padding(.top, 8)
     }
 }

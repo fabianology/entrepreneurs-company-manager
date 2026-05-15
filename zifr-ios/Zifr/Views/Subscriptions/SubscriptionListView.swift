@@ -455,7 +455,7 @@ struct SubscriptionCardView: View {
                             .padding(.horizontal, 24)
                             .padding(.vertical, 12)
                             .frame(maxWidth: .infinity)
-                            .background(Color(hex: "#2C2C2E"))
+                            .background(Color.white.opacity(0.05))
                             .overlay(
                                 Rectangle()
                                     .frame(height: 1)
@@ -537,7 +537,7 @@ struct SubscriptionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#2C2C2E"))
+                            .background(Color.white.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
@@ -555,13 +555,10 @@ struct SubscriptionCardView: View {
                             Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                             Text("Add Service").font(.system(size: 13, weight: .semibold))
                         }
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
-                        .background(Color.zifrGreen)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .buttonStyle(PremiumButtonStyle())
+                    .buttonStyle(MiloomSecondaryButtonStyle())
                     .padding(.top, sub.subServices.isEmpty ? 0 : 4)
                 }
                 }
@@ -608,7 +605,7 @@ struct SubscriptionCardView: View {
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
-                            .background(Color(hex: "#2C2C2E"))
+                            .background(Color.white.opacity(0.05))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
@@ -626,13 +623,10 @@ struct SubscriptionCardView: View {
                             Image(systemName: "plus").font(.system(size: 12, weight: .bold))
                             Text("Add Email").font(.system(size: 13, weight: .semibold))
                         }
-                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 36)
-                        .background(Color.zifrGreen)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .buttonStyle(PremiumButtonStyle())
+                    .buttonStyle(MiloomSecondaryButtonStyle())
                     .padding(.top, sub.linkedEmails.isEmpty ? 0 : 4)
                 }
                 }
@@ -778,7 +772,7 @@ struct SubscriptionCardView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color(hex: "#2C2C2E"))
+                .background(Color.white.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }

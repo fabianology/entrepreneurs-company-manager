@@ -579,7 +579,7 @@ struct CustomSegmentedControl: View {
                         .background {
                             if selection == option {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(LinearGradient(colors: [Color(hex: "#1F8A70"), Color(hex: "#30D158")], startPoint: .leading, endPoint: .trailing))
+                                    .fill(.miloomPrimary)
                                     .matchedGeometryEffect(id: "SEGMENT", in: animation)
                             }
                         }
@@ -691,6 +691,43 @@ struct PremiumButtonStyle: ButtonStyle {
     }
 }
 
+struct MiloomPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isEnabled ? .white : Color.white.opacity(0.3))
+            .background {
+                if isEnabled {
+                    LinearGradient.miloomPrimary
+                } else {
+                    Color.white.opacity(0.05)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
+
+struct MiloomSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(isEnabled ? .white : Color.white.opacity(0.3))
+            .background {
+                if isEnabled {
+                    LinearGradient.miloomSecondary
+                } else {
+                    Color.white.opacity(0.05)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: configuration.isPressed)
+    }
+}
 struct PremiumRow<Left: View, Right: View>: View {
     let left: Left
     let right: Right
@@ -979,12 +1016,7 @@ struct MiloomListCard<Content: View>: View {
         VStack(spacing: 0) {
             content
         }
-        .background(Color(hex: "#1C1C1E"))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
+        .masonryGlass(cornerRadius: 24)
     }
 }
 

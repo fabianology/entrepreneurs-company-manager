@@ -8,6 +8,7 @@ struct EditSubscriptionSheet: View {
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     let isNew: Bool
+    var onSave: (() -> Void)? = nil
 
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -726,6 +727,7 @@ struct EditSubscriptionSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         vm.saveSub(sub, appState: appState)
+                        onSave?()
                         dismiss()
                     }
                     .fontWeight(.semibold)
@@ -810,14 +812,11 @@ struct SubServicesSection: View {
                         Spacer()
                         Text("💾  Add Supplemental Service")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#223E5A"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MiloomSecondaryButtonStyle())
             }
 
                 ForEach(sub.subServices.indices, id: \.self) { i in
@@ -1280,14 +1279,11 @@ struct LinkedEmailsSection: View {
                         Spacer()
                         Text("📨  Add Linked Email")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
                         Spacer()
                     }
                     .frame(height: 40)
-                    .background(Color(hex: "#223E5A"))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(MiloomSecondaryButtonStyle())
             }
 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in

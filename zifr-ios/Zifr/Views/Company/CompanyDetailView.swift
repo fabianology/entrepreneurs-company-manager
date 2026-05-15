@@ -176,128 +176,168 @@ struct CompanyDetailView: View {
 
                     // Tab Controls (Pages icons) aligned to the right
                     HStack(spacing: 28) { // Distributed equally
-                        let visibleTabs: [AppViewModel.CompanyTab] = vm.activeTab == .home ? [.home] : [vm.activeTab, .home]
-                        ForEach(visibleTabs, id: \.self) { tab in
-                            Group {
-                                if tab == .home {
-                                    Menu {
-                                        if !allCompanies.isEmpty {
-                                            Section("Jump to Entity") {
-                                                ForEach(allCompanies) { c in
+                        if vm.activeTab != .home {
+                            let pageTabs: [AppViewModel.CompanyTab] = [.subscriptions, .financial, .documents]
+                            let activeIndex = pageTabs.firstIndex(of: vm.activeTab) ?? 0
+                            
+                            ZStack {
+                                ForEach(Array(pageTabs.enumerated()), id: \.element) { index, tab in
+                                    let offsetIndex = (index - activeIndex + 3) % 3
+                                    let isFront = offsetIndex == 0
+                                    
+                                    let scale: CGFloat = offsetIndex == 0 ? 1.0 : 0.8
+                                    let xOffset: CGFloat = offsetIndex == 0 ? 0 : (offsetIndex == 1 ? 14 : -14)
+                                    let opacity: Double = offsetIndex == 0 ? 1.0 : 0.4
+                                    let layerZIndex: Double = offsetIndex == 0 ? 3 : 2
+                                    
+                                    ZStack {
+                                        if tab == .financial {
+                                            Menu {
+                                                Button {
+                                                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                                                    showFinancialWizard = true
+                                                } label: {
+                                                    Label("Add Account", systemImage: "building.columns")
+                                                }
+                                                if !institutions.isEmpty {
                                                     Button {
-                                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                        company = c
-                                                        vm.touchCompany(c, appState: appState)
+                                                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
                                                     } label: {
-                                                        if c.id == company.id {
-                                                            Label(c.name, systemImage: "checkmark")
-                                                        } else {
-                                                            Text(c.name)
+                                                        Label("Add Card", systemImage: "creditcard")
+                                                    }
+                                                    Button {
+                                                        newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
+                                                    } label: {
+                                                        Label("Add Loan", systemImage: "dollarsign.circle")
+                                                    }
+                                                }
+                                            } label: {
+                                                Image(systemName: tab.icon)
+                                                    .font(.system(size: 20, weight: isFront ? .semibold : .medium))
+                                                    .foregroundStyle(isFront ? tabColor(tab) : .secondary)
+                                                    .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
+                                                    .frame(width: 32, height: 44)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 6)
+                                                            .fill(Color.black)
+                                                            .frame(width: 20, height: 20)
+                                                    )
+                                            } primaryAction: {
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                    vm.activeTab = .documents
+                                                }
+                                                tabBounces[.documents, default: 0] += 1
+                                            }
+                                            .simultaneousGesture(
+                                                LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                                }
+                                            )
+                                        } else {
+                                            Button {
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                let nextTab: AppViewModel.CompanyTab = tab == .subscriptions ? .financial : .subscriptions
+                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                    vm.activeTab = nextTab
+                                                }
+                                                tabBounces[nextTab, default: 0] += 1
+                                            } label: {
+                                                Image(systemName: tab.icon)
+                                                    .font(.system(size: 20, weight: isFront ? .semibold : .medium))
+                                                    .foregroundStyle(isFront ? tabColor(tab) : .secondary)
+                                                    .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                                                    .frame(width: 32, height: 44)
+                                                    .background(
+                                                        RoundedRectangle(cornerRadius: 6)
+                                                            .fill(Color.black)
+                                                            .frame(width: 20, height: 20)
+                                                    )
+                                            }
+                                            .simultaneousGesture(
+                                                LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                                    if isFront {
+                                                        UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                                                        if tab == .subscriptions {
+                                                            newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+                                                        } else if tab == .documents {
+                                                            newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
                                                         }
                                                     }
                                                 }
-                                            }
+                                            )
                                         }
-                                    } label: {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                            .foregroundStyle(vm.activeTab == tab ? .white : .secondary)
-                                            .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                            .frame(width: 32, height: 44)
-                                    } primaryAction: {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            vm.activeTab = tab
-                                        }
-                                        tabBounces[tab, default: 0] += 1
                                     }
-                                    .simultaneousGesture(
-                                        LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                        }
-                                    )
-                                } else if tab == .financial {
-                                    Menu {
-                                        Button {
-                                            wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                                            showFinancialWizard = true
-                                        } label: {
-                                            Label("Add Account", systemImage: "building.columns")
-                                        }
-                                        if !institutions.isEmpty {
-                                            Button {
-                                                newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                                            } label: {
-                                                Label("Add Card", systemImage: "creditcard")
-                                            }
-                                            Button {
-                                                newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
-                                            } label: {
-                                                Label("Add Loan", systemImage: "dollarsign.circle")
-                                            }
-                                        }
-                                    } label: {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                            .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                            .symbolEffect(.bounce.up.byLayer, options: .nonRepeating, value: tabBounces[tab, default: 0])
-                                            .frame(width: 32, height: 44)
-                                    } primaryAction: {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            if vm.activeTab == tab {
-                                                vm.activeTab = .documents
-                                            } else {
-                                                vm.activeTab = tab
-                                            }
-                                        }
-                                        tabBounces[tab, default: 0] += 1
-                                    }
-                                    .simultaneousGesture(
-                                        LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                                            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                        }
-                                    )
-                                } else {
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                            if vm.activeTab == tab {
-                                                if tab == .subscriptions {
-                                                    vm.activeTab = .financial
-                                                } else if tab == .documents {
-                                                    vm.activeTab = .subscriptions
-                                                } else {
-                                                    vm.activeTab = tab
-                                                }
-                                            } else {
-                                                vm.activeTab = tab
-                                            }
-                                        }
-                                        tabBounces[tab, default: 0] += 1
-                                    } label: {
-                                        Image(systemName: tab.icon)
-                                            .font(.system(size: 20, weight: vm.activeTab == tab ? .semibold : .medium))
-                                            .foregroundStyle(vm.activeTab == tab ? tabColor(tab) : .secondary)
-                                            .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                            .frame(width: 32, height: 44)
-                                    }
-                                    .simultaneousGesture(
-                                        LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                                            if vm.activeTab == tab {
-                                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                                if tab == .subscriptions {
-                                                    newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
-                                                } else if tab == .documents {
-                                                    newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-                                                }
-                                            }
-                                        }
-                                    )
+                                    .zIndex(layerZIndex)
+                                    .scaleEffect(scale)
+                                    .offset(x: xOffset)
+                                    .opacity(opacity)
+                                    .allowsHitTesting(isFront)
                                 }
                             }
+                            .frame(width: 32, height: 44)
                             .transition(.scale.combined(with: .opacity))
+                            .highPriorityGesture(
+                                DragGesture(minimumDistance: 10, coordinateSpace: .local)
+                                    .onEnded { value in
+                                        let transX = value.translation.width
+                                        if abs(transX) > 10 {
+                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                            var nextTab = vm.activeTab
+                                            if transX < 0 {
+                                                if vm.activeTab == .subscriptions { nextTab = .financial }
+                                                else if vm.activeTab == .financial { nextTab = .documents }
+                                                else if vm.activeTab == .documents { nextTab = .subscriptions }
+                                            } else {
+                                                if vm.activeTab == .subscriptions { nextTab = .documents }
+                                                else if vm.activeTab == .financial { nextTab = .subscriptions }
+                                                else if vm.activeTab == .documents { nextTab = .financial }
+                                            }
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                vm.activeTab = nextTab
+                                            }
+                                            tabBounces[nextTab, default: 0] += 1
+                                        }
+                                    }
+                            )
                         }
+                        
+                        Menu {
+                            if !allCompanies.isEmpty {
+                                Section("Jump to Entity") {
+                                    ForEach(allCompanies) { c in
+                                        Button {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            company = c
+                                            vm.touchCompany(c, appState: appState)
+                                        } label: {
+                                            if c.id == company.id {
+                                                Label(c.name, systemImage: "checkmark")
+                                            } else {
+                                                Text(c.name)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: AppViewModel.CompanyTab.home.icon)
+                                .font(.system(size: 20, weight: vm.activeTab == .home ? .semibold : .medium))
+                                .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
+                                .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
+                                .frame(width: 32, height: 44)
+                        } primaryAction: {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                vm.activeTab = .home
+                            }
+                            tabBounces[.home, default: 0] += 1
+                        }
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                            }
+                        )
                     }
                     .padding(.trailing, 12)
                 }

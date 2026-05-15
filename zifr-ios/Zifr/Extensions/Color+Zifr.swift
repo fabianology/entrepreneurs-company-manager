@@ -57,3 +57,22 @@ extension String {
         }
     }
 }
+
+// MARK: - Gradients
+extension ShapeStyle where Self == LinearGradient {
+    static var miloomPrimary: LinearGradient {
+        LinearGradient(
+            colors: [Color(hex: "#4f609a"), Color(hex: "#f2ac5b")],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    static var miloomSecondary: LinearGradient {
+        LinearGradient(
+            colors: [Color(hex: "#15566a"), Color(hex: "#00544e")],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+}

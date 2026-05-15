@@ -32,6 +32,7 @@ struct EntityHomeView: View {
     @State private var newSub: Subscription? = nil
     @State private var newCard: FinancialCard? = nil
     @State private var newDoc: CompanyDocument? = nil
+    @State private var wizardInstitution: Institution? = nil
     
     // Prototype States
     @State private var sheetSub: Subscription? = nil
@@ -119,7 +120,8 @@ struct EntityHomeView: View {
         }
         .background(Color.clear)
         .sheet(item: $newSub) { sub in
-            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
+            AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
+                .presentationDetents([.fraction(0.9), .large])
         }
         .sheet(item: $newCard) { c in
             EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: true, customTitle: "Add Account")
@@ -127,8 +129,15 @@ struct EntityHomeView: View {
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
+        .sheet(item: $wizardInstitution) { inst in
+            AddFinancialWizard(institution: inst, vm: vm, isCommandCenterContext: true, allInstitutions: institutions)
+        }
         .sheet(item: $sheetSub) { sub in
-            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
+            EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false, onSave: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    flippedHeroIndex = nil
+                }
+            })
         }
         .sheet(item: $editingCard) { c in
             EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: false)
@@ -236,12 +245,7 @@ struct EntityHomeView: View {
                             cards: cards,
                             onEdit: {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    flippedHeroIndex = nil
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                                    sheetSub = sub
-                                }
+                                sheetSub = sub
                             }
                         )
                     }
@@ -265,7 +269,7 @@ struct EntityHomeView: View {
             
             quickAddButton(icon: "dollarsign.bank.building", title: "Add Account", color: finColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                wizardInstitution = Institution(userId: company.userId, companyId: company.id)
             }
             
             Rectangle()

@@ -15,7 +15,7 @@ struct InstitutionAccountsSection: View {
                     Text("ADD ACCOUNT")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                    Text("checking · savings · investing · 401(k)")
+                    Text("checking · savings · investing · 401(k) · more")
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.tertiary)
                 }

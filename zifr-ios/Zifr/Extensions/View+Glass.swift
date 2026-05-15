@@ -40,10 +40,7 @@ struct MasonryGlassModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color(hex: "#1C1C1E").opacity(0.70))
-            )
+            .background(Color(hex: "#1C1C1E").opacity(0.70))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
