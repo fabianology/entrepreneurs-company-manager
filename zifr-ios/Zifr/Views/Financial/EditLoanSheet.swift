@@ -532,8 +532,8 @@ struct EditLoanSheet: View {
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("LOAN TERM")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                         Button {
                             showTermPicker = true
                         } label: {
@@ -578,8 +578,8 @@ struct EditLoanSheet: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("MATURITY")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.45))
                     
                     if let selection = Binding($loan.maturityDate) {
                         DatePicker("", selection: selection, displayedComponents: .date)
@@ -604,8 +604,8 @@ struct EditLoanSheet: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text("LOAN SUMMARY")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.45))
                     .padding(.leading, 6)
                 
                 TextField("Add notes...", text: Binding(get: { loan.notes ?? "" }, set: { loan.notes = $0 }), axis: .vertical)

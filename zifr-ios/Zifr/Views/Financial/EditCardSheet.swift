@@ -219,8 +219,8 @@ struct EditCardSheet: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("AUTOPAY")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.45))
                     HStack {
                         Text(autoPayBinding.wrappedValue ? "Enabled" : "Disabled")
                             .font(.system(size: 14, weight: .bold))
@@ -242,8 +242,8 @@ struct EditCardSheet: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("PAID ON")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.5))
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.45))
                     HStack {
                         Picker("", selection: paidOnBinding) {
                             ForEach(1...31, id: \.self) { day in
@@ -272,8 +272,8 @@ struct EditCardSheet: View {
     @ViewBuilder private var row4: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("PAID FROM")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             
             Button {
                 showPaymentPicker = true
@@ -303,8 +303,8 @@ struct EditCardSheet: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("ROLE")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.45))
                 VStack(spacing: 0) {
                     Spacer()
                     CustomSegmentedControl(
@@ -355,8 +355,8 @@ struct EditCardSheet: View {
         let services = paysForServices
         VStack(alignment: .leading, spacing: 12) {
             Text("PAYS FOR")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
                 .padding(.leading, 6)
             
             if services.isEmpty {
@@ -496,8 +496,8 @@ struct EditCardSheet: View {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("NOTES")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.leading, 6)
                         
                         TextField("Add notes...", text: Binding(get: { card.notes ?? "" }, set: { card.notes = $0 }), axis: .vertical)

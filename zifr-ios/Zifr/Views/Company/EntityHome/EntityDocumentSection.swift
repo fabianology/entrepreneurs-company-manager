@@ -48,7 +48,7 @@ struct EntityDocumentSection: View {
                         
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.4))
+                            .foregroundStyle(Color.white)
                             .padding(.leading, 4)
                     }
                     

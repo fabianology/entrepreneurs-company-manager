@@ -64,8 +64,8 @@ struct FinancialCardHUD: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("ROLE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             VStack(spacing: 0) {
                                 Spacer()
                                 CustomSegmentedControl(
@@ -123,8 +123,8 @@ struct FinancialCardHUD: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("BALANCE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             HStack(spacing: 4) {
                                 Text("$")
                                     .font(.system(size: 14, weight: .bold))
@@ -143,8 +143,8 @@ struct FinancialCardHUD: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text("LIMIT")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             HStack(spacing: 4) {
                                 Text("$")
                                     .font(.system(size: 14, weight: .bold))

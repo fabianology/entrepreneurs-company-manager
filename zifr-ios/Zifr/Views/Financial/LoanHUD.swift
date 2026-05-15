@@ -34,8 +34,8 @@ struct LoanHUD: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("ROLE")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                         Picker("", selection: $draft.role) {
                             ForEach(Loan.roles, id: \.self) { t in
                                 Text(t).tag(t)
@@ -55,8 +55,8 @@ struct LoanHUD: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("PRINCIPAL")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             HStack(spacing: 4) {
                                 Text("$")
                                     .font(.system(size: 14, weight: .bold))
@@ -75,8 +75,8 @@ struct LoanHUD: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text("INTEREST RATE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             HStack(spacing: 4) {
                                 DoubleField(placeholder: "0.00", value: $draft.interestRate)
                                     .font(.system(size: 14, weight: .bold))
@@ -98,8 +98,8 @@ struct LoanHUD: View {
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("TERM YEARS")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             Picker("", selection: $draft.termYears) {
                                 ForEach(0...40, id: \.self) { y in
                                     Text("\(y) Years").tag(y)
@@ -117,8 +117,8 @@ struct LoanHUD: View {
                         
                         VStack(alignment: .leading, spacing: 4) {
                             Text("TERM MONTHS")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             Picker("", selection: $draft.termMonths) {
                                 ForEach(0...11, id: \.self) { m in
                                     Text("\(m) Months").tag(m)

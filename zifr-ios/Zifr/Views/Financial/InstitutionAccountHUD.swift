@@ -26,8 +26,8 @@ struct InstitutionAccountHUD: View {
                 Section {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("TYPE")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                         Picker("", selection: $draft.type) {
                             ForEach(InstitutionAccount.allTypes, id: \.self) { t in
                                 Text(t).tag(t)
@@ -84,8 +84,8 @@ struct InstitutionAccountHUD: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("BALANCE")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                         HStack(spacing: 4) {
                             Text("$")
                                 .font(.system(size: 14, weight: .bold))

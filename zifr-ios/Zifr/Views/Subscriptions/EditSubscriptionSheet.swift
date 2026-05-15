@@ -34,8 +34,7 @@ struct EditSubscriptionSheet: View {
 
     @State private var showPaymentPicker = false
 
-    // User preference for form density
-    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
+    // Removed user preference for form density
 
     struct Snapshot: Equatable {
         var name, website, pricingModel, status, billingCycle, nextRenewal, paymentMethod, renew, loginId, password, twoFactorAuth, recoveryMethod, notes: String
@@ -111,23 +110,7 @@ struct EditSubscriptionSheet: View {
         )
     }
 
-    private var detailSliderBinding: Binding<Double> {
-        Binding<Double>(
-            get: {
-                switch detailLevel {
-                case "Essentials": return 0.0
-                default: return 1.0
-                }
-            },
-            set: { val in
-                let newState = val < 0.5 ? "Essentials" : "Detailed"
-                if newState != detailLevel {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    detailLevel = newState
-                }
-            }
-        )
-    }
+
 
 
 
@@ -135,8 +118,8 @@ struct EditSubscriptionSheet: View {
     private var costCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("COST")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             HStack(spacing: 4) {
                 Text("$")
                     .font(.system(size: 14, weight: .bold))
@@ -160,8 +143,8 @@ struct EditSubscriptionSheet: View {
     private var autoPayCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("AUTO PAY")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             HStack {
                 Text(autoPayBinding.wrappedValue ? "Enabled" : "Manual")
                     .font(.system(size: 14, weight: .bold))
@@ -184,8 +167,8 @@ struct EditSubscriptionSheet: View {
     private var statusCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("STATUS")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             HStack {
                 StatusDot(isGreen: sub.status == "Active")
                 Text(sub.status == "Active" ? "Active" : "Paused")
@@ -212,8 +195,8 @@ struct EditSubscriptionSheet: View {
     private var billingCycleCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("BILLING CYCLE")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
                 get: { sub.billingCycle },
                 set: { (newCycle: String) in
@@ -236,8 +219,8 @@ struct EditSubscriptionSheet: View {
     private var renewalCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("RENEWS ON")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             if sub.billingCycle == "Monthly" {
                 Picker("", selection: dayBinding) {
                     ForEach(1...31, id: \.self) { day in
@@ -268,8 +251,8 @@ struct EditSubscriptionSheet: View {
     private var paidFromCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("PAID FROM")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             
             Button {
                 showPaymentPicker = true
@@ -301,24 +284,6 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Top Controls
                 VStack(spacing: 12) {
                     CustomSegmentedControl(options: ["paid", "free"], selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 }))
-                    
-                    Slider(value: detailSliderBinding, in: 0...1, step: 1) {
-                        Text("Detail Level")
-                    } minimumValueLabel: {
-                        Text("ESSENTIALS")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.2)) // Darker font
-                    } maximumValueLabel: {
-                        Text("ALL DATA")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.2)) // Darker font
-                    }
-                    .onAppear {
-                        // Liquid glass effect for thumb
-                        UISlider.appearance().thumbTintColor = UIColor(white: 1.0, alpha: 0.15)
-                        UISlider.appearance().minimumTrackTintColor = .black
-                        UISlider.appearance().maximumTrackTintColor = .black
-                    }
                 }
                 .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                 .listRowBackground(Color.clear)
@@ -326,22 +291,20 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Identity
                 Section {
                      VStack(spacing: 16) {
-                        if detailLevel != "Essentials" {
-                            HStack(spacing: 12) {
-                                ZifrField(
-                                    label: "SERVICE NAME",
-                                    placeholder: "e.g. Shopify",
-                                    text: Binding(get: { sub.name }, set: { sub.name = $0 })
-                                )
-                                ZifrField(
-                                    label: "WEBSITE",
-                                    placeholder: "shopify.com",
-                                    text: Binding(get: { sub.website ?? "" }, set: { sub.website = $0 }),
-                                    keyboardType: .URL,
-                                    textContentType: .URL
-                                )
-                                .textInputAutocapitalization(.never)
-                            }
+                        HStack(spacing: 12) {
+                            ZifrField(
+                                label: "SERVICE NAME",
+                                placeholder: "e.g. Shopify",
+                                text: Binding(get: { sub.name }, set: { sub.name = $0 })
+                            )
+                            ZifrField(
+                                label: "WEBSITE",
+                                placeholder: "shopify.com",
+                                text: Binding(get: { sub.website ?? "" }, set: { sub.website = $0 }),
+                                keyboardType: .URL,
+                                textContentType: .URL
+                            )
+                            .textInputAutocapitalization(.never)
                         }
                         
                         VStack(alignment: .leading, spacing: 8) {
@@ -382,48 +345,54 @@ struct EditSubscriptionSheet: View {
                         }
 
                     }
-                    .padding(.vertical, detailLevel == "Essentials" ? 2 : 4)
-                } header: { EmptyView() }
+                    .padding(.vertical, 4)
+                } header: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.shield")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("SERVICE DETAILS")
+                            .font(.system(size: 12, weight: .black))
+                            .tracking(1.5)
+                    }
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
+                }
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 4 : 8, leading: 20, bottom: detailLevel == "Essentials" ? 4 : 8, trailing: 20))
+                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                 .listRowSeparator(.hidden)
 
                 // MARK: – Billing (Paid only)
                 if !sub.isFree {
-                    if detailLevel != "Essentials" {
-                        Section {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.07))
-                                .frame(height: 1)
-                        } header: { EmptyView() }
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
-                        .listRowSeparator(.hidden)
-                    }
+
                     Section {
-                        VStack(spacing: detailLevel == "Essentials" ? 8 : 16) {
-                            if detailLevel == "Essentials" {
-                                HStack(spacing: 12) {
-                                    costCard
-                                    paidFromCard
-                                }
-                            } else {
-                                HStack(spacing: 12) {
-                                    costCard
-                                    autoPayCard
-                                }
-                                billingCycleCard
-                                HStack(spacing: 12) {
-                                    renewalCard
-                                    statusCard
-                                }
-                                paidFromCard
+                        VStack(spacing: 16) {
+                            HStack(spacing: 12) {
+                                costCard
+                                autoPayCard
                             }
+                            billingCycleCard
+                            HStack(spacing: 12) {
+                                renewalCard
+                                statusCard
+                            }
+                            paidFromCard
                         }
-                        .padding(.vertical, detailLevel == "Essentials" ? 2 : 4)
-                    } header: { EmptyView() }
+                        .padding(.vertical, 4)
+                    } header: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "creditcard")
+                                .font(.system(size: 12, weight: .bold))
+                            Text("BILLING & RENEWAL")
+                                .font(.system(size: 12, weight: .black))
+                                .tracking(1.5)
+                        }
+                        .foregroundStyle(Color.white.opacity(0.6))
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                    }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 4 : 8, leading: 20, bottom: detailLevel == "Essentials" ? 4 : 8, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
 
@@ -431,8 +400,8 @@ struct EditSubscriptionSheet: View {
                     Section {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("PURPOSE & NOTES")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             TextField("e.g. Design tool used by marketing...",
                                       text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }),
                                       axis: .vertical)
@@ -447,18 +416,10 @@ struct EditSubscriptionSheet: View {
                         }
                     } header: { EmptyView() }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: detailLevel == "Essentials" ? 2 : 4, leading: 20, bottom: detailLevel == "Essentials" ? 4 : 8, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                     .listRowSeparator(.hidden)
 
-                if detailLevel == "Detailed" {
-                    Section {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.07))
-                            .frame(height: 1)
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 2.5, leading: 20, bottom: 2.5, trailing: 20))
-                    .listRowSeparator(.hidden)
+
 
                     // MARK: – Security & Recovery (below Notes)
                     // Reveal button — shown only when section is hidden
@@ -489,7 +450,7 @@ struct EditSubscriptionSheet: View {
                             .buttonStyle(.plain)
                         } header: { EmptyView() }
                         .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
+                        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                         .listRowSeparator(.hidden)
                     }
 
@@ -521,8 +482,8 @@ struct EditSubscriptionSheet: View {
                                 // 2FA Picker card
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("2FA")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
                                     Picker("", selection: Binding(get: { sub.twoFactorAuth }, set: { sub.twoFactorAuth = $0 })) {
                                         ForEach(twoFAOptions, id: \.self) { opt in
                                             Text(opt).tag(opt)
@@ -548,21 +509,14 @@ struct EditSubscriptionSheet: View {
                         }
                         } header: { EmptyView() }
                         .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 2.5, leading: 20, bottom: 2.5, trailing: 20))
+                        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                         .listRowSeparator(.hidden)
                     }
-                } // End of detailLevel == "Detailed"
+
 
                     // MARK: – Supplemental Services
                     // Thin divider above SubServices
-                    Section {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.07))
-                            .frame(height: 1)
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 2.5, leading: 20, bottom: 2.5, trailing: 20))
-                    .listRowSeparator(.hidden)
+
 
                     SubServicesSection(
                         sub: sub,
@@ -580,14 +534,6 @@ struct EditSubscriptionSheet: View {
                     )
 
                     // MARK: – Linked Emails
-                    Section {
-                        Rectangle()
-                            .fill(Color.white.opacity(0.07))
-                            .frame(height: 1)
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
-                    .listRowSeparator(.hidden)
 
                     LinkedEmailsSection(
                         sub: sub,
@@ -607,26 +553,26 @@ struct EditSubscriptionSheet: View {
                 // MARK: – Danger Zone
                 if !isNew {
                     Section {
-                        // Share Service
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showShareSheet = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Share Service")
-                                Spacer()
-                            }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#4f46e5"))
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.bottom, 8)
+                        // Share Service (premium gradient)
+                         Button {
+                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                             showShareSheet = true
+                         } label: {
+                             VStack(spacing: 4) {
+                                 HStack(spacing: 6) {
+                                     Image(systemName: "person.crop.circle.badge.plus")
+                                     Text("Share Service")
+                                 }
+                                 .font(.system(size: 13, weight: .semibold))
+                                 Text("Generate a share link for collaborators")
+                                     .font(.system(size: 10, weight: .regular))
+                                     .foregroundStyle(Color.white.opacity(0.6))
+                             }
+                             .frame(maxWidth: .infinity)
+                             .padding(.vertical, 10)
+                         }
+                         .buttonStyle(MiloomSecondaryButtonStyle())
+                         .padding(.bottom, 8)
 
                         // Delete Service
                         Button(role: .destructive) {
@@ -797,7 +743,6 @@ struct EditSubscriptionSheet: View {
 // MARK: – Supplemental Services Section
 
 struct SubServicesSection: View {
-    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
     @State var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, SubService) -> Void
@@ -806,18 +751,22 @@ struct SubServicesSection: View {
 
     var body: some View {
         Section {
-            if detailLevel != "Essentials" {
                 Button { onAdd() } label: {
-                    HStack {
-                        Spacer()
-                        Text("💾  Add Supplemental Service")
-                            .font(.body.weight(.semibold))
-                        Spacer()
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                            Text("Add Sub-Service")
+                        }
+                        .font(.system(size: 13, weight: .bold))
+                        
+                        Text("addons · extra licenses · premium tiers")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.6))
                     }
-                    .frame(height: 40)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
                 }
                 .buttonStyle(MiloomSecondaryButtonStyle())
-            }
 
                 ForEach(sub.subServices.indices, id: \.self) { i in
                     let ss = sub.subServices[i]
@@ -877,9 +826,20 @@ struct SubServicesSection: View {
                         .tint(.red)
                     }
                 }
-        } header: { EmptyView() }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.3x3.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text("SUB-SERVICES")
+                    .font(.system(size: 12, weight: .black))
+                    .tracking(1.5)
+            }
+            .foregroundStyle(Color.white.opacity(0.6))
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+        }
         .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
+        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
         .listRowSeparator(.hidden)
     }
 }
@@ -931,8 +891,8 @@ struct SubServiceHUD: View {
                             // Paid From card
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("PAID FROM")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
                                 
                                 Button {
                                     showPaymentPicker = true
@@ -962,8 +922,8 @@ struct SubServiceHUD: View {
                             // Cost card
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("COST")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
                                 HStack(spacing: 4) {
                                     Text("$")
                                         .font(.system(size: 14, weight: .bold))
@@ -983,8 +943,8 @@ struct SubServiceHUD: View {
                             // Billing Cycle card
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("CYCLE")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
                                 CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
                                     get: { draft.billingCycle == .monthly ? "Monthly" : "Yearly" },
                                     set: { draft.billingCycle = $0 == "Monthly" ? .monthly : .yearly }
@@ -997,8 +957,8 @@ struct SubServiceHUD: View {
                             // Auto Pay card
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("AUTO PAY")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
                                 HStack {
                                     Text(draft.autoPay == .auto ? "Enabled" : "Manual")
                                         .font(.system(size: 14, weight: .bold))
@@ -1023,8 +983,8 @@ struct SubServiceHUD: View {
                             // Status card
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("STATUS")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
                                 HStack {
                                     StatusDot(isGreen: draft.status == .active)
                                     Text(draft.status == .active ? "Active" : "Paused")
@@ -1051,8 +1011,8 @@ struct SubServiceHUD: View {
                         // Row 4: Purpose (full width)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("PURPOSE")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             TextField("What is this service for?",
                                       text: $draft.purpose,
                                       axis: .vertical)
@@ -1098,6 +1058,9 @@ struct SubServiceHUD: View {
                     .listRowSeparator(.hidden)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -1145,7 +1108,7 @@ struct LinkedEmailCardView: View {
     let allSubscriptions: [Subscription]
     let onEdit: () -> Void
 
-    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
+
 
     private var computedServices: [UsedInEmailService] {
         let normalizedEmail = em.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1261,7 +1224,6 @@ struct LinkedEmailCardView: View {
 // MARK: – Linked Emails Section
 
 struct LinkedEmailsSection: View {
-    @AppStorage("subscriptionDetailLevel") private var detailLevel: String = "Detailed"
     @State var sub: Subscription
     let onAdd: () -> Void
     let onEdit: (Int, LinkedEmail) -> Void
@@ -1273,18 +1235,22 @@ struct LinkedEmailsSection: View {
 
     var body: some View {
         Section {
-            if detailLevel != "Essentials" {
                 Button { onAdd() } label: {
-                    HStack {
-                        Spacer()
-                        Text("📨  Add Linked Email")
-                            .font(.body.weight(.semibold))
-                        Spacer()
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                            Text("Add Linked Email")
+                        }
+                        .font(.system(size: 13, weight: .bold))
+                        
+                        Text("aliases · forwards · external accounts")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.6))
                     }
-                    .frame(height: 40)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
                 }
                 .buttonStyle(MiloomSecondaryButtonStyle())
-            }
 
                 ForEach(sub.linkedEmails.indices, id: \.self) { i in
                     let em = sub.linkedEmails[i]
@@ -1302,9 +1268,20 @@ struct LinkedEmailsSection: View {
                         .tint(.red)
                     }
                 }
-        } header: { EmptyView() }
+        } header: {
+            HStack(spacing: 6) {
+                Image(systemName: "envelope.fill")
+                    .font(.system(size: 12, weight: .bold))
+                Text("LINKED EMAILS")
+                    .font(.system(size: 12, weight: .black))
+                    .tracking(1.5)
+            }
+            .foregroundStyle(Color.white.opacity(0.6))
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+        }
         .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 8, trailing: 20))
+        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
         .listRowSeparator(.hidden)
     }
 }
@@ -1389,8 +1366,8 @@ struct LinkedEmailHUD: View {
     private var usedInCard: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("USED IN")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.5))
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
             
             if computedServices.isEmpty && legacyTags.isEmpty {
                 HStack {
@@ -1500,8 +1477,8 @@ struct LinkedEmailHUD: View {
                         // Row 5: Notes (full width)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("NOTES")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                             TextField("Add notes…", text: notesBinding, axis: .vertical)
                                 .lineLimit(2...4)
                                 .font(.system(size: 14, weight: .medium))
@@ -1545,6 +1522,9 @@ struct LinkedEmailHUD: View {
                     .listRowSeparator(.hidden)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
             .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)
             .navigationBarTitleDisplayMode(.inline)

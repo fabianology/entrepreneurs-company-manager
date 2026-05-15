@@ -107,8 +107,8 @@ struct EditCompanySheet: View {
                     // Entity Category
                     VStack(alignment: .leading, spacing: 8) {
                         Text("ENTITY CATEGORY")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.horizontal, 4)
                         
                         CustomSegmentedControl(options: ["Personal", "Business"], selection: $entityCategory)
@@ -128,8 +128,8 @@ struct EditCompanySheet: View {
                     // Structure Picker
                     VStack(alignment: .leading, spacing: 8) {
                         Text("ENTITY STRUCTURE")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.horizontal, 4)
                         
                         Picker("Select Structure", selection: $structure) {
@@ -157,8 +157,8 @@ struct EditCompanySheet: View {
                         // App Navigators
                         VStack(alignment: .leading, spacing: 8) {
                             Text("APP NAVIGATORS")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
                                 .padding(.leading, 4)
                             
                             Button {

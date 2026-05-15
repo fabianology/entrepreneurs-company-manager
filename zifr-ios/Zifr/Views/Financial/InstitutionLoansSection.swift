@@ -11,21 +11,21 @@ struct InstitutionLoansSection: View {
     var body: some View {
         Section {
             Button { onAdd() } label: {
-                VStack(spacing: 3) {
-                    Text("ADD LOAN")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                VStack(spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                        Text("Add Loan")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    
                     Text("lending out · bank loan · custom loan")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.tertiary)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.6))
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
-            .buttonStyle(.plain)
-            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .buttonStyle(MiloomSecondaryButtonStyle())
 
                 ForEach(loans, id: \.id) { loan in
                     Button { onEdit(loan) } label: {
@@ -76,9 +76,20 @@ struct InstitutionLoansSection: View {
                         .tint(.red)
                     }
                 }
-        } header: { EmptyView() }
+        } header: { 
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 12, weight: .bold))
+                Text("LOANS")
+                    .font(.system(size: 12, weight: .black))
+                    .tracking(1.5)
+            }
+            .foregroundStyle(Color.white.opacity(0.6))
+            .padding(.top, 24)
+            .padding(.bottom, 8)
+        }
         .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
         .listRowSeparator(.hidden)
     }
 }

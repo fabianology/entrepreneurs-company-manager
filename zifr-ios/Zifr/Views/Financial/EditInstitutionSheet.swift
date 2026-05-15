@@ -137,19 +137,23 @@ struct EditInstitutionSheet: View {
                         }
                     }
                     .padding(.vertical, 4)
+                } header: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.shield")
+                            .font(.system(size: 12, weight: .bold))
+                        Text("LOGIN & IDENTITY")
+                            .font(.system(size: 12, weight: .black))
+                            .tracking(1.5)
+                    }
+                    .foregroundStyle(Color.white.opacity(0.6))
+                    .padding(.top, 16)
+                    .padding(.bottom, 8)
                 }
                 .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
+                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                 .listRowSeparator(.hidden)
 
-                Section {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.07))
-                        .frame(height: 1)
-                } header: { EmptyView() }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
-                .listRowSeparator(.hidden)
+
 
                 // MARK: - Accounts Section
                 InstitutionAccountsSection(
@@ -168,14 +172,7 @@ struct EditInstitutionSheet: View {
                     }
                 )
 
-                Section {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.07))
-                        .frame(height: 1)
-                } header: { EmptyView() }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
-                .listRowSeparator(.hidden)
+
 
                 // MARK: - Cards Section
                 InstitutionCardsSection(
@@ -195,14 +192,7 @@ struct EditInstitutionSheet: View {
                     }
                 )
 
-                Section {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.07))
-                        .frame(height: 1)
-                } header: { EmptyView() }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
-                .listRowSeparator(.hidden)
+
 
                 // MARK: - Loans Section
                 InstitutionLoansSection(
@@ -229,20 +219,20 @@ struct EditInstitutionSheet: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             showShareSheet = true
                         } label: {
-                            HStack {
-                                Spacer()
+                        VStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 Image(systemName: "person.crop.circle.badge.plus")
                                 Text("Share Institution")
-                                Spacer()
                             }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#4f46e5"))
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
+                            .font(.system(size: 13, weight: .semibold))
+                            Text("Generate a share link for collaborators")
+                                .font(.system(size: 10, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.6))
                         }
-                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        }
+                        .buttonStyle(MiloomSecondaryButtonStyle())
                         .padding(.bottom, 8)
 
                         // Delete Institution
@@ -276,7 +266,7 @@ struct EditInstitutionSheet: View {
                         }
                     }
                     .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
+                    .listRowInsets(EdgeInsets(top: 32, leading: 20, bottom: 20, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
 
