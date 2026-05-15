@@ -72,10 +72,7 @@ final class AppViewModel {
 
     // CRUD: Subscriptions
     func addSubscription(appState: AppState, userId: UUID, companyId: UUID) -> Subscription {
-        let sub = Subscription(userId: userId, companyId: companyId)
-        appState.subscriptions.append(sub)
-        Task { try? await DataRepository.shared.insertSubscription(sub) }
-        return sub
+        return Subscription(userId: userId, companyId: companyId)
     }
 
     func saveSub(_ sub: Subscription, appState: AppState) {
@@ -97,10 +94,7 @@ final class AppViewModel {
 
     // CRUD: Financial Cards
     func addCard(appState: AppState, userId: UUID, companyId: UUID) -> FinancialCard {
-        let card = FinancialCard(userId: userId, companyId: companyId)
-        appState.cards.append(card)
-        Task { try? await DataRepository.shared.insertCard(card) }
-        return card
+        return FinancialCard(userId: userId, companyId: companyId)
     }
 
     func saveCard(_ card: FinancialCard, appState: AppState) {
@@ -121,10 +115,7 @@ final class AppViewModel {
 
     // CRUD: Institutions
     func addInstitution(appState: AppState, userId: UUID, companyId: UUID) -> Institution {
-        let inst = Institution(userId: userId, companyId: companyId)
-        appState.institutions.append(inst)
-        Task { try? await DataRepository.shared.insertInstitution(inst) }
-        return inst
+        return Institution(userId: userId, companyId: companyId)
     }
 
     func saveInstitution(_ inst: Institution, appState: AppState) {
@@ -183,10 +174,7 @@ final class AppViewModel {
 
     // CRUD: Loans
     func addLoan(appState: AppState, userId: UUID, companyId: UUID) -> Loan {
-        let loan = Loan(userId: userId, companyId: companyId)
-        appState.loans.append(loan)
-        Task { try? await DataRepository.shared.insertLoan(loan) }
-        return loan
+        return Loan(userId: userId, companyId: companyId)
     }
 
     func saveLoan(_ loan: Loan, appState: AppState) {
@@ -206,10 +194,7 @@ final class AppViewModel {
 
     // CRUD: Documents
     func addDocument(appState: AppState, userId: UUID, companyId: UUID) -> CompanyDocument {
-        let doc = CompanyDocument(userId: userId, companyId: companyId)
-        appState.documents.append(doc)
-        Task { try? await DataRepository.shared.insertDocument(doc) }
-        return doc
+        return CompanyDocument(userId: userId, companyId: companyId)
     }
 
     func saveDoc(_ doc: CompanyDocument, appState: AppState) {

@@ -260,7 +260,7 @@ struct EntityHomeView: View {
         HStack(spacing: 0) {
             quickAddButton(icon: "square.3.layers.3d", title: "Add Service", color: subsColor) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+                newSub = Subscription(userId: company.userId, companyId: company.id)
             }
             
             Rectangle()

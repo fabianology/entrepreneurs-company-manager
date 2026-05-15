@@ -259,7 +259,7 @@ struct CompanyDetailView: View {
                                                     if isFront {
                                                         UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                                                         if tab == .subscriptions {
-                                                            newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+                                                            newSub = Subscription(userId: company.userId, companyId: company.id)
                                                         } else if tab == .documents {
                                                             newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
                                                         }

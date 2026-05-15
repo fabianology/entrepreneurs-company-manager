@@ -274,13 +274,10 @@ struct EntityFinancialSection: View {
                 Text("Generate Report")
             }
             .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(Color(hex: "#2C2C2E"))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
+        .buttonStyle(MiloomSecondaryButtonStyle())
         .padding(.horizontal, 16)
     }
     
