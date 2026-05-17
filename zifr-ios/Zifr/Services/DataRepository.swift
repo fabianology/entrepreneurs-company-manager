@@ -127,8 +127,31 @@ class DataRepository {
             print("⏳ [Sharing] Inserting invitation record into 'resource_invitations' table...")
             try await client.from("resource_invitations").insert(invitation).execute()
             print("✅ [Sharing] Successfully inserted invitation record for \(email).")
+            
+            // Invoke the edge function to send the email
+            struct ShareEmailPayload: Encodable {
+                let email: String
+                let role: String
+                let resourceType: String
+                let inviterId: UUID
+            }
+            
+            let payload = ShareEmailPayload(
+                email: email,
+                role: role,
+                resourceType: resourceType,
+                inviterId: currentUser.id
+            )
+            
+            print("⏳ [Sharing] Invoking 'send-share-email' edge function...")
+            if let encodedPayload = try? JSONEncoder().encode(payload) {
+                let options = FunctionInvokeOptions(method: .post, headers: ["Content-Type": "application/json"], body: encodedPayload)
+                try await client.functions.invoke("send-share-email", options: options)
+                print("✅ [Sharing] Successfully invoked edge function.")
+            }
+            
         } catch {
-            print("❌ [Sharing] Database insert failed: \(error.localizedDescription)")
+            print("❌ [Sharing] Database insert or edge function failed: \(error.localizedDescription)")
             throw error
         }
     }

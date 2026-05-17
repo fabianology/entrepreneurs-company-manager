@@ -9,8 +9,11 @@ struct AdminSettingsView: View {
     @State private var userEmail: String = "Loading..."
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
+            
+            AnimatedHeaderBackground()
+                .ignoresSafeArea(edges: .top)
             
             ScrollView {
                 VStack(spacing: 24) {
@@ -31,9 +34,7 @@ struct AdminSettingsView: View {
                         Spacer()
                         
                         Text("ACCOUNT & SETTINGS")
-                            .font(.system(size: 13, weight: .bold))
-                            .tracking(2)
-                            .foregroundStyle(Color.white.opacity(0.6))
+                            .zifrLabel()
                         
                         Spacer()
                         
@@ -69,9 +70,7 @@ struct AdminSettingsView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 32)
-                    .background(Color.white.opacity(0.03))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .masonryGlass(cornerRadius: 24)
                     .padding(.horizontal, 20)
                     
                     // General Settings (Placeholders)
@@ -82,9 +81,7 @@ struct AdminSettingsView: View {
                         Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
                         SettingsRow(icon: "lock.shield.fill", title: "Security", value: "Face ID")
                     }
-                    .background(Color.white.opacity(0.03))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .masonryGlass(cornerRadius: 24)
                     .padding(.horizontal, 20)
                     
                     // Actions
@@ -129,9 +126,7 @@ struct AdminSettingsView: View {
                             .frame(height: 56)
                         }
                     }
-                    .background(Color.white.opacity(0.03))
-                    .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .masonryGlass(cornerRadius: 24)
                     .padding(.horizontal, 20)
                     
                 }
