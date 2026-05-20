@@ -64,6 +64,17 @@ struct InstitutionCardView: View {
                                 }
                                 .font(.system(size: 12, weight: .semibold))
                                 .tracking(0.3)
+                                
+                                if let syncedDate = institution.lastSyncedAt {
+                                    statusPipe()
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Text(syncedDate, style: .relative)
+                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                                    }
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                }
                             }
                         }
                         .padding(.top, 8)
@@ -101,7 +112,23 @@ struct InstitutionCardView: View {
                         DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, institution.isDisconnected ? 16 : 24)
+                    
+                    if institution.isDisconnected {
+                        PlaidLinkButton(
+                            companyId: institution.companyId,
+                            institutionId: institution.id,
+                            buttonText: "Reconnect Bank",
+                            isReconnect: true,
+                            onSuccess: { _, _, _ in
+                                var updatedInst = institution
+                                updatedInst.isDisconnected = false
+                                vm.saveInstitution(updatedInst, appState: appState)
+                            }
+                        )
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                    }
                 }
                 .contentShape(Rectangle())
             }

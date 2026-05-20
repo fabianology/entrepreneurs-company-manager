@@ -41,6 +41,8 @@ struct Institution: Identifiable, Codable, Hashable {
     var password: String?
     var twoFactor: String?
     var accountsData: [InstitutionAccount]
+    var lastSyncedAt: Date?
+    var isDisconnected: Bool
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -53,6 +55,8 @@ struct Institution: Identifiable, Codable, Hashable {
         case password
         case twoFactor = "two_factor"
         case accountsData = "accounts_data"
+        case lastSyncedAt = "last_synced_at"
+        case isDisconnected = "is_disconnected"
     }
     
     init(
@@ -65,7 +69,9 @@ struct Institution: Identifiable, Codable, Hashable {
         email: String? = nil,
         password: String? = nil,
         twoFactor: String? = nil,
-        accounts: [InstitutionAccount] = []
+        accounts: [InstitutionAccount] = [],
+        lastSyncedAt: Date? = nil,
+        isDisconnected: Bool = false
     ) {
         self.id = id
         self.userId = userId
@@ -77,6 +83,8 @@ struct Institution: Identifiable, Codable, Hashable {
         self.password = password
         self.twoFactor = twoFactor
         self.accountsData = accounts
+        self.lastSyncedAt = lastSyncedAt
+        self.isDisconnected = isDisconnected
     }
 
     var accounts: [InstitutionAccount] {

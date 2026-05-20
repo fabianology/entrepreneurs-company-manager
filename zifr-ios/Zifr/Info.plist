@@ -11,7 +11,11 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Zifr</string>
+	<string>Miloom</string>
+	<key>CFBundleDisplayName</key>
+	<string>Miloom</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
@@ -43,7 +47,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>CiFr uses your camera to scan and digitize important company documents.</string>
+	<string>Miloom uses your camera to scan and digitize important company documents.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Miloom needs microphone access so you can talk to your AI Executive Assistant.</string>
 	<key>GIDClientID</key>

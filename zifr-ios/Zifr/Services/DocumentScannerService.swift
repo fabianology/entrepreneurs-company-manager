@@ -89,7 +89,7 @@ class DocumentProcessor {
     // MARK: - Generate PDF
     func generatePDF(from images: [UIImage], filename: String = UUID().uuidString) -> URL? {
         let pdfMetaData = [
-            kCGPDFContextCreator: "CiFr App",
+            kCGPDFContextCreator: "Miloom App",
             kCGPDFContextAuthor: "Entrepreneur"
         ]
         

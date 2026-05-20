@@ -25,6 +25,9 @@ packages:
   GoogleSignIn:
     url: https://github.com/google/GoogleSignIn-iOS.git
     from: 7.1.0
+  LinkKit:
+    url: https://github.com/plaid/plaid-link-ios-spm.git
+    from: 6.4.0
 
 targets:
   Zifr:
@@ -35,6 +38,7 @@ targets:
     dependencies:
       - package: Supabase
       - package: GoogleSignIn
+      - package: LinkKit
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vibing.miloom

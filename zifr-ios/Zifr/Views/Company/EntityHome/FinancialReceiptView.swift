@@ -96,7 +96,7 @@ struct FinancialReceiptView: View {
     
     private var receiptHeader: some View {
         VStack(alignment: .center, spacing: 6) {
-            Text("ZIFR COMMAND CENTER")
+            Text("MILOOM COMMAND CENTER")
                 .font(.system(size: 18, weight: .bold, design: .monospaced))
             Text("FINANCIAL REPORT")
                 .font(.system(size: 14, weight: .medium, design: .monospaced))

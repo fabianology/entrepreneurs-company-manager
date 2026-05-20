@@ -33,6 +33,7 @@ struct AddFinancialWizard: View {
 
     @State private var hasManuallyEditedWebsite = false
     @State private var isNewInstitution: Bool = true
+    @State private var linkedPlaidItemId: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -249,6 +250,16 @@ struct AddFinancialWizard: View {
         
         // Use VM to persist everything
         vm.saveFinancialInstitutionCascade(institution: instToSave, cards: finalCards, loans: finalLoans, appState: appState)
+        
+        if let plaidItemId = linkedPlaidItemId {
+            Task {
+                try? await SupabaseService.shared.client.from("plaid_items")
+                    .update(["institution_id": instToSave.id.uuidString])
+                    .eq("item_id", value: plaidItemId)
+                    .execute()
+            }
+        }
+        
         dismiss()
     }
 
@@ -438,6 +449,47 @@ struct AddFinancialWizard: View {
                 }
                 
                 if isNewInstitution || !isCommandCenterContext {
+                    PlaidLinkButton(companyId: institution.companyId) { instName, plaidAccounts, plaidItemId in
+                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                        
+                        self.linkedPlaidItemId = plaidItemId
+                        
+                        // Auto-fill institution details
+                        let cleanName = instName.lowercased()
+                            .replacingOccurrences(of: " ", with: "")
+                            .replacingOccurrences(of: ",", with: "")
+                            .replacingOccurrences(of: ".", with: "")
+                            .replacingOccurrences(of: "&", with: "and")
+                        
+                        institution.name = instName
+                        institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
+                        institution.username = "plaid-connected"
+                        institution.password = "••••••••"
+                        hasManuallyEditedWebsite = true
+                        
+                        // Convert Plaid accounts to our domain model
+                        let mappedAccounts: [InstitutionAccount] = plaidAccounts.map { pa in
+                            InstitutionAccount(
+                                name: pa.name,
+                                type: (pa.subtype ?? pa.type).capitalized,
+                                last4: String(pa.account_id.suffix(4)),
+                                balance: pa.balances.current ?? pa.balances.available ?? 0.0
+                            )
+                        }
+                        accounts.append(contentsOf: mappedAccounts)
+                        
+                        // Skip to step 2 automatically
+                        advanceToStep(2)
+                    }
+                    .padding(.bottom, 16)
+                    
+                    HStack {
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+                        Text("OR ENTER MANUALLY").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(height: 1)
+                    }
+                    .padding(.bottom, 16)
+                    
                     HStack(spacing: 12) {
                         ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: {
                             institution.name

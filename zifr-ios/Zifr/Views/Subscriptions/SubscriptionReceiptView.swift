@@ -44,6 +44,9 @@ struct SubscriptionReceiptView: View {
                             dashedDivider
                         }
                         
+                        paymentBreakdown
+                        dashedDivider
+                        
                         receiptFooter
                     }
                     .padding(24)
@@ -77,7 +80,7 @@ struct SubscriptionReceiptView: View {
     
     private var receiptHeader: some View {
         VStack(alignment: .center, spacing: 6) {
-            Text("ZIFR COMMAND CENTER")
+            Text("MILOOM COMMAND CENTER")
                 .font(.system(size: 18, weight: .bold, design: .monospaced))
             Text("SUBSCRIPTION REPORT")
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -160,10 +163,15 @@ struct SubscriptionReceiptView: View {
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
                     ForEach(sub.subServices.indices, id: \.self) { i in
                         let ss = sub.subServices[i]
-                        HStack {
-                            Text("- \(ss.name)")
-                            Spacer()
-                            Text("$\(String(format: "%.0f", ss.cost))")
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack {
+                                Text("- \(ss.name.isEmpty ? "Unnamed Service" : ss.name)")
+                                Spacer()
+                                Text("$\(String(format: "%.0f", ss.cost))")
+                            }
+                            if !ss.purpose.isEmpty {
+                                Text("  PURPOSE: \(ss.purpose)").foregroundStyle(fadedInk)
+                            }
                         }
                     }
                 }
@@ -185,7 +193,7 @@ struct SubscriptionReceiptView: View {
                                 Text("  PURPOSE: \(le.usedFor)").foregroundStyle(fadedInk)
                             }
                             if !le.notes.isEmpty {
-                                Text("  NOTES: \(le.notes)").foregroundStyle(fadedInk)
+                                Text("  NOTES: \(le.notes.joined(separator: ", "))").foregroundStyle(fadedInk)
                             }
                         }
                     }
@@ -221,6 +229,63 @@ struct SubscriptionReceiptView: View {
         .foregroundStyle(inkColor)
     }
     
+    private var paymentBreakdown: some View {
+        // Group subs by payment source
+        var breakdown: [String: [(name: String, cost: Double)]] = [:]
+        
+        for sub in activeSubscriptions {
+            let baseCost = sub.billingCycle == "Monthly" ? sub.cost : sub.cost / 12
+            let extras = sub.subServices.filter { $0.status != .paused }.reduce(0.0) { $0 + $1.cost }
+            let totalSubMonthly = baseCost + extras
+            
+            if totalSubMonthly == 0 { continue } // Skip free subs for the payment breakdown
+            
+            let sourceName: String
+            if let tuple = getBankAccountTuple(for: sub) {
+                sourceName = "\(tuple.bank) • \(tuple.account)"
+            } else {
+                sourceName = sub.paymentMethod?.isEmpty == false ? sub.paymentMethod! : "UNKNOWN SOURCE"
+            }
+            
+            breakdown[sourceName, default: []].append((name: sub.name.isEmpty ? "Unnamed Service" : sub.name, cost: totalSubMonthly))
+        }
+        
+        let sortedSources = breakdown.keys.sorted()
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            Text("PAYMENT SOURCE BREAKDOWN")
+                .font(.system(size: 14, weight: .bold, design: .monospaced))
+                .padding(.bottom, 4)
+            
+            ForEach(sortedSources, id: \.self) { source in
+                let items = breakdown[source]!
+                let totalCost = items.reduce(0.0) { $0 + $1.cost }
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(source.uppercased())
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        Spacer()
+                        Text("$\(String(format: "%.2f", totalCost))")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    }
+                    
+                    ForEach(items.indices, id: \.self) { i in
+                        let item = items[i]
+                        HStack {
+                            Text("- \(item.name)")
+                            Spacer()
+                            Text("$\(String(format: "%.2f", item.cost))")
+                        }
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(fadedInk)
+                    }
+                }
+            }
+        }
+        .foregroundStyle(inkColor)
+    }
+
     // MARK: - Helpers
     
     private func getBankAccountTuple(for sub: Subscription) -> (bank: String, account: String)? {
