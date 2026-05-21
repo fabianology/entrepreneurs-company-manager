@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Supabase
 
 class GeminiLiveClient {
     private var webSocket: URLSessionWebSocketTask?
@@ -32,11 +33,6 @@ class GeminiLiveClient {
         onLog?(message)
     }
     
-    // Gemini API key — loaded from Info.plist to avoid leak detection
-    private static var apiKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "GeminiAPIKey") as? String ?? ""
-    }
-    
     func connect() async throws {
         intentionalDisconnect = false
         reconnectAttempts = 0
@@ -44,19 +40,27 @@ class GeminiLiveClient {
     }
     
     private func establishConnection() async throws {
-        let wsString = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=\(Self.apiKey)"
+        let wsString = "\(SupabaseService.shared.urlString.replacingOccurrences(of: "https://", with: "wss://"))/functions/v1/gemini-live-proxy"
         
         guard let url = URL(string: wsString) else {
             throw NSError(domain: "GeminiLiveClient", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
         }
         
+        var request = URLRequest(url: url)
+        
+        if let session = try? await SupabaseService.shared.client.auth.session {
+            request.addValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        } else {
+            throw NSError(domain: "GeminiLiveClient", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
         // Clean up any existing socket
         webSocket?.cancel(with: .goingAway, reason: nil)
         
-        webSocket = self.session.webSocketTask(with: url)
+        webSocket = self.session.webSocketTask(with: request)
         webSocket?.resume()
         isConnected = true
-        log("WebSocket connected to Gemini directly")
+        log("WebSocket connected to Supabase Proxy")
         
         startPinging()
         
