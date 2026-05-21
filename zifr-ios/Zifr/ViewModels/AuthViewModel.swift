@@ -3,25 +3,73 @@ import Supabase
 import AuthenticationServices
 import CryptoKit
 import GoogleSignIn
+import LocalAuthentication
 
 @Observable
 final class AuthViewModel: NSObject {
     var isAuthenticated = false
     var isLoading = false
     var authError: String?
+    var isBiometricsAvailable = false
+    var hasCachedSession = false
+    var session: Session?
+    var currentUser: User?
+
+    var isBiometricEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "isBiometricEnabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "isBiometricEnabled") }
+    }
 
     private var currentNonce: String?
     private var authorizationController: ASAuthorizationController?
 
+    func checkBiometrics() {
+        let context = LAContext()
+        var error: NSError?
+        isBiometricsAvailable = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+    }
+
     func checkSession() async {
+        checkBiometrics()
         do {
             let session = try await SupabaseService.shared.client.auth.session
             await MainActor.run {
-                self.isAuthenticated = true
+                self.session = session
+                self.currentUser = session.user
+                self.hasCachedSession = true
+                if self.isBiometricEnabled && self.isBiometricsAvailable {
+                    self.isAuthenticated = false
+                } else {
+                    self.isAuthenticated = true
+                }
             }
         } catch {
             await MainActor.run {
+                self.session = nil
+                self.currentUser = nil
+                self.hasCachedSession = false
                 self.isAuthenticated = false
+            }
+        }
+    }
+
+    func authenticateWithBiometrics() async {
+        checkBiometrics()
+        guard isBiometricsAvailable else { return }
+        let context = LAContext()
+        let reason = "Unlock your business command center."
+        
+        do {
+            let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
+            if success {
+                await MainActor.run {
+                    self.isAuthenticated = true
+                    self.authError = nil
+                }
+            }
+        } catch {
+            await MainActor.run {
+                self.authError = error.localizedDescription
             }
         }
     }
@@ -30,6 +78,10 @@ final class AuthViewModel: NSObject {
         do {
             try await SupabaseService.shared.client.auth.signOut()
             await MainActor.run {
+                self.session = nil
+                self.currentUser = nil
+                self.isBiometricEnabled = false
+                self.hasCachedSession = false
                 self.isAuthenticated = false
             }
         } catch {
@@ -43,8 +95,37 @@ final class AuthViewModel: NSObject {
     func signInWithEmail(email: String, password: String) async {
         await MainActor.run { self.isLoading = true; self.authError = nil }
         do {
-            _ = try await SupabaseService.shared.client.auth.signIn(email: email, password: password)
+            let response = try await SupabaseService.shared.client.auth.signIn(email: email, password: password)
             await MainActor.run {
+                self.session = response
+                self.currentUser = response.user
+                self.isBiometricEnabled = true
+                self.hasCachedSession = true
+                self.isAuthenticated = true
+                self.isLoading = false
+            }
+        } catch {
+            let errorMsg = error.localizedDescription
+            await MainActor.run {
+                if errorMsg.localizedCaseInsensitiveContains("confirm") || errorMsg.localizedCaseInsensitiveContains("verification") {
+                    self.authError = "Please confirm your email address. We sent a verification link to your inbox. Tap the link to activate your account, then sign in."
+                } else {
+                    self.authError = errorMsg
+                }
+                self.isLoading = false
+            }
+        }
+    }
+    
+    func signUpWithEmail(email: String, password: String) async {
+        await MainActor.run { self.isLoading = true; self.authError = nil }
+        do {
+            let response = try await SupabaseService.shared.client.auth.signUp(email: email, password: password)
+            await MainActor.run {
+                self.session = response.session
+                self.currentUser = response.user
+                self.isBiometricEnabled = true
+                self.hasCachedSession = true
                 self.isAuthenticated = true
                 self.isLoading = false
             }
@@ -55,21 +136,22 @@ final class AuthViewModel: NSObject {
             }
         }
     }
-    
-    func signUpWithEmail(email: String, password: String) async {
+
+    func resetPassword(email: String) async -> Bool {
         await MainActor.run { self.isLoading = true; self.authError = nil }
         do {
-            _ = try await SupabaseService.shared.client.auth.signUp(email: email, password: password)
+            let redirectURL = URL(string: "https://miloom.co/reset-password")
+            try await SupabaseService.shared.client.auth.resetPasswordForEmail(email, redirectTo: redirectURL)
             await MainActor.run {
-                self.isAuthenticated = true
                 self.isLoading = false
-                // Depending on Supabase settings, email confirmation might be required
             }
+            return true
         } catch {
             await MainActor.run {
                 self.authError = error.localizedDescription
                 self.isLoading = false
             }
+            return false
         }
     }
     
@@ -94,11 +176,13 @@ final class AuthViewModel: NSObject {
                     throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "No ID token found"])
                 }
                 
-                _ = try await SupabaseService.shared.client.auth.signInWithIdToken(
+                let response = try await SupabaseService.shared.client.auth.signInWithIdToken(
                     credentials: .init(provider: .google, idToken: idToken, nonce: nil)
                 )
                 
                 await MainActor.run {
+                    self.session = response
+                    self.currentUser = response.user
                     self.isAuthenticated = true
                     self.isLoading = false
                 }
@@ -170,10 +254,12 @@ extension AuthViewModel: ASAuthorizationControllerDelegate {
             Task {
                 await MainActor.run { self.isLoading = true }
                 do {
-                    _ = try await SupabaseService.shared.client.auth.signInWithIdToken(
+                    let response = try await SupabaseService.shared.client.auth.signInWithIdToken(
                         credentials: .init(provider: .apple, idToken: idTokenString, nonce: nonce)
                     )
                     await MainActor.run {
+                        self.session = response
+                        self.currentUser = response.user
                         self.isAuthenticated = true
                         self.isLoading = false
                     }

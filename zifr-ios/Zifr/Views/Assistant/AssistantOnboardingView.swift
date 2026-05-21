@@ -4,6 +4,7 @@ import Combine
 struct AssistantOnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authViewModel
     @Bindable var vm: AppViewModel
     
     @StateObject private var captureManager = AudioCaptureManager()
@@ -257,20 +258,27 @@ struct AssistantOnboardingView: View {
     }
     
     private func saveCompany(_ company: Company) {
-        Task {
-            if let session = try? await SupabaseService.shared.client.auth.session {
-                await MainActor.run {
-                    vm.addCompany(
-                        appState: appState,
-                        userId: session.user.id,
-                        name: company.name,
-                        structure: company.structure,
-                        colorHex: company.colorHex,
-                        logoData: nil,
-                        website: company.website ?? ""
-                    )
-                }
-            }
+        if let userId = authViewModel.currentUser?.id {
+            vm.addCompany(
+                appState: appState,
+                userId: userId,
+                name: company.name,
+                structure: company.structure,
+                colorHex: company.colorHex,
+                logoData: nil,
+                website: company.website ?? ""
+            )
+        } else {
+            print("⚠️ [AssistantOnboardingView] No authenticated user found. Falling back to temporary UUID.")
+            vm.addCompany(
+                appState: appState,
+                userId: UUID(),
+                name: company.name,
+                structure: company.structure,
+                colorHex: company.colorHex,
+                logoData: nil,
+                website: company.website ?? ""
+            )
         }
     }
     

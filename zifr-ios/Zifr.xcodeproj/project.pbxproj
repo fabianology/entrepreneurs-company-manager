@@ -49,6 +49,7 @@
 		809A04619167553B473B316F /* EntityDocumentSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2348CF988672E52D0C0A67C9 /* EntityDocumentSection.swift */; };
 		8A070A7615864E49CB8499F5 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D566C75171D24A33263FD868 /* AudioCaptureManager.swift */; };
 		8AFCA9C0E6F4B81083C49B31 /* AudioPlaybackManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 035737E80A51990996AF6F2E /* AudioPlaybackManager.swift */; };
+		8C6E420FD79CFF06AB7AF830 /* ForgotPasswordSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 227F3111EFA9B5F57450796E /* ForgotPasswordSheet.swift */; };
 		8D148D138EA70E05BAE81DCC /* AddFinancialWizard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C7D524ABF1B87C51AF7A4F0 /* AddFinancialWizard.swift */; };
 		8FDA92009DE2B8708CCEC374 /* FinancialCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F35D3D91F4D431D42B40709 /* FinancialCard.swift */; };
 		9102B68AD2A515E65924160E /* HomeRenewalParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D855706F59A3903694ED1DB /* HomeRenewalParser.swift */; };
@@ -103,6 +104,7 @@
 		0F79056214FD3154519E3427 /* GeminiLiveClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveClient.swift; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
 		206BF5A20D625639D22919AC /* LoanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoanCardView.swift; sourceTree = "<group>"; };
+		227F3111EFA9B5F57450796E /* ForgotPasswordSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ForgotPasswordSheet.swift; sourceTree = "<group>"; };
 		2348CF988672E52D0C0A67C9 /* EntityDocumentSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityDocumentSection.swift; sourceTree = "<group>"; };
 		246C3FC623F0712EFC4736F7 /* InstitutionCardsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionCardsSection.swift; sourceTree = "<group>"; };
 		28AA97D0931C9A2302F11955 /* CompanyMetaSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyMetaSheet.swift; sourceTree = "<group>"; };
@@ -249,6 +251,7 @@
 			isa = PBXGroup;
 			children = (
 				A805E3AF7A5C2535E780EF24 /* LoginView.swift */,
+				227F3111EFA9B5F57450796E /* ForgotPasswordSheet.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -570,6 +573,7 @@
 				70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */,
 				371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */,
 				DEB7FEBFA4823EF00C95AB90 /* ZifrSwipeActions.swift in Sources */,
+				8C6E420FD79CFF06AB7AF830 /* ForgotPasswordSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

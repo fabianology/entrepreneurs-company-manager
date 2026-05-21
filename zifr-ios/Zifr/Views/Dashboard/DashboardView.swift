@@ -1,6 +1,7 @@
 import SwiftUI
 struct DashboardView: View {
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authViewModel
     private var companies: [Company] { appState.companies.sorted { $0.lastViewed > $1.lastViewed } }
     private var subscriptions: [Subscription] { appState.subscriptions }
     private var cards: [FinancialCard] { appState.cards }
@@ -14,8 +15,10 @@ struct DashboardView: View {
     @State private var editingCompany: Company? = nil
     @State private var companyToDelete: Company? = nil
     @State private var companyToShare: Company? = nil
-    @State private var currentUserId: UUID?
     @State private var showAssistant = false    
+    
+    private var currentUserId: UUID? { authViewModel.currentUser?.id }
+    
     // Shared companies
     private var sharedCompanies: [Company] {
         guard let currentUserId = currentUserId else { return [] }
@@ -208,11 +211,6 @@ struct DashboardView: View {
             .navigationDestination(isPresented: $showSharedWithMe) {
                 if let uid = currentUserId {
                     SharedWithMeView(vm: vm, currentUserId: uid)
-                }
-            }
-            .task {
-                if let session = try? await SupabaseService.shared.client.auth.session {
-                    currentUserId = session.user.id
                 }
             }
             .sheet(item: $companyToShare) { company in

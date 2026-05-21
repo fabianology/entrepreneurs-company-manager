@@ -50,6 +50,8 @@
 	<string>Miloom uses your camera to scan and digitize important company documents.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Miloom needs microphone access so you can talk to your AI Executive Assistant.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Miloom uses Face ID to securely unlock your company database and financial insights.</string>
 	<key>GIDClientID</key>
 	<string>473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>
@@ -60,6 +62,16 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.vibing.miloom</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>miloom</string>
 			</array>
 		</dict>
 	</array>
