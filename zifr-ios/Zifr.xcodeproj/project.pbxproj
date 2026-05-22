@@ -37,6 +37,7 @@
 		656E6D3AAA4F61BC73C58401 /* CompanyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73663491A43CB99703F9853B /* CompanyCardView.swift */; };
 		67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1CA7408BE63B84A63BABDB8 /* Date+Formatting.swift */; };
 		69D91C3C7B5CDA51965F9B7C /* GeminiLiveModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E25EDBCCD886BA5EE5BA4F7 /* GeminiLiveModels.swift */; };
+		6C46EFBD69964364C9C5EDB4 /* PremiumUpgradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16D6BBDF83C69BAE06B41FC /* PremiumUpgradeView.swift */; };
 		70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */; };
 		73D5A6C76807E119730217CA /* EntityHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49911BBD98F14E05FC2A96B7 /* EntityHomeViewModel.swift */; };
 		74D76977C55D740A6CB6337A /* FinancialCardVisual.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6270511A82E324E0EC29FE87 /* FinancialCardVisual.swift */; };
@@ -72,6 +73,7 @@
 		BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9602D7532DE04DFA8294ACAE /* DashboardView.swift */; };
 		C039D8C90239DB0F79A528D1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9C3A87C6A9399B175E90556D /* GoogleSignIn */; };
 		C0602B559E7624043CF0A151 /* Color+Zifr.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3141954F83AF71011D282471 /* Color+Zifr.swift */; };
+		C2A80EF26F1341EAEA278F1D /* ResetPasswordSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB6907BC498BB2697B95920A /* ResetPasswordSheet.swift */; };
 		C7C30C6E7A58FB2F27CD53A8 /* patch_svg.py in Resources */ = {isa = PBXBuildFile; fileRef = 0BC09D962F2587315597B9DD /* patch_svg.py */; };
 		CBCCF60367A5BD08461E105B /* AdminSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032520FD864A3B1FF73C81A0 /* AdminSettingsView.swift */; };
 		CD0308E14A8A6FD71D3348AC /* CompanyMetaSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28AA97D0931C9A2302F11955 /* CompanyMetaSheet.swift */; };
@@ -80,6 +82,7 @@
 		DEB7FEBFA4823EF00C95AB90 /* ZifrSwipeActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61A850DC5075A689B18E8282 /* ZifrSwipeActions.swift */; };
 		DEEB7F47CBCE5D07C0F17701 /* Institution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 008FF13CD7DB43FB47297A75 /* Institution.swift */; };
 		E03225E193203FE61013AC61 /* HomeBillingTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ACE6215663A4836222052E /* HomeBillingTimeline.swift */; };
+		E30DF1991208D368B9CFA9B6 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94404D955B8D06F50A12AB6D /* EditProfileView.swift */; };
 		E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED204010D74AB9325095BD9A /* DocumentScannerService.swift */; };
 		E4899788A1B2E80B89DBC55B /* EditLoanSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AE50B1DF4829E44C696A33 /* EditLoanSheet.swift */; };
 		E8C0EDD7920B1ECC3814BB0E /* FinancialReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F564E5574B9B03EDA84362FA /* FinancialReceiptView.swift */; };
@@ -140,6 +143,7 @@
 		8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSharingView.swift; sourceTree = "<group>"; };
 		90DB2F263B4BBBE8096C1D54 /* patch.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch.py; sourceTree = "<group>"; };
 		92717522EB1C824EB367EF4D /* miloom.console.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = miloom.console.svg; sourceTree = "<group>"; };
+		94404D955B8D06F50A12AB6D /* EditProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		9527B3A94D5AF9697F46A147 /* EntitySubscriptionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitySubscriptionSection.swift; sourceTree = "<group>"; };
 		9602D7532DE04DFA8294ACAE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		963885CDE8BC1E19192BDAEC /* AddSubscriptionWizard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddSubscriptionWizard.swift; sourceTree = "<group>"; };
@@ -147,6 +151,7 @@
 		99D7628D8C499839405F0CB0 /* EditSubscriptionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSubscriptionSheet.swift; sourceTree = "<group>"; };
 		9D855706F59A3903694ED1DB /* HomeRenewalParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRenewalParser.swift; sourceTree = "<group>"; };
 		9E1FB05FF46D194404F4544A /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		A16D6BBDF83C69BAE06B41FC /* PremiumUpgradeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PremiumUpgradeView.swift; sourceTree = "<group>"; };
 		A805E3AF7A5C2535E780EF24 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		AC3CC8DCAA09EB5F037AA043 /* .svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = .svg; sourceTree = "<group>"; };
 		AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoanPaymentsLedgerView.swift; sourceTree = "<group>"; };
@@ -158,6 +163,7 @@
 		C8AE50B1DF4829E44C696A33 /* EditLoanSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditLoanSheet.swift; sourceTree = "<group>"; };
 		C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDocument.swift; sourceTree = "<group>"; };
 		C9E5CF10B11366A7F77DE656 /* DataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepository.swift; sourceTree = "<group>"; };
+		CB6907BC498BB2697B95920A /* ResetPasswordSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ResetPasswordSheet.swift; sourceTree = "<group>"; };
 		D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialView.swift; sourceTree = "<group>"; };
 		D566C75171D24A33263FD868 /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
@@ -252,6 +258,7 @@
 			children = (
 				A805E3AF7A5C2535E780EF24 /* LoginView.swift */,
 				227F3111EFA9B5F57450796E /* ForgotPasswordSheet.swift */,
+				CB6907BC498BB2697B95920A /* ResetPasswordSheet.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -362,6 +369,8 @@
 				659E8EBED03990059CDE9CEC /* Financial */,
 				E882E25BA727BC3B31BDEAA8 /* Search */,
 				9D14F0BAE3407DAB2FE1606F /* Subscriptions */,
+				94404D955B8D06F50A12AB6D /* EditProfileView.swift */,
+				A16D6BBDF83C69BAE06B41FC /* PremiumUpgradeView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -574,6 +583,9 @@
 				371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */,
 				DEB7FEBFA4823EF00C95AB90 /* ZifrSwipeActions.swift in Sources */,
 				8C6E420FD79CFF06AB7AF830 /* ForgotPasswordSheet.swift in Sources */,
+				E30DF1991208D368B9CFA9B6 /* EditProfileView.swift in Sources */,
+				6C46EFBD69964364C9C5EDB4 /* PremiumUpgradeView.swift in Sources */,
+				C2A80EF26F1341EAEA278F1D /* ResetPasswordSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

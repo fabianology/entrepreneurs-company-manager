@@ -29,6 +29,9 @@ extension UIColor {
 struct ZifrApp: App {
     @State private var authViewModel = AuthViewModel()
     @State private var appState = AppState()
+    @Environment(\.scenePhase) var scenePhase
+    @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
+    @State private var backgroundDate: Date? = nil
 
     init() {
         // MARK: - Global UI Styling
@@ -60,6 +63,40 @@ struct ZifrApp: App {
                 if isAuth {
                     Task { await DataRepository.shared.fetchAllData(appState: appState) }
                 }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .background {
+                    backgroundDate = Date()
+                } else if newPhase == .active {
+                    if let bgDate = backgroundDate {
+                        let timeElapsed = Date().timeIntervalSince(bgDate)
+                        let timeoutSeconds = Double(autoLockTimeout * 60)
+                        
+                        if authViewModel.isBiometricEnabled && authViewModel.isBiometricsAvailable {
+                            if autoLockTimeout == 0 || timeElapsed >= timeoutSeconds {
+                                authViewModel.isAuthenticated = false
+                            }
+                        }
+                    }
+                    backgroundDate = nil
+                }
+            }
+            .onOpenURL { url in
+                Task {
+                    do {
+                        try await SupabaseService.shared.client.handle(url)
+                        if url.absoluteString.contains("reset-password") {
+                            await MainActor.run {
+                                authViewModel.isRecoveringPassword = true
+                            }
+                        }
+                    } catch {
+                        print("Failed to handle deep link: \(error)")
+                    }
+                }
+            }
+            .sheet(isPresented: $authViewModel.isRecoveringPassword) {
+                ResetPasswordSheet(authViewModel: authViewModel)
             }
         }
     }
