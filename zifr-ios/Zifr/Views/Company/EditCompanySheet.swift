@@ -371,6 +371,7 @@ struct ShareEntitySheet: View {
     let resourceTitle: String
     
     @State private var email: String = ""
+    @State private var senderDisplayName: String = ""
     @State private var role: String = "Viewer"
     @State private var isSending = false
     @State private var successMessage: String?
@@ -382,6 +383,9 @@ struct ShareEntitySheet: View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -438,6 +442,30 @@ struct ShareEntitySheet: View {
                                 )
                             }
                             
+                            // Send As Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Send As (Optional)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .textCase(.uppercase)
+                                
+                                HStack {
+                                    Image(systemName: "person.text.rectangle")
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    TextField("e.g. Kris from Miloom", text: $senderDisplayName)
+                                        .textInputAutocapitalization(.words)
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(16)
+                                .background(Color(hex: "#1A1A1C"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                            }
+                            
                             // Role Picker
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Permission Level")
@@ -473,6 +501,10 @@ struct ShareEntitySheet: View {
                         
                         Spacer(minLength: 40)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -503,14 +535,15 @@ struct ShareEntitySheet: View {
     }
     
     private func sendInvite() {
-        guard !email.isEmpty else { return }
+        let cleanedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleanedEmail.isEmpty else { return }
         isSending = true
         errorMessage = nil
         successMessage = nil
         
         Task {
             do {
-                try await DataRepository.shared.inviteUser(email: email, role: role, resourceId: resourceId, resourceType: resourceType)
+                try await DataRepository.shared.inviteUser(email: cleanedEmail, role: role, resourceId: resourceId, resourceType: resourceType, senderDisplayName: senderDisplayName.isEmpty ? nil : senderDisplayName)
                 await MainActor.run {
                     isSending = false
                     successMessage = "Invitation sent successfully!"

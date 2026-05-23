@@ -4,20 +4,18 @@ project_path = 'Zifr.xcodeproj'
 project = Xcodeproj::Project.open(project_path)
 target = project.targets.first
 
-files_to_add = [
-  'Zifr/Services/SupabaseService.swift'
-]
+group = project.main_group.find_subpath('Zifr/Views', true)
 
-files_to_add.each do |file_path|
-  file_ref = project.main_group.find_file_by_path(file_path) || project.main_group.new_reference(file_path)
-  
-  unless target.source_build_phase.files_references.include?(file_ref)
-    target.add_file_references([file_ref])
-    puts "Added #{file_path}"
-  else
-    puts "Already added #{file_path}"
-  end
+file_path_1 = 'Zifr/Views/EditProfileView.swift'
+if !group.files.any? { |f| f.path == File.basename(file_path_1) }
+  file_ref_1 = group.new_reference(File.basename(file_path_1))
+  target.add_file_references([file_ref_1])
+end
+
+file_path_2 = 'Zifr/Views/PremiumUpgradeView.swift'
+if !group.files.any? { |f| f.path == File.basename(file_path_2) }
+  file_ref_2 = group.new_reference(File.basename(file_path_2))
+  target.add_file_references([file_ref_2])
 end
 
 project.save
-puts "Saved project."

@@ -298,6 +298,14 @@ struct LoginView: View {
                 }
             }
         }
+        .onChange(of: authViewModel.hasCachedSession) { _, hasSession in
+            if hasSession && authViewModel.isBiometricEnabled && authViewModel.isBiometricsAvailable {
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    await authViewModel.authenticateWithBiometrics()
+                }
+            }
+        }
     }
     
     // MARK: - Biometric Icon Helper

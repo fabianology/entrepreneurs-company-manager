@@ -10,6 +10,7 @@ final class AppState {
     var cards: [FinancialCard] = []
     var loans: [Loan] = []
     var documents: [CompanyDocument] = []
+    var resourceShares: [ResourceShare] = []
     
     var isLoading: Bool = false
     var error: String? = nil

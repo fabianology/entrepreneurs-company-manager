@@ -139,9 +139,34 @@ final class AuthViewModel: NSObject {
     // MARK: - Active Sessions
     func fetchActiveSessions() async {
         do {
-            let sessions: [ActiveSession] = try await SupabaseService.shared.client.rpc("get_active_sessions").execute().value
+            var sessions: [ActiveSession] = try await SupabaseService.shared.client.rpc("get_active_sessions").execute().value
+            
+            // Enrich with location based on IP
+            for i in 0..<sessions.count {
+                if let ip = sessions[i].ipAddress, !ip.isEmpty, ip != "127.0.0.1", ip != "::1" {
+                    if let url = URL(string: "https://ipinfo.io/\(ip)/json"),
+                       let (data, _) = try? await URLSession.shared.data(from: url) {
+                        struct IPInfoResponse: Codable {
+                            let city: String?
+                            let region: String?
+                            let country: String?
+                        }
+                        if let response = try? JSONDecoder().decode(IPInfoResponse.self, from: data) {
+                            var components: [String] = []
+                            if let city = response.city, !city.isEmpty { components.append(city) }
+                            if let region = response.region, !region.isEmpty { components.append(region) }
+                            if let country = response.country, !country.isEmpty { components.append(country) }
+                            if !components.isEmpty {
+                                sessions[i].location = components.joined(separator: ", ")
+                            }
+                        }
+                    }
+                }
+            }
+            
+            let finalSessions = sessions
             await MainActor.run {
-                self.activeSessions = sessions
+                self.activeSessions = finalSessions
             }
         } catch {
             print("Failed to fetch active sessions: \(error)")
@@ -408,6 +433,7 @@ struct ActiveSession: Codable, Identifiable, Hashable {
     let updatedAt: Date
     let userAgent: String?
     let ipAddress: String?
+    var location: String?
     
     enum CodingKeys: String, CodingKey {
         case id

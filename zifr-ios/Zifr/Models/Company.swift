@@ -77,6 +77,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
     var email: String
     var role: String
     var invitedBy: UUID
+    var senderEmail: String?
+    var senderDisplayName: String?
     var createdAt: Date
     var status: String
     
@@ -87,6 +89,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
         case email
         case role
         case invitedBy = "invited_by"
+        case senderEmail = "sender_email"
+        case senderDisplayName = "sender_display_name"
         case createdAt = "created_at"
         case status
     }
@@ -98,6 +102,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
         email: String,
         role: String = "Viewer",
         invitedBy: UUID,
+        senderEmail: String? = nil,
+        senderDisplayName: String? = nil,
         createdAt: Date = Date(),
         status: String = "Pending"
     ) {
@@ -107,6 +113,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
         self.email = email
         self.role = role
         self.invitedBy = invitedBy
+        self.senderEmail = senderEmail
+        self.senderDisplayName = senderDisplayName
         self.createdAt = createdAt
         self.status = status
     }
@@ -118,6 +126,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
     var resourceType: String
     var userId: UUID
     var role: String
+    var senderEmail: String?
+    var senderDisplayName: String?
     var createdAt: Date
     
     enum CodingKeys: String, CodingKey {
@@ -126,6 +136,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         case resourceType = "resource_type"
         case userId = "user_id"
         case role
+        case senderEmail = "sender_email"
+        case senderDisplayName = "sender_display_name"
         case createdAt = "created_at"
     }
     
@@ -135,6 +147,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         resourceType: String,
         userId: UUID,
         role: String = "Viewer",
+        senderEmail: String? = nil,
+        senderDisplayName: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -142,6 +156,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         self.resourceType = resourceType
         self.userId = userId
         self.role = role
+        self.senderEmail = senderEmail
+        self.senderDisplayName = senderDisplayName
         self.createdAt = createdAt
     }
 }

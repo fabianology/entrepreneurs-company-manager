@@ -190,7 +190,7 @@ struct AdminSettingsView: View {
                                     SessionRow(
                                         icon: deviceDetails.icon,
                                         device: deviceDetails.name,
-                                        location: session.ipAddress ?? "Unknown IP",
+                                        location: session.location ?? session.ipAddress ?? "Unknown IP",
                                         isCurrent: isCurrent,
                                         onRevoke: {
                                             Task {

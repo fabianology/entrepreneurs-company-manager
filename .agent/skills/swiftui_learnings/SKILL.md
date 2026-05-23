@@ -210,3 +210,15 @@ This document summarizes the core SwiftUI architectural lessons and specialized 
 ## 48. Consistent Theming with ButtonStyles over View Modifiers
 - **The Issue**: Manually stacking `.font`, `.background`, `.clipShape`, and `.overlay` directly onto individual `Button` labels creates scattered aesthetic inconsistencies and forces repetitive structural changes whenever a global design token updates.
 - **The Native Solution**: Abstract visual characteristics completely into custom `ButtonStyle` implementations (like `MiloomSecondaryButtonStyle`). By confining visual layering, gradients, opacities, and interactive `.scaleEffect` animations to the style, views remain clean (only defining semantic fonts and padding geometry) while effortlessly inheriting cohesive, system-wide interaction behaviors.
+
+## 49. Capturing PKCE Deep Links for Password Recovery
+- **The Issue**: In Supabase's newer PKCE authentication flow, deep links for password resets contain a secure `code` snippet, not a full token or a `type=recovery` fragment. When the iOS app handles the deep link natively via `.onOpenURL`, the Supabase SDK immediately exchanges the code and logs the user in, but it often fails to properly broadcast the `passwordRecovery` event down to the UI layer, preventing the new password sheet from appearing.
+- **The Native Solution**: Explicitly parse the URL string inside `.onOpenURL`. If `url.absoluteString.contains("reset-password")` is true, manually toggle the `@State` boolean controlling your `ResetPasswordSheet`. This guarantees the sheet deploys consistently the moment the deep link is resolved, regardless of the async Supabase session broadcast timing.
+
+## 50. Customizing Native User-Agent Tracking for Supabase Sessions
+- **The Issue**: By default, the Supabase iOS SDK (via `URLSession`) sends an obscure signature (like `Darwin/22.4.0`) as the `User-Agent`. When tracking active sessions in a dashboard, this falls back to a generic "Web Session" label because it lacks distinct hardware identifiers.
+- **The Native Solution**: Inject a custom dynamic HTTP `User-Agent` into every network request. When initializing `SupabaseClient`, define `global: SupabaseClientOptions.GlobalOptions(headers: ["User-Agent": "Miloom iOS App (\(UIDevice.current.model); iOS \(UIDevice.current.systemVersion))"])`. This allows the `auth.sessions` table to capture the exact device (iPhone, iPad, Mac) seamlessly.
+
+## 51. Querying IP Addresses in Supabase `auth.sessions`
+- **The Issue**: When writing custom Postgres RPC functions to pull active session metadata directly from Supabase's internal `auth.sessions` table, developers often try to select `s.ip_address`. This throws an `identifier "s.ip_address" does not exist` database error.
+- **The Native Solution**: The correct column name in the Supabase `auth` schema for active sessions is simply `s.ip`. Ensure your SQL views and RPC functions specifically query `ip` to accurately map location data to the UI.
