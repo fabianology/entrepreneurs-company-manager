@@ -876,27 +876,28 @@ struct CollaboratorsSheet: View {
             var documentShares: [ResourceInvitation] = []
             
             for collab in collaborators {
-                if collab.resourceType == "company" && collab.resourceId == company.id {
+                let type = collab.resourceType.lowercased()
+                if type == "company" && collab.resourceId == company.id {
                     companyShares.append(collab)
-                } else if collab.resourceType == "institution" || collab.resourceType == "card" || collab.resourceType == "loan" {
-                    if collab.resourceType == "institution" {
+                } else if type == "institution" || type == "card" || type == "loan" {
+                    if type == "institution" {
                         if let inst = appState.institutions.first(where: { $0.id == collab.resourceId }), inst.companyId == company.id {
                             bankShares.append(collab)
                         }
-                    } else if collab.resourceType == "card" {
+                    } else if type == "card" {
                         if let card = appState.cards.first(where: { $0.id == collab.resourceId }), card.companyId == company.id {
                             bankShares.append(collab)
                         }
-                    } else if collab.resourceType == "loan" {
+                    } else if type == "loan" {
                         if let loan = appState.loans.first(where: { $0.id == collab.resourceId }), loan.companyId == company.id {
                             bankShares.append(collab)
                         }
                     }
-                } else if collab.resourceType == "subscription" {
+                } else if type == "subscription" {
                     if let sub = appState.subscriptions.first(where: { $0.id == collab.resourceId }), sub.companyId == company.id {
                         subscriptionShares.append(collab)
                     }
-                } else if collab.resourceType == "document" {
+                } else if type == "document" {
                     if let doc = appState.documents.first(where: { $0.id == collab.resourceId }), doc.companyId == company.id {
                         documentShares.append(collab)
                     }
@@ -921,28 +922,29 @@ struct CollaboratorsSheet: View {
     
     var uncategorizedShares: [ResourceInvitation] {
         collaborators.filter { collab in
+            let type = collab.resourceType.lowercased()
             for company in appState.companies {
-                if collab.resourceType == "company" && collab.resourceId == company.id {
+                if type == "company" && collab.resourceId == company.id {
                     return false
-                } else if collab.resourceType == "institution" || collab.resourceType == "card" || collab.resourceType == "loan" {
-                    if collab.resourceType == "institution" {
+                } else if type == "institution" || type == "card" || type == "loan" {
+                    if type == "institution" {
                         if let inst = appState.institutions.first(where: { $0.id == collab.resourceId }), inst.companyId == company.id {
                             return false
                         }
-                    } else if collab.resourceType == "card" {
+                    } else if type == "card" {
                         if let card = appState.cards.first(where: { $0.id == collab.resourceId }), card.companyId == company.id {
                             return false
                         }
-                    } else if collab.resourceType == "loan" {
+                    } else if type == "loan" {
                         if let loan = appState.loans.first(where: { $0.id == collab.resourceId }), loan.companyId == company.id {
                             return false
                         }
                     }
-                } else if collab.resourceType == "subscription" {
+                } else if type == "subscription" {
                     if let sub = appState.subscriptions.first(where: { $0.id == collab.resourceId }), sub.companyId == company.id {
                         return false
                     }
-                } else if collab.resourceType == "document" {
+                } else if type == "document" {
                     if let doc = appState.documents.first(where: { $0.id == collab.resourceId }), doc.companyId == company.id {
                         return false
                     }
