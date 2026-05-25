@@ -310,4 +310,12 @@ class DataRepository {
             return localURL
         }
     }
+    
+    // MARK: - Revoke Shared Access
+    func revokeResourceShare(invitationId: UUID) async throws {
+        try await client.from("resource_invitations")
+            .delete()
+            .eq("id", value: invitationId)
+            .execute()
+    }
 }
