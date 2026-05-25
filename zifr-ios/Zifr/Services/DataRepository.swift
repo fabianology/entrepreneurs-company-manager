@@ -65,21 +65,12 @@ class DataRepository {
         let log = ActivityLog(userId: ownerId, actorEmail: session.user.email ?? "Unknown", actionType: "left_resource", message: "\(session.user.email ?? "Someone") left the shared \(resourceType) '\(resourceName)'.", resourceId: resourceId, resourceType: resourceType)
         try? await insertActivityLog(log)
         
-        // 1. Delete from resource_shares
-        try await client.from("resource_shares")
-            .delete()
-            .eq("resource_id", value: resourceId)
-            .eq("user_id", value: session.user.id)
-            .execute()
-            
-        // 2. Delete from resource_invitations to fully revoke access at RLS level
-        if let email = session.user.email {
-            try await client.from("resource_invitations")
-                .delete()
-                .eq("resource_id", value: resourceId)
-                .eq("email", value: email)
-                .execute()
+        // Use the secure backend RPC to atomically delete both shares and invitations case-insensitively
+        struct LeaveRPCParams: Encodable {
+            let p_resource_id: UUID
         }
+        let params = LeaveRPCParams(p_resource_id: resourceId)
+        try await client.rpc("leave_resource", params: params).execute()
     }
     
     // MARK: - Subscriptions
