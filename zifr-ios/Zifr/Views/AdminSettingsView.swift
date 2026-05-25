@@ -549,9 +549,11 @@ struct LinkedAccountRow: View {
     @Bindable var vm: AppViewModel
     let appState: AppState
     @State private var showingUnlinkAlert = false
+    @State private var isExpanded = false
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
+            // Top Header (Tappable to expand)
             HStack(spacing: 16) {
                 if let loginUrl = inst.loginUrl, !loginUrl.isEmpty {
                     FaviconImage(website: loginUrl, size: 36)
@@ -587,28 +589,98 @@ struct LinkedAccountRow: View {
                             .fill(inst.isDisconnected ? Color.red : Color.green)
                             .frame(width: 6, height: 6)
                         Text(inst.isDisconnected ? "Connection issue" : "Connected")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(inst.isDisconnected ? .red : .green)
                     }
                 }
                 
                 Spacer()
                 
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    showingUnlinkAlert = true
-                } label: {
-                    Text("Unlink")
+                HStack(spacing: 12) {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        showingUnlinkAlert = true
+                    } label: {
+                        Text("Unlink")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.red.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(Capsule())
+                        .foregroundStyle(Color.white.opacity(0.4))
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
-                .buttonStyle(.plain)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    isExpanded.toggle()
+                }
             }
             
+            // Accordion expanded bank accounts
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.vertical, 14)
+                    
+                    if inst.accounts.isEmpty {
+                        Text("No sub-accounts found")
+                            .font(.system(size: 13))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.bottom, 6)
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(inst.accounts) { acc in
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.white.opacity(0.05))
+                                            .frame(width: 32, height: 32)
+                                        Image(systemName: acc.isCard ? "creditcard.fill" : "dollarsign.circle.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(acc.isCard ? Color.orange : Color(hex: "#1A7077"))
+                                    }
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(acc.name)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Text(acc.type)
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.4))
+                                            if !acc.last4.isEmpty {
+                                                Text("•••• \(acc.last4)")
+                                                    .font(.system(size: 11))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                            }
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Text(formatCurrency(acc.balance, code: acc.currency))
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+            
+            // Connection Fix Banner
             if inst.isDisconnected {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -638,10 +710,11 @@ struct LinkedAccountRow: View {
                 .background(Color.red.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.15), lineWidth: 1))
+                .padding(.top, 14)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(16)
+        .masonryGlass(cornerRadius: 20)
         .alert("Unlink Connection?", isPresented: $showingUnlinkAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Unlink", role: .destructive) {
@@ -650,6 +723,14 @@ struct LinkedAccountRow: View {
         } message: {
             Text("This will permanently remove the Plaid connection for \(inst.name) and erase all linked card and bank account data.")
         }
+    }
+    
+    private func formatCurrency(_ value: Double, code: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = code
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(value)"
     }
 }
 
@@ -666,13 +747,10 @@ struct LinkedAccountsSheet: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
-            
-            AnimatedHeaderBackground()
-                .ignoresSafeArea(edges: .top)
+            Color(hex: "#171717").ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Premium Zifr Header
+                // Header
                 HStack {
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -697,37 +775,29 @@ struct LinkedAccountsSheet: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-                .padding(.bottom, 8)
+                .padding(.bottom, 16)
                 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        Text("CONNECTED PLAID ACCOUNTS")
-                            .font(.system(size: 12, weight: .bold))
+                if activeInstitutions.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "building.columns")
+                            .font(.system(size: 48, weight: .light))
+                            .foregroundStyle(Color.white.opacity(0.3))
+                        Text("No linked accounts yet")
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.5))
-                            .padding(.leading, 40)
-                            .padding(.top, 24)
-                        
-                        VStack(spacing: 0) {
-                            if activeInstitutions.isEmpty {
-                                Text("No connected accounts found")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                    .padding(.vertical, 40)
-                                    .frame(maxWidth: .infinity)
-                            } else {
-                                ForEach(activeInstitutions) { inst in
-                                    LinkedAccountRow(inst: inst, vm: vm, appState: appState)
-                                    
-                                    if inst.id != activeInstitutions.last?.id {
-                                        Divider().background(Color.white.opacity(0.1)).padding(.horizontal, 20)
-                                    }
-                                }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(activeInstitutions) { inst in
+                                LinkedAccountRow(inst: inst, vm: vm, appState: appState)
                             }
                         }
-                        .masonryGlass(cornerRadius: 24)
                         .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, 40)
                     }
-                    .padding(.bottom, 40)
                 }
             }
         }
