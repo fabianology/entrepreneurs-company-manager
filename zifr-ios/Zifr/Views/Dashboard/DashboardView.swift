@@ -12,9 +12,16 @@ struct DashboardView: View {
     @Bindable var vm: AppViewModel
     @State private var showAddCompany = false
     @State private var showSharedWithMe = false
-    @State private var editingCompany: Company? = nil
-    @State private var companyToDelete: Company? = nil
-    @State private var companyToShare: Company? = nil
+    @State private var editingCompany: Company?
+    @State private var companyToDelete: Company?
+    @State private var companyToShare: Company?
+    
+    // Shared Item states
+    @State private var selectedSubscription: Subscription?
+    @State private var selectedCard: FinancialCard?
+    @State private var selectedInstitution: Institution?
+    @State private var selectedLoan: Loan?
+    @State private var selectedDocument: CompanyDocument? = nil
     @State private var showAssistant = false    
     
     private var currentUserId: UUID? { authViewModel.currentUser?.id }
@@ -46,75 +53,21 @@ struct DashboardView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 40)
 
-                    HStack(spacing: 0) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "square.grid.2x2.fill")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("Dashboard")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                        }
-                        .padding(.leading, 16)
-
-                        Spacer()
-
-                        // Share Button
-                        Menu {
-                            ForEach(companies) { company in
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    companyToShare = company
-                                } label: {
-                                    Label("Share \(company.name.isEmpty ? "Entity" : company.name)", systemImage: "person.crop.circle.badge.plus")
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-
-                        Rectangle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 1, height: 20)
-
-                        // Add Button
-                        Button {
-                            showAddCompany = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Text("ADD ENTITY").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
-                                Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
-                            }
-                            .frame(width: 164, height: 44)
-                            .contentShape(Rectangle())
-                        }
-                    }
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(hex: "#1C1C1E").opacity(0.70))
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    .padding(.bottom, 16)
+                    dashboardHeader
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .padding(.bottom, 16)
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
 
-                // Company cards
                 ForEach(filteredCompanies) { company in
                     companyCardRow(for: company)
-                    .onTapGesture {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        vm.selectedCompany = company
-                        vm.activeTab = .home
-                        vm.touchCompany(company, appState: appState)
-                        vm.path.append(company)
-                    }
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
@@ -172,10 +125,33 @@ struct DashboardView: View {
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: hasOrphanedRecords ? 16 : 120, trailing: 20))
+                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: orphanedSharedItems.isEmpty ? 120 : 16, trailing: 20))
 
-                if hasOrphanedRecords {
-                    sharedWithMeRow
+                if !orphanedSharedItems.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "tray.fill")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                            Text("Shared With Me")
+                                .font(.system(size: 13, weight: .black))
+                                .tracking(1.5)
+                                .textCase(.uppercase)
+                                .foregroundStyle(Color.white.opacity(0.4))
+                        }
+                        .padding(.horizontal, 20)
+                        
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                            ForEach(orphanedSharedItems, id: \.id) { share in
+                                SharedItemCardView(title: share.title, type: share.type.capitalized, role: share.role, senderEmail: share.senderEmail, createdAt: share.createdAt)
+                                    .onTapGesture {
+                                        openSharedItem(share)
+                                    }
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 120)
                 }
             }
             .listStyle(.plain)
@@ -186,22 +162,25 @@ struct DashboardView: View {
                 await DataRepository.shared.fetchAllData(appState: appState)
             }
             .confirmationDialog(
-                "Delete Company",
+                companyToDelete?.userId != currentUserId ? "Leave Company" : "Delete Company",
                 isPresented: Binding(get: { companyToDelete != nil }, set: { if !$0 { companyToDelete = nil } }),
-                titleVisibility: .visible,
-                presenting: companyToDelete
-            ) { company in
-                Button("Delete \(company.name)", role: .destructive) {
-                    withAnimation {
-                        vm.deleteCompany(company, appState: appState)
+                titleVisibility: .visible
+            ) {
+                Button(companyToDelete?.userId != currentUserId ? "Leave" : "Delete", role: .destructive) {
+                    if let company = companyToDelete {
+                        vm.deleteCompany(company, appState: appState, currentUserId: currentUserId)
                     }
                     companyToDelete = nil
                 }
                 Button("Cancel", role: .cancel) {
                     companyToDelete = nil
                 }
-            } message: { company in
-                Text("This will permanently delete \(company.name) and all associated data. This action cannot be undone.")
+            } message: {
+                if companyToDelete?.userId != currentUserId {
+                    Text("Are you sure you want to leave this company? It will be removed from your dashboard.")
+                } else {
+                    Text("Are you sure you want to delete this company? All associated data will be removed for everyone.")
+                }
             }
             .navigationDestination(for: Company.self) { company in
                 CompanyDetailView(company: company, vm: vm)
@@ -234,6 +213,21 @@ struct DashboardView: View {
             .fullScreenCover(isPresented: $showAssistant) {
                 AssistantOnboardingView(vm: vm)
                     .environment(appState)
+            }
+            .sheet(item: $selectedSubscription) { sub in
+                EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false, onSave: {})
+            }
+            .sheet(item: $selectedCard) { card in
+                EditCardSheet(card: card, vm: vm, institutions: institutions, cards: cards, isNew: false)
+            }
+            .sheet(item: $selectedInstitution) { inst in
+                EditInstitutionSheet(institution: inst, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false)
+            }
+            .sheet(item: $selectedLoan) { loan in
+                EditLoanSheet(loan: loan, vm: vm, isNew: false, institutions: institutions, cards: cards)
+            }
+            .sheet(item: $selectedDocument) { doc in
+                EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
             }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 10) {
@@ -308,53 +302,146 @@ struct DashboardView: View {
         return baseList.filter { $0.name.lowercased().contains(q) || $0.structure.lowercased().contains(q) }
     }
 
-    @ViewBuilder
-    private var sharedWithMeRow: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showSharedWithMe = true
-        } label: {
-            HStack(spacing: 16) {
-                ZStack {
-                    Color(hex: "#3b82f6")
-                    Image(systemName: "tray.full.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 56, height: 56)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Shared with Me")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text("Incoming items and inbox")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.2))
-            }
-            .padding(16)
-            .background(Color.white.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 120, trailing: 20))
+    struct SharedItem: Identifiable {
+        let id: UUID
+        let title: String
+        let type: String
+        let role: String
+        let createdAt: Date
+        let senderEmail: String
+        let rawItem: Any
     }
 
-    private var hasOrphanedRecords: Bool {
-        let hasSubs = subscriptions.contains(where: { sub in !companies.contains(where: { $0.id == sub.companyId }) })
-        let hasCards = cards.contains(where: { card in !companies.contains(where: { $0.id == card.companyId }) })
-        let hasInsts = institutions.contains(where: { inst in !companies.contains(where: { $0.id == inst.companyId }) })
-        let hasLoans = loans.contains(where: { loan in !companies.contains(where: { $0.id == loan.companyId }) })
-        let hasDocs = documents.contains(where: { doc in !companies.contains(where: { $0.id == doc.companyId }) })
-        return hasSubs || hasCards || hasInsts || hasLoans || hasDocs
+    @ViewBuilder
+    private var dashboardHeader: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.2x2.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                Text("Dashboard")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+            }
+            .padding(.leading, 16)
+
+            Spacer()
+
+            // Share Button
+            shareMenu
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 1, height: 20)
+
+            // Add Button
+            addButton
+        }
+    }
+
+    @ViewBuilder
+    private var shareMenu: some View {
+        Menu {
+            ForEach(companies) { company in
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    companyToShare = company
+                } label: {
+                    if company.name.isEmpty {
+                        Label("Share Entity", systemImage: "person.crop.circle.badge.plus")
+                    } else {
+                        Label("Share \(company.name)", systemImage: "person.crop.circle.badge.plus")
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color(hex: "#A2A2A2"))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+    }
+
+    @ViewBuilder
+    private var addButton: some View {
+        Button {
+            showAddCompany = true
+        } label: {
+            HStack(spacing: 6) {
+                Text("ADD ENTITY")
+                    .font(.system(size: 13, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(.white)
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .frame(width: 164, height: 44)
+            .contentShape(Rectangle())
+        }
+    }
+
+    private func openSharedItem(_ share: SharedItem) {
+        // Load the full object from DataRepository and set it to the appropriate selected state
+        if share.type == "subscription" {
+            if let sub = appState.subscriptions.first(where: { $0.id == share.id }) {
+                selectedSubscription = sub
+            }
+        } else if share.type == "card" {
+            if let card = appState.cards.first(where: { $0.id == share.id }) {
+                selectedCard = card
+            }
+        } else if share.type == "loan" {
+            if let loan = appState.loans.first(where: { $0.id == share.id }) {
+                selectedLoan = loan
+            }
+        } else if share.type == "document" {
+            if let doc = appState.documents.first(where: { $0.id == share.id }) {
+                selectedDocument = doc
+            }
+        } else if share.type == "institution" {
+            if let inst = appState.institutions.first(where: { $0.id == share.id }) {
+                selectedInstitution = inst
+            }
+        }
+    }
+
+    private var orphanedSharedItems: [SharedItem] {
+        var items: [SharedItem] = []
+        let localCompanyIds = Set(appState.companies.map { $0.id })
+        
+        func process<T: Identifiable>(list: [T], type: String, titleKeyPath: KeyPath<T, String>, companyIdKeyPath: KeyPath<T, UUID>) {
+            for item in list {
+                let cid = item[keyPath: companyIdKeyPath]
+                let effectiveCid = appState.localCompanyOverrides[(item.id as! UUID).uuidString] ?? cid
+                
+                if !localCompanyIds.contains(effectiveCid) {
+                    let share = appState.resourceShares.first { $0.resourceId == (item.id as! UUID) || $0.resourceId == effectiveCid }
+                    let role = share?.role ?? "Viewer"
+                    let sEmail = share?.senderEmail ?? "Unknown Sender"
+                    let createdAt = share?.createdAt ?? Date()
+                    
+                    items.append(SharedItem(
+                        id: item.id as! UUID, 
+                        title: item[keyPath: titleKeyPath], 
+                        type: type, 
+                        role: role, 
+                        createdAt: createdAt,
+                        senderEmail: sEmail,
+                        rawItem: item
+                    ))
+                }
+            }
+        }
+        
+        process(list: appState.subscriptions, type: "Subscription", titleKeyPath: \.name, companyIdKeyPath: \.companyId)
+        process(list: appState.cards, type: "Card", titleKeyPath: \.name, companyIdKeyPath: \.companyId)
+        process(list: appState.institutions, type: "Institution", titleKeyPath: \.name, companyIdKeyPath: \.companyId)
+        process(list: appState.loans, type: "Loan", titleKeyPath: \.name, companyIdKeyPath: \.companyId)
+        process(list: appState.documents, type: "Document", titleKeyPath: \.name, companyIdKeyPath: \.companyId)
+        
+        return items.sorted { $0.createdAt > $1.createdAt }
     }
 
     private var headerSection: some View {
@@ -413,28 +500,28 @@ struct DashboardView: View {
         let isSharedByMe = (company.userId == currentUserId) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
         let role = appState.resourceShares.first(where: { $0.resourceId == company.id })?.role ?? "Viewer"
 
+        let navigateAction: (AppViewModel.CompanyTab) -> Void = { tab in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            vm.selectedCompany = company
+            vm.activeTab = tab
+            vm.touchCompany(company, appState: appState)
+            vm.path.append(company)
+        }
+
         CompanyCardView(
             company: company,
             institutionsCount: iCount,
             subscriptionsCount: sCount,
             docsCount: dCount,
-            onEdit: { editingCompany = company }
+            onEdit: { editingCompany = company },
+            shareRole: role,
+            isSharedWithMe: isSharedWithMe,
+            isSharedByMe: isSharedByMe,
+            onTapSubscriptions: { navigateAction(.subscriptions) },
+            onTapInstitutions: { navigateAction(.financial) },
+            onTapDocuments: { navigateAction(.documents) },
+            onTapMain: { navigateAction(.home) }
         )
-        .overlay(alignment: .topTrailing) {
-            if isSharedWithMe || isSharedByMe {
-                HStack(spacing: 4) {
-                    Image(systemName: isSharedWithMe ? "person.2.fill" : "person.crop.circle.badge.checkmark")
-                    Text(isSharedWithMe ? "Shared with you (\(role))" : "You are sharing")
-                }
-                .font(.system(size: 10, weight: .bold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(isSharedWithMe ? Color(hex: "#4f46e5") : Color(hex: "#059669"))
-                .foregroundStyle(.white)
-                .clipShape(Capsule())
-                .offset(x: -16, y: 16)
-            }
-        }
     }
 }
 

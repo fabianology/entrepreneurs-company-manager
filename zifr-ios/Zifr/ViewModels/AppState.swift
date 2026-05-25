@@ -11,28 +11,51 @@ final class AppState {
     var loans: [Loan] = []
     var documents: [CompanyDocument] = []
     var resourceShares: [ResourceShare] = []
+    var activityLogs: [ActivityLog] = []
+    var notifications: [AppNotification] = []
+    var userPreferences: UserPreferences? = nil
     
     var isLoading: Bool = false
     var error: String? = nil
     
+    // Local Overrides: resourceId -> companyId
+    var localCompanyOverrides: [String: UUID] = [:] {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(localCompanyOverrides) {
+                UserDefaults.standard.set(encoded, forKey: "localCompanyOverrides")
+            }
+        }
+    }
+    
+    init() {
+        if let data = UserDefaults.standard.data(forKey: "localCompanyOverrides"),
+           let decoded = try? JSONDecoder().decode([String: UUID].self, from: data) {
+            self.localCompanyOverrides = decoded
+        }
+    }
+    
     // Derived properties for easy access
+    private func effectiveCompanyId(for resourceId: UUID, defaultCompanyId: UUID) -> UUID {
+        return localCompanyOverrides[resourceId.uuidString] ?? defaultCompanyId
+    }
+
     func subscriptions(for companyId: UUID) -> [Subscription] {
-        subscriptions.filter { $0.companyId == companyId }
+        subscriptions.filter { effectiveCompanyId(for: $0.id ?? UUID(), defaultCompanyId: $0.companyId) == companyId }
     }
     
     func cards(for companyId: UUID) -> [FinancialCard] {
-        cards.filter { $0.companyId == companyId }
+        cards.filter { effectiveCompanyId(for: $0.id ?? UUID(), defaultCompanyId: $0.companyId) == companyId }
     }
     
     func loans(for companyId: UUID) -> [Loan] {
-        loans.filter { $0.companyId == companyId }
+        loans.filter { effectiveCompanyId(for: $0.id ?? UUID(), defaultCompanyId: $0.companyId) == companyId }
     }
     
     func institutions(for companyId: UUID) -> [Institution] {
-        institutions.filter { $0.companyId == companyId }
+        institutions.filter { effectiveCompanyId(for: $0.id ?? UUID(), defaultCompanyId: $0.companyId) == companyId }
     }
     
     func documents(for companyId: UUID) -> [CompanyDocument] {
-        documents.filter { $0.companyId == companyId }
+        documents.filter { effectiveCompanyId(for: $0.id ?? UUID(), defaultCompanyId: $0.companyId) == companyId }
     }
 }

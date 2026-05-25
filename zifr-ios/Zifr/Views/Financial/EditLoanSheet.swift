@@ -14,6 +14,11 @@ struct EditLoanSheet: View {
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
     
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == loan.id || $0.resourceId == loan.companyId })
+        return share?.role == "Viewer"
+    }
+    
     struct Snapshot: Equatable {
         var name, lender, term, role, status, interestType, scheduleFrequency, notes: String
         var principalAmount, remainingBalance, monthlyPayment, interestRate: Double
@@ -60,6 +65,9 @@ struct EditLoanSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    SharedItemOverrideBanner(resourceId: loan.id, defaultCompanyId: loan.companyId)
+                    
+                    Group {
                     loanSummarySection()
                     
                     loanRoleSection()
@@ -125,6 +133,8 @@ struct EditLoanSheet: View {
                             Button("Cancel", role: .cancel) {}
                         }
                     }
+                    } // Close Group
+                    .disabled(isViewer)
                 }
             }
             .scrollDismissesKeyboard(.interactively)
@@ -163,12 +173,14 @@ struct EditLoanSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        vm.saveLoan(loan, appState: appState)
-                        dismiss()
+                    if !isViewer {
+                        Button("Save") {
+                            vm.saveLoan(loan, appState: appState)
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
                     }
-                    .fontWeight(.semibold)
-                    .tint(isDirty ? .green : nil)
                 }
             }
             .interactiveDismissDisabled(isNew)

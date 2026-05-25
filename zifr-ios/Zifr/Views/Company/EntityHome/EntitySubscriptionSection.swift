@@ -57,7 +57,8 @@ struct EntitySubscriptionSection: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(Color.white.opacity(0.1))
-                                Capsule().fill(subsColor)
+                                Capsule()
+                                    .fill(LinearGradient(colors: [subsColor, subsColor.opacity(0.7)], startPoint: .leading, endPoint: .trailing))
                                     .frame(width: geo.size.width * CGFloat(autoRenewRatio))
                             }
                         }
@@ -71,7 +72,7 @@ struct EntitySubscriptionSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.black.opacity(0.3))
+                .background(Color.white.opacity(0.03))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom
@@ -147,13 +148,17 @@ struct EntitySubscriptionSection: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
                     Text("Generate Report")
                 }
                 .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
+                .background(Color.white.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
-            .buttonStyle(MiloomSecondaryButtonStyle())
+            .buttonStyle(PremiumButtonStyle())
             .padding(.horizontal, 16)
         }
         .padding(.bottom, 16)

@@ -52,6 +52,10 @@
 	<string>Miloom needs microphone access so you can talk to your AI Executive Assistant.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Miloom uses Face ID to securely unlock your company database and financial insights.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Miloom uses your photo library to let you upload documents and receipts.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Miloom uses your photo library to save scanned images and documents.</string>
 	<key>GIDClientID</key>
 	<string>473094376315-k0rd5eq6d6l4dvcddslmpuo1h9dkdr5f.apps.googleusercontent.com</string>
 	<key>CFBundleURLTypes</key>

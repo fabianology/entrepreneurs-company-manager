@@ -73,6 +73,9 @@ struct CopyableField: View {
                 guard !value.isEmpty else { return }
                 UIPasteboard.general.string = value
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                if isPassword {
+                    Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password was copied to your clipboard.") }
+                }
                 withAnimation { copied = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     withAnimation { copied = false }
@@ -334,6 +337,7 @@ struct ProContextMenuModifier: ViewModifier {
                     Button {
                         UIPasteboard.general.string = pwd
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password was copied to your clipboard.") }
                     } label: {
                         Label("Copy Password", systemImage: "key.fill")
                     }
@@ -909,6 +913,9 @@ struct DashboardInnerRow: View {
     let value: String
     var valueColor: Color = .white
     var trailingView: AnyView? = nil
+    var copyValue: String? = nil
+    
+    @State private var isCopied = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -927,9 +934,25 @@ struct DashboardInnerRow: View {
             
             Text(value)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(valueColor)
+                .foregroundStyle(isCopied ? Color(hex: "#818cf8") : valueColor)
+                .animation(.easeOut(duration: 0.15), value: isCopied)
             
-            if let trailingView = trailingView {
+            if let copyValue = copyValue {
+                Button {
+                    UIPasteboard.general.string = copyValue
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    
+                    isCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isCopied = false
+                    }
+                } label: {
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(isCopied ? Color(hex: "#818cf8") : Color.white.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+            } else if let trailingView = trailingView {
                 trailingView
             }
         }

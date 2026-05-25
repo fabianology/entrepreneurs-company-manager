@@ -49,7 +49,9 @@ struct FinancialCardView: View {
                     .shadow(color: card.status.statusColor, radius: 4)
             }
             .padding(14)
-            .background(Color(hex: "#2C2C2E")).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            .background(Color(hex: "#1C1C1E"))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
         .buttonStyle(.plain)
         .proContextMenu(password: card.password, loginId: card.login, last4: card.last4)

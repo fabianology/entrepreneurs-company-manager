@@ -17,6 +17,11 @@ struct EditSubscriptionSheet: View {
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == sub.id || $0.resourceId == sub.companyId })
+        return share?.role == "Viewer"
+    }
+
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
     @State private var showSecurity = false
@@ -280,8 +285,12 @@ struct EditSubscriptionSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                SharedItemOverrideBanner(resourceId: sub.id, defaultCompanyId: sub.companyId)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
 
-                // MARK: – Top Controls
+                Group {
+                    // MARK: – Top Controls
                 VStack(spacing: 12) {
                     CustomSegmentedControl(options: ["paid", "free"], selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 }))
                 }
@@ -610,6 +619,8 @@ struct EditSubscriptionSheet: View {
                     .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
+                } // End Group
+                .disabled(isViewer)
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
@@ -671,14 +682,16 @@ struct EditSubscriptionSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        vm.saveSub(sub, appState: appState)
-                        onSave?()
-                        dismiss()
+                    if !isViewer {
+                        Button("Save") {
+                            vm.saveSub(sub, appState: appState)
+                            onSave?()
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
+                        .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    .fontWeight(.semibold)
-                    .tint(isDirty ? .green : nil)
-                    .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             .interactiveDismissDisabled(isNew)

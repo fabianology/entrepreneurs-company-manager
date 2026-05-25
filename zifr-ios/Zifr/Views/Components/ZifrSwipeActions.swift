@@ -92,3 +92,57 @@ struct ZifrSwipeActionsModifier: ViewModifier {
         .clipped()
     }
 }
+
+// MARK: - Message Swipe Actions (Unread / Delete)
+struct ZifrMessageSwipeModifier: ViewModifier {
+    let onUnread: () -> Void
+    let onDelete: () -> Void
+    let isRead: Bool
+    @State private var offset: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        ZStack {
+            // Unread Background (Leading)
+            Color.blue
+                .overlay(alignment: .leading) {
+                    Image(systemName: isRead ? "envelope.badge" : "envelope.open")
+                        .foregroundColor(.white)
+                        .padding(.leading, 20)
+                }
+                .opacity(offset > 0 ? 1 : 0)
+            
+            // Delete Background (Trailing)
+            Color.red
+                .overlay(alignment: .trailing) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .padding(.trailing, 20)
+                }
+                .opacity(offset < 0 ? 1 : 0)
+            
+            content
+                .background(Color(hex: "#171717")) // Match background color of messages
+                .offset(x: offset)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            offset = value.translation.width
+                        }
+                        .onEnded { value in
+                            withAnimation(.spring()) {
+                                if value.translation.width < -80 {
+                                    onDelete()
+                                    offset = 0
+                                } else if value.translation.width > 80 {
+                                    onUnread()
+                                    offset = 0
+                                } else {
+                                    offset = 0
+                                }
+                            }
+                        }
+                )
+        }
+        .clipped()
+    }
+}

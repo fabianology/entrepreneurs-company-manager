@@ -364,6 +364,7 @@ struct GlobalSearchView: View {
                 Button {
                     UIPasteboard.general.string = pwd
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password for '\(result.title)' was copied to your clipboard.") }
                 } label: {
                     Label("Copy Password", systemImage: "key.fill")
                 }

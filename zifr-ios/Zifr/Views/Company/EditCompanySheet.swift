@@ -20,10 +20,52 @@ struct EditCompanySheet: View {
 
     var isEditing: Bool { company != nil }
 
+    private var isViewer: Bool {
+        shareRole == "Viewer"
+    }
+
+    private var shareRole: String? {
+        guard let cId = company?.id else { return nil }
+        return appState.resourceShares.first(where: { $0.resourceId == cId })?.role
+    }
+
+    private var sharedBy: String? {
+        guard let cId = company?.id else { return nil }
+        return appState.resourceShares.first(where: { $0.resourceId == cId })?.senderEmail
+    }
+
+    private var isSharedWithMe: Bool {
+        guard let company = company, let currentUserId = authViewModel.currentUser?.id else { return false }
+        return company.userId != currentUserId
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    if isSharedWithMe {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.2.fill")
+                            Text("Shared with you • \(shareRole ?? "Viewer")")
+                            Spacer()
+                            if let sender = sharedBy {
+                                Text(sender)
+                                    .lineLimit(1)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color(hex: "#818cf8"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: "#4f46e5").opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, -8)
+                    }
+
+                    Group {
                     // Entity Name Row
                     HStack(spacing: 16) {
                         ZStack {
@@ -152,6 +194,8 @@ struct EditCompanySheet: View {
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         })
                     }
+                    } // End Group
+                    .disabled(isViewer)
 
                     VStack(spacing: 30) {
                         // App Navigators
@@ -196,7 +240,7 @@ struct EditCompanySheet: View {
 
 
                         // Share Entity
-                        if isEditing {
+                        if isEditing && !isViewer {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 showShareSheet = true
@@ -224,8 +268,8 @@ struct EditCompanySheet: View {
                             } label: {
                                 HStack {
                                     Spacer()
-                                    Image(systemName: "trash")
-                                    Text("Delete \(name.isEmpty ? "Entity" : name)")
+                                    Image(systemName: company?.userId != authViewModel.currentUser?.id ? "rectangle.portrait.and.arrow.right" : "trash")
+                                    Text(company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \(name.isEmpty ? "Entity" : name)")
                                     Spacer()
                                 }
                                 .font(.system(size: 15, weight: .semibold))
@@ -236,17 +280,21 @@ struct EditCompanySheet: View {
                             }
                             .buttonStyle(.plain)
                             .confirmationDialog(
-                                "Delete \"\(name.isEmpty ? "this entity" : name)\"?",
+                                company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \"\(name.isEmpty ? "this entity" : name)\"?",
                                 isPresented: $showDeleteConfirm,
                                 titleVisibility: .visible
                             ) {
-                                Button("Delete Entity", role: .destructive) {
-                                    if let company { vm.deleteCompany(company, appState: appState) }
+                                Button(company?.userId != authViewModel.currentUser?.id ? "Leave" : "Delete Entity", role: .destructive) {
+                                    if let company { vm.deleteCompany(company, appState: appState, currentUserId: authViewModel.currentUser?.id) }
                                     dismiss()
                                 }
                                 Button("Cancel", role: .cancel) {}
                             } message: {
-                                Text("This will permanently delete this entity and all associated data. This action cannot be undone.")
+                                if company?.userId != authViewModel.currentUser?.id {
+                                    Text("Are you sure you want to leave this company? It will be removed from your dashboard.")
+                                } else {
+                                    Text("This will permanently delete this entity and all associated data for everyone. This action cannot be undone.")
+                                }
                             }
                         }
                     }
@@ -272,7 +320,8 @@ struct EditCompanySheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    if !isViewer {
+                        Button("Save") {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         save()
                         dismiss()
@@ -280,6 +329,7 @@ struct EditCompanySheet: View {
                     .fontWeight(.semibold)
                     .tint((hasChanges && !name.isEmpty) ? .green : nil)
                     .disabled(!hasChanges || name.isEmpty)
+                    }
                 }
             }
         }
@@ -544,6 +594,7 @@ struct ShareEntitySheet: View {
         Task {
             do {
                 try await DataRepository.shared.inviteUser(email: cleanedEmail, role: role, resourceId: resourceId, resourceType: resourceType, senderDisplayName: senderDisplayName.isEmpty ? nil : senderDisplayName)
+                await DataRepository.shared.logSecurityEvent(title: "Resource Shared", message: "You shared \(resourceTitle) with \(cleanedEmail).")
                 await MainActor.run {
                     isSending = false
                     successMessage = "Invitation sent successfully!"

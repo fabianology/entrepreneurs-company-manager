@@ -200,6 +200,34 @@ final class AuthViewModel: NSObject {
                 self.isAuthenticated = true
                 self.isLoading = false
             }
+            
+            // Record new login security alert
+            Task {
+                let userId = response.user.id
+                var locationStr = "an unknown location"
+                
+                if let sessions: [ActiveSession] = try? await SupabaseService.shared.client.rpc("get_active_sessions").execute().value,
+                   let latestSession = sessions.first, let ip = latestSession.ipAddress, !ip.isEmpty, ip != "127.0.0.1", ip != "::1" {
+                    if let url = URL(string: "https://ipinfo.io/\(ip)/json"),
+                       let (data, _) = try? await URLSession.shared.data(from: url) {
+                        struct IPInfoResponse: Codable {
+                            let city: String?
+                            let region: String?
+                        }
+                        if let res = try? JSONDecoder().decode(IPInfoResponse.self, from: data) {
+                            var components: [String] = []
+                            if let city = res.city, !city.isEmpty { components.append(city) }
+                            if let region = res.region, !region.isEmpty { components.append(region) }
+                            if !components.isEmpty {
+                                locationStr = components.joined(separator: ", ")
+                            }
+                        }
+                    }
+                }
+                
+                let log = ActivityLog(userId: userId, actorEmail: email, actionType: "security_alert", message: "New login detected from \(locationStr). If this wasn't you, go to Admin Settings to revoke the session immediately.")
+                try? await DataRepository.shared.insertActivityLog(log)
+            }
         } catch {
             let errorMsg = error.localizedDescription
             await MainActor.run {

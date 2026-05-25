@@ -5,6 +5,7 @@ struct AdminSettingsView: View {
     @Bindable var vm: AppViewModel
     @Environment(AuthViewModel.self) private var authVM
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
@@ -12,6 +13,14 @@ struct AdminSettingsView: View {
     @State private var showingDeleteAlert: Bool = false
     @State private var showingEditProfile: Bool = false
     @State private var showingPremiumUpgrade: Bool = false
+    @State private var showingMessages: Bool = false
+    @State private var showingLinkedAccounts: Bool = false
+    
+    private var activeInstitutions: [Institution] {
+        appState.institutions.filter { inst in
+            appState.companies.contains { $0.id == inst.companyId }
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -104,28 +113,77 @@ struct AdminSettingsView: View {
                         showingPremiumUpgrade = true
                     } label: {
                         HStack {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.2))
+                                    .frame(width: 44, height: 44)
+                                Image(systemName: "star.fill")
+                                    .foregroundStyle(.white)
+                                    .font(.system(size: 18))
+                            }
+                            
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("MILOOM PRO")
-                                    .font(.system(size: 16, weight: .black))
+                                    .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(.white)
                                 Text("Unlock all premium features")
                                     .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.8))
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.6))
+                                .padding(.leading, 8)
+                        }
+                        .padding(16)
+                        .background(.miloomSecondary)
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Messages
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingMessages = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "tray.full.fill")
+                                .foregroundStyle(Color(hex: "#4f46e5"))
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 44, height: 44)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("MESSAGES")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Activity and notifications")
+                                    .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.6))
                             }
+                            
                             Spacer()
+                            
+                            let unreadCount = appState.activityLogs.filter { !$0.isRead }.count
+                            if unreadCount > 0 {
+                                Text("\(unreadCount)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.red)
+                                    .clipShape(Capsule())
+                            }
+                            
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.4))
+                                .padding(.leading, 8)
                         }
-                        .padding(20)
-                        .background(
-                            LinearGradient(colors: [Color(hex: "#1e3a8a").opacity(0.6), Color(hex: "#3b82f6").opacity(0.3)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                                .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-                        )
+                        .padding(16)
+                        .masonryGlass(cornerRadius: 24)
                     }
                     .padding(.horizontal, 20)
                     
@@ -167,6 +225,48 @@ struct AdminSettingsView: View {
                         .masonryGlass(cornerRadius: 24)
                         .padding(.horizontal, 20)
                     }
+
+                    // Linked Accounts
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingLinkedAccounts = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "building.columns.fill")
+                                .foregroundStyle(Color(hex: "#1A7077"))
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 44, height: 44)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("LINKED ACCOUNTS")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Manage Plaid bank connections")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+                            
+                            Spacer()
+                            
+                            if !activeInstitutions.isEmpty {
+                                Text("\(activeInstitutions.count)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.15))
+                                    .clipShape(Capsule())
+                            }
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .padding(.leading, 8)
+                        }
+                        .padding(16)
+                        .masonryGlass(cornerRadius: 24)
+                    }
+                    .padding(.horizontal, 20)
                     
                     // Active Sessions
                     VStack(alignment: .leading, spacing: 16) {
@@ -302,6 +402,12 @@ struct AdminSettingsView: View {
             PremiumUpgradeView()
                 .environment(authVM)
         }
+        .sheet(isPresented: $showingMessages) {
+            ActivityLogsView(vm: vm)
+        }
+        .sheet(isPresented: $showingLinkedAccounts) {
+            LinkedAccountsSheet(vm: vm, appState: appState)
+        }
     }
 }
 
@@ -435,5 +541,195 @@ func parseUserAgent(_ userAgent: String?) -> (name: String, icon: String) {
         return ("Linux PC", "laptopcomputer")
     } else {
         return ("Web Session", "globe")
+    }
+}
+
+struct LinkedAccountRow: View {
+    let inst: Institution
+    @Bindable var vm: AppViewModel
+    let appState: AppState
+    @State private var showingUnlinkAlert = false
+    
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 16) {
+                if let loginUrl = inst.loginUrl, !loginUrl.isEmpty {
+                    FaviconImage(website: loginUrl, size: 36)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(hex: "#1A7077"))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "building.columns.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(.white)
+                    }
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(inst.name)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                    
+                    if let company = appState.companies.first(where: { $0.id == inst.companyId }) {
+                        Text(company.name)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.6))
+                    } else {
+                        Text("Unknown Entity")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.4))
+                    }
+                    
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(inst.isDisconnected ? Color.red : Color.green)
+                            .frame(width: 6, height: 6)
+                        Text(inst.isDisconnected ? "Connection issue" : "Connected")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(inst.isDisconnected ? .red : .green)
+                    }
+                }
+                
+                Spacer()
+                
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showingUnlinkAlert = true
+                } label: {
+                    Text("Unlink")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.red)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            
+            if inst.isDisconnected {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Action Required")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.red)
+                        Text("Fix connection to sync recent bank updates.")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    }
+                    Spacer()
+                    
+                    PlaidLinkButton(
+                        companyId: inst.companyId,
+                        institutionId: inst.id,
+                        buttonText: "Fix",
+                        isReconnect: true,
+                        onSuccess: { _, _, _ in
+                            var updatedInst = inst
+                            updatedInst.isDisconnected = false
+                            vm.saveInstitution(updatedInst, appState: appState)
+                        }
+                    )
+                    .frame(width: 80, height: 32)
+                }
+                .padding(12)
+                .background(Color.red.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.15), lineWidth: 1))
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .alert("Unlink Connection?", isPresented: $showingUnlinkAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Unlink", role: .destructive) {
+                vm.deleteInstitution(inst, appState: appState)
+            }
+        } message: {
+            Text("This will permanently remove the Plaid connection for \(inst.name) and erase all linked card and bank account data.")
+        }
+    }
+}
+
+struct LinkedAccountsSheet: View {
+    @Bindable var vm: AppViewModel
+    let appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    
+    private var activeInstitutions: [Institution] {
+        appState.institutions.filter { inst in
+            appState.companies.contains { $0.id == inst.companyId }
+        }
+    }
+    
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color.black.ignoresSafeArea()
+            
+            AnimatedHeaderBackground()
+                .ignoresSafeArea(edges: .top)
+            
+            VStack(spacing: 0) {
+                // Premium Zifr Header
+                HStack {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    
+                    Spacer()
+                    
+                    Text("LINKED ACCOUNTS")
+                        .zifrLabel()
+                    
+                    Spacer()
+                    
+                    Color.clear.frame(width: 44, height: 44)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        Text("CONNECTED PLAID ACCOUNTS")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .padding(.leading, 40)
+                            .padding(.top, 24)
+                        
+                        VStack(spacing: 0) {
+                            if activeInstitutions.isEmpty {
+                                Text("No connected accounts found")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                    .padding(.vertical, 40)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                ForEach(activeInstitutions) { inst in
+                                    LinkedAccountRow(inst: inst, vm: vm, appState: appState)
+                                    
+                                    if inst.id != activeInstitutions.last?.id {
+                                        Divider().background(Color.white.opacity(0.1)).padding(.horizontal, 20)
+                                    }
+                                }
+                            }
+                        }
+                        .masonryGlass(cornerRadius: 24)
+                        .padding(.horizontal, 20)
+                    }
+                    .padding(.bottom, 40)
+                }
+            }
+        }
     }
 }

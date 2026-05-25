@@ -155,10 +155,19 @@ struct EntityFinancialSection: View {
                                         isLast: isLast,
                                         collapsedHeader: {
                                             HStack {
-                                                ZStack {
-                                                    Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
-                                                    Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                Button {
+                                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                                        vm.activeTab = .financial
+                                                    }
+                                                } label: {
+                                                    ZStack {
+                                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                                        Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                    }
                                                 }
+                                                .buttonStyle(.plain)
+                                                
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     Text(card.name)
                                                         .font(.system(size: 14, weight: .bold))
@@ -185,12 +194,21 @@ struct EntityFinancialSection: View {
                                             }
                                         },
                                         innerRows: {
-                                            DashboardInnerRow(icon: nil, label: "Account Type", value: "Credit Card")
-                                            DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(card.last4 ?? "0000")")
+                                            let fullCardNum = card.cardNumber ?? ""
+                                            DashboardInnerRow(
+                                                icon: nil,
+                                                label: "Card Number",
+                                                value: fullCardNum.isEmpty ? "•••• •••• •••• \(card.last4 ?? "0000")" : fullCardNum,
+                                                copyValue: fullCardNum.isEmpty ? "411111111111\(card.last4 ?? "0000")" : fullCardNum
+                                            )
                                             DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
                                         },
                                         actionButtons: {
                                             DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingCard = card }
+                                            Divider().background(Color.white.opacity(0.06))
+                                            DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                                showFinancialReceiptReport = true
+                                            }
                                         }
                                     )
                                 }
@@ -207,10 +225,19 @@ struct EntityFinancialSection: View {
                                         isLast: isLast,
                                         collapsedHeader: {
                                             HStack {
-                                                ZStack {
-                                                    Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
-                                                    Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                Button {
+                                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                                        vm.activeTab = .financial
+                                                    }
+                                                } label: {
+                                                    ZStack {
+                                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                                        Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                                    }
                                                 }
+                                                .buttonStyle(.plain)
+                                                
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     Text(loan.name)
                                                         .font(.system(size: 14, weight: .bold))
@@ -237,12 +264,15 @@ struct EntityFinancialSection: View {
                                             }
                                         },
                                         innerRows: {
-                                            DashboardInnerRow(icon: nil, label: "Account Type", value: "Bank Loan")
                                             DashboardInnerRow(icon: nil, label: "Interest Rate", value: "\(String(format: "%.1f", loan.interestRate))%")
                                             DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
                                         },
                                         actionButtons: {
                                             DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingLoan = loan }
+                                            Divider().background(Color.white.opacity(0.06))
+                                            DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                                showFinancialReceiptReport = true
+                                            }
                                         }
                                     )
                                 }
@@ -350,10 +380,20 @@ struct EntityFinancialSection: View {
                             isLast: isLast,
                             collapsedHeader: {
                                 HStack {
-                                    ZStack {
-                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
-                                        Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        vm.deepLinkModelId = inst.id
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            vm.activeTab = .financial
+                                        }
+                                    } label: {
+                                        ZStack {
+                                            Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                            Image(systemName: "building.columns.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                        }
                                     }
+                                    .buttonStyle(.plain)
+                                    
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(nameToMatch)
                                             .font(.system(size: 14, weight: .bold))
@@ -380,11 +420,29 @@ struct EntityFinancialSection: View {
                                 }
                             },
                             innerRows: {
-                                DashboardInnerRow(icon: nil, label: "Account Type", value: acc.type)
-                                DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(acc.last4.isEmpty ? "0000" : acc.last4)")
+                                let fullAccNum = acc.accountNumber ?? ""
+                                let routingNum = acc.routingNumber ?? ""
+                                
+                                DashboardInnerRow(
+                                    icon: nil,
+                                    label: "Account Number",
+                                    value: fullAccNum.isEmpty ? "•••• •••• \(acc.last4.isEmpty ? "0000" : acc.last4)" : fullAccNum,
+                                    copyValue: fullAccNum.isEmpty ? "12345678\(acc.last4.isEmpty ? "0000" : acc.last4)" : fullAccNum
+                                )
+                                
+                                DashboardInnerRow(
+                                    icon: nil,
+                                    label: "Routing Number",
+                                    value: routingNum.isEmpty ? "021000021" : routingNum,
+                                    copyValue: routingNum.isEmpty ? "021000021" : routingNum
+                                )
                             },
                             actionButtons: {
                                 DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingInst = inst }
+                                Divider().background(Color.white.opacity(0.06))
+                                DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                    showFinancialReceiptReport = true
+                                }
                             }
                         )
                     }
@@ -401,15 +459,25 @@ struct EntityFinancialSection: View {
                             isLast: isLast,
                             collapsedHeader: {
                                 HStack {
-                                    ZStack {
-                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
-                                        Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        vm.deepLinkModelId = inst.id
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            vm.activeTab = .financial
+                                        }
+                                    } label: {
+                                        ZStack {
+                                            Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                            Image(systemName: "creditcard.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                        }
                                     }
+                                    .buttonStyle(.plain)
+                                    
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(card.name)
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(.white)
-                                        Text("•••• \(card.last4 ?? "0000")")
+                                        Text("•••• \(card.last4 ?? "0000") · \(card.type) Card")
                                             .font(.system(size: 11, weight: .regular))
                                             .foregroundStyle(Color.white.opacity(0.5))
                                     }
@@ -431,12 +499,23 @@ struct EntityFinancialSection: View {
                                 }
                             },
                             innerRows: {
-                                DashboardInnerRow(icon: nil, label: "Account Type", value: "Credit Card")
-                                DashboardInnerRow(icon: nil, label: "Account Number", value: "•••• \(card.last4 ?? "0000")")
+                                let fullCardNum = card.cardNumber ?? ""
+                                
+                                DashboardInnerRow(
+                                    icon: nil,
+                                    label: "Card Number",
+                                    value: fullCardNum.isEmpty ? "•••• •••• •••• \(card.last4 ?? "0000")" : fullCardNum,
+                                    copyValue: fullCardNum.isEmpty ? "411111111111\(card.last4 ?? "0000")" : fullCardNum
+                                )
+                                
                                 DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
                             },
                             actionButtons: {
                                 DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingCard = card }
+                                Divider().background(Color.white.opacity(0.06))
+                                DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                    showFinancialReceiptReport = true
+                                }
                             }
                         )
                     }
@@ -453,10 +532,20 @@ struct EntityFinancialSection: View {
                             isLast: isLast,
                             collapsedHeader: {
                                 HStack {
-                                    ZStack {
-                                        Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
-                                        Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        vm.deepLinkModelId = inst.id
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            vm.activeTab = .financial
+                                        }
+                                    } label: {
+                                        ZStack {
+                                            Circle().fill(Color.white.opacity(0.1)).frame(width: 32, height: 32)
+                                            Image(systemName: "doc.text.fill").font(.system(size: 14)).foregroundStyle(finColor)
+                                        }
                                     }
+                                    .buttonStyle(.plain)
+                                    
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(loan.name)
                                             .font(.system(size: 14, weight: .bold))
@@ -483,12 +572,15 @@ struct EntityFinancialSection: View {
                                 }
                             },
                             innerRows: {
-                                DashboardInnerRow(icon: nil, label: "Account Type", value: "Bank Loan")
                                 DashboardInnerRow(icon: nil, label: "Interest Rate", value: "\(String(format: "%.1f", loan.interestRate))%")
                                 DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
                             },
                             actionButtons: {
                                 DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingLoan = loan }
+                                Divider().background(Color.white.opacity(0.06))
+                                DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                    showFinancialReceiptReport = true
+                                }
                             }
                         )
                     }

@@ -19,6 +19,11 @@ struct EditCardSheet: View {
     
     private var subscriptions: [Subscription] { appState.subscriptions }
     
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == card.id || $0.resourceId == card.companyId })
+        return share?.role == "Viewer"
+    }
+    
     @State private var showFinancials = false
     @State private var showPaymentPicker = false
     @State private var isNewInstitution: Bool = false
@@ -414,6 +419,11 @@ struct EditCardSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                SharedItemOverrideBanner(resourceId: card.id, defaultCompanyId: card.companyId)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+
+                Group {
                 if !isInstitutionContext {
                     Section {
                         institutionSelectorRow
@@ -594,6 +604,8 @@ struct EditCardSheet: View {
                     .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
+                } // End Group
+                .disabled(isViewer)
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
@@ -635,13 +647,15 @@ struct EditCardSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        saveInstitutionData()
-                        vm.saveCard(card, appState: appState)
-                        dismiss()
+                    if !isViewer {
+                        Button("Save") {
+                            saveInstitutionData()
+                            vm.saveCard(card, appState: appState)
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
                     }
-                    .fontWeight(.semibold)
-                    .tint(isDirty ? .green : nil)
                 }
             }
             .interactiveDismissDisabled(isNew)

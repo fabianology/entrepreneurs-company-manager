@@ -1,0 +1,1 @@
+/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/Zifr/Views/ActivityLogsView.swift:105:42: error: value of type 'AppViewModel' has no member 'refreshData'

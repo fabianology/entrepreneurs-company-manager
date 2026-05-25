@@ -49,7 +49,7 @@ final class AppViewModel {
         Task { try? await DataRepository.shared.updateCompany(mutableCompany) }
     }
 
-    func deleteCompany(_ company: Company, appState: AppState) {
+    func deleteCompany(_ company: Company, appState: AppState, currentUserId: UUID?) {
         appState.companies.removeAll { $0.id == company.id }
         appState.subscriptions.removeAll { $0.companyId == company.id }
         appState.institutions.removeAll { $0.companyId == company.id }
@@ -57,7 +57,13 @@ final class AppViewModel {
         appState.loans.removeAll { $0.companyId == company.id }
         appState.documents.removeAll { $0.companyId == company.id }
         
-        Task { try? await DataRepository.shared.deleteCompany(company.id) }
+        Task {
+            if company.userId != currentUserId {
+                try? await DataRepository.shared.leaveResource(resourceId: company.id, resourceType: "company", resourceName: company.name, ownerId: company.userId)
+            } else {
+                try? await DataRepository.shared.deleteCompany(company.id)
+            }
+        }
         if selectedCompany?.id == company.id { selectedCompany = nil }
     }
 
