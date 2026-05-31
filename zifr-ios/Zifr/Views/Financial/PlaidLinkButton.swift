@@ -10,7 +10,7 @@ struct PlaidLinkButton: View {
     
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var linkHandler: Handler?
+    @State private var linkHandler: LinkKit.Handler?
     
     var body: some View {
         Button {
@@ -33,7 +33,10 @@ struct PlaidLinkButton: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .disabled(isLoading)
-        .alert("Plaid Error", isPresented: .constant(errorMessage != nil)) {
+        .alert("Plaid Error", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             if let errorMessage { Text(errorMessage) }
@@ -65,6 +68,7 @@ struct PlaidLinkButton: View {
                             )
                             await MainActor.run { onSuccess(success.metadata.institution.name, result.accounts, result.item_id) }
                         } catch {
+                            print("Plaid Exchange Error:", error)
                             await MainActor.run { errorMessage = error.localizedDescription }
                         }
                     }

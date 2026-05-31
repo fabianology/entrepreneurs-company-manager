@@ -7,6 +7,7 @@ struct FinancialView: View {
     let loans: [Loan]
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var editingCard: FinancialCard? = nil
     @State private var editingInst: Institution? = nil
@@ -76,7 +77,8 @@ struct FinancialView: View {
                                         shareResourceTitle = card.name.isEmpty ? "Card" : card.name
                                         showShareSheet = true
                                     } label: {
-                                        Label(card.name.isEmpty ? "Unnamed" : card.name, systemImage: "person.crop.circle.badge.plus")
+                                        let cardName = card.name.isEmpty ? "Unnamed" : card.name
+                                        Label(cardName, systemImage: "person.crop.circle.badge.plus")
                                     }
                                 }
                             }
@@ -178,6 +180,31 @@ struct FinancialView: View {
                             apr: 29.99
                         )
                         
+                    if onboardingState.isSpotlightingTutorialFinancial {
+                            // Tutorial mode: show demo wallet un-blurred
+                            VStack(spacing: 0) {
+                                ZStack(alignment: .top) {
+                                    FinancialCardVisual(card: dummyCard1, isPopped: false)
+                                        .frame(height: 110)
+                                        .offset(y: -36)
+                                        .zIndex(2)
+                                    InstitutionCardView(
+                                        institution: dummyAmex,
+                                        totalMonthlyPayment: 0,
+                                        cardCount: 1,
+                                        loanCount: 0,
+                                        loans: [],
+                                        vm: vm,
+                                        onEdit: {},
+                                        onEditLoan: { _ in }
+                                    )
+                                    .zIndex(3)
+                                }
+                                .padding(.top, 36)
+                            }
+                            .allowsHitTesting(false)
+                            .padding(.top, 40)
+                        } else {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             wizardInstitution = Institution(userId: company.userId, companyId: company.id)
@@ -224,6 +251,8 @@ struct FinancialView: View {
                             }
                         }
                         .padding(.top, 40)
+                        .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
+                        }
                     } else {
                         // Institutions Block
                         if !institutions.isEmpty {

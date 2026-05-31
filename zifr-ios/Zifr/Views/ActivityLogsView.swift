@@ -180,23 +180,27 @@ struct MessageRowView: View {
     let vm: AppViewModel
     @Environment(AppState.self) private var appState
     
+    private var isSecurityConcern: Bool {
+        log.actionType == "security_alert" || log.actionType == "new_device"
+    }
+    
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "#4f46e5").opacity(0.2))
+                    .fill(isSecurityConcern ? Color.red.opacity(0.15) : Color(hex: "#4f46e5").opacity(0.2))
                     .frame(width: 44, height: 44)
                 
                 Image(systemName: iconForAction(log.actionType))
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#4f46e5"))
+                    .foregroundStyle(isSecurityConcern ? Color.red : Color(hex: "#4f46e5"))
             }
             
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text(titleForAction(log.actionType))
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isSecurityConcern ? Color.red : .white)
                     Spacer()
                     Text(timeAgo(log.createdAt))
                         .font(.system(size: 12, weight: .medium))
@@ -205,7 +209,7 @@ struct MessageRowView: View {
                 
                 Text(log.message)
                     .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.7))
+                    .foregroundStyle(isSecurityConcern ? Color.red.opacity(0.85) : Color.white.opacity(0.7))
                     .fixedSize(horizontal: false, vertical: true)
                 
                 if !log.isRead {
@@ -219,7 +223,7 @@ struct MessageRowView: View {
                         } label: {
                             Text("Mark as read")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color(hex: "#4f46e5"))
+                                .foregroundStyle(isSecurityConcern ? Color.red : Color(hex: "#4f46e5"))
                         }
                     }
                     .padding(.top, 4)
@@ -230,7 +234,7 @@ struct MessageRowView: View {
         .masonryGlass(cornerRadius: 20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(log.isRead ? Color.clear : Color(hex: "#4f46e5").opacity(0.5), lineWidth: 1)
+                .stroke(log.isRead ? Color.clear : (isSecurityConcern ? Color.red.opacity(0.5) : Color(hex: "#4f46e5").opacity(0.5)), lineWidth: 1)
         )
     }
     
@@ -240,6 +244,7 @@ struct MessageRowView: View {
         case "left_resource": return "person.fill.xmark"
         case "updated_company", "updated_subscription", "updated_card", "updated_institution", "updated_loan", "updated_document": return "pencil"
         case "new_device": return "iphone.badge.play"
+        case "security_alert": return "shield.exclamation.fill"
         default: return "bell.fill"
         }
     }
@@ -250,6 +255,7 @@ struct MessageRowView: View {
         case "left_resource": return "User Left"
         case "updated_company", "updated_subscription", "updated_card", "updated_institution", "updated_loan", "updated_document": return "Resource Updated"
         case "new_device": return "New Login"
+        case "security_alert": return "Security Alert"
         default: return "Activity"
         }
     }

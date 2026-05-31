@@ -8,6 +8,7 @@ struct DocumentListView: View {
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
@@ -323,6 +324,7 @@ struct DocumentListView: View {
             }
         }
         .padding(.top, 40)
+        .spotlightTarget(isActive: onboardingState.isSpotlightingNotes)
     }
 
     private func processScan(_ images: [UIImage]) {

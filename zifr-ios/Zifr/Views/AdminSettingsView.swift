@@ -10,7 +10,7 @@ struct AdminSettingsView: View {
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
     @State private var showingExportAlert: Bool = false
-    @State private var showingDeleteAlert: Bool = false
+    @State private var showingDeleteAccountSheet: Bool = false
     @State private var showingEditProfile: Bool = false
     @State private var showingPremiumUpgrade: Bool = false
     @State private var showingMessages: Bool = false
@@ -368,7 +368,7 @@ struct AdminSettingsView: View {
                         
                         Button {
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                            showingDeleteAlert = true
+                            showingDeleteAccountSheet = true
                         } label: {
                             HStack {
                                 Image(systemName: "trash.fill")
@@ -409,13 +409,9 @@ struct AdminSettingsView: View {
         } message: {
             Text("A secure download link containing all your company and financial data will be generated.")
         }
-        .alert("Delete Account", isPresented: $showingDeleteAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete Permanently", role: .destructive) {
-                // Trigger account deletion
-            }
-        } message: {
-            Text("This action cannot be undone. All of your data, including shared companies and financial connections, will be permanently erased within 30 days.")
+        .sheet(isPresented: $showingDeleteAccountSheet) {
+            DeleteAccountView()
+                .environment(authVM)
         }
         .task {
             if let session = try? await SupabaseService.shared.client.auth.session {

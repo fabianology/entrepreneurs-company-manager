@@ -130,9 +130,32 @@ final class AuthViewModel: NSObject {
                 self.isBiometricEnabled = false
                 self.hasCachedSession = false
                 self.isAuthenticated = false
+                UserDefaults.standard.removeObject(forKey: "onboardingStep")
             }
         } catch {
             print("Error signing out: \(error.localizedDescription)")
+        }
+    }
+    
+    func deleteAccount() async throws {
+        await MainActor.run { self.isLoading = true; self.authError = nil }
+        do {
+            try await SupabaseService.shared.deleteUserAccount()
+            await MainActor.run {
+                self.session = nil
+                self.currentUser = nil
+                self.isBiometricEnabled = false
+                self.hasCachedSession = false
+                self.isAuthenticated = false
+                UserDefaults.standard.removeObject(forKey: "onboardingStep")
+                self.isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                self.authError = error.localizedDescription
+                self.isLoading = false
+            }
+            throw error
         }
     }
     

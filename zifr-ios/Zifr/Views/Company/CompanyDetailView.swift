@@ -5,6 +5,7 @@ struct CompanyDetailView: View {
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Environment(OnboardingStateManager.self) private var onboardingState
 
     private var allCompanies: [Company] { appState.companies.sorted { $0.name < $1.name } }
     private var allSubscriptions: [Subscription] { appState.subscriptions }
@@ -55,6 +56,7 @@ struct CompanyDetailView: View {
     @State private var newLoan: Loan? = nil
     @State private var showFinancialWizard = false
     @State private var wizardInstitution: Institution? = nil
+    @State private var showAssistant = false
 
     
     private var currentTabIndex: Int {
@@ -122,6 +124,60 @@ struct CompanyDetailView: View {
         }
         .sheet(item: $newLoan) { l in
             EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards)
+        }
+        .fullScreenCover(isPresented: $showAssistant) {
+            AssistantOnboardingView(vm: vm)
+                .environment(appState)
+        }
+        .overlayPreferenceValue(SpotlightBoundsKey.self) { anchors in
+            buildSpotlightOverlay(for: anchors)
+        }
+        .onChange(of: appState.institutions.count) { _, _ in
+            onboardingState.evaluateState(appState: appState)
+        }
+        .onChange(of: showFinancialWizard) { _, isPresented in
+            if !isPresented {
+                onboardingState.evaluateState(appState: appState)
+            }
+        }
+        .onChange(of: newSub) { _, sub in
+            if sub == nil {
+                onboardingState.evaluateState(appState: appState)
+            }
+        }
+        .onChange(of: newDoc) { _, doc in
+            if doc == nil {
+                onboardingState.evaluateState(appState: appState)
+            }
+        }
+        .onChange(of: appState.subscriptions.count) { _, _ in
+            if onboardingState.currentStep == .needsReview {
+                onboardingState.completeOnboarding()
+            }
+        }
+        .onChange(of: appState.documents.count) { _, _ in
+            if onboardingState.currentStep == .needsNotes {
+                onboardingState.completeOnboarding()
+            }
+        }
+        .onChange(of: onboardingState.currentStep, initial: true) { _, newStep in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                switch newStep {
+                case .needsBank:
+                    vm.activeTab = .financial
+                case .needsReview:
+                    vm.activeTab = .subscriptions
+                case .needsNotes:
+                    vm.activeTab = .documents
+                case .needsCommandCenterQuickAdd, .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport, .needsCommandCenterSubscriptions, .needsCommandCenterDocuments:
+                    vm.activeTab = .home
+                default:
+                    break
+                }
+            }
+        }
+        .onAppear {
+            onboardingState.evaluateState(appState: appState)
         }
         // Popover moved to the button
         .safeAreaInset(edge: .bottom) {
@@ -474,6 +530,114 @@ struct CompanyDetailView: View {
         case .subscriptions: return Color(hex: "#2070BD")
         case .financial:     return Color(hex: "#1A7077")
         case .documents:     return Color(hex: "#918457")
+        }
+    }
+
+    @ViewBuilder
+    private func buildSpotlightOverlay(for anchors: [Anchor<CGRect>]) -> some View {
+        if anchors.isEmpty {
+            EmptyView()
+        } else {
+            switch onboardingState.currentStep {
+            case .needsBank:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "Connect your bank account securely. We'll automatically find your subscriptions and organize your financials.",
+                    stepIndex: 2, totalSteps: 8,
+                    onSkip: { onboardingState.skipOnboarding() },
+                    onTapTarget: {
+                        onboardingState.currentStep = .notStarted // Temporary hide so tap goes through
+                        wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                        showFinancialWizard = true
+                    }
+                )
+            case .needsReview:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: subscriptions.isEmpty ? "Now let's add your first subscription or service. You can track all recurring costs here." : "Magic! ✨ We found your active subscriptions. You can review them or add documents anytime.",
+                    stepIndex: 3, totalSteps: 8,
+                    onSkip: { onboardingState.completeOnboarding() },
+                    onTapTarget: {
+                        if subscriptions.isEmpty {
+                            newSub = Subscription(userId: company.userId, companyId: company.id)
+                        } else {
+                            onboardingState.completeOnboarding()
+                        }
+                    }
+                )
+            case .needsNotes:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "Add your first document. You can store articles of incorporation, tax forms, and notes securely in your vault.",
+                    stepIndex: 4, totalSteps: 8,
+                    onSkip: { onboardingState.completeOnboarding() },
+                    onTapTarget: {
+                        newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                    }
+                )
+            case .needsCommandCenterQuickAdd:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "This is your Command Center. Use this top row to quickly add services, accounts, and documents from anywhere.",
+                    stepIndex: 5, totalSteps: 8,
+                    onBack: { onboardingState.currentStep = .needsNotes },
+                    onNext: { onboardingState.currentStep = .needsCommandCenterFinancialsHeader },
+                    onSkip: { onboardingState.currentStep = .completed },
+                    onTapTarget: { onboardingState.currentStep = .needsCommandCenterFinancialsHeader }
+                )
+            case .needsCommandCenterFinancialsHeader:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "Click here to go to your financial page.",
+                    stepIndex: 6, totalSteps: 8,
+                    onBack: { onboardingState.currentStep = .needsCommandCenterQuickAdd },
+                    onNext: { onboardingState.currentStep = .needsCommandCenterFinancialsAccounts },
+                    onSkip: { onboardingState.currentStep = .completed },
+                    onTapTarget: { onboardingState.currentStep = .needsCommandCenterFinancialsAccounts }
+                )
+            case .needsCommandCenterFinancialsAccounts:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "See all your financial accounts here.",
+                    stepIndex: 6, totalSteps: 8,
+                    onBack: { onboardingState.currentStep = .needsCommandCenterFinancialsHeader },
+                    onNext: { onboardingState.currentStep = .needsCommandCenterFinancialsReport },
+                    onSkip: { onboardingState.currentStep = .completed },
+                    onTapTarget: { onboardingState.currentStep = .needsCommandCenterFinancialsReport }
+                )
+            case .needsCommandCenterFinancialsReport:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "Generate a single page easy to read report.",
+                    stepIndex: 6, totalSteps: 8,
+                    onBack: { onboardingState.currentStep = .needsCommandCenterFinancialsAccounts },
+                    onNext: { onboardingState.currentStep = .needsCommandCenterSubscriptions },
+                    onSkip: { onboardingState.currentStep = .completed },
+                    onTapTarget: { onboardingState.currentStep = .needsCommandCenterSubscriptions }
+                )
+            case .needsCommandCenterSubscriptions:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "Your active subscriptions and monthly costs are summarized in this card.",
+                    stepIndex: 7, totalSteps: 8,
+                    onBack: { onboardingState.currentStep = .needsCommandCenterFinancialsReport },
+                    onNext: { onboardingState.currentStep = .needsCommandCenterDocuments },
+                    onSkip: { onboardingState.currentStep = .completed },
+                    onTapTarget: { onboardingState.currentStep = .needsCommandCenterDocuments }
+                )
+            case .needsCommandCenterDocuments:
+                SpotlightOverlayView(
+                    anchors: anchors,
+                    message: "And finally, your document vault summary. Next, let's meet your assistant!",
+                    stepIndex: 8, totalSteps: 8,
+                    onBack: { onboardingState.currentStep = .needsCommandCenterSubscriptions },
+                    onNext: { onboardingState.currentStep = .needsAssistant },
+                    onSkip: { onboardingState.currentStep = .completed },
+                    onTapTarget: { onboardingState.currentStep = .needsAssistant }
+                )
+            default:
+                EmptyView()
+            }
         }
     }
 }

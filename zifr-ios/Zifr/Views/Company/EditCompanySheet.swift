@@ -5,6 +5,7 @@ struct EditCompanySheet: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(OnboardingStateManager.self) private var onboardingState
     @Bindable var vm: AppViewModel
     var company: Company?
 
@@ -207,11 +208,19 @@ struct EditCompanySheet: View {
                             
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                dismiss()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    // Pop back to DashboardView, then start tutorial
+                                    vm.path.removeLast(vm.path.count)
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                        onboardingState.startTutorial()
+                                    }
+                                }
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "play.circle")
                                         .font(.system(size: 14))
-                                    Text("Help & Guide")
+                                    Text("Tutorial")
                                         .font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundStyle(.white)
@@ -224,17 +233,7 @@ struct EditCompanySheet: View {
                             .buttonStyle(.plain)
                             .padding(.bottom, 4)
                             
-                            HStack(spacing: 12) {
-                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), text: "Subscriptions") {
-                                    if let company { vm.selectedCompany = company; vm.activeTab = .subscriptions; dismiss() }
-                                }
-                                navButton(icon: "dollarsign.bank.building", color: Color(hex: "#1A7077"), text: "Financials") {
-                                    if let company { vm.selectedCompany = company; vm.activeTab = .financial; dismiss() }
-                                }
-                                navButton(icon: "doc.text", color: Color(hex: "#918457"), text: "Docs") {
-                                    if let company { vm.selectedCompany = company; vm.activeTab = .documents; dismiss() }
-                                }
-                            }
+
                         }
 
 
@@ -383,27 +382,7 @@ struct EditCompanySheet: View {
         }
     }
 
-    private func navButton(icon: String, color: Color, text: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(color)
-                Text(text)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
+
 }
 
 // MARK: - Helpers

@@ -29,6 +29,7 @@ extension UIColor {
 struct ZifrApp: App {
     @State private var authViewModel = AuthViewModel()
     @State private var appState = AppState()
+    @State private var onboardingState = OnboardingStateManager()
     @Environment(\.scenePhase) var scenePhase
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
     @State private var backgroundDate: Date? = nil
@@ -53,6 +54,7 @@ struct ZifrApp: App {
             .preferredColorScheme(.dark)
             .environment(authViewModel)
             .environment(appState)
+            .environment(onboardingState)
             .task {
                 await authViewModel.checkSession()
                 if authViewModel.isAuthenticated {

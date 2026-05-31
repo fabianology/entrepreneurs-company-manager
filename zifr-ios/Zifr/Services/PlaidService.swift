@@ -13,9 +13,13 @@ class PlaidService {
         struct Response: Decodable { let link_token: String }
         
         let payload = try JSONEncoder().encode(Request(company_id: companyId, institution_id: institutionId))
+        let session = try await client.auth.session
         let options = FunctionInvokeOptions(
             method: .post,
-            headers: ["Content-Type": "application/json"],
+            headers: [
+                "Content-Type": "application/json",
+                "Authorization": "Bearer \(session.accessToken)"
+            ],
             body: payload
         )
         do {
@@ -50,9 +54,13 @@ class PlaidService {
             institution_id: institutionId,
             company_id: companyId
         ))
+        let session = try await client.auth.session
         let options = FunctionInvokeOptions(
             method: .post,
-            headers: ["Content-Type": "application/json"],
+            headers: [
+                "Content-Type": "application/json",
+                "Authorization": "Bearer \(session.accessToken)"
+            ],
             body: payload
         )
         do {

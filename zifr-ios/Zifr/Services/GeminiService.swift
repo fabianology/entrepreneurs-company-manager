@@ -44,14 +44,17 @@ actor GeminiService {
 
     // MARK: - Portfolio Insights
     func askPortfolioQuestion(data: String, question: String) async -> String {
+        let cleanData = data.trimmingCharacters(in: .whitespacesAndNewlines)
+        let dataString = cleanData.isEmpty ? "[NO DATA. The user has not added any companies, subscriptions, or accounts yet.]" : cleanData
         let prompt = """
         You are a smart portfolio manager assistant for an entrepreneur.
-        Here is the minified data of all companies and subscriptions: \(data)
+        Here is the minified data of all companies and subscriptions: \(dataString)
         User Question: "\(question)"
         Instructions:
         1. Answer briefly and directly (max 2 sentences).
         2. If the user asks about costs, sum them up across relevant companies.
-        3. Be helpful and professional.
+        3. If the data is empty or indicates no data, explicitly inform the user that they haven't added any data yet and encourage them to add some.
+        4. Be helpful and professional.
         """
         do {
             return try await generate(model: "gemini-flash-latest", prompt: prompt)

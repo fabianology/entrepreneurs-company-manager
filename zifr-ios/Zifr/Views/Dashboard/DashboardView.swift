@@ -2,6 +2,7 @@ import SwiftUI
 struct DashboardView: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
+    @Environment(OnboardingStateManager.self) private var onboardingState
     private var companies: [Company] { appState.companies.sorted { $0.lastViewed > $1.lastViewed } }
     private var subscriptions: [Subscription] { appState.subscriptions }
     private var cards: [FinancialCard] { appState.cards }
@@ -38,6 +39,11 @@ struct DashboardView: View {
         structure: "LLC"
     )
 
+    // Tutorial target frames (captured in 'dashboard' coordinate space)
+    @State private var tutorialEntityFrame: CGRect = .zero
+    @State private var tutorialSearchFrame: CGRect = .zero
+    @State private var tutorialAssistantFrame: CGRect = .zero
+
     var body: some View {
         NavigationStack(path: $vm.path) {
             ZStack(alignment: .top) {
@@ -66,61 +72,85 @@ struct DashboardView: View {
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
 
-                ForEach(filteredCompanies) { company in
-                    companyCardRow(for: company)
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
-                    .swipeActions(edge: .leading) {
-                        Button {
-                            editingCompany = company
-                        } label: {
-                            Label("Edit", systemImage: "pencil")
+                ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
+                    let row = companyCardRow(for: company)
+                    let withFrame = row.background(tutorialFrameCapture(index: index))
+                    withFrame
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
+                        .swipeActions(edge: .leading) {
+                            Button { editingCompany = company } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            .tint(Color.indigo)
                         }
-                        .tint(Color.indigo)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            companyToDelete = company
-                        } label: {
-                            Image(systemName: "trash")
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) { companyToDelete = company } label: {
+                                Image(systemName: "trash")
+                            }
+                            .tint(.red)
                         }
-                        .tint(.red)
-                    }
                 }
 
-                // Add company button
+                // Add company button / tutorial demo card
                 Group {
                     if companies.isEmpty {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            showAddCompany = true
-                        } label: {
-                            ZStack {
-                                CompanyCardView(
-                                    company: dummyCompany,
-                                    institutionsCount: 0,
-                                    subscriptionsCount: 0,
-                                    docsCount: 0,
-                                    onEdit: {}
-                                )
-                                .allowsHitTesting(false)
-                                .blur(radius: 3)
-                                .opacity(0.8)
+                        // Un-blurred only while the tutorial is actively running.
+                        // tutorialHasBeenRun is a stored @Observable Bool — reliably triggers re-render.
+                        if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
+                            // Tutorial in progress: show demo card fully visible
+                            CompanyCardView(
+                                company: dummyCompany,
+                                institutionsCount: 1,
+                                subscriptionsCount: 3,
+                                docsCount: 2,
+                                onEdit: {}
+                            )
+                            .allowsHitTesting(false)
+                            .padding(.top, 4)
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.onAppear {
+                                        tutorialEntityFrame = geo.frame(in: .named("dashboard"))
+                                    }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                        tutorialEntityFrame = f
+                                    }
+                                }
+                            )
+                        } else {
+                            // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                showAddCompany = true
+                            } label: {
+                                ZStack {
+                                    CompanyCardView(
+                                        company: dummyCompany,
+                                        institutionsCount: 0,
+                                        subscriptionsCount: 0,
+                                        docsCount: 0,
+                                        onEdit: {}
+                                    )
+                                    .allowsHitTesting(false)
+                                    .blur(radius: 3)
+                                    .opacity(0.8)
 
-                                VStack(spacing: 16) {
-                                    Image(systemName: "plus.app.fill")
-                                        .font(.system(size: 28))
-                                        .foregroundStyle(.white)
-                                    Text("+ CREATE YOUR FIRST ENTITY")
-                                        .font(.system(size: 11, weight: .black))
-                                        .textCase(.uppercase)
-                                        .tracking(2)
-                                        .foregroundStyle(.white)
+                                    VStack(spacing: 16) {
+                                        Image(systemName: "plus.app.fill")
+                                            .font(.system(size: 28))
+                                            .foregroundStyle(.white)
+                                        Text("+ CREATE YOUR FIRST ENTITY")
+                                            .font(.system(size: 11, weight: .black))
+                                            .textCase(.uppercase)
+                                            .tracking(2)
+                                            .foregroundStyle(.white)
+                                    }
                                 }
                             }
+                            .padding(.top, 4)
+                            .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
                         }
-                        .padding(.top, 4)
                     }
                 }
                 .listRowBackground(Color.clear)
@@ -158,12 +188,42 @@ struct DashboardView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollIndicators(.hidden)
+            .onAppear {
+                onboardingState.evaluateState(appState: appState)
+            }
+            .onChange(of: appState.companies.count) { _, _ in
+                let previousStep = onboardingState.currentStep
+                onboardingState.evaluateState(appState: appState)
+                
+                if (previousStep == .needsEntity || previousStep == .notStarted) && onboardingState.currentStep == .needsBank {
+                    // Automatically jump to the new entity's financial tab
+                    if let newCompany = appState.companies.sorted(by: { $0.lastModified > $1.lastModified }).first {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            vm.selectedCompany = newCompany
+                            vm.activeTab = .financial
+                            vm.touchCompany(newCompany, appState: appState)
+                            vm.path.append(newCompany)
+                        }
+                    }
+                }
+            }
+            .onChange(of: appState.institutions.count) { _, _ in
+                let previousStep = onboardingState.currentStep
+                onboardingState.evaluateState(appState: appState)
+                guard previousStep == .needsBank else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    handlePostBankNavigation()
+                }
+            }
             .refreshable {
                 await DataRepository.shared.fetchAllData(appState: appState)
             }
             .confirmationDialog(
                 companyToDelete?.userId != currentUserId ? "Leave Company" : "Delete Company",
-                isPresented: Binding(get: { companyToDelete != nil }, set: { if !$0 { companyToDelete = nil } }),
+                isPresented: Binding(
+                    get: { companyToDelete != nil },
+                    set: { if !$0 { companyToDelete = nil } }
+                ),
                 titleVisibility: .visible
             ) {
                 Button(companyToDelete?.userId != currentUserId ? "Leave" : "Delete", role: .destructive) {
@@ -229,6 +289,28 @@ struct DashboardView: View {
             .sheet(item: $selectedDocument) { doc in
                 EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
             }
+            // Tutorial tab navigation coordinator
+            .onChange(of: onboardingState.currentStep) { _, step in
+                switch step {
+                case .tutorialFinancial:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        if let company = appState.companies.first ?? Optional(dummyCompany) {
+                            vm.selectedCompany = company
+                        }
+                        vm.activeTab = .financial
+                    }
+                case .tutorialSubscriptions:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        vm.activeTab = .subscriptions
+                    }
+                case .tutorialSwipeHint, .tutorialDone:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        vm.activeTab = .home
+                    }
+                default:
+                    break
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 10) {
                     Button {
@@ -266,6 +348,19 @@ struct DashboardView: View {
                         .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
                     }
                     .buttonStyle(.plain)
+                    .background(
+                        Group {
+                            if onboardingState.isTutorialActive {
+                                GeometryReader { geo in
+                                    Color.clear.onAppear {
+                                        tutorialSearchFrame = geo.frame(in: .named("dashboard"))
+                                    }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                        tutorialSearchFrame = f
+                                    }
+                                }
+                            }
+                        }
+                    )
                     
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -286,11 +381,99 @@ struct DashboardView: View {
                             .shadow(color: Color(hex: "#0A84FF").opacity(0.6), radius: 8, x: 0, y: 0)
                     }
                     .buttonStyle(.plain)
+                    .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
+                    .background(
+                        Group {
+                            if onboardingState.isTutorialActive {
+                                GeometryReader { geo in
+                                    Color.clear.onAppear {
+                                        tutorialAssistantFrame = geo.frame(in: .named("dashboard"))
+                                    }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                        tutorialAssistantFrame = f
+                                    }
+                                }
+                            }
+                        }
+                    )
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
             }
             } // End ZStack
+            .coordinateSpace(name: "dashboard")
+            // ── Real onboarding spotlights (needsEntity / needsAssistant) ──
+            .overlayPreferenceValue(SpotlightBoundsKey.self) { anchors in
+                if !anchors.isEmpty {
+                    if onboardingState.isSpotlightingEntity {
+                        SpotlightOverlayView(
+                            anchors: anchors,
+                            message: "Welcome! Let's start by adding your first business entity or individual account.",
+                            stepIndex: 1, totalSteps: 8,
+                            onSkip: { onboardingState.skipOnboarding() },
+                            onTapTarget: {
+                                onboardingState.currentStep = .notStarted
+                                showAddCompany = true
+                            }
+                        )
+                    } else if onboardingState.isSpotlightingAssistant {
+                        SpotlightOverlayView(
+                            anchors: anchors,
+                            message: "Meet your AI Assistant! It can help you manage your entity, answer questions, and even add accounts for you.",
+                            onSkip: { onboardingState.skipOnboarding() },
+                            onTapTarget: {
+                                onboardingState.completeOnboarding()
+                                showAssistant = true
+                            }
+                        )
+                    }
+                }
+            }
+            // ── Tutorial spotlight overlay (steps 1–7) ──
+            .overlay {
+                if onboardingState.isTutorialActive && !onboardingState.isTutorialDone {
+                    let targetFrame: CGRect = {
+                        switch onboardingState.currentStep {
+                        case .tutorialEntityCard, .tutorialQuickActions, .tutorialSwipeHint:
+                            return tutorialEntityFrame
+                        case .tutorialSearch:
+                            return tutorialSearchFrame
+                        case .tutorialAssistant:
+                            return tutorialAssistantFrame
+                        default:
+                            return .zero
+                        }
+                    }()
+
+                    if targetFrame != .zero {
+                        TutorialSpotlightOverlayView(
+                            anchor: targetFrame,
+                            stepIndex: onboardingState.tutorialStepIndex,
+                            totalSteps: onboardingState.tutorialTotalSteps,
+                            title: tutorialTitle(for: onboardingState.currentStep),
+                            message: tutorialMessage(for: onboardingState.currentStep),
+                            onBack: onboardingState.tutorialStepIndex > 1 ? { onboardingState.tutorialBack() } : nil,
+                            onNext: { onboardingState.tutorialNext() },
+                            onSkip: { onboardingState.exitTutorial() }
+                        )
+                        .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                    }
+                }
+            }
+            // ── Step 8: Completion overlay ──
+            .overlay {
+                if onboardingState.isTutorialDone {
+                    TutorialCompletionOverlay(
+                        onGetStarted: {
+                            onboardingState.exitTutorial()
+                            showAddCompany = true
+                        },
+                        onExplore: {
+                            onboardingState.exitTutorial()
+                        }
+                    )
+                    .transition(.opacity)
+                }
+            }
         }
     }
 
@@ -523,7 +706,70 @@ struct DashboardView: View {
             onTapMain: { navigateAction(.home) }
         )
     }
+
+    // MARK: - Onboarding helpers
+
+    private func handlePostBankNavigation() {
+        switch onboardingState.currentStep {
+        case .needsReview:
+            vm.activeTab = .subscriptions
+        case .needsAssistant, .completed:
+            vm.path = NavigationPath()
+            vm.activeTab = .home
+        default:
+            break
+        }
+    }
+
+    // MARK: - Tutorial helpers
+
+
+    @ViewBuilder
+    private func tutorialFrameCapture(index: Int) -> some View {
+        if index == 0 && onboardingState.isTutorialActive {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { tutorialEntityFrame = geo.frame(in: .named("dashboard")) }
+                    .onChange(of: geo.frame(in: .named("dashboard"))) { _, f in tutorialEntityFrame = f }
+            }
+        }
+    }
+
+    private func tutorialTitle(for step: OnboardingStep) -> String {
+        switch step {
+        case .tutorialEntityCard:    return "Your Entity"
+        case .tutorialQuickActions:  return "Quick Actions"
+        case .tutorialSearch:        return "Global Search"
+        case .tutorialAssistant:     return "AI Assistant"
+        case .tutorialFinancial:     return "Financials"
+        case .tutorialSubscriptions: return "Subscriptions"
+        case .tutorialSwipeHint:     return "Navigate & Edit"
+        default:                     return ""
+        }
+    }
+
+    private func tutorialMessage(for step: OnboardingStep) -> String {
+        switch step {
+        case .tutorialEntityCard:
+            return "This is your entity — a company, LLC, or personal account. Everything you track lives inside it."
+        case .tutorialQuickActions:
+            return "Tap the entity card to open its Command Center with Subscriptions, Financials, and Documents."
+        case .tutorialSearch:
+            return "Instantly find any entity, subscription, financial record, or document across all your accounts."
+        case .tutorialAssistant:
+            return "Your AI assistant can add accounts, answer questions about your finances, and keep you organised."
+        case .tutorialFinancial:
+            return "This is the Financials tab — connect banks, track credit cards, and monitor loans for this entity."
+        case .tutorialSubscriptions:
+            return "Subscriptions are tracked here — billing cycles, costs, and status all in one place."
+        case .tutorialSwipeHint:
+            return "Swipe left on an entity card to edit it. Swipe right to archive. Long-press to share."
+        default:
+            return ""
+        }
+    }
 }
+
 
 
 // MARK: - Shared With Me View

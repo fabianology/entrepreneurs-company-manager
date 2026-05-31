@@ -21,6 +21,8 @@ struct EntityFinancialSection: View {
     
     private let finColor = Color(hex: "#1A7077")
     
+    @Environment(OnboardingStateManager.self) private var onboardingState
+    
     var body: some View {
         VStack(spacing: 16) {
             // Header
@@ -81,6 +83,7 @@ struct EntityFinancialSection: View {
                 )
             }
             .buttonStyle(.plain)
+            .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsHeader)
 
             // Institutions
             VStack(spacing: 12) {
@@ -283,6 +286,7 @@ struct EntityFinancialSection: View {
                     .padding(.horizontal, 16)
                 }
             }
+            .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsAccounts)
             
             financialReportButton
         }
@@ -314,6 +318,7 @@ struct EntityFinancialSection: View {
         }
         .buttonStyle(PremiumButtonStyle())
         .padding(.horizontal, 16)
+        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsReport)
     }
     
     private func institutionRow(_ inst: Institution) -> some View {

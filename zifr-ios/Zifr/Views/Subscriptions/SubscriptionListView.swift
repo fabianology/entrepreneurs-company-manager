@@ -7,6 +7,7 @@ struct SubscriptionListView: View {
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var editingSub: Subscription? = nil
     @State private var newSub: Subscription? = nil
@@ -76,8 +77,13 @@ struct SubscriptionListView: View {
                         newSub = Subscription(userId: company.userId, companyId: company.id)
                     } label: {
                         HStack(spacing: 6) {
-                            Text("ADD SERVICE").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
-                            Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
+                            Text("ADD SERVICE")
+                                .font(.system(size: 13, weight: .bold))
+                                .tracking(1)
+                                .foregroundStyle(.white)
+                            Image(systemName: "plus")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
                         }
                         .frame(width: 164, height: 44)
                         .contentShape(Rectangle())
@@ -95,7 +101,7 @@ struct SubscriptionListView: View {
                 if subscriptions.isEmpty {
                     emptyState
                 } else {
-                    ForEach(subscriptions) { sub in
+                    ForEach(Array(subscriptions.enumerated()), id: \.element.id) { index, sub in
                         SubscriptionCardView(
                             sub: sub, 
                             allSubscriptions: subscriptions, 
@@ -112,7 +118,7 @@ struct SubscriptionListView: View {
                             }
                         )
                             .id(sub.id)
-                            
+                            .spotlightTarget(isActive: onboardingState.isSpotlightingReview && index == 0)
                     }
                 }
             }
@@ -165,11 +171,9 @@ struct SubscriptionListView: View {
     )
 
     private var emptyState: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            newSub = Subscription(userId: company.userId, companyId: company.id)
-        }) {
-            ZStack {
+        Group {
+            if onboardingState.isSpotlightingTutorialSubs {
+                // Tutorial mode: show demo subscription card un-blurred
                 SubscriptionCardView(
                     sub: dummyNetflix,
                     allSubscriptions: [],
@@ -181,24 +185,46 @@ struct SubscriptionListView: View {
                     }
                 )
                 .allowsHitTesting(false)
-                .blur(radius: 3)
-                
-                VStack(spacing: 16) {
-                    Image(systemName: "square.3.layers.3d")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.white)
-                    Text("ADD YOUR FIRST SERVICE")
-                        .font(.system(size: 11, weight: .black))
-                        .textCase(.uppercase)
-                        .tracking(2)
-                        .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.top, 40)
+            } else {
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    newSub = Subscription(userId: company.userId, companyId: company.id)
+                }) {
+                    ZStack {
+                        SubscriptionCardView(
+                            sub: dummyNetflix,
+                            allSubscriptions: [],
+                            institutions: [],
+                            cards: [],
+                            onEdit: {},
+                            onSave: { modifiedSub in
+                                dummyNetflix = modifiedSub
+                            }
+                        )
+                        .allowsHitTesting(false)
+                        .blur(radius: 3)
+                        
+                        VStack(spacing: 16) {
+                            Image(systemName: "square.3.layers.3d")
+                                .font(.system(size: 28))
+                                .foregroundStyle(.white)
+                            Text("ADD YOUR FIRST SERVICE")
+                                .font(.system(size: 11, weight: .black))
+                                .textCase(.uppercase)
+                                .tracking(2)
+                                .foregroundStyle(.white)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
+                .padding(.horizontal, 20)
+                .padding(.top, 40)
+                .spotlightTarget(isActive: onboardingState.isSpotlightingReview)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 40)
     }
 }
 
