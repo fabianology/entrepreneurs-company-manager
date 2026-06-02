@@ -289,24 +289,50 @@ struct DashboardView: View {
             .sheet(item: $selectedDocument) { doc in
                 EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
             }
-            // Tutorial tab navigation coordinator
+            // Tutorial navigation coordinator
             .onChange(of: onboardingState.currentStep) { _, step in
                 switch step {
-                case .tutorialFinancial:
+                // ── Command Center steps: push into entity, home tab ──
+                case .tutorialCommandCenter, .tutorialCommandQuickAdd,
+                     .tutorialCommandFinancials, .tutorialCommandSubscriptions,
+                     .tutorialCommandDocuments:
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        if let company = appState.companies.first ?? Optional(dummyCompany) {
-                            vm.selectedCompany = company
+                        let entity = appState.companies.first ?? dummyCompany
+                        vm.selectedCompany = entity
+                        if vm.path.isEmpty {
+                            vm.path.append(entity)
                         }
-                        vm.activeTab = .financial
+                        // CompanyDetailView's own onChange will set vm.activeTab = .home
                     }
-                case .tutorialSubscriptions:
+
+                // ── Financial steps (incl. tabBar step): push into entity, financial tab ──
+                case .tutorialCommandTabBar,
+                     .tutorialFinancialPage, .tutorialFinancialWallet,
+                     .tutorialFinancialCardTap, .tutorialFinancialSwipe:
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        vm.activeTab = .subscriptions
+                        let entity = appState.companies.first ?? dummyCompany
+                        vm.selectedCompany = entity
+                        if vm.path.isEmpty {
+                            vm.path.append(entity)
+                        }
+                        // CompanyDetailView's own onChange will set vm.activeTab = .financial
                     }
-                case .tutorialSwipeHint, .tutorialDone:
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+
+                // ── Back from step 5 → Dashboard steps resume (pop path so DashboardView shows overlay) ──
+                case .tutorialEntityCard, .tutorialQuickActions,
+                     .tutorialSearch, .tutorialAssistant, .tutorialSwipeHint:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        vm.path = NavigationPath()
                         vm.activeTab = .home
                     }
+
+                // ── Done ──
+                case .tutorialDone:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        vm.path = NavigationPath()
+                        vm.activeTab = .home
+                    }
+
                 default:
                     break
                 }
@@ -353,8 +379,8 @@ struct DashboardView: View {
                             if onboardingState.isTutorialActive {
                                 GeometryReader { geo in
                                     Color.clear.onAppear {
-                                        tutorialSearchFrame = geo.frame(in: .named("dashboard"))
-                                    }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                        tutorialSearchFrame = geo.frame(in: .global)
+                                    }.onChange(of: geo.frame(in: .global)) { _, f in
                                         tutorialSearchFrame = f
                                     }
                                 }
@@ -387,8 +413,8 @@ struct DashboardView: View {
                             if onboardingState.isTutorialActive {
                                 GeometryReader { geo in
                                     Color.clear.onAppear {
-                                        tutorialAssistantFrame = geo.frame(in: .named("dashboard"))
-                                    }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                        tutorialAssistantFrame = geo.frame(in: .global)
+                                    }.onChange(of: geo.frame(in: .global)) { _, f in
                                         tutorialAssistantFrame = f
                                     }
                                 }
@@ -428,34 +454,46 @@ struct DashboardView: View {
                     }
                 }
             }
-            // ── Tutorial spotlight overlay (steps 1–7) ──
+            // ── Tutorial spotlight overlay (steps 1–4 and 15) on Dashboard ──
             .overlay {
                 if onboardingState.isTutorialActive && !onboardingState.isTutorialDone {
-                    let targetFrame: CGRect = {
+                    let isDashboardStep: Bool = {
                         switch onboardingState.currentStep {
-                        case .tutorialEntityCard, .tutorialQuickActions, .tutorialSwipeHint:
-                            return tutorialEntityFrame
-                        case .tutorialSearch:
-                            return tutorialSearchFrame
-                        case .tutorialAssistant:
-                            return tutorialAssistantFrame
-                        default:
-                            return .zero
+                        case .tutorialEntityCard, .tutorialQuickActions,
+                             .tutorialSearch, .tutorialAssistant:
+                            return true
+                        default: return false
                         }
                     }()
 
-                    if targetFrame != .zero {
-                        TutorialSpotlightOverlayView(
-                            anchor: targetFrame,
-                            stepIndex: onboardingState.tutorialStepIndex,
-                            totalSteps: onboardingState.tutorialTotalSteps,
-                            title: tutorialTitle(for: onboardingState.currentStep),
-                            message: tutorialMessage(for: onboardingState.currentStep),
-                            onBack: onboardingState.tutorialStepIndex > 1 ? { onboardingState.tutorialBack() } : nil,
-                            onNext: { onboardingState.tutorialNext() },
-                            onSkip: { onboardingState.exitTutorial() }
-                        )
-                        .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                    if isDashboardStep {
+                        let targetFrame: CGRect = {
+                            switch onboardingState.currentStep {
+                            case .tutorialEntityCard, .tutorialQuickActions:
+                                return tutorialEntityFrame
+                            case .tutorialSearch:
+                                return tutorialSearchFrame
+                            case .tutorialAssistant:
+                                return tutorialAssistantFrame
+                            default:
+                                return .zero
+                            }
+                        }()
+
+                        if targetFrame != .zero {
+                            TutorialSpotlightOverlayView(
+                                anchor: targetFrame,
+                                stepIndex: onboardingState.tutorialStepIndex,
+                                totalSteps: onboardingState.tutorialTotalSteps,
+                                title: tutorialTitle(for: onboardingState.currentStep),
+                                message: tutorialMessage(for: onboardingState.currentStep),
+                                segment: onboardingState.tutorialSegmentLabel,
+                                onBack: onboardingState.tutorialStepIndex > 1 ? { onboardingState.tutorialBack() } : nil,
+                                onNext: { onboardingState.tutorialNext() },
+                                onSkip: { onboardingState.exitTutorial() }
+                            )
+                            .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                        }
                     }
                 }
             }
@@ -729,8 +767,8 @@ struct DashboardView: View {
         if index == 0 && onboardingState.isTutorialActive {
             GeometryReader { geo in
                 Color.clear
-                    .onAppear { tutorialEntityFrame = geo.frame(in: .named("dashboard")) }
-                    .onChange(of: geo.frame(in: .named("dashboard"))) { _, f in tutorialEntityFrame = f }
+                    .onAppear { tutorialEntityFrame = geo.frame(in: .global) }
+                    .onChange(of: geo.frame(in: .global)) { _, f in tutorialEntityFrame = f }
             }
         }
     }
@@ -741,8 +779,6 @@ struct DashboardView: View {
         case .tutorialQuickActions:  return "Quick Actions"
         case .tutorialSearch:        return "Global Search"
         case .tutorialAssistant:     return "AI Assistant"
-        case .tutorialFinancial:     return "Financials"
-        case .tutorialSubscriptions: return "Subscriptions"
         case .tutorialSwipeHint:     return "Navigate & Edit"
         default:                     return ""
         }
@@ -758,10 +794,6 @@ struct DashboardView: View {
             return "Instantly find any entity, subscription, financial record, or document across all your accounts."
         case .tutorialAssistant:
             return "Your AI assistant can add accounts, answer questions about your finances, and keep you organised."
-        case .tutorialFinancial:
-            return "This is the Financials tab — connect banks, track credit cards, and monitor loans for this entity."
-        case .tutorialSubscriptions:
-            return "Subscriptions are tracked here — billing cycles, costs, and status all in one place."
         case .tutorialSwipeHint:
             return "Swipe left on an entity card to edit it. Swipe right to archive. Long-press to share."
         default:

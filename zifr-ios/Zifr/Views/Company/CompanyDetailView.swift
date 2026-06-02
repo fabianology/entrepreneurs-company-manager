@@ -57,6 +57,16 @@ struct CompanyDetailView: View {
     @State private var showFinancialWizard = false
     @State private var wizardInstitution: Institution? = nil
     @State private var showAssistant = false
+    @State private var assistantStrokeRotation: Double = 0.0
+
+    // Tutorial frame targets — populated by TutorialFrameKey preferences
+    @State private var tutFrameHeader: CGRect = .zero
+    @State private var tutFrameQuickAdd: CGRect = .zero
+    @State private var tutFrameFinancials: CGRect = .zero
+    @State private var tutFrameSubscriptions: CGRect = .zero
+    @State private var tutFrameDocuments: CGRect = .zero
+    @State private var tutFrameTabBar: CGRect = .zero
+    @State private var tutFrameFinancialActionBar: CGRect = .zero
 
     
     private var currentTabIndex: Int {
@@ -76,6 +86,14 @@ struct CompanyDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(
+                                key: TutorialFrameKey.self,
+                                value: ["header": geo.frame(in: .global)]
+                            )
+                        }
+                    )
                 
             // ── Content ──────────────────────────────────────────────────
             ZStack(alignment: .top) {
@@ -103,6 +121,7 @@ struct CompanyDetailView: View {
                 }
             }
         }
+        .coordinateSpace(name: "commandCenter")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditCompany) {
             EditCompanySheet(vm: vm, company: company)
@@ -131,6 +150,15 @@ struct CompanyDetailView: View {
         }
         .overlayPreferenceValue(SpotlightBoundsKey.self) { anchors in
             buildSpotlightOverlay(for: anchors)
+        }
+        .onPreferenceChange(TutorialFrameKey.self) { frames in
+            if let f = frames["header"]              { tutFrameHeader = f }
+            if let f = frames["quickAdd"]            { tutFrameQuickAdd = f }
+            if let f = frames["financials"]          { tutFrameFinancials = f }
+            if let f = frames["subscriptions"]       { tutFrameSubscriptions = f }
+            if let f = frames["documents"]           { tutFrameDocuments = f }
+            if let f = frames["tabBar"]              { tutFrameTabBar = f }
+            if let f = frames["financialActionBar"]  { tutFrameFinancialActionBar = f }
         }
         .onChange(of: appState.institutions.count) { _, _ in
             onboardingState.evaluateState(appState: appState)
@@ -163,14 +191,27 @@ struct CompanyDetailView: View {
         .onChange(of: onboardingState.currentStep, initial: true) { _, newStep in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                 switch newStep {
+                // Real onboarding tab switches
                 case .needsBank:
                     vm.activeTab = .financial
                 case .needsReview:
                     vm.activeTab = .subscriptions
                 case .needsNotes:
                     vm.activeTab = .documents
-                case .needsCommandCenterQuickAdd, .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport, .needsCommandCenterSubscriptions, .needsCommandCenterDocuments:
+                case .needsCommandCenterQuickAdd, .needsCommandCenterFinancialsHeader,
+                     .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport,
+                     .needsCommandCenterSubscriptions, .needsCommandCenterDocuments:
                     vm.activeTab = .home
+                // Tutorial tab switches
+                case .tutorialCommandCenter, .tutorialCommandQuickAdd,
+                     .tutorialCommandFinancials, .tutorialCommandSubscriptions,
+                     .tutorialCommandDocuments:
+                    vm.activeTab = .home
+                // tutorialCommandTabBar is now on the financial page
+                case .tutorialCommandTabBar,
+                     .tutorialFinancialPage, .tutorialFinancialWallet,
+                     .tutorialFinancialCardTap:
+                    vm.activeTab = .financial
                 default:
                     break
                 }
@@ -226,6 +267,46 @@ struct CompanyDetailView: View {
                                 .symbolEffect(.bounce, value: searchBounce)
                                 .frame(width: 32, height: 44)
                         }
+
+                        // Assistant Button
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            showAssistant = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                Text("Assistant")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 34)
+                            .background(Color.black)
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule().stroke(
+                                    AngularGradient(
+                                        gradient: Gradient(stops: [
+                                            .init(color: Color.gray.opacity(0.8), location: 0.0),
+                                            .init(color: Color.black, location: 0.25),
+                                            .init(color: Color(hex: "#9333EA"), location: 0.5),
+                                            .init(color: Color.black, location: 0.75),
+                                            .init(color: Color.gray.opacity(0.8), location: 1.0)
+                                        ]),
+                                        center: .center,
+                                        angle: .degrees(assistantStrokeRotation)
+                                    ),
+                                    lineWidth: 0.8
+                                )
+                            )
+                            .onAppear {
+                                withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
+                                    assistantStrokeRotation = 360.0
+                                }
+                            }
+                        }
                     }
 
                     Spacer()
@@ -240,57 +321,11 @@ struct CompanyDetailView: View {
                                 ForEach(Array(pageTabs.enumerated()), id: \.element) { index, tab in
                                     let offsetIndex = (index - activeIndex + 3) % 3
                                     let isFront = offsetIndex == 0
-                                    
-                                    let scale: CGFloat = offsetIndex == 0 ? 1.0 : 0.8
-                                    let xOffset: CGFloat = offsetIndex == 0 ? 0 : (offsetIndex == 1 ? 14 : -14)
-                                    let opacity: Double = offsetIndex == 0 ? 1.0 : 0.4
-                                    let layerZIndex: Double = offsetIndex == 0 ? 3 : 2
-                                    
-                                    ZStack {
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            var nextTab = tab
-                                            if tab == .subscriptions { nextTab = .financial }
-                                            else if tab == .financial { nextTab = .documents }
-                                            else if tab == .documents { nextTab = .subscriptions }
-                                            
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                vm.activeTab = nextTab
-                                            }
-                                            tabBounces[nextTab, default: 0] += 1
-                                        } label: {
-                                            Image(systemName: tab.icon)
-                                                .font(.system(size: 20, weight: isFront ? .semibold : .medium))
-                                                .foregroundStyle(isFront ? tabColor(tab) : .secondary)
-                                                .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                                                .frame(width: 32, height: 44)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 6)
-                                                        .fill(Color.black)
-                                                        .frame(width: 20, height: 20)
-                                                )
-                                        }
-                                        .simultaneousGesture(
-                                            LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                                                if isFront {
-                                                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                                    if tab == .subscriptions {
-                                                        newSub = Subscription(userId: company.userId, companyId: company.id)
-                                                    } else if tab == .documents {
-                                                        newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-                                                    } else if tab == .financial {
-                                                        wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                                                        showFinancialWizard = true
-                                                    }
-                                                }
-                                            }
-                                        )
-                                    }
-                                    .zIndex(layerZIndex)
-                                    .scaleEffect(scale)
-                                    .offset(x: xOffset)
-                                    .opacity(opacity)
-                                    .allowsHitTesting(isFront)
+                                    let scale: CGFloat = isFront ? 1.0 : 0.8
+                                    let xOffset: CGFloat = isFront ? 0 : (offsetIndex == 1 ? 14 : -14)
+                                    let opacity: Double = isFront ? 1.0 : 0.4
+                                    let zIdx: Double = isFront ? 3 : 2
+                                    tabIconView(tab: tab, isFront: isFront, scale: scale, xOffset: xOffset, opacity: opacity, layerZIndex: zIdx)
                                 }
                             }
                             .frame(width: 32, height: 44)
@@ -361,8 +396,55 @@ struct CompanyDetailView: View {
                 }
                 .padding(.horizontal, 20)
                 .frame(height: 49) // Standard HIG TabBar Height
+                .background(
+                    Group {
+                        if onboardingState.isInFinancialTutorial || onboardingState.isInCommandCenterTutorial {
+                            GeometryReader { geo in
+                                Color.clear
+                                    .onAppear { tutFrameTabBar = geo.frame(in: .global) }
+                                    .onChange(of: geo.frame(in: .global)) { _, f in tutFrameTabBar = f }
+                            }
+                        }
+                    }
+                )
             }
             .background(Color.black)
+        }
+        // ── Tutorial spotlight overlay — placed AFTER safeAreaInset so it draws above the tab bar ──
+        .overlay {
+            if onboardingState.isInCommandCenterTutorial || onboardingState.isInFinancialTutorial {
+                let walletFrame = onboardingState.tutorialFinancialWalletFrame
+                let institutionFrame = onboardingState.tutorialFinancialInstitutionFrame
+                let targetFrame: CGRect = {
+                    switch onboardingState.currentStep {
+                    case .tutorialCommandCenter:         return tutFrameHeader
+                    case .tutorialCommandQuickAdd:       return tutFrameQuickAdd != .zero ? tutFrameQuickAdd : tutFrameHeader
+                    case .tutorialCommandFinancials:     return tutFrameFinancials != .zero ? tutFrameFinancials : tutFrameHeader
+                    case .tutorialCommandSubscriptions:  return tutFrameSubscriptions != .zero ? tutFrameSubscriptions : tutFrameHeader
+                    case .tutorialCommandDocuments:      return tutFrameDocuments != .zero ? tutFrameDocuments : tutFrameHeader
+                    case .tutorialCommandTabBar:         return tutFrameTabBar != .zero ? tutFrameTabBar : tutFrameHeader
+                    case .tutorialFinancialPage:         return tutFrameFinancialActionBar != .zero ? tutFrameFinancialActionBar : tutFrameHeader
+                    case .tutorialFinancialWallet:       return walletFrame != .zero ? walletFrame : tutFrameHeader
+                    case .tutorialFinancialCardTap:      return institutionFrame != .zero ? institutionFrame : walletFrame
+                    default:                             return .zero
+                    }
+                }()
+                let frame = targetFrame != .zero ? targetFrame : tutFrameHeader
+                if frame != .zero {
+                    TutorialSpotlightOverlayView(
+                        anchor: frame,
+                        stepIndex: onboardingState.tutorialStepIndex,
+                        totalSteps: onboardingState.tutorialTotalSteps,
+                        title: commandCenterTutorialTitle(for: onboardingState.currentStep),
+                        message: commandCenterTutorialMessage(for: onboardingState.currentStep),
+                        segment: onboardingState.tutorialSegmentLabel,
+                        onBack: { onboardingState.tutorialBack() },
+                        onNext: { onboardingState.tutorialNext() },
+                        onSkip: { onboardingState.exitTutorial() }
+                    )
+                    .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                }
+            }
         }
         .gesture(
             DragGesture(minimumDistance: 20, coordinateSpace: .global)
@@ -628,16 +710,112 @@ struct CompanyDetailView: View {
             case .needsCommandCenterDocuments:
                 SpotlightOverlayView(
                     anchors: anchors,
-                    message: "And finally, your document vault summary. Next, let's meet your assistant!",
+                    message: "And finally, your document vault summary. You're all set!",
                     stepIndex: 8, totalSteps: 8,
                     onBack: { onboardingState.currentStep = .needsCommandCenterSubscriptions },
-                    onNext: { onboardingState.currentStep = .needsAssistant },
+                    onNext: { onboardingState.currentStep = .completed },
                     onSkip: { onboardingState.currentStep = .completed },
-                    onTapTarget: { onboardingState.currentStep = .needsAssistant }
+                    onTapTarget: { onboardingState.currentStep = .completed }
                 )
             default:
                 EmptyView()
             }
         }
+    }
+
+    // MARK: - Tutorial Copy Helpers (Command Center + Financial)
+
+    private func commandCenterTutorialTitle(for step: OnboardingStep) -> String {
+        switch step {
+        case .tutorialCommandCenter:       return "Command Center"
+        case .tutorialCommandQuickAdd:     return "Quick Add"
+        case .tutorialCommandFinancials:   return "Financials Summary"
+        case .tutorialCommandSubscriptions: return "Subscriptions"
+        case .tutorialCommandDocuments:    return "Document Vault"
+        case .tutorialCommandTabBar:       return "Navigate Between Pages"
+        case .tutorialFinancialPage:       return "Financial Page"
+        case .tutorialFinancialWallet:     return "Your Wallet"
+        case .tutorialFinancialCardTap:    return "Tap an Institution"
+        default:                           return ""
+        }
+    }
+
+    private func commandCenterTutorialMessage(for step: OnboardingStep) -> String {
+        switch step {
+        case .tutorialCommandCenter:
+            return "This is your entity’s Command Center — a living dashboard of every subscription, financial account, and document tied to this business."
+        case .tutorialCommandQuickAdd:
+            return "Add a service, bank account, or document instantly from this bar. No digging through menus."
+        case .tutorialCommandFinancials:
+            return "See your total debt, available credit, and all linked bank accounts at a glance. Tap any row to expand."
+        case .tutorialCommandSubscriptions:
+            return "Every active subscription is tracked here — monthly burn, yearly total, and upcoming renewals front and center."
+        case .tutorialCommandDocuments:
+            return "Store articles of incorporation, tax documents, or any notes here. Everything organized by category."
+        case .tutorialCommandTabBar:
+            return "These icons switch between Command Center, Subscriptions, Financials, and Documents. Tap to jump, or swipe the icon cluster left and right to cycle pages."
+        case .tutorialFinancialPage:
+            return "Connect banks, credit cards, and loans here. Use the top bar to add a new account — or sync automatically via Plaid."
+        case .tutorialFinancialWallet:
+            return "Accounts stack like a wallet. Each institution groups its cards on top. Tap any card to pop it open and see full details."
+        case .tutorialFinancialCardTap:
+            return "Tap any institution row to expand it and see its cards, loans, and totals. Long-press to edit details or remove the account."
+        default:
+            return ""
+        }
+    }
+
+    @ViewBuilder
+    private func tabIconView(
+        tab: AppViewModel.CompanyTab,
+        isFront: Bool,
+        scale: CGFloat,
+        xOffset: CGFloat,
+        opacity: Double,
+        layerZIndex: Double
+    ) -> some View {
+        ZStack {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                var nextTab = tab
+                if tab == .subscriptions { nextTab = .financial }
+                else if tab == .financial { nextTab = .documents }
+                else if tab == .documents { nextTab = .subscriptions }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    vm.activeTab = nextTab
+                }
+                tabBounces[nextTab, default: 0] += 1
+            } label: {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 20, weight: isFront ? .semibold : .medium))
+                    .foregroundStyle(isFront ? tabColor(tab) : .secondary)
+                    .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                    .frame(width: 32, height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.black)
+                            .frame(width: 20, height: 20)
+                    )
+            }
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.4).onEnded { _ in
+                    guard isFront else { return }
+                    UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+                    if tab == .subscriptions {
+                        newSub = Subscription(userId: company.userId, companyId: company.id)
+                    } else if tab == .documents {
+                        newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                    } else if tab == .financial {
+                        wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                        showFinancialWizard = true
+                    }
+                }
+            )
+        }
+        .zIndex(layerZIndex)
+        .scaleEffect(scale)
+        .offset(x: xOffset)
+        .opacity(opacity)
+        .allowsHitTesting(isFront)
     }
 }

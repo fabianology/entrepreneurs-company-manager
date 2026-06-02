@@ -28,130 +28,16 @@ struct FinancialView: View {
             ScrollView {
             VStack(spacing: 0) {
                 // ── Action Bar ──
-                HStack(spacing: 0) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "dollarsign.bank.building")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Text("Financial")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                    }
-                    .padding(.leading, 16)
-
-                    Spacer()
-
-                    Menu {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            shareResourceId = company.id
-                            shareResourceType = "all_financials"
-                            shareResourceTitle = "All Financials"
-                            showShareSheet = true
-                        } label: {
-                            Label("All Financials", systemImage: "folder.badge.person.crop")
-                        }
-                        
-                        if !institutions.isEmpty {
-                            Section("Institutions") {
-                                ForEach(institutions) { inst in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        shareResourceId = inst.id
-                                        shareResourceType = "institution"
-                                        shareResourceTitle = inst.name.isEmpty ? "Institution" : inst.name
-                                        showShareSheet = true
-                                    } label: {
-                                        Label(inst.name.isEmpty ? "Unnamed" : inst.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                        if !cards.isEmpty {
-                            Section("Cards") {
-                                ForEach(cards) { card in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        shareResourceId = card.id
-                                        shareResourceType = "card"
-                                        shareResourceTitle = card.name.isEmpty ? "Card" : card.name
-                                        showShareSheet = true
-                                    } label: {
-                                        let cardName = card.name.isEmpty ? "Unnamed" : card.name
-                                        Label(cardName, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                        if !loans.isEmpty {
-                            Section("Loans") {
-                                ForEach(loans) { loan in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        shareResourceId = loan.id
-                                        shareResourceType = "loan"
-                                        shareResourceTitle = loan.name.isEmpty ? "Loan" : loan.name
-                                        showShareSheet = true
-                                    } label: {
-                                        Label(loan.name.isEmpty ? "Unnamed" : loan.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 1, height: 20)
-
-                    Menu {
-                        Button {
-                            wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                            showWizard = true
-                        } label: {
-                            Label("Add Account", systemImage: "building.columns")
-                        }
-                        if !institutions.isEmpty {
-                            Button {
-                                newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                            } label: {
-                                Label("Add Card", systemImage: "creditcard")
-                            }
-                            Button {
-                                newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
-                            } label: {
-                                Label("Add Loan", systemImage: "dollarsign.circle")
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("ADD ACCOUNT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
-                            Image(systemName: "chevron.down").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
-                        }
-                        .frame(width: 164, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "#1C1C1E").opacity(0.70))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
-                .padding(.bottom, 16)
+                financialActionBar
                 
                 // ── Main Wallet Stack ──
                 LazyVStack(spacing: 20) {
                     if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
-                        // Empty State — dummy Amex wallet with glass overlay
+                        // Empty State — dummy wallet
+                        let dummyAmexId = UUID()
+                        let dummyCard1Id = UUID()
+                        let dummyCard2Id = UUID()
+
                         let dummyAmex = Institution(
                             id: UUID(),
                             userId: UUID(),
@@ -165,7 +51,7 @@ struct FinancialView: View {
                             ]
                         )
                         let dummyCard1 = FinancialCard(
-                            id: UUID(),
+                            id: dummyCard1Id,
                             userId: UUID(),
                             companyId: UUID(),
                             name: "Amex Platinum",
@@ -179,31 +65,120 @@ struct FinancialView: View {
                             autopay: "Yes",
                             apr: 29.99
                         )
-                        
-                    if onboardingState.isSpotlightingTutorialFinancial {
-                            // Tutorial mode: show demo wallet un-blurred
-                            VStack(spacing: 0) {
-                                ZStack(alignment: .top) {
-                                    FinancialCardVisual(card: dummyCard1, isPopped: false)
-                                        .frame(height: 110)
-                                        .offset(y: -36)
-                                        .zIndex(2)
-                                    InstitutionCardView(
-                                        institution: dummyAmex,
-                                        totalMonthlyPayment: 0,
-                                        cardCount: 1,
-                                        loanCount: 0,
-                                        loans: [],
-                                        vm: vm,
-                                        onEdit: {},
-                                        onEditLoan: { _ in }
-                                    )
-                                    .zIndex(3)
+                        let dummyCard2 = FinancialCard(
+                            id: dummyCard2Id,
+                            userId: UUID(),
+                            companyId: UUID(),
+                            name: "Chase Sapphire Reserve",
+                            institutionName: "Chase Bank",
+                            cardHolder: "Jane Founder",
+                            last4: "4242",
+                            expiry: "03/28",
+                            network: "Visa",
+                            type: "Credit",
+                            limit: 10000,
+                            autopay: "Yes",
+                            apr: 22.99
+                        )
+                        let dummyChase = Institution(
+                            id: UUID(),
+                            userId: UUID(),
+                            companyId: UUID(),
+                            name: "Chase Bank",
+                            loginUrl: "chase.com",
+                            username: "founder@company.com",
+                            password: "••••••••",
+                            accounts: [
+                                InstitutionAccount(name: "Sapphire Reserve", type: "Credit Card", last4: "4242", balance: 0, limit: 10000)
+                            ]
+                        )
+                        let dummyLoan = Loan(
+                            id: UUID(),
+                            userId: UUID(),
+                            companyId: UUID(),
+                            role: "Bank Loan",
+                            lender: "Chase Bank",
+                            name: "SBA Startup Loan",
+                            principalAmount: 50000,
+                            remainingBalance: 38500,
+                            interestRate: 6.5,
+                            monthlyPayment: 825
+                        )
+
+                    if onboardingState.isInFinancialTutorial {
+                            // Tutorial mode: show full dummy wallet un-blurred
+                            VStack(spacing: 20) {
+                                // Amex wallet stack
+                                VStack(spacing: 0) {
+                                    ZStack(alignment: .top) {
+                                        let isPopped = poppedCardId == dummyCard1Id.uuidString
+                                        FinancialCardVisual(card: dummyCard1, isPopped: isPopped)
+                                            .frame(height: isPopped ? 210 : 110)
+                                            .offset(y: isPopped ? 16 : -36)
+                                            .zIndex(2)
+                                            .animation(.spring(response: 0.55, dampingFraction: 0.78), value: isPopped)
+                                        InstitutionCardView(
+                                            institution: dummyAmex,
+                                            totalMonthlyPayment: 0,
+                                            cardCount: 1,
+                                            loanCount: 0,
+                                            loans: [],
+                                            vm: vm,
+                                            onEdit: {},
+                                            onEditLoan: { _ in }
+                                        )
+                                        .zIndex(3)
+                                    }
+                                    .padding(.top, 36)
                                 }
-                                .padding(.top, 36)
+                                .background(
+                                    GeometryReader { geo in
+                                        Color.clear
+                                            .onAppear {
+                                                onboardingState.tutorialFinancialWalletFrame = geo.frame(in: .global)
+                                            }
+                                            .onChange(of: geo.frame(in: .global)) { _, newFrame in
+                                                onboardingState.tutorialFinancialWalletFrame = newFrame
+                                            }
+                                    }
+                                )
+
+                                // Chase wallet stack with loan
+                                VStack(spacing: 0) {
+                                    ZStack(alignment: .top) {
+                                        FinancialCardVisual(card: dummyCard2, isPopped: false)
+                                            .frame(height: 110)
+                                            .offset(y: -36)
+                                            .zIndex(2)
+                                        InstitutionCardView(
+                                            institution: dummyChase,
+                                            totalMonthlyPayment: dummyLoan.monthlyPayment,
+                                            cardCount: 1,
+                                            loanCount: 1,
+                                            loans: [dummyLoan],
+                                            vm: vm,
+                                            onEdit: {},
+                                            onEditLoan: { _ in }
+                                        )
+                                        .zIndex(3)
+                                        .background(
+                                            GeometryReader { geo in
+                                                Color.clear
+                                                    .onAppear {
+                                                        onboardingState.tutorialFinancialInstitutionFrame = geo.frame(in: .global)
+                                                    }
+                                                    .onChange(of: geo.frame(in: .global)) { _, newFrame in
+                                                        onboardingState.tutorialFinancialInstitutionFrame = newFrame
+                                                    }
+                                            }
+                                        )
+                                    }
+                                    .padding(.top, 36)
+                                }
                             }
                             .allowsHitTesting(false)
                             .padding(.top, 40)
+                            .id("tutorialWallet")
                         } else {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -290,6 +265,29 @@ struct FinancialView: View {
             }
     }
         .scrollIndicators(.hidden)
+        .onChange(of: onboardingState.currentStep) { _, step in
+            // Scroll wallet into view for tutorial steps 11-13
+            switch step {
+            case .tutorialFinancialPage, .tutorialFinancialWallet,
+                 .tutorialFinancialCardTap:
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo("tutorialWallet", anchor: .center)
+                    }
+                }
+            default: break
+            }
+            // Auto-pop the first dummy card to illustrate expanded state
+            if step == .tutorialFinancialCardTap {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    withAnimation(.spring(response: 0.55, dampingFraction: 0.78)) {
+                        poppedCardId = "tutorial-popped"
+                    }
+                }
+            } else if step != .tutorialFinancialWallet {
+                poppedCardId = nil
+            }
+        }
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
@@ -309,6 +307,17 @@ struct FinancialView: View {
         }
         .onAppear {
             handleDeepLink(id: vm.deepLinkModelId, proxy: proxy)
+            // If we land on the financial tab during a wallet tutorial step, scroll into view
+            let step = onboardingState.currentStep
+            switch step {
+            case .tutorialFinancialPage, .tutorialFinancialWallet, .tutorialFinancialCardTap:
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo("tutorialWallet", anchor: .center)
+                    }
+                }
+            default: break
+            }
         }
         }
     }
@@ -499,5 +508,140 @@ struct FinancialView: View {
             .padding(.bottom, 16)
         }
     }
-}
 
+    // Extracted to reduce body complexity for the Swift type-checker
+    @ViewBuilder
+    private var financialActionBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "dollarsign.bank.building")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                Text("Financial")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+            }
+            .padding(.leading, 16)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    shareResourceId = company.id
+                    shareResourceType = "all_financials"
+                    shareResourceTitle = "All Financials"
+                    showShareSheet = true
+                } label: {
+                    Label("All Financials", systemImage: "folder.badge.person.crop")
+                }
+                if !institutions.isEmpty {
+                    Section("Institutions") {
+                        ForEach(institutions) { inst in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                shareResourceId = inst.id
+                                shareResourceType = "institution"
+                                shareResourceTitle = inst.name.isEmpty ? "Institution" : inst.name
+                                showShareSheet = true
+                            } label: {
+                                Label(inst.name.isEmpty ? "Unnamed" : inst.name, systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    }
+                }
+                if !cards.isEmpty {
+                    Section("Cards") {
+                        ForEach(cards) { card in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                shareResourceId = card.id
+                                shareResourceType = "card"
+                                shareResourceTitle = card.name.isEmpty ? "Card" : card.name
+                                showShareSheet = true
+                            } label: {
+                                let cardName: String = card.name.isEmpty ? "Unnamed" : card.name
+                                Label(cardName, systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    }
+                }
+                if !loans.isEmpty {
+                    Section("Loans") {
+                        ForEach(loans) { loan in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                shareResourceId = loan.id
+                                shareResourceType = "loan"
+                                shareResourceTitle = loan.name.isEmpty ? "Loan" : loan.name
+                                showShareSheet = true
+                            } label: {
+                                let loanName: String = loan.name.isEmpty ? "Unnamed" : loan.name
+                                Label(loanName, systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 1, height: 20)
+
+            Menu {
+                Button {
+                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                    showWizard = true
+                } label: {
+                    Label("Add Account", systemImage: "building.columns")
+                }
+                if !institutions.isEmpty {
+                    Button {
+                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Card", systemImage: "creditcard")
+                    }
+                    Button {
+                        newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Loan", systemImage: "dollarsign.circle")
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("ADD ACCOUNT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
+                    Image(systemName: "chevron.down").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 164, height: 44)
+                .contentShape(Rectangle())
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
+        .padding(.bottom, 16)
+        .background(actionBarFrameCapture)
+    }
+
+    // Extracted to help the Swift type-checker on the deeply-nested action bar expression
+    @ViewBuilder
+    private var actionBarFrameCapture: some View {
+        GeometryReader { geo in
+            Color.clear.preference(
+                key: TutorialFrameKey.self,
+                value: ["financialActionBar": geo.frame(in: .global)]
+            )
+        }
+    }
+}

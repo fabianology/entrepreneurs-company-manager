@@ -20,12 +20,24 @@ enum OnboardingStep: String, Codable {
     case skipped
 
     // Tutorial walkthrough steps
+    // Dashboard segment (steps 1–4)
     case tutorialEntityCard
     case tutorialQuickActions
     case tutorialSearch
     case tutorialAssistant
-    case tutorialFinancial
-    case tutorialSubscriptions
+    // Command Center segment (steps 5–10)
+    case tutorialCommandCenter
+    case tutorialCommandQuickAdd
+    case tutorialCommandFinancials
+    case tutorialCommandSubscriptions
+    case tutorialCommandDocuments
+    case tutorialCommandTabBar
+    // Financial segment (steps 11–14)
+    case tutorialFinancialPage
+    case tutorialFinancialWallet
+    case tutorialFinancialCardTap
+    case tutorialFinancialSwipe
+    // Final dashboard steps (15–16)
     case tutorialSwipeHint
     case tutorialDone
 }
@@ -101,39 +113,103 @@ final class OnboardingStateManager {
     var isTutorialActive: Bool {
         switch currentStep {
         case .tutorialEntityCard, .tutorialQuickActions, .tutorialSearch,
-             .tutorialAssistant, .tutorialFinancial, .tutorialSubscriptions,
-             .tutorialSwipeHint:
+             .tutorialAssistant,
+             .tutorialCommandCenter, .tutorialCommandQuickAdd, .tutorialCommandFinancials,
+             .tutorialCommandSubscriptions, .tutorialCommandDocuments, .tutorialCommandTabBar,
+             .tutorialFinancialPage, .tutorialFinancialWallet, .tutorialFinancialCardTap:
             return true
         default:
             return false
         }
     }
 
+    // Dashboard steps
     var isSpotlightingTutorialEntity: Bool      { currentStep == .tutorialEntityCard }
     var isSpotlightingTutorialQuickActions: Bool { currentStep == .tutorialQuickActions }
     var isSpotlightingTutorialSearch: Bool       { currentStep == .tutorialSearch }
     var isSpotlightingTutorialAssistant: Bool    { currentStep == .tutorialAssistant }
-    var isSpotlightingTutorialFinancial: Bool    { currentStep == .tutorialFinancial }
-    var isSpotlightingTutorialSubs: Bool         { currentStep == .tutorialSubscriptions }
     var isSpotlightingTutorialSwipe: Bool        { currentStep == .tutorialSwipeHint }
+
+    // Command Center steps
+    var isSpotlightingTutorialCommandCenter: Bool       { currentStep == .tutorialCommandCenter }
+    var isSpotlightingTutorialCommandQuickAdd: Bool     { currentStep == .tutorialCommandQuickAdd }
+    var isSpotlightingTutorialCommandFinancials: Bool   { currentStep == .tutorialCommandFinancials }
+    var isSpotlightingTutorialCommandSubs: Bool         { currentStep == .tutorialCommandSubscriptions }
+    var isSpotlightingTutorialCommandDocs: Bool         { currentStep == .tutorialCommandDocuments }
+    var isSpotlightingTutorialCommandTabBar: Bool       { currentStep == .tutorialCommandTabBar }
+
+    // Financial page steps
+    var isSpotlightingTutorialFinancialPage: Bool     { currentStep == .tutorialFinancialPage }
+    var isSpotlightingTutorialFinancialWallet: Bool   { currentStep == .tutorialFinancialWallet }
+    var isSpotlightingTutorialFinancialCardTap: Bool  { currentStep == .tutorialFinancialCardTap }
+    var isSpotlightingTutorialFinancialSwipe: Bool    { currentStep == .tutorialFinancialSwipe }
+
+    /// True when ANY financial tutorial step is active (used to show dummy wallet)
+    var isInFinancialTutorial: Bool {
+        currentStep == .tutorialCommandTabBar ||
+        currentStep == .tutorialFinancialPage ||
+        currentStep == .tutorialFinancialWallet ||
+        currentStep == .tutorialFinancialCardTap ||
+        currentStep == .tutorialFinancialSwipe
+    }
+
+    /// True when ANY command center tutorial step is active
+    var isInCommandCenterTutorial: Bool {
+        currentStep == .tutorialCommandCenter ||
+        currentStep == .tutorialCommandQuickAdd ||
+        currentStep == .tutorialCommandFinancials ||
+        currentStep == .tutorialCommandSubscriptions ||
+        currentStep == .tutorialCommandDocuments
+    }
+
     var isTutorialDone: Bool                     { currentStep == .tutorialDone }
 
     /// Step index (1-based) and total for the progress indicator
     var tutorialStepIndex: Int {
         switch currentStep {
-        case .tutorialEntityCard:     return 1
-        case .tutorialQuickActions:   return 2
-        case .tutorialSearch:         return 3
-        case .tutorialAssistant:      return 4
-        case .tutorialFinancial:      return 5
-        case .tutorialSubscriptions:  return 6
-        case .tutorialSwipeHint:      return 7
-        case .tutorialDone:           return 8
-        default:                      return 0
+        case .tutorialEntityCard:             return 1
+        case .tutorialQuickActions:           return 2
+        case .tutorialSearch:                 return 3
+        case .tutorialAssistant:              return 4
+        case .tutorialCommandCenter:          return 5
+        case .tutorialCommandQuickAdd:        return 6
+        case .tutorialCommandFinancials:      return 7
+        case .tutorialCommandSubscriptions:   return 8
+        case .tutorialCommandDocuments:       return 9
+        case .tutorialCommandTabBar:          return 10
+        case .tutorialFinancialPage:          return 11
+        case .tutorialFinancialWallet:        return 12
+        case .tutorialFinancialCardTap:       return 13
+        default:                              return 0
         }
     }
 
-    let tutorialTotalSteps = 8
+    /// Segment label shown in the progress pill alongside the step counter
+    var tutorialSegmentLabel: String {
+        switch currentStep {
+        case .tutorialEntityCard, .tutorialQuickActions,
+             .tutorialSearch, .tutorialAssistant:
+            return "DASHBOARD"
+        case .tutorialCommandCenter, .tutorialCommandQuickAdd,
+             .tutorialCommandFinancials, .tutorialCommandSubscriptions,
+             .tutorialCommandDocuments:
+            return "COMMAND CENTER"
+        case .tutorialCommandTabBar,
+             .tutorialFinancialPage, .tutorialFinancialWallet,
+             .tutorialFinancialCardTap:
+            return "FINANCIALS"
+        default:
+            return ""
+        }
+    }
+
+    var tutorialTotalSteps = 13
+
+    // MARK: - Shared Tutorial Frame Storage
+    // These bypass PreferenceKey propagation (which fails inside LazyVStack).
+    // FinancialView writes directly; CompanyDetailView reads for spotlight positioning.
+    var tutorialFinancialWalletFrame: CGRect = .zero
+    var tutorialFinancialInstitutionFrame: CGRect = .zero
 
     // MARK: - Init
 
@@ -228,27 +304,44 @@ final class OnboardingStateManager {
 
     func tutorialNext() {
         switch currentStep {
-        case .tutorialEntityCard:     currentStep = .tutorialQuickActions
-        case .tutorialQuickActions:   currentStep = .tutorialSearch
-        case .tutorialSearch:         currentStep = .tutorialAssistant
-        case .tutorialAssistant:      currentStep = .tutorialFinancial
-        case .tutorialFinancial:      currentStep = .tutorialSubscriptions
-        case .tutorialSubscriptions:  currentStep = .tutorialSwipeHint
-        case .tutorialSwipeHint:      currentStep = .tutorialDone
-        case .tutorialDone:           currentStep = .skipped
+        // Dashboard segment
+        case .tutorialEntityCard:          currentStep = .tutorialQuickActions
+        case .tutorialQuickActions:        currentStep = .tutorialSearch
+        case .tutorialSearch:              currentStep = .tutorialAssistant
+        case .tutorialAssistant:           currentStep = .tutorialCommandCenter
+        // Command Center segment
+        case .tutorialCommandCenter:       currentStep = .tutorialCommandQuickAdd
+        case .tutorialCommandQuickAdd:     currentStep = .tutorialCommandFinancials
+        case .tutorialCommandFinancials:   currentStep = .tutorialCommandSubscriptions
+        case .tutorialCommandSubscriptions: currentStep = .tutorialCommandDocuments
+        case .tutorialCommandDocuments:    currentStep = .tutorialCommandTabBar
+        // Financial segment (step 10 = tabBar, shown on financial page)
+        case .tutorialCommandTabBar:       currentStep = .tutorialFinancialPage
+        case .tutorialFinancialPage:       currentStep = .tutorialFinancialWallet
+        case .tutorialFinancialWallet:     currentStep = .tutorialFinancialCardTap
+        case .tutorialFinancialCardTap:    currentStep = .tutorialDone  // last step — show completion overlay
+        case .tutorialDone:                currentStep = .skipped
         default: break
         }
     }
 
     func tutorialBack() {
         switch currentStep {
-        case .tutorialQuickActions:   currentStep = .tutorialEntityCard
-        case .tutorialSearch:         currentStep = .tutorialQuickActions
-        case .tutorialAssistant:      currentStep = .tutorialSearch
-        case .tutorialFinancial:      currentStep = .tutorialAssistant
-        case .tutorialSubscriptions:  currentStep = .tutorialFinancial
-        case .tutorialSwipeHint:      currentStep = .tutorialSubscriptions
-        case .tutorialDone:           currentStep = .tutorialSwipeHint
+        // Dashboard segment
+        case .tutorialQuickActions:        currentStep = .tutorialEntityCard
+        case .tutorialSearch:              currentStep = .tutorialQuickActions
+        case .tutorialAssistant:           currentStep = .tutorialSearch
+        // Command Center segment
+        case .tutorialCommandCenter:       currentStep = .tutorialAssistant
+        case .tutorialCommandQuickAdd:     currentStep = .tutorialCommandCenter
+        case .tutorialCommandFinancials:   currentStep = .tutorialCommandQuickAdd
+        case .tutorialCommandSubscriptions: currentStep = .tutorialCommandFinancials
+        case .tutorialCommandDocuments:    currentStep = .tutorialCommandSubscriptions
+        case .tutorialCommandTabBar:       currentStep = .tutorialCommandDocuments
+        // Financial segment
+        case .tutorialFinancialPage:       currentStep = .tutorialCommandTabBar
+        case .tutorialFinancialWallet:     currentStep = .tutorialFinancialPage
+        case .tutorialFinancialCardTap:    currentStep = .tutorialFinancialWallet
         default: break
         }
     }
