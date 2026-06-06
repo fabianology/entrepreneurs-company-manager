@@ -330,7 +330,9 @@ struct EntityFinancialSection: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .premiumDarkBar(cornerRadius: 12)
+            .background(Color.white.opacity(0.03))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .miloomReportStroke()
         }
         .buttonStyle(PremiumButtonStyle())
         .padding(.horizontal, 16)

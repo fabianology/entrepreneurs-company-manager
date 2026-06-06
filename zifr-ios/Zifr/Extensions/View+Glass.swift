@@ -67,6 +67,38 @@ struct PremiumDarkBarModifier: ViewModifier {
     }
 }
 
+// MARK: - Miloom Report Stroke Modifier
+struct MiloomReportStrokeModifier: ViewModifier {
+    @State private var rotation: Double = 0.0
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                Color(hex: "#4f609a"), // Miloom Primary Start
+                                Color(hex: "#f2ac5b"), // Miloom Primary End
+                                Color(hex: "#15566a"), // Miloom Secondary Start
+                                Color(hex: "#00544e"), // Miloom Secondary End
+                                Color(hex: "#4f609a")  // Seamless loop point
+                            ]),
+                            center: .center,
+                            angle: .degrees(rotation)
+                        ),
+                        lineWidth: 1.2
+                    )
+            )
+            .onAppear {
+                withAnimation(.linear(duration: 6.0).repeatForever(autoreverses: false)) {
+                    rotation = 360.0
+                }
+            }
+    }
+}
+
+
 // MARK: - CiFr Modal Field style
 struct CifrFieldModifier: ViewModifier {
     func body(content: Content) -> some View {
@@ -97,6 +129,11 @@ extension View {
     func premiumDarkBar(cornerRadius: CGFloat = 12) -> some View {
         modifier(PremiumDarkBarModifier(cornerRadius: cornerRadius))
     }
+
+    func miloomReportStroke() -> some View {
+        modifier(MiloomReportStrokeModifier())
+    }
+
 
     func cifrField() -> some View {
         modifier(CifrFieldModifier())
