@@ -380,7 +380,7 @@ struct CompanyDetailView: View {
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                                     .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
                                     .frame(width: 32, height: 26)
-                                Text("dashboard")
+                                Text("home")
                                     .font(.system(size: 8, weight: vm.activeTab == .home ? .bold : .medium))
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                             }
@@ -748,7 +748,7 @@ struct CompanyDetailView: View {
 
     private func tabLabelText(for tab: AppViewModel.CompanyTab) -> String {
         switch tab {
-        case .home: return "dashboard"
+        case .home: return "home"
         case .subscriptions: return "subs"
         case .financial: return "finance"
         case .documents: return "docs"
