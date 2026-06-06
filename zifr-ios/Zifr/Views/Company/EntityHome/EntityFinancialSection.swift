@@ -34,7 +34,7 @@ struct EntityFinancialSection: View {
                 VStack(spacing: 8) {
                     HStack {
                         Image(systemName: "dollarsign.bank.building")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(finColor)
                             .padding(.trailing, 4)
                         

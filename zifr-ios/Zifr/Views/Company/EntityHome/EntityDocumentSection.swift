@@ -31,7 +31,7 @@ struct EntityDocumentSection: View {
                 VStack(spacing: 8) {
                     HStack(spacing: 0) {
                         Image(systemName: "doc.text")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(docsColor)
                             .padding(.trailing, 8)
                         

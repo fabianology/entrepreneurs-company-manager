@@ -29,7 +29,7 @@ struct EntitySubscriptionSection: View {
                 VStack(spacing: 8) {
                     HStack {
                         Image(systemName: "square.3.layers.3d")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(subsColor)
                             .padding(.trailing, 4)
                         
