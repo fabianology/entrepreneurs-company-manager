@@ -1,4 +1,0 @@
-module GTMSessionFetcherCore {
-umbrella "/Users/yager/Downloads/cifr---entrepreneur's-company-manager/zifr-ios/build/SourcePackages/checkouts/gtm-session-fetcher/Sources/Core/Public"
-export *
-}

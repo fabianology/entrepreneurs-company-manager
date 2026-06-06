@@ -9,15 +9,89 @@ serve(async (req) => {
   
   if (!GEMINI_API_KEY) {
     console.error("GEMINI_API_KEY is not set in environment");
-    return new Response("Server configuration error", { status: 500 });
+    return new Response(JSON.stringify({ error: "Server configuration error" }), {
+      status: 500,
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
   }
 
-  // 1. Validate the WebSocket upgrade request
+  // Handle standard HTTP POST/OPTIONS requests (REST proxy for Chat Mode)
   if (req.headers.get("upgrade") !== "websocket") {
-    return new Response("Expected WebSocket", { status: 426 });
+    if (req.method === "OPTIONS") {
+      return new Response("ok", {
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+        }
+      });
+    }
+
+    if (req.method === "POST") {
+      try {
+        const body = await req.json();
+        const model = body.model ?? "gemini-2.5-flash";
+        const action = body.action ?? "generateContent";
+        
+        const targetUrl = new URL(`https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}`);
+        targetUrl.searchParams.set("key", GEMINI_API_KEY.trim());
+        
+        const geminiRequestBody: any = {
+          contents: body.contents
+        };
+        
+        if (body.systemInstruction) {
+          geminiRequestBody.systemInstruction = body.systemInstruction;
+        }
+        if (body.tools) {
+          geminiRequestBody.tools = body.tools;
+        }
+        if (body.generationConfig) {
+          geminiRequestBody.generationConfig = body.generationConfig;
+        }
+
+        const response = await fetch(targetUrl.toString(), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(geminiRequestBody)
+        });
+        
+        const responseData = await response.text();
+        return new Response(responseData, {
+          status: response.status,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type"
+          }
+        });
+      } catch (e: any) {
+        console.error("REST Proxy Error:", e);
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+          }
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ error: "Expected WebSocket or POST request" }), {
+      status: 400,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
   }
 
-  // 3. Upgrade the connection
+  // Validate and upgrade WebSocket connection
   const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
 
   const url = new URL("wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent");
@@ -30,7 +104,6 @@ serve(async (req) => {
     geminiSocket = new WebSocket(url.toString());
   } catch (e: any) {
     console.error("Failed to create Gemini WebSocket", e);
-    // Since clientSocket is not yet open, we can't send.
     return new Response("Internal Server Error", { status: 500 });
   }
 

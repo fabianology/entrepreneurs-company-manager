@@ -10,10 +10,12 @@ class GeminiLiveClient {
     // Publishers to emit received data
     let audioDataPublisher = PassthroughSubject<Data, Never>()
     let toolCallPublisher = PassthroughSubject<ToolCall, Never>()
+    let textDataPublisher = PassthroughSubject<String, Never>()
     
     // We need the system instructions and tools to send during setup
     private let systemInstruction: String
     private let tools: [Tool]
+    private let responseModalities: [String]
     private let onLog: ((String) -> Void)?
     
     // Auto-reconnect state
@@ -22,9 +24,10 @@ class GeminiLiveClient {
     private let maxReconnectAttempts = 5
     private var pingTimer: Timer?
     
-    init(systemInstruction: String, tools: [Tool], onLog: ((String) -> Void)? = nil) {
+    init(systemInstruction: String, tools: [Tool], responseModalities: [String] = ["AUDIO"], onLog: ((String) -> Void)? = nil) {
         self.systemInstruction = systemInstruction
         self.tools = tools
+        self.responseModalities = responseModalities
         self.onLog = onLog
     }
     
@@ -72,24 +75,25 @@ class GeminiLiveClient {
     }
     
     private func sendSetup() {
-        let speechConfig = SpeechConfig(
+        let speechConfig = responseModalities.contains("AUDIO") ? SpeechConfig(
             voiceConfig: VoiceConfig(
                 prebuiltVoiceConfig: PrebuiltVoiceConfig(voiceName: "Aoede")
             )
-        )
+        ) : nil
         let generationConfig = GenerationConfig(
-            responseModalities: ["AUDIO"],
+            responseModalities: responseModalities,
             speechConfig: speechConfig
         )
+        let modelName = responseModalities.contains("AUDIO") ? "models/gemini-2.5-flash-native-audio-latest" : "models/gemini-2.0-flash-exp"
         let setup = Setup(
-            model: "models/gemini-2.5-flash-native-audio-latest",
+            model: modelName,
             generationConfig: generationConfig,
             systemInstruction: SystemInstruction(parts: [TextPart(text: systemInstruction)]),
             tools: tools.isEmpty ? nil : tools
         )
         
         let clientMsg = ClientMessage(setup: setup)
-        log("Sending setup...")
+        log("Sending setup with model \(modelName) and modalities: \(responseModalities)...")
         send(clientMsg)
     }
     
@@ -102,6 +106,14 @@ class GeminiLiveClient {
     
     func sendToolResponse(response: FunctionResponse) {
         let msg = ClientMessage(toolResponse: ToolResponseWrapper(functionResponses: [response]))
+        send(msg)
+    }
+    
+    func sendTextMessage(_ text: String) {
+        let turn = Turn(role: "user", parts: [TextPart(text: text)])
+        let content = ClientContent(turns: [turn], turnComplete: true)
+        let msg = ClientMessage(clientContent: content)
+        log("Sending text message: \(text)")
         send(msg)
     }
     
@@ -159,7 +171,9 @@ class GeminiLiveClient {
                     self.receiveMessages()
                 }
             case .failure(let error):
-                self.log("WebSocket receive error: \(error)")
+                if !self.intentionalDisconnect {
+                    self.log("WebSocket receive error: \(error)")
+                }
                 self.handleDisconnect()
             }
         }
@@ -183,10 +197,15 @@ class GeminiLiveClient {
                 self.toolCallPublisher.send(toolCall)
             }
             
-            // Handle audio
+            // Handle content
             var receivedAudio = false
+            var receivedText = false
             if let parts = serverMsg.serverContent?.modelTurn?.parts {
                 for part in parts {
+                    if let text = part.text, !text.isEmpty {
+                        receivedText = true
+                        self.textDataPublisher.send(text)
+                    }
                     if let inlineData = part.inlineData,
                        inlineData.mimeType.starts(with: "audio/pcm"),
                        let audioData = Data(base64Encoded: inlineData.data) {
@@ -198,8 +217,12 @@ class GeminiLiveClient {
             
             if receivedAudio {
                 self.log("Received audio chunk")
-            } else if serverMsg.toolCall == nil {
-                self.log("Received message without audio/tools")
+            }
+            if receivedText {
+                self.log("Received text chunk")
+            }
+            if !receivedAudio && !receivedText && serverMsg.toolCall == nil && serverMsg.setupComplete == nil {
+                self.log("Received message without audio/text/tools")
             }
         } catch {
             self.log("Decode error: \(error.localizedDescription)\nPreview: \(String(jsonString.prefix(200)))")
