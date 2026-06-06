@@ -3,84 +3,290 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Miloom | Secure AI Management for Entrepreneurs</title>
-    <meta name="description" content="Miloom is a premium, secure company management app for entrepreneurs. Financial tracking, document vaults, and AI-powered insights.">
+    <title>Miloom | Clean Financial Command Center for Founders</title>
+    <meta name="description" content="Miloom is an award-winning multi-company management suite for modern entrepreneurs. Track tech stack burn, secure credentials, and command your business.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="stars-bg"></div>
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
+    <!-- Background elements for high-end styling -->
+    <div class="grid-bg"></div>
+    <div class="glow-blob glow-1"></div>
+    <div class="glow-blob glow-2"></div>
+    <div class="glow-blob glow-3"></div>
 
-    <nav class="navbar glass">
-        <div class="logo">Miloom</div>
+    <!-- Header Navigation -->
+    <nav class="navbar">
+        <div class="logo">miloom</div>
         <div class="nav-links">
-            <a href="#features">Features</a>
-            <a href="#waitlist" class="btn-primary-outline">Join Waitlist</a>
+            <a href="#features" class="nav-link">Features</a>
+            <a href="#simulator" class="nav-link">Interactive Demo</a>
+            <a href="#waitlist" class="btn-navbar">Join Waitlist</a>
         </div>
     </nav>
 
-    <header class="hero">
-        <div class="hero-content">
-            <h1>Command Your Company. <br><span class="gradient-text">Beautifully.</span></h1>
-            <p>Miloom is the ultimate AI-powered command center for modern entrepreneurs. Secure, seamless, and stunning.</p>
-            <a href="#waitlist" class="btn-primary">Get Early Access</a>
-        </div>
-        <div class="hero-image-wrapper glass-panel">
-            <img src="assets/hero.png" alt="Miloom App Dashboard" class="hero-image">
-        </div>
-    </header>
-
-    <section id="features" class="features">
-        <h2 class="section-title">Everything you need. <span class="gradient-text">Nothing you don't.</span></h2>
-        
-        <div class="feature-grid">
-            <div class="feature-card glass">
-                <div class="feature-image-wrapper">
-                    <img src="assets/finance.png" alt="Financial Tracking" loading="lazy">
-                </div>
-                <h3>Financial Command Center</h3>
-                <p>Connect your institutions securely via Plaid. Track runways, analyze expenses, and forecast revenue with our stunning financial suite.</p>
-            </div>
-            
-            <div class="feature-card glass">
-                <div class="feature-image-wrapper">
-                    <img src="assets/documents.png" alt="Secure Document Vault" loading="lazy">
-                </div>
-                <h3>Secure Document Vault</h3>
-                <p>Enterprise-grade encryption meets beautiful design. Store and share sensitive documents with peace of mind.</p>
-            </div>
-            
-            <div class="feature-card glass">
-                <div class="feature-icon">✨</div>
-                <h3>Gemini Live Assistant</h3>
-                <p>Your on-demand executive AI assistant. Use real-time voice conversations to navigate data, generate reports, and manage tasks.</p>
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="hero-text">
+            <div class="pill-badge">Voted #1 Dashboard Design for Founders</div>
+            <h1>Command multiple companies.<br><span class="highlight-text">Without the chaos.</span></h1>
+            <p>Miloom aggregates your SaaS stack, tracks recurring burn, secures bank credentials, and answers natural language questions. All in one gorgeous space.</p>
+            <div class="hero-actions">
+                <a href="#waitlist" class="btn-primary">Request Early Access</a>
+                <a href="#simulator" class="btn-secondary">Try Interactive Demo</a>
             </div>
         </div>
     </section>
 
+    <!-- Interactive App Simulator Section -->
+    <section id="simulator" class="simulator-section">
+        <div class="section-header">
+            <h2 class="section-title">The "Aha" Demo</h2>
+            <p class="section-subtitle">Interact with our live dashboard below. Switch companies, reveal credentials, or ask the AI assistant questions.</p>
+        </div>
+
+        <div class="simulator-container glass-panel">
+            <!-- App Sidebar Mock -->
+            <div class="sim-sidebar">
+                <div class="sim-app-logo">miloom</div>
+                
+                <div class="sim-nav-group">
+                    <div class="sim-nav-label">Select Company</div>
+                    <div class="company-selector-wrapper">
+                        <button class="company-dropdown-btn" id="company-btn">
+                            <span class="company-color-indicator" style="background-color: #4f46e5;"></span>
+                            <span class="company-name-text">Aura SaaS</span>
+                            <span class="dropdown-chevron">▼</span>
+                        </button>
+                        <div class="company-dropdown-list" id="company-list">
+                            <div class="company-option active" data-company="aura">
+                                <span class="company-color-indicator" style="background-color: #4f46e5;"></span>
+                                Aura SaaS
+                            </div>
+                            <div class="company-option" data-company="eclipse">
+                                <span class="company-color-indicator" style="background-color: #8b5cf6;"></span>
+                                Eclipse E-Commerce
+                            </div>
+                            <div class="company-option" data-company="nexus">
+                                <span class="company-color-indicator" style="background-color: #10b981;"></span>
+                                Nexus Consulting
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sim-menu-items">
+                    <button class="sim-menu-item active" id="btn-show-dashboard">
+                        <span>📊</span> Dashboard
+                    </button>
+                    <button class="sim-menu-item" id="btn-show-vault">
+                        <span>🔒</span> Secure Vault
+                    </button>
+                </div>
+
+                <div class="sim-sidebar-footer">
+                    <div class="sim-burn-bar">
+                        <div class="sim-burn-label">Combined Burn</div>
+                        <div class="sim-burn-value">$5,470/mo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- App Main Content Mock -->
+            <div class="sim-main-content">
+                <!-- Top Header -->
+                <div class="sim-header">
+                    <div class="sim-title-area">
+                        <h3 id="current-company-title">Aura SaaS</h3>
+                        <span class="sim-badge" id="current-company-structure">C-Corp</span>
+                    </div>
+                    <div class="sim-keyboard-shortcut">Press <kbd>⌘K</kbd> to search</div>
+                </div>
+
+                <!-- Stats Grid -->
+                <div class="sim-stats-grid">
+                    <div class="sim-stat-card">
+                        <div class="sim-stat-label">Monthly Burn</div>
+                        <div class="sim-stat-value text-purple" id="stat-burn">$1,420</div>
+                        <div class="sim-stat-sub">Across active stack</div>
+                    </div>
+                    <div class="sim-stat-card">
+                        <div class="sim-stat-label">Runway</div>
+                        <div class="sim-stat-value text-green" id="stat-runway">24 Mos</div>
+                        <div class="sim-stat-sub">Based on current cash</div>
+                    </div>
+                    <div class="sim-stat-card">
+                        <div class="sim-stat-label">Active Stack</div>
+                        <div class="sim-stat-value text-blue" id="stat-stack">8 Tools</div>
+                        <div class="sim-stat-sub">1 Trial pending renewal</div>
+                    </div>
+                </div>
+
+                <!-- Interactive App View Area -->
+                <div class="sim-view-container">
+                    <!-- Dashboard View (Subscriptions) -->
+                    <div class="sim-view active" id="view-dashboard">
+                        <h4 class="view-section-title">Tech Stack & Subscriptions</h4>
+                        <div class="sim-table-wrapper">
+                            <table class="sim-table">
+                                <thead>
+                                    <tr>
+                                        <th>Service</th>
+                                        <th>Cost</th>
+                                        <th>Cycle</th>
+                                        <th>Payment</th>
+                                        <th>Next Renewal</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sub-table-body">
+                                    <!-- Populated dynamically by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Vault View (Credentials & Logins) -->
+                    <div class="sim-view" id="view-vault">
+                        <h4 class="view-section-title">Secure Credential Vault</h4>
+                        <div class="sim-vault-grid" id="vault-items-grid">
+                            <!-- Populated dynamically by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- App AI Assistant Mock -->
+            <div class="sim-ai-panel">
+                <div class="sim-ai-header">
+                    <div class="sim-ai-avatar">✨</div>
+                    <div>
+                        <div class="sim-ai-name">Gemini Command</div>
+                        <div class="sim-ai-status">Ready to audit</div>
+                    </div>
+                </div>
+
+                <!-- AI Chat Area -->
+                <div class="sim-ai-chat" id="ai-chat-history">
+                    <div class="ai-msg bot">
+                        Hello! I am your real-time finance auditor. Click one of the preset prompts below to test my capabilities.
+                    </div>
+                </div>
+
+                <!-- AI Quick Prompts -->
+                <div class="sim-ai-prompts">
+                    <button class="ai-prompt-btn" data-prompt="burn">
+                        "What is our monthly SaaS burn?"
+                    </button>
+                    <button class="ai-prompt-btn" data-prompt="stripe">
+                        "Show Stripe credentials for Aura SaaS"
+                    </button>
+                    <button class="ai-prompt-btn" data-prompt="leak">
+                        "Find any potential money leaks"
+                    </button>
+                </div>
+
+                <!-- AI Input Mock -->
+                <div class="sim-ai-input-wrapper">
+                    <input type="text" placeholder="Ask Gemini about your company..." disabled id="sim-ai-input">
+                    <button class="sim-ai-send" disabled>➔</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Bento Feature Grid -->
+    <section id="features" class="features-section">
+        <div class="section-header">
+            <h2 class="section-title">Crafted for serious founders.</h2>
+            <p class="section-subtitle">Every tool designed with high density, speed, and beautiful styling.</p>
+        </div>
+
+        <div class="bento-grid">
+            <!-- Feature 1: High Density -->
+            <div class="bento-card glass-panel bento-large">
+                <div class="bento-card-content">
+                    <div class="feature-badge">Data</div>
+                    <h3>Multi-Entity Consolidated Control</h3>
+                    <p>Stop juggling dozens of accounts. Group SaaS tools, credit cards, bank accounts, and loans under their respective business entities, and switch views instantly. Perfect for serial founders.</p>
+                </div>
+                <div class="bento-visual density-visual">
+                    <div class="density-row"><span>AWS Cloud</span><span class="tag tag-blue">$432/mo</span></div>
+                    <div class="density-row"><span>Slack Workspace</span><span class="tag tag-purple">$120/mo</span></div>
+                    <div class="density-row"><span>GitHub Team</span><span class="tag tag-green">$48/mo</span></div>
+                    <div class="density-row"><span>OpenAI API</span><span class="tag tag-orange">$380/mo</span></div>
+                </div>
+            </div>
+
+            <!-- Feature 2: Gemini Integration -->
+            <div class="bento-card glass-panel">
+                <div class="bento-card-content">
+                    <div class="feature-badge">AI</div>
+                    <h3>Gemini Live Voice Audit</h3>
+                    <p>A natural voice proxy connected to your business data. Ask questions, audit logs, and trigger summaries out loud.</p>
+                </div>
+                <div class="bento-visual voice-visual">
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                    <div class="wave-bar"></div>
+                </div>
+            </div>
+
+            <!-- Feature 3: Liquid Glass Radii -->
+            <div class="bento-card glass-panel">
+                <div class="bento-card-content">
+                    <div class="feature-badge">Aesthetic</div>
+                    <h3>Liquid Glass Interaction</h3>
+                    <p>Buttons and tabs expand, morph, and slide smoothly, giving you tactile feedback and satisfying animations.</p>
+                </div>
+                <div class="bento-visual interaction-visual">
+                    <button class="liquid-demo-btn">Interact</button>
+                </div>
+            </div>
+
+            <!-- Feature 4: Secure Vault -->
+            <div class="bento-card glass-panel bento-medium">
+                <div class="bento-card-content">
+                    <div class="feature-badge">Security</div>
+                    <h3>Zero-Knowledge Local Storage</h3>
+                    <p>Your passwords, bank logins, and company documents are encrypted and saved locally in your database. No servers, no middleware leaks, and complete privacy.</p>
+                </div>
+                <div class="bento-visual vault-visual">
+                    <div class="lock-icon">🔒</div>
+                    <div class="vault-status">AES-256 Encrypted</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Waitlist / Conversion Section -->
     <section id="waitlist" class="waitlist-section">
-        <div class="waitlist-container glass">
-            <h2>Join the exclusive <span class="gradient-text">Miloom</span> beta.</h2>
-            <p>We're opening access to a select group of founders. Secure your spot now.</p>
+        <div class="waitlist-container glass-panel">
+            <h2>Command your company. <br><span class="highlight-text">Beautifully.</span></h2>
+            <p>Miloom is currently in private beta for founders managing multiple entities. Request your invite below.</p>
             <form id="waitlist-form" class="waitlist-form">
                 <div class="input-group">
-                    <input type="email" id="email" placeholder="Enter your email address" required>
-                    <button type="submit" class="btn-primary">Join Waitlist</button>
+                    <input type="email" id="email" placeholder="Enter your business email" required autocomplete="off">
+                    <button type="submit" class="btn-primary">Request Invitation</button>
                 </div>
                 <p class="form-message" id="form-message"></p>
             </form>
         </div>
     </section>
 
+    <!-- Footer -->
     <footer>
-        <p>&copy; 2026 Miloom. All rights reserved.</p>
-        <div style="margin-top: 10px; display: flex; justify-content: center; gap: 20px;">
-            <a href="/terms" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; transition: color 0.2s;">Terms of Service</a>
-            <a href="/privacy" style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; transition: color 0.2s;">Privacy Policy</a>
+        <div class="footer-content">
+            <div class="footer-logo">miloom</div>
+            <p>&copy; 2026 Miloom. Built for modern builders. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="/terms">Terms of Service</a>
+                <a href="/privacy">Privacy Policy</a>
+            </div>
         </div>
     </footer>
 
