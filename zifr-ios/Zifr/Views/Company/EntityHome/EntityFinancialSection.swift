@@ -33,18 +33,10 @@ struct EntityFinancialSection: View {
             } label: {
                 VStack(spacing: 8) {
                     HStack {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(finColor.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(finColor.opacity(0.25), lineWidth: 1)
-                            
-                            Image(systemName: "dollarsign.bank.building")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(finColor)
-                        }
-                        .frame(width: 24, height: 24)
-                        .padding(.trailing, 4)
+                        Image(systemName: "dollarsign.bank.building")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(finColor)
+                            .padding(.trailing, 4)
                         
                         Text("FINANCIAL")
                             .font(.system(size: 13, weight: .black))

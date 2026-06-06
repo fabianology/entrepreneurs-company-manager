@@ -28,18 +28,10 @@ struct EntitySubscriptionSection: View {
             } label: {
                 VStack(spacing: 8) {
                     HStack {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(subsColor.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(subsColor.opacity(0.25), lineWidth: 1)
-                            
-                            Image(systemName: "square.3.layers.3d")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(subsColor)
-                        }
-                        .frame(width: 24, height: 24)
-                        .padding(.trailing, 4)
+                        Image(systemName: "square.3.layers.3d")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(subsColor)
+                            .padding(.trailing, 4)
                         
                         Text("SUBSCRIPTIONS")
                             .font(.system(size: 13, weight: .black))

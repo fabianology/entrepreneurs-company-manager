@@ -30,18 +30,10 @@ struct EntityDocumentSection: View {
             } label: {
                 VStack(spacing: 8) {
                     HStack(spacing: 0) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(docsColor.opacity(0.15))
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(docsColor.opacity(0.25), lineWidth: 1)
-                            
-                            Image(systemName: "doc.text")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(docsColor)
-                        }
-                        .frame(width: 24, height: 24)
-                        .padding(.trailing, 8)
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(docsColor)
+                            .padding(.trailing, 8)
                         
                         Text("DOCUMENTS")
                             .font(.system(size: 13, weight: .black))
