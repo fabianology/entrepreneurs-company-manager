@@ -244,7 +244,7 @@ struct CompanyDetailView: View {
                                     
                                     dismiss()
                                 } label: {
-                                    Label("Home", systemImage: "square.grid.2x2")
+                                    Label("Dashboard", systemImage: "square.grid.2x2")
                                 }
                             }
                             
@@ -380,7 +380,7 @@ struct CompanyDetailView: View {
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                                     .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
                                     .frame(width: 32, height: 26)
-                                Text("home")
+                                Text("dashboard")
                                     .font(.system(size: 8, weight: vm.activeTab == .home ? .bold : .medium))
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                             }
@@ -550,7 +550,7 @@ struct CompanyDetailView: View {
         switch vm.activeTab {
         case .home:
             HStack(spacing: 6) {
-                Text("DASHBOARD")
+                Text("HOME")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color(hex: "#C1AA78"))
                     .tracking(2)
@@ -748,7 +748,7 @@ struct CompanyDetailView: View {
 
     private func tabLabelText(for tab: AppViewModel.CompanyTab) -> String {
         switch tab {
-        case .home: return "home"
+        case .home: return "dashboard"
         case .subscriptions: return "subs"
         case .financial: return "finance"
         case .documents: return "docs"

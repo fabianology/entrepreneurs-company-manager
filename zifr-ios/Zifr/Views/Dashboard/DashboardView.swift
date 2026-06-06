@@ -584,7 +584,7 @@ struct DashboardView: View {
                 Image(systemName: "square.grid.2x2.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(hex: "#A2A2A2"))
-                Text("Home")
+                Text("Dashboard")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color(hex: "#A2A2A2"))
             }
