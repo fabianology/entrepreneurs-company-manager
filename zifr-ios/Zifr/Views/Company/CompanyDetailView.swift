@@ -374,11 +374,17 @@ struct CompanyDetailView: View {
                                 }
                             }
                         } label: {
-                            Image(systemName: AppViewModel.CompanyTab.home.icon)
-                                .font(.system(size: 20, weight: vm.activeTab == .home ? .semibold : .medium))
-                                .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
-                                .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
-                                .frame(width: 32, height: 44)
+                            VStack(spacing: 1) {
+                                Image(systemName: AppViewModel.CompanyTab.home.icon)
+                                    .font(.system(size: 18, weight: vm.activeTab == .home ? .semibold : .medium))
+                                    .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
+                                    .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
+                                    .frame(width: 24, height: 24)
+                                Text("home")
+                                    .font(.system(size: 8, weight: vm.activeTab == .home ? .bold : .medium))
+                                    .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
+                            }
+                            .frame(width: 32, height: 44)
                         } primaryAction: {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -740,6 +746,15 @@ struct CompanyDetailView: View {
 
     // MARK: - Tutorial Copy Helpers (Command Center + Financial)
 
+    private func tabLabelText(for tab: AppViewModel.CompanyTab) -> String {
+        switch tab {
+        case .home: return "home"
+        case .subscriptions: return "subs"
+        case .financial: return "finance"
+        case .documents: return "docs"
+        }
+    }
+
     private func commandCenterTutorialTitle(for step: OnboardingStep) -> String {
         switch step {
         case .tutorialCommandCenter:       return "Command Center"
@@ -801,16 +816,22 @@ struct CompanyDetailView: View {
                 }
                 tabBounces[nextTab, default: 0] += 1
             } label: {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 20, weight: isFront ? .semibold : .medium))
-                    .foregroundStyle(isFront ? tabColor(tab) : .secondary)
-                    .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                    .frame(width: 32, height: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.black)
-                            .frame(width: 20, height: 20)
-                    )
+                VStack(spacing: 1) {
+                    Image(systemName: tab.icon)
+                        .font(.system(size: 18, weight: isFront ? .semibold : .medium))
+                        .foregroundStyle(isFront ? tabColor(tab) : .secondary)
+                        .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
+                        .frame(width: 24, height: 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.black)
+                                .frame(width: 20, height: 20)
+                        )
+                    Text(tabLabelText(for: tab))
+                        .font(.system(size: 8, weight: isFront ? .bold : .medium))
+                        .foregroundStyle(isFront ? tabColor(tab) : .secondary)
+                }
+                .frame(width: 32, height: 44)
             }
             .simultaneousGesture(
                 LongPressGesture(minimumDuration: 0.4).onEnded { _ in
