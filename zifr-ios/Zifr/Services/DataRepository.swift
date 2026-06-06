@@ -38,6 +38,9 @@ class DataRepository {
             let secureInst = institutions.map { i -> Institution in var m = i; m.password = SecurityService.shared.decrypt(i.password); return m }
             let secureCards = cards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
             
+            let session = try? await client.auth.session
+            let currentUserId = session?.user.id
+            
             await MainActor.run {
                 appState.companies = companies
                 appState.subscriptions = secureSubs
@@ -51,6 +54,10 @@ class DataRepository {
                 appState.notifications = notifications
                 appState.userPreferences = preferences.first
                 appState.isLoading = false
+                
+                if companies.isEmpty, let userId = currentUserId {
+                    SandboxSeeder.seed(appState: appState, userId: userId)
+                }
             }
         } catch {
             print("Failed to fetch data: \(error)")

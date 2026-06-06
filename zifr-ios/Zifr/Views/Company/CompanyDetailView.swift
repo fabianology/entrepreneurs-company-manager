@@ -244,7 +244,7 @@ struct CompanyDetailView: View {
                                     
                                     dismiss()
                                 } label: {
-                                    Label("Dashboard", systemImage: "square.grid.2x2")
+                                    Label("Home", systemImage: "square.grid.2x2")
                                 }
                             }
                             
@@ -440,7 +440,7 @@ struct CompanyDetailView: View {
                         segment: onboardingState.tutorialSegmentLabel,
                         onBack: { onboardingState.tutorialBack() },
                         onNext: { onboardingState.tutorialNext() },
-                        onSkip: { onboardingState.exitTutorial() }
+                        onSkip: { onboardingState.exitTutorial(appState: appState) }
                     )
                     .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                 }
@@ -496,8 +496,16 @@ struct CompanyDetailView: View {
 
     // MARK: - Entity Command Plate
     private var companyHeader: some View {
-        HStack(alignment: .center, spacing: 14) {
-            CompanyAvatar(company: company, size: 48)
+        HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                CompanyAvatar(company: company, size: 48)
+            }
+            .frame(width: 56, height: 56)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showEditCompany = true
+            }
 
             VStack(alignment: .leading, spacing: 4) {
                 // Company name
@@ -512,13 +520,23 @@ struct CompanyDetailView: View {
             Spacer()
         }
         .padding(.vertical, 12)
-        .padding(.horizontal, 16)
+        .padding(.leading, 12)
+        .padding(.trailing, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+                .fill(Color(hex: "#1C1C1E").opacity(0.60))
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if vm.activeTab != .home {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    vm.activeTab = .home
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -526,10 +544,7 @@ struct CompanyDetailView: View {
         switch vm.activeTab {
         case .home:
             HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(tabColor(.home))
-                Text("COMMAND CENTER")
+                Text("DASHBOARD")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color(hex: "#C1AA78"))
                     .tracking(2)

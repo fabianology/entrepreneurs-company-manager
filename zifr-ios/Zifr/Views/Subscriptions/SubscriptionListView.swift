@@ -210,7 +210,7 @@ struct SubscriptionListView: View {
                             Image(systemName: "square.3.layers.3d")
                                 .font(.system(size: 28))
                                 .foregroundStyle(.white)
-                            Text("ADD YOUR FIRST SERVICE")
+                            Text("ADD YOUR FIRST SUBSCRIPTION")
                                 .font(.system(size: 11, weight: .black))
                                 .textCase(.uppercase)
                                 .tracking(2)

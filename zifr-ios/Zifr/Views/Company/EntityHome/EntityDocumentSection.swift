@@ -11,7 +11,7 @@ struct EntityDocumentSection: View {
     @Binding var newDoc: CompanyDocument?
     @Binding var editingDoc: CompanyDocument?
 
-    private let docsColor = Color(hex: "#23414B")
+    private let docsColor = Color(hex: "#918457")
 
     private var docCategories: [String] {
         ["Incorporation", "Taxes", "Bank Statements", "Contracts", "IP", "Payroll", "Insurance", "Misc"]
@@ -29,10 +29,20 @@ struct EntityDocumentSection: View {
                 vm.activeTab = .documents
             } label: {
                 VStack(spacing: 8) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(docsColor)
+                    HStack(spacing: 0) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(docsColor.opacity(0.15))
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(docsColor.opacity(0.25), lineWidth: 1)
+                            
+                            Image(systemName: "doc.text")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(docsColor)
+                        }
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 8)
+                        
                         Text("DOCUMENTS")
                             .font(.system(size: 13, weight: .black))
                             .tracking(1.5)
@@ -75,7 +85,7 @@ struct EntityDocumentSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.white.opacity(0.03))
+                .background(Color.black.opacity(0.70))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom

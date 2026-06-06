@@ -73,6 +73,56 @@ actor GeminiService {
         }
     }
 
+    func askPortfolioQuestionREST(contents: [[String: Any]], systemInstruction: String, tools: [Tool]?) async throws -> [String: Any] {
+        // Fetch current session for auth token
+        guard let session = try? await SupabaseService.shared.client.auth.session else {
+            throw NSError(domain: "GeminiService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
+        }
+        
+        // Construct target proxy URL
+        var request = URLRequest(url: URL(string: "\(SupabaseService.shared.urlString)/functions/v1/gemini-live-proxy")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Build request body
+        var body: [String: Any] = [
+            "model": "gemini-2.5-flash",
+            "contents": contents
+        ]
+        
+        body["systemInstruction"] = [
+            "parts": [["text": systemInstruction]]
+        ]
+        
+        if let tools = tools, !tools.isEmpty {
+            let encoder = JSONEncoder()
+            if let toolsData = try? encoder.encode(tools),
+               let toolsJson = try? JSONSerialization.jsonObject(with: toolsData) as? [[String: Any]] {
+                body["tools"] = toolsJson
+            }
+        }
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        if httpResponse.statusCode != 200 {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "GeminiService", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+        }
+        
+        if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return json
+        } else {
+            throw NSError(domain: "GeminiService", code: 500, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON response"])
+        }
+    }
+
     // MARK: - Document Scanning AI
     func categorizeDocument(text: String, isPersonal: Bool = false) async -> [String: String]? {
         let validCategories = isPersonal 

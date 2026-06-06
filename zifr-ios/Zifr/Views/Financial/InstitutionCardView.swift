@@ -23,11 +23,17 @@ struct InstitutionCardView: View {
             // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
-                    HStack(alignment: .top, spacing: 16) {
+                    HStack(alignment: .center, spacing: 16) {
                         ZStack {
-                            RoundedRectangle(cornerRadius: 16).fill(Color.clear).frame(width: 56, height: 56)
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.white.opacity(0.06))
+                                .frame(width: 56, height: 56)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
                             if !(institution.loginUrl ?? "").isEmpty {
-                                FaviconImage(website: institution.loginUrl ?? "", size: 36)
+                                FaviconImage(website: institution.loginUrl ?? "", size: 32)
                             } else {
                                 Image(systemName: "building.columns")
                                     .font(.system(size: 22, weight: .semibold))
@@ -35,7 +41,7 @@ struct InstitutionCardView: View {
                             }
                         }
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(institution.name.isEmpty ? "Institution" : institution.name)
+                            Text(institution.name.isEmpty ? "Bank" : institution.name)
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.white)
 
@@ -77,17 +83,15 @@ struct InstitutionCardView: View {
                                 }
                             }
                         }
-                        .padding(.top, 8)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
                     .padding(.bottom, 6)
                     
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundStyle(Color.white.opacity(0.08))
-                        .frame(width: UIScreen.main.bounds.width * 0.8)
+                    Divider()
+                        .background(Color.white.opacity(0.08))
+                        .padding(.horizontal, 24)
                         .padding(.bottom, 12)
 
                     // ── Credentials (tap-to-copy) ────
@@ -221,7 +225,7 @@ struct InstitutionCardView: View {
             InstitutionAccountHUD(
                 draft: $accountDraft,
                 isNew: false,
-                institutionName: institution.name.isEmpty ? "Institution" : institution.name,
+                institutionName: institution.name.isEmpty ? "Bank" : institution.name,
                 onSave: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         var updatedInst = institution

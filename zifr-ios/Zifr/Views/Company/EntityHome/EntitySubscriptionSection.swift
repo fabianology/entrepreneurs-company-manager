@@ -28,9 +28,19 @@ struct EntitySubscriptionSection: View {
             } label: {
                 VStack(spacing: 8) {
                     HStack {
-                        Image(systemName: "square.3.layers.3d")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(subsColor)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(subsColor.opacity(0.15))
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(subsColor.opacity(0.25), lineWidth: 1)
+                            
+                            Image(systemName: "square.3.layers.3d")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(subsColor)
+                        }
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 4)
+                        
                         Text("SUBSCRIPTIONS")
                             .font(.system(size: 13, weight: .black))
                             .tracking(1.5)
@@ -75,7 +85,7 @@ struct EntitySubscriptionSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.white.opacity(0.03))
+                .background(Color.black.opacity(0.70))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom
@@ -169,6 +179,7 @@ struct EntitySubscriptionSection: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(hex: "#1C1C1E").opacity(0.70))
         )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterSubscriptions)
         .padding(.horizontal, 20)

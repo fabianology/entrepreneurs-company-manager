@@ -35,6 +35,9 @@ final class AppViewModel {
 
     // CRUD: Companies
     func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
+        // Purge sandbox if they added a real business
+        SandboxSeeder.purge(appState: appState)
+
         let company = Company(userId: userId, name: name, structure: structure, companyDescription: nil, colorHex: colorHex, logoData: logoData, website: website)
         appState.companies.append(company)
         Task {
@@ -505,10 +508,5 @@ final class AppViewModel {
             }
         }
         return minifiedData
-    }
-
-    func askGeminiSearch(query: String, appState: AppState) async -> String {
-        let minifiedData = generateMinifiedPortfolio(appState: appState)
-        return await GeminiService.shared.askPortfolioQuestion(data: minifiedData, question: query)
     }
 }

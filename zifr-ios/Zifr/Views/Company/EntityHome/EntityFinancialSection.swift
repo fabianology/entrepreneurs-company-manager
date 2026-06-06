@@ -33,9 +33,19 @@ struct EntityFinancialSection: View {
             } label: {
                 VStack(spacing: 8) {
                     HStack {
-                        Image(systemName: "dollarsign.bank.building")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(finColor)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(finColor.opacity(0.15))
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(finColor.opacity(0.25), lineWidth: 1)
+                            
+                            Image(systemName: "dollarsign.bank.building")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(finColor)
+                        }
+                        .frame(width: 24, height: 24)
+                        .padding(.trailing, 4)
+                        
                         Text("FINANCIAL")
                             .font(.system(size: 13, weight: .black))
                             .tracking(1.5)
@@ -65,7 +75,7 @@ struct EntityFinancialSection: View {
                                 Capsule()
                                     .fill(LinearGradient(colors: [finColor, finColor.opacity(0.7)], startPoint: .leading, endPoint: .trailing))
                                     .frame(width: geo.size.width * CGFloat(debtRatio))
-                            }
+                             }
                         }
                         .frame(height: 4)
                         
@@ -77,7 +87,7 @@ struct EntityFinancialSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.white.opacity(0.03))
+                .background(Color.black.opacity(0.70))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom

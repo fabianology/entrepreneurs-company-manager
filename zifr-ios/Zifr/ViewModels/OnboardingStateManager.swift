@@ -3,41 +3,29 @@ import SwiftUI
 import Observation
 
 enum OnboardingStep: String, Codable {
-    // Real first-run onboarding
     case notStarted
-    case needsEntity
-    case needsBank
-    case needsReview
-    case needsNotes
-    case needsCommandCenterQuickAdd
-    case needsCommandCenterFinancialsHeader
-    case needsCommandCenterFinancialsAccounts
-    case needsCommandCenterFinancialsReport
-    case needsCommandCenterSubscriptions
-    case needsCommandCenterDocuments
-    case needsAssistant
     case completed
     case skipped
 
+    case needsEntity, needsBank, needsReview, needsNotes
+    case needsCommandCenterQuickAdd, needsCommandCenterFinancialsHeader, needsCommandCenterFinancialsAccounts, needsCommandCenterFinancialsReport
+    case needsCommandCenterSubscriptions, needsCommandCenterDocuments, needsAssistant
+    
     // Tutorial walkthrough steps
-    // Dashboard segment (steps 1–4)
     case tutorialEntityCard
     case tutorialQuickActions
     case tutorialSearch
     case tutorialAssistant
-    // Command Center segment (steps 5–10)
     case tutorialCommandCenter
     case tutorialCommandQuickAdd
     case tutorialCommandFinancials
     case tutorialCommandSubscriptions
     case tutorialCommandDocuments
     case tutorialCommandTabBar
-    // Financial segment (steps 11–14)
     case tutorialFinancialPage
     case tutorialFinancialWallet
     case tutorialFinancialCardTap
     case tutorialFinancialSwipe
-    // Final dashboard steps (15–16)
     case tutorialSwipeHint
     case tutorialDone
 }
@@ -50,66 +38,43 @@ final class OnboardingStateManager {
         }
     }
 
-    /// True once the tutorial has been started at least once — used to show the
-    /// blurred dummy card after tutorial completion instead of the un-blurred one.
     var tutorialHasBeenRun: Bool {
         didSet {
             UserDefaults.standard.set(tutorialHasBeenRun, forKey: "tutorialHasBeenRun")
         }
     }
 
-    // MARK: - Real Onboarding Spotlights
-
-    var isSpotlightingEntity: Bool {
-        currentStep == .needsEntity
+    // MARK: - JIT Contextual Tooltip Flags
+    var hasShownFinancialTooltip: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownFinancialTooltip") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownFinancialTooltip") }
     }
 
-    var isSpotlightingBank: Bool {
-        currentStep == .needsBank
+    var hasShownAssistantTooltip: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownAssistantTooltip") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownAssistantTooltip") }
     }
 
-    var isSpotlightingReview: Bool {
-        currentStep == .needsReview
+    var hasShownDashboardTooltip: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasShownDashboardTooltip") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasShownDashboardTooltip") }
     }
 
-    var isSpotlightingNotes: Bool {
-        currentStep == .needsNotes
-    }
+    // MARK: - Onboarding Spotlights
+    var isSpotlightingEntity: Bool { false }
+    var isSpotlightingBank: Bool { false }
+    var isSpotlightingReview: Bool { false }
+    var isSpotlightingNotes: Bool { false }
+    var isSpotlightingCommandCenterQuickAdd: Bool { false }
+    var isSpotlightingCommandCenterFinancialsHeader: Bool { false }
+    var isSpotlightingCommandCenterFinancialsAccounts: Bool { false }
+    var isSpotlightingCommandCenterFinancialsReport: Bool { false }
+    var isSpotlightingCommandCenterFinancials: Bool { false }
+    var isSpotlightingCommandCenterSubscriptions: Bool { false }
+    var isSpotlightingCommandCenterDocuments: Bool { false }
+    var isSpotlightingAssistant: Bool { false }
 
-    var isSpotlightingCommandCenterQuickAdd: Bool {
-        currentStep == .needsCommandCenterQuickAdd
-    }
-
-    var isSpotlightingCommandCenterFinancialsHeader: Bool {
-        currentStep == .needsCommandCenterFinancialsHeader
-    }
-
-    var isSpotlightingCommandCenterFinancialsAccounts: Bool {
-        currentStep == .needsCommandCenterFinancialsAccounts
-    }
-
-    var isSpotlightingCommandCenterFinancialsReport: Bool {
-        currentStep == .needsCommandCenterFinancialsReport
-    }
-
-    var isSpotlightingCommandCenterFinancials: Bool {
-        currentStep == .needsCommandCenterFinancialsHeader || currentStep == .needsCommandCenterFinancialsAccounts || currentStep == .needsCommandCenterFinancialsReport
-    }
-
-    var isSpotlightingCommandCenterSubscriptions: Bool {
-        currentStep == .needsCommandCenterSubscriptions
-    }
-
-    var isSpotlightingCommandCenterDocuments: Bool {
-        currentStep == .needsCommandCenterDocuments
-    }
-
-    var isSpotlightingAssistant: Bool {
-        currentStep == .needsAssistant
-    }
-
-    // MARK: - Tutorial Mode
-
+    // MARK: - Tutorial Mode (Restored)
     var isTutorialActive: Bool {
         switch currentStep {
         case .tutorialEntityCard, .tutorialQuickActions, .tutorialSearch,
@@ -122,15 +87,13 @@ final class OnboardingStateManager {
             return false
         }
     }
-
-    // Dashboard steps
+    
     var isSpotlightingTutorialEntity: Bool      { currentStep == .tutorialEntityCard }
     var isSpotlightingTutorialQuickActions: Bool { currentStep == .tutorialQuickActions }
     var isSpotlightingTutorialSearch: Bool       { currentStep == .tutorialSearch }
     var isSpotlightingTutorialAssistant: Bool    { currentStep == .tutorialAssistant }
     var isSpotlightingTutorialSwipe: Bool        { currentStep == .tutorialSwipeHint }
 
-    // Command Center steps
     var isSpotlightingTutorialCommandCenter: Bool       { currentStep == .tutorialCommandCenter }
     var isSpotlightingTutorialCommandQuickAdd: Bool     { currentStep == .tutorialCommandQuickAdd }
     var isSpotlightingTutorialCommandFinancials: Bool   { currentStep == .tutorialCommandFinancials }
@@ -138,13 +101,11 @@ final class OnboardingStateManager {
     var isSpotlightingTutorialCommandDocs: Bool         { currentStep == .tutorialCommandDocuments }
     var isSpotlightingTutorialCommandTabBar: Bool       { currentStep == .tutorialCommandTabBar }
 
-    // Financial page steps
     var isSpotlightingTutorialFinancialPage: Bool     { currentStep == .tutorialFinancialPage }
     var isSpotlightingTutorialFinancialWallet: Bool   { currentStep == .tutorialFinancialWallet }
     var isSpotlightingTutorialFinancialCardTap: Bool  { currentStep == .tutorialFinancialCardTap }
     var isSpotlightingTutorialFinancialSwipe: Bool    { currentStep == .tutorialFinancialSwipe }
 
-    /// True when ANY financial tutorial step is active (used to show dummy wallet)
     var isInFinancialTutorial: Bool {
         currentStep == .tutorialCommandTabBar ||
         currentStep == .tutorialFinancialPage ||
@@ -153,7 +114,6 @@ final class OnboardingStateManager {
         currentStep == .tutorialFinancialSwipe
     }
 
-    /// True when ANY command center tutorial step is active
     var isInCommandCenterTutorial: Bool {
         currentStep == .tutorialCommandCenter ||
         currentStep == .tutorialCommandQuickAdd ||
@@ -162,9 +122,8 @@ final class OnboardingStateManager {
         currentStep == .tutorialCommandDocuments
     }
 
-    var isTutorialDone: Bool                     { currentStep == .tutorialDone }
+    var isTutorialDone: Bool { currentStep == .tutorialDone }
 
-    /// Step index (1-based) and total for the progress indicator
     var tutorialStepIndex: Int {
         switch currentStep {
         case .tutorialEntityCard:             return 1
@@ -184,7 +143,6 @@ final class OnboardingStateManager {
         }
     }
 
-    /// Segment label shown in the progress pill alongside the step counter
     var tutorialSegmentLabel: String {
         switch currentStep {
         case .tutorialEntityCard, .tutorialQuickActions,
@@ -205,121 +163,71 @@ final class OnboardingStateManager {
 
     var tutorialTotalSteps = 13
 
-    // MARK: - Shared Tutorial Frame Storage
-    // These bypass PreferenceKey propagation (which fails inside LazyVStack).
-    // FinancialView writes directly; CompanyDetailView reads for spotlight positioning.
     var tutorialFinancialWalletFrame: CGRect = .zero
     var tutorialFinancialInstitutionFrame: CGRect = .zero
 
     // MARK: - Init
-
     init() {
         if let savedStr = UserDefaults.standard.string(forKey: "onboardingStep"),
            let saved = OnboardingStep(rawValue: savedStr) {
             self.currentStep = saved
         } else {
-            self.currentStep = .notStarted
+            self.currentStep = .skipped // Default to skipped to allow free sandbox exploration
         }
         self.tutorialHasBeenRun = UserDefaults.standard.bool(forKey: "tutorialHasBeenRun")
     }
 
-    // MARK: - Real Onboarding
-
+    // MARK: - Real Onboarding Evaluator
     func evaluateState(appState: AppState) {
-        let companiesCount = appState.companies.count
-        let institutionsCount = appState.institutions.count
-        let subscriptionsCount = appState.subscriptions.count
-
-        // If tutorial is mid-flow, don't interrupt
         if isTutorialActive && currentStep != .tutorialDone { return }
-
-        // If stuck on the completion screen (app killed/relaunched), treat as skipped
         if currentStep == .tutorialDone {
             currentStep = .skipped
         }
-
-        // If they have NO data, force onboarding to start unless explicitly skipped/completed
-        if companiesCount == 0 && currentStep != .skipped && currentStep != .completed {
-            currentStep = .needsEntity
-            return
+        if currentStep != .completed && currentStep != .skipped {
+            currentStep = .skipped
         }
-
-        if currentStep == .completed || currentStep == .skipped {
-            return
-        }
-
-        if companiesCount == 0 {
-            currentStep = .needsEntity
-        } else if institutionsCount == 0 {
-            currentStep = .needsBank
-        } else if currentStep == .needsEntity || currentStep == .needsBank || currentStep == .notStarted {
-            currentStep = .needsReview
-        }
-        // If currentStep is already .needsReview, .needsNotes, .needsCommandCenter*, or .needsAssistant, leave it alone.
     }
 
     func skipOnboarding() {
-        if currentStep == .needsBank || currentStep == .needsEntity {
-            currentStep = .needsReview
-        } else {
-            currentStep = .completed
-        }
+        currentStep = .skipped
     }
 
     func completeOnboarding() {
-        switch currentStep {
-        case .needsEntity:
-            currentStep = .needsBank
-        case .needsBank:
-            currentStep = .needsReview
-        case .needsReview:
-            currentStep = .needsNotes
-        case .needsNotes:
-            currentStep = .needsCommandCenterQuickAdd
-        case .needsCommandCenterQuickAdd:
-            currentStep = .needsCommandCenterFinancialsHeader
-        case .needsCommandCenterFinancialsHeader:
-            currentStep = .needsCommandCenterFinancialsAccounts
-        case .needsCommandCenterFinancialsAccounts:
-            currentStep = .needsCommandCenterFinancialsReport
-        case .needsCommandCenterFinancialsReport:
-            currentStep = .needsCommandCenterSubscriptions
-        case .needsCommandCenterSubscriptions:
-            currentStep = .needsCommandCenterDocuments
-        case .needsCommandCenterDocuments:
-            currentStep = .completed
-        case .needsAssistant:
-            currentStep = .completed
-        default:
-            currentStep = .completed
-        }
+        currentStep = .completed
     }
 
     // MARK: - Tutorial Navigation
-
     func startTutorial() {
+        tutorialHasBeenRun = true
+        currentStep = .tutorialEntityCard
+    }
+    
+    func startTutorial(appState: AppState, userId: UUID) {
+        UserDefaults.standard.set(false, forKey: "sandboxPurged")
+        SandboxSeeder.purge(appState: appState)
+        SandboxSeeder.seed(appState: appState, userId: userId, force: true)
+        if let idx = appState.companies.firstIndex(where: { $0.id == SandboxSeeder.sandboxCompanyId }) {
+            appState.companies[idx].lastViewed = Date().addingTimeInterval(1000)
+        }
         tutorialHasBeenRun = true
         currentStep = .tutorialEntityCard
     }
 
     func tutorialNext() {
         switch currentStep {
-        // Dashboard segment
         case .tutorialEntityCard:          currentStep = .tutorialQuickActions
         case .tutorialQuickActions:        currentStep = .tutorialSearch
         case .tutorialSearch:              currentStep = .tutorialAssistant
         case .tutorialAssistant:           currentStep = .tutorialCommandCenter
-        // Command Center segment
         case .tutorialCommandCenter:       currentStep = .tutorialCommandQuickAdd
         case .tutorialCommandQuickAdd:     currentStep = .tutorialCommandFinancials
         case .tutorialCommandFinancials:   currentStep = .tutorialCommandSubscriptions
         case .tutorialCommandSubscriptions: currentStep = .tutorialCommandDocuments
         case .tutorialCommandDocuments:    currentStep = .tutorialCommandTabBar
-        // Financial segment (step 10 = tabBar, shown on financial page)
         case .tutorialCommandTabBar:       currentStep = .tutorialFinancialPage
         case .tutorialFinancialPage:       currentStep = .tutorialFinancialWallet
         case .tutorialFinancialWallet:     currentStep = .tutorialFinancialCardTap
-        case .tutorialFinancialCardTap:    currentStep = .tutorialDone  // last step — show completion overlay
+        case .tutorialFinancialCardTap:    currentStep = .tutorialDone
         case .tutorialDone:                currentStep = .skipped
         default: break
         }
@@ -327,18 +235,15 @@ final class OnboardingStateManager {
 
     func tutorialBack() {
         switch currentStep {
-        // Dashboard segment
         case .tutorialQuickActions:        currentStep = .tutorialEntityCard
         case .tutorialSearch:              currentStep = .tutorialQuickActions
         case .tutorialAssistant:           currentStep = .tutorialSearch
-        // Command Center segment
         case .tutorialCommandCenter:       currentStep = .tutorialAssistant
         case .tutorialCommandQuickAdd:     currentStep = .tutorialCommandCenter
         case .tutorialCommandFinancials:   currentStep = .tutorialCommandQuickAdd
         case .tutorialCommandSubscriptions: currentStep = .tutorialCommandFinancials
         case .tutorialCommandDocuments:    currentStep = .tutorialCommandSubscriptions
         case .tutorialCommandTabBar:       currentStep = .tutorialCommandDocuments
-        // Financial segment
         case .tutorialFinancialPage:       currentStep = .tutorialCommandTabBar
         case .tutorialFinancialWallet:     currentStep = .tutorialFinancialPage
         case .tutorialFinancialCardTap:    currentStep = .tutorialFinancialWallet
@@ -346,11 +251,16 @@ final class OnboardingStateManager {
         }
     }
 
-    func exitTutorial() {
+    func exitTutorial(appState: AppState) {
         currentStep = .skipped
+        let hasRealCompanies = appState.companies.contains { $0.id != SandboxSeeder.sandboxCompanyId }
+        if hasRealCompanies {
+            SandboxSeeder.purge(appState: appState)
+        }
     }
 }
 
+// Keep SpeechManager
 import AVFoundation
 
 @Observable

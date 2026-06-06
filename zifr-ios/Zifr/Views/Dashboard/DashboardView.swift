@@ -59,6 +59,50 @@ struct DashboardView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 40)
 
+                    if let firstCompany = appState.companies.first, SandboxSeeder.isSandbox(companyId: firstCompany.id) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(Color(hex: "#5AC8FA"))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Demo Mode Active")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Explore features or set up your real business.")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                            
+                            Spacer()
+                            
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                showAddCompany = true
+                            } label: {
+                                Text("Set Up")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [Color(hex: "#5AC8FA"), Color(hex: "#0A84FF")],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: "#1C1C1E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#5AC8FA").opacity(0.3), lineWidth: 1))
+                        .padding(.bottom, 20)
+                    }
+
                     dashboardHeader
                         .background(
                             RoundedRectangle(cornerRadius: 12)
@@ -140,7 +184,7 @@ struct DashboardView: View {
                                         Image(systemName: "plus.app.fill")
                                             .font(.system(size: 28))
                                             .foregroundStyle(.white)
-                                        Text("+ CREATE YOUR FIRST ENTITY")
+                                        Text("+ CREATE YOUR FIRST BUSINESS")
                                             .font(.system(size: 11, weight: .black))
                                             .textCase(.uppercase)
                                             .tracking(2)
@@ -169,9 +213,8 @@ struct DashboardView: View {
                                 .textCase(.uppercase)
                                 .foregroundStyle(Color.white.opacity(0.4))
                         }
-                        .padding(.horizontal, 20)
                         
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                        VStack(spacing: 12) {
                             ForEach(orphanedSharedItems, id: \.id) { share in
                                 SharedItemCardView(title: share.title, type: share.type.capitalized, role: share.role, senderEmail: share.senderEmail, createdAt: share.createdAt)
                                     .onTapGesture {
@@ -179,9 +222,10 @@ struct DashboardView: View {
                                     }
                             }
                         }
-                        .padding(.horizontal, 20)
                     }
-                    .padding(.bottom, 120)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
                 }
             }
             .listStyle(.plain)
@@ -490,7 +534,7 @@ struct DashboardView: View {
                                 segment: onboardingState.tutorialSegmentLabel,
                                 onBack: onboardingState.tutorialStepIndex > 1 ? { onboardingState.tutorialBack() } : nil,
                                 onNext: { onboardingState.tutorialNext() },
-                                onSkip: { onboardingState.exitTutorial() }
+                                onSkip: { onboardingState.exitTutorial(appState: appState) }
                             )
                             .transition(.opacity.animation(.easeInOut(duration: 0.2)))
                         }
@@ -502,11 +546,11 @@ struct DashboardView: View {
                 if onboardingState.isTutorialDone {
                     TutorialCompletionOverlay(
                         onGetStarted: {
-                            onboardingState.exitTutorial()
+                            onboardingState.exitTutorial(appState: appState)
                             showAddCompany = true
                         },
                         onExplore: {
-                            onboardingState.exitTutorial()
+                            onboardingState.exitTutorial(appState: appState)
                         }
                     )
                     .transition(.opacity)
@@ -540,11 +584,12 @@ struct DashboardView: View {
                 Image(systemName: "square.grid.2x2.fill")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(hex: "#A2A2A2"))
-                Text("Dashboard")
+                Text("Home")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color(hex: "#A2A2A2"))
             }
             .padding(.leading, 16)
+            .allowsHitTesting(false)
 
             Spacer()
 
@@ -569,7 +614,7 @@ struct DashboardView: View {
                     companyToShare = company
                 } label: {
                     if company.name.isEmpty {
-                        Label("Share Entity", systemImage: "person.crop.circle.badge.plus")
+                        Label("Share Business", systemImage: "person.crop.circle.badge.plus")
                     } else {
                         Label("Share \(company.name)", systemImage: "person.crop.circle.badge.plus")
                     }
@@ -582,6 +627,7 @@ struct DashboardView: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -590,7 +636,7 @@ struct DashboardView: View {
             showAddCompany = true
         } label: {
             HStack(spacing: 6) {
-                Text("ADD ENTITY")
+                Text("ADD BUSINESS")
                     .font(.system(size: 13, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(.white)
@@ -601,27 +647,29 @@ struct DashboardView: View {
             .frame(width: 164, height: 44)
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private func openSharedItem(_ share: SharedItem) {
         // Load the full object from DataRepository and set it to the appropriate selected state
-        if share.type == "subscription" {
+        let lowercasedType = share.type.lowercased()
+        if lowercasedType == "subscription" {
             if let sub = appState.subscriptions.first(where: { $0.id == share.id }) {
                 selectedSubscription = sub
             }
-        } else if share.type == "card" {
+        } else if lowercasedType == "card" {
             if let card = appState.cards.first(where: { $0.id == share.id }) {
                 selectedCard = card
             }
-        } else if share.type == "loan" {
+        } else if lowercasedType == "loan" {
             if let loan = appState.loans.first(where: { $0.id == share.id }) {
                 selectedLoan = loan
             }
-        } else if share.type == "document" {
+        } else if lowercasedType == "document" {
             if let doc = appState.documents.first(where: { $0.id == share.id }) {
                 selectedDocument = doc
             }
-        } else if share.type == "institution" {
+        } else if lowercasedType == "institution" {
             if let inst = appState.institutions.first(where: { $0.id == share.id }) {
                 selectedInstitution = inst
             }
@@ -638,20 +686,21 @@ struct DashboardView: View {
                 let effectiveCid = appState.localCompanyOverrides[(item.id as! UUID).uuidString] ?? cid
                 
                 if !localCompanyIds.contains(effectiveCid) {
-                    let share = appState.resourceShares.first { $0.resourceId == (item.id as! UUID) || $0.resourceId == effectiveCid }
-                    let role = share?.role ?? "Viewer"
-                    let sEmail = share?.senderEmail ?? "Unknown Sender"
-                    let createdAt = share?.createdAt ?? Date()
-                    
-                    items.append(SharedItem(
-                        id: item.id as! UUID, 
-                        title: item[keyPath: titleKeyPath], 
-                        type: type, 
-                        role: role, 
-                        createdAt: createdAt,
-                        senderEmail: sEmail,
-                        rawItem: item
-                    ))
+                    if let share = appState.resourceShares.first(where: { $0.resourceId == (item.id as! UUID) || $0.resourceId == effectiveCid }) {
+                        let role = share.role
+                        let sEmail = share.senderEmail ?? "Unknown Sender"
+                        let createdAt = share.createdAt
+                        
+                        items.append(SharedItem(
+                            id: item.id as! UUID, 
+                            title: item[keyPath: titleKeyPath], 
+                            type: type, 
+                            role: role, 
+                            createdAt: createdAt,
+                            senderEmail: sEmail,
+                            rawItem: item
+                        ))
+                    }
                 }
             }
         }
@@ -839,18 +888,19 @@ struct SharedWithMeView: View {
                 let cid = item[keyPath: companyIdKeyPath]
                 if !localCompanyIds.contains(cid) {
                     // It's orphaned! Look up its share record
-                    let share = appState.resourceShares.first { $0.resourceId == (item.id as! UUID) || $0.resourceId == cid }
-                    let role = share?.role ?? "Viewer"
-                    let sEmail = share?.senderEmail ?? "Unknown Sender"
-                    let sName = share?.senderDisplayName
-                    let createdAt = share?.createdAt ?? Date()
-                    
-                    let sharedItem = SharedItem(id: item.id as! UUID, title: item[keyPath: titleKeyPath], type: type, role: role, createdAt: createdAt)
-                    
-                    if groups[sEmail] != nil {
-                        groups[sEmail]!.items.append(sharedItem)
-                    } else {
-                        groups[sEmail] = SenderGroup(id: sEmail, displayName: sName, items: [sharedItem])
+                    if let share = appState.resourceShares.first(where: { $0.resourceId == (item.id as! UUID) || $0.resourceId == cid }) {
+                        let role = share.role
+                        let sEmail = share.senderEmail ?? "Unknown Sender"
+                        let sName = share.senderDisplayName
+                        let createdAt = share.createdAt
+                        
+                        let sharedItem = SharedItem(id: item.id as! UUID, title: item[keyPath: titleKeyPath], type: type, role: role, createdAt: createdAt)
+                        
+                        if groups[sEmail] != nil {
+                            groups[sEmail]!.items.append(sharedItem)
+                        } else {
+                            groups[sEmail] = SenderGroup(id: sEmail, displayName: sName, items: [sharedItem])
+                        }
                     }
                 }
             }

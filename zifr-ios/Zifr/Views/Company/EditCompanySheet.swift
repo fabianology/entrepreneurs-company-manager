@@ -111,7 +111,7 @@ struct EditCompanySheet: View {
                         }
                         
                         formSection {
-                            PremiumInputField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
+                            PremiumInputField(label: "BUSINESS NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
                         }
                     }
                     .padding(.top, 8)
@@ -149,7 +149,7 @@ struct EditCompanySheet: View {
 
                     // Entity Category
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ENTITY CATEGORY")
+                        Text("BUSINESS CATEGORY")
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.horizontal, 4)
@@ -170,7 +170,7 @@ struct EditCompanySheet: View {
 
                     // Structure Picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ENTITY STRUCTURE")
+                        Text("BUSINESS STRUCTURE")
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.horizontal, 4)
@@ -211,9 +211,9 @@ struct EditCompanySheet: View {
                                 dismiss()
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     // Pop back to DashboardView, then start tutorial
-                                    vm.path.removeLast(vm.path.count)
+                                    vm.path = NavigationPath()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                        onboardingState.startTutorial()
+                                        onboardingState.startTutorial(appState: appState, userId: authViewModel.currentUser?.id ?? UUID())
                                     }
                                 }
                             } label: {
@@ -246,7 +246,7 @@ struct EditCompanySheet: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "person.crop.circle.badge.plus")
-                                    Text("Share Entity")
+                                    Text("Share Business")
                                 }
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(Color(hex: "#4f46e5"))
@@ -268,7 +268,7 @@ struct EditCompanySheet: View {
                                 HStack {
                                     Spacer()
                                     Image(systemName: company?.userId != authViewModel.currentUser?.id ? "rectangle.portrait.and.arrow.right" : "trash")
-                                    Text(company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \(name.isEmpty ? "Entity" : name)")
+                                    Text(company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \(name.isEmpty ? "Business" : name)")
                                     Spacer()
                                 }
                                 .font(.system(size: 15, weight: .semibold))
@@ -279,11 +279,11 @@ struct EditCompanySheet: View {
                             }
                             .buttonStyle(.plain)
                             .confirmationDialog(
-                                company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \"\(name.isEmpty ? "this entity" : name)\"?",
+                                company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \"\(name.isEmpty ? "this business" : name)\"?",
                                 isPresented: $showDeleteConfirm,
                                 titleVisibility: .visible
                             ) {
-                                Button(company?.userId != authViewModel.currentUser?.id ? "Leave" : "Delete Entity", role: .destructive) {
+                                Button(company?.userId != authViewModel.currentUser?.id ? "Leave" : "Delete Business", role: .destructive) {
                                     if let company { vm.deleteCompany(company, appState: appState, currentUserId: authViewModel.currentUser?.id) }
                                     dismiss()
                                 }
@@ -310,7 +310,7 @@ struct EditCompanySheet: View {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
             )
-            .navigationTitle(isEditing ? "Edit Entity" : "New Entity")
+            .navigationTitle(isEditing ? "Edit Business" : "New Business")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

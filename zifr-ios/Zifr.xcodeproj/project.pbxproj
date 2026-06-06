@@ -25,6 +25,7 @@
 		24A7E43856B3A1263C086E64 /* SharedItemOverrideBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E67F6233E34F02957BC04A3 /* SharedItemOverrideBanner.swift */; };
 		24BD94852802E5649BA31668 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1FB05FF46D194404F4544A /* AppState.swift */; };
 		2B70095DAD91F32DD56DE591 /* PlaidLinkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2977C629E97631FFAE00EEFD /* PlaidLinkButton.swift */; };
+		2C3A0A6F5F8542F4BC590FC1 /* SandboxSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A535B55E87E3170B0FCDF4C /* SandboxSeeder.swift */; };
 		2D36949DE96309F0EA2BEEB1 /* FinancialCardHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3404CEE7CFA7CC4809F14D /* FinancialCardHUD.swift */; };
 		35D7AD052A31B0416172216F /* miloom.console.svg in Resources */ = {isa = PBXBuildFile; fileRef = 92717522EB1C824EB367EF4D /* miloom.console.svg */; };
 		36AB8B6A02E69F639D65509F /* LoanHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = E37853EBF92DDAF1AC5B60F9 /* LoanHUD.swift */; };
@@ -132,6 +133,7 @@
 		2E4DFF2E12CA02748A1371FB /* InstitutionAccountHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionAccountHUD.swift; sourceTree = "<group>"; };
 		2F29D9FCB918B70318DBED51 /* make_symbol.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = make_symbol.py; sourceTree = "<group>"; };
 		3141954F83AF71011D282471 /* Color+Zifr.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Zifr.swift"; sourceTree = "<group>"; };
+		3A535B55E87E3170B0FCDF4C /* SandboxSeeder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SandboxSeeder.swift; sourceTree = "<group>"; };
 		4101F9620312FEC6BD9A1DD3 /* ActivityLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
 		413C5A710215BBAF96C2E51F /* ZifrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZifrApp.swift; sourceTree = "<group>"; };
 		48FACB377EF3DEDCA10F5A3E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -239,6 +241,7 @@
 				708E295DDABD085515D80626 /* AppViewModel.swift */,
 				4C3A8B1889223B777ECDA81B /* AuthViewModel.swift */,
 				D1A73D787862A2955DEB8BEA /* OnboardingStateManager.swift */,
+				3A535B55E87E3170B0FCDF4C /* SandboxSeeder.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -647,6 +650,7 @@
 				DBF7B3F9D3433E1CA369520D /* OnboardingStateManager.swift in Sources */,
 				E9C91760B61AA7765091D5E9 /* SpotlightOverlay.swift in Sources */,
 				72BC06A839A641B99C1899EF /* TutorialSheetView.swift in Sources */,
+				2C3A0A6F5F8542F4BC590FC1 /* SandboxSeeder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

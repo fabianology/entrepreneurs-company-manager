@@ -215,7 +215,7 @@ struct FinancialView: View {
                                     Image(systemName: "dollarsign.bank.building")
                                         .font(.system(size: 28))
                                         .foregroundStyle(.white)
-                                    Text("ADD YOUR FIRST INSTITUTION")
+                                    Text("ADD YOUR FIRST BANK")
                                         .font(.system(size: 11, weight: .black))
                                         .textCase(.uppercase)
                                         .tracking(2)
