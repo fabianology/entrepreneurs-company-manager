@@ -89,12 +89,7 @@ struct SubscriptionListView: View {
                         .contentShape(Rectangle())
                     }
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "#1C1C1E").opacity(0.70))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .premiumDarkBar(cornerRadius: 12)
                 .padding(.top, -10)
                 .padding(.bottom, 8)
 
