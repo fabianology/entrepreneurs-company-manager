@@ -23,71 +23,74 @@ struct InstitutionCardView: View {
             // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
-                    HStack(alignment: .center, spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.06))
-                                .frame(width: 56, height: 56)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                                )
-                            if !(institution.loginUrl ?? "").isEmpty {
-                                FaviconImage(website: institution.loginUrl ?? "", size: 32)
-                            } else {
-                                Image(systemName: "building.columns")
-                                    .font(.system(size: 22, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.8))
+                    VStack(spacing: 0) {
+                        HStack(alignment: .center, spacing: 16) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(width: 56, height: 56)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                    )
+                                if !(institution.loginUrl ?? "").isEmpty {
+                                    FaviconImage(website: institution.loginUrl ?? "", size: 32)
+                                } else {
+                                    Image(systemName: "building.columns")
+                                        .font(.system(size: 22, weight: .semibold))
+                                        .foregroundStyle(Color.white.opacity(0.8))
+                                }
                             }
-                        }
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(institution.name.isEmpty ? "Bank" : institution.name)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(institution.name.isEmpty ? "Bank" : institution.name)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(.white)
 
-                            HStack(spacing: 8) {
-                                HStack(spacing: 4) {
-                                    Text("\(institution.accounts.count)").foregroundStyle(.white)
-                                    Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
-                                }
-                                .font(.system(size: 12, weight: .semibold))
-                                .tracking(0.3)
-                                
-                                statusPipe()
-                                
-                                HStack(spacing: 4) {
-                                    Text("\(cardCount)").foregroundStyle(.white)
-                                    Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
-                                }
-                                .font(.system(size: 12, weight: .semibold))
-                                .tracking(0.3)
-                                
-                                statusPipe()
-                                
-                                HStack(spacing: 4) {
-                                    Text("\(loanCount)").foregroundStyle(.white)
-                                    Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
-                                }
-                                .font(.system(size: 12, weight: .semibold))
-                                .tracking(0.3)
-                                
-                                if let syncedDate = institution.lastSyncedAt {
-                                    statusPipe()
+                                HStack(spacing: 8) {
                                     HStack(spacing: 4) {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                        Text(syncedDate, style: .relative)
-                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                                        Text("\(institution.accounts.count)").foregroundStyle(.white)
+                                        Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
                                     }
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.4))
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .tracking(0.3)
+                                    
+                                    statusPipe()
+                                    
+                                    HStack(spacing: 4) {
+                                        Text("\(cardCount)").foregroundStyle(.white)
+                                        Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
+                                    }
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .tracking(0.3)
+                                    
+                                    statusPipe()
+                                    
+                                    HStack(spacing: 4) {
+                                        Text("\(loanCount)").foregroundStyle(.white)
+                                        Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
+                                    }
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .tracking(0.3)
+                                    
+                                    if let syncedDate = institution.lastSyncedAt {
+                                        statusPipe()
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "arrow.triangle.2.circlepath")
+                                            Text(syncedDate, style: .relative)
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
+                                        }
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.4))
+                                    }
                                 }
                             }
+                            Spacer(minLength: 0)
                         }
-                        Spacer(minLength: 0)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 24)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 24)
-                    .padding(.bottom, 6)
+                    .background(Color.black.opacity(0.70))
                     
                     Divider()
                         .background(Color.white.opacity(0.08))
