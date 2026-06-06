@@ -25,7 +25,7 @@ struct EntityFinancialSection: View {
     @Environment(OnboardingStateManager.self) private var onboardingState
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             // Header
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -96,7 +96,8 @@ struct EntityFinancialSection: View {
             .buttonStyle(.plain)
             .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsHeader)
 
-            // Institutions
+            VStack(spacing: 16) {
+                // Institutions
             VStack(spacing: 12) {
                 ForEach(institutions) { inst in
                     institutionRow(inst)
@@ -305,11 +306,11 @@ struct EntityFinancialSection: View {
             
             financialReportButton
         }
+        .padding(.top, 16)
         .padding(.bottom, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#1C1C1E").opacity(0.70))
-        )
+        .background(Color(hex: "#1C1C1E").opacity(0.70))
+        .frame(maxWidth: .infinity)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancials)

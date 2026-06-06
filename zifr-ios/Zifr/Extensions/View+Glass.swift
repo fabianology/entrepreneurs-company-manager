@@ -49,6 +49,24 @@ struct MasonryGlassModifier: ViewModifier {
     }
 }
 
+// MARK: - Premium Dark Bar Modifier (70% Opacity Black)
+struct PremiumDarkBarModifier: ViewModifier {
+    var cornerRadius: CGFloat = 12
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.black.opacity(0.70))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+    }
+}
+
 // MARK: - CiFr Modal Field style
 struct CifrFieldModifier: ViewModifier {
     func body(content: Content) -> some View {
@@ -74,6 +92,10 @@ extension View {
 
     func masonryGlass(cornerRadius: CGFloat = 12) -> some View {
         modifier(MasonryGlassModifier(cornerRadius: cornerRadius))
+    }
+
+    func premiumDarkBar(cornerRadius: CGFloat = 12) -> some View {
+        modifier(PremiumDarkBarModifier(cornerRadius: cornerRadius))
     }
 
     func cifrField() -> some View {
