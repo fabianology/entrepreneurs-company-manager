@@ -1,5 +1,6 @@
 import SwiftUI
-
+import StoreKit
+import Observation
 struct PremiumUpgradeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthViewModel.self) private var authVM
@@ -92,8 +93,20 @@ struct PremiumUpgradeView: View {
                 // CTA Button
                 Button {
                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                    // TODO: Trigger RevenueCat purchase
-                    dismiss()
+                    Task {
+                        let productId = isYearly ? "com.miloom.premium.yearly" : "com.miloom.premium.monthly"
+                        if let product = StoreService.shared.products.first(where: { $0.id == productId }) {
+                            do {
+                                try await StoreService.shared.purchase(product)
+                                dismiss()
+                            } catch {
+                                print("Purchase failed: \(error)")
+                            }
+                        } else {
+                            // Fallback if products not loaded in simulator
+                            dismiss()
+                        }
+                    }
                 } label: {
                     Text(isYearly ? "Start Yearly Trial" : "Start Monthly Trial")
                         .font(.system(size: 18, weight: .bold))
@@ -170,5 +183,75 @@ struct PricingTab: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+@Observable
+final class StoreService {
+    static let shared = StoreService()
+    
+    var isPremium: Bool = false
+    var products: [Product] = []
+    
+    private let productIDs = ["com.miloom.premium.monthly", "com.miloom.premium.yearly"]
+    
+    private init() {
+        Task {
+            await fetchProducts()
+            await updateCustomerProductStatus()
+        }
+    }
+    
+    @MainActor
+    func fetchProducts() async {
+        do {
+            products = try await Product.products(for: productIDs)
+        } catch {
+            print("Failed product request from the App Store server: \(error)")
+        }
+    }
+    
+    func purchase(_ product: Product) async throws {
+        let result = try await product.purchase()
+        
+        switch result {
+        case .success(let verification):
+            let transaction = try checkVerified(verification)
+            await updateCustomerProductStatus()
+            await transaction.finish()
+        case .userCancelled, .pending:
+            break
+        @unknown default:
+            break
+        }
+    }
+    
+    @MainActor
+    func updateCustomerProductStatus() async {
+        for await result in StoreKit.Transaction.currentEntitlements {
+            do {
+                let transaction = try checkVerified(result)
+                if transaction.revocationDate == nil {
+                    isPremium = true
+                    return
+                }
+            } catch {
+                print("Transaction verification failed.")
+            }
+        }
+        isPremium = false
+    }
+    
+    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
+        switch result {
+        case .unverified:
+            throw StoreError.failedVerification
+        case .verified(let safe):
+            return safe
+        }
+    }
+    
+    enum StoreError: Error {
+        case failedVerification
     }
 }

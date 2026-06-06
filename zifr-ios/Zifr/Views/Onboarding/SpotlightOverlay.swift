@@ -9,6 +9,16 @@ struct SpotlightBoundsKey: PreferenceKey {
     }
 }
 
+// MARK: - Tutorial Frame PreferenceKey
+// Bubbles named CGRects from EntityHomeView / FinancialView up to CompanyDetailView.
+
+struct TutorialFrameKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
 // MARK: - View extensions
 
 extension View {
@@ -68,15 +78,21 @@ struct SpotlightOverlayView: View {
                 ForEach(anchors.indices, id: \.self) { index in
                     let frame = proxy[anchors[index]]
                     let isOutermost = (index == anchors.count - 1)
-                    let strokeColor = isOutermost ? Color(hex: "#0A84FF") : Color.purple
-                    
-                    // Glowing border
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(strokeColor, lineWidth: 3)
-                        .frame(width: frame.width + 16, height: frame.height + 16)
-                        .shadow(color: strokeColor.opacity(0.8), radius: 15)
-                        .position(x: frame.midX, y: frame.midY)
-                        .allowsHitTesting(false)
+                    if isOutermost {
+                        let strokeColor = Color(hex: "#0A84FF")
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(strokeColor, lineWidth: 3)
+                            .frame(width: frame.width + 16, height: frame.height + 16)
+                            .shadow(color: strokeColor.opacity(0.8), radius: 15)
+                            .position(x: frame.midX, y: frame.midY)
+                            .allowsHitTesting(false)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(LinearGradient.miloomPrimary, lineWidth: 1.5)
+                            .frame(width: frame.width - 4, height: frame.height - 4)
+                            .position(x: frame.midX, y: frame.midY)
+                            .allowsHitTesting(false)
+                    }
 
                     // Tap-through zone over target
                     Color.black.opacity(0.001)
@@ -198,19 +214,30 @@ struct SpotlightOverlayView: View {
 // No PreferenceKey / Anchor required — bypasses the List preference-swallowing issue.
 
 struct TutorialSpotlightOverlayView: View {
-    let anchor: CGRect          // Frame in 'dashboard' coordinate space
+    let anchor: CGRect          // Frame in coordinate space
     let stepIndex: Int          // 1-based
     let totalSteps: Int
     let title: String
     let message: String
+    var segment: String? = nil  // Optional screen label, e.g. "COMMAND CENTER"
     let onBack: (() -> Void)?   // nil on step 1
     let onNext: () -> Void
     let onSkip: () -> Void
 
+    // Maps segment labels to their index (0, 1, 2)
+    private var segmentPageIndex: Int {
+        switch segment {
+        case "COMMAND CENTER": return 1
+        case "FINANCIALS":     return 2
+        default:               return 0  // DASHBOARD
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let frame = anchor
-            let tooltipAbove = frame.midY > proxy.size.height / 2
+            // Determine if the spotlight is in the lower half
+            let tooltipAbove = frame.midY > proxy.size.height * 0.5
 
             ZStack {
                 // Dimming layer with hole punched over target
@@ -241,24 +268,35 @@ struct TutorialSpotlightOverlayView: View {
                 // Tooltip card
                 VStack(alignment: .leading, spacing: 0) {
 
-                    // Step pill + progress dots row
+                    // Top row: step counter (plain, no pill) + 3 segment dots
                     HStack(spacing: 10) {
-                        Text("\(stepIndex) of \(totalSteps)")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(Color(hex: "#5AC8FA"))
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(Color(hex: "#5AC8FA").opacity(0.15))
-                            .clipShape(Capsule())
+                        // Segment label + step counter — plain text, no background
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let segment = segment, !segment.isEmpty {
+                                Text(segment)
+                                    .font(.system(size: 9, weight: .black))
+                                    .foregroundStyle(Color(hex: "#5AC8FA").opacity(0.7))
+                                    .tracking(1.5)
+                                    .textCase(.uppercase)
+                            }
+                            Text("\(stepIndex) of \(totalSteps)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color(hex: "#5AC8FA"))
+                        }
 
                         Spacer()
 
+                        // 3-dot page segment indicator (Dashboard · Command Center · Financials)
                         HStack(spacing: 8) {
-                            ForEach(1...totalSteps, id: \.self) { i in
+                            ForEach(0..<3, id: \.self) { i in
                                 Capsule()
-                                    .fill(i == stepIndex ? Color(hex: "#5AC8FA") : (i < stepIndex ? Color(hex: "#5AC8FA").opacity(0.3) : Color.white.opacity(0.1)))
-                                    .frame(width: i == stepIndex ? 24 : 8, height: 8)
-                                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: stepIndex)
+                                    .fill(i == segmentPageIndex
+                                          ? Color(hex: "#5AC8FA")
+                                          : (i < segmentPageIndex
+                                             ? Color(hex: "#5AC8FA").opacity(0.35)
+                                             : Color.white.opacity(0.12)))
+                                    .frame(width: i == segmentPageIndex ? 22 : 8, height: 6)
+                                    .animation(.spring(response: 0.4, dampingFraction: 0.85), value: segmentPageIndex)
                             }
                         }
                     }
@@ -344,11 +382,12 @@ struct TutorialSpotlightOverlayView: View {
                         .shadow(color: .black.opacity(0.6), radius: 24, y: 8)
                 )
                 .padding(.horizontal, 24)
+                .frame(maxWidth: .infinity)
                 .position(
                     x: proxy.size.width / 2,
                     y: tooltipAbove
-                        ? max(frame.minY - 160, 160)
-                        : min(frame.maxY + 160, proxy.size.height - 160)
+                        ? max(frame.minY - 150, 140)
+                        : min(frame.maxY + 150, proxy.size.height - 140)
                 )
             }
         }

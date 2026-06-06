@@ -15,6 +15,8 @@ struct EntitySubscriptionSection: View {
     
     var flipAnimation: Namespace.ID
 
+    @Environment(OnboardingStateManager.self) private var onboardingState
+
     private let subsColor = Color(hex: "#2070BD")
 
     var body: some View {
@@ -64,7 +66,8 @@ struct EntitySubscriptionSection: View {
                         }
                         .frame(height: 4)
                         
-                        Text("\(autoRenewPct)% Auto-Renew")
+                        let pctString = String(autoRenewPct)
+                        Text("\(pctString)% Auto-Renew")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
@@ -167,6 +170,7 @@ struct EntitySubscriptionSection: View {
                 .fill(Color(hex: "#1C1C1E").opacity(0.70))
         )
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterSubscriptions)
         .padding(.horizontal, 20)
         .zIndex(1)
         .sheet(isPresented: $showReceiptReport) {

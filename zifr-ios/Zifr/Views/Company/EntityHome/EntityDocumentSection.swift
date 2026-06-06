@@ -5,6 +5,7 @@ struct EntityDocumentSection: View {
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
     
     @Binding var expandedCategories: Set<String>
     @Binding var newDoc: CompanyDocument?
@@ -166,6 +167,7 @@ struct EntityDocumentSection: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterDocuments)
         .padding(.horizontal, 20)
     }
 }

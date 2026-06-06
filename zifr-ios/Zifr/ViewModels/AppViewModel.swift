@@ -37,43 +37,51 @@ final class AppViewModel {
     func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
         let company = Company(userId: userId, name: name, structure: structure, companyDescription: nil, colorHex: colorHex, logoData: logoData, website: website)
         appState.companies.append(company)
-        Task { try? await DataRepository.shared.insertCompany(company) }
+        Task {
+            do { try await DataRepository.shared.insertCompany(company) }
+            catch { await MainActor.run { appState.companies.removeAll { $0.id == company.id }; appState.error = "Failed to add company." } }
+        }
     }
 
     func updateCompany(_ company: Company, appState: AppState) {
+        guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
+        let original = appState.companies[idx]
         var mutableCompany = company
         mutableCompany.lastModified = Date()
-        if let idx = appState.companies.firstIndex(where: { $0.id == company.id }) {
-            appState.companies[idx] = mutableCompany
+        appState.companies[idx] = mutableCompany
+        Task {
+            do { try await DataRepository.shared.updateCompany(mutableCompany) }
+            catch { await MainActor.run { if let currentIdx = appState.companies.firstIndex(where: { $0.id == company.id }) { appState.companies[currentIdx] = original }; appState.error = "Failed to update company." } }
         }
-        Task { try? await DataRepository.shared.updateCompany(mutableCompany) }
     }
 
     func deleteCompany(_ company: Company, appState: AppState, currentUserId: UUID?) {
+        let originalCompanies = appState.companies
         appState.companies.removeAll { $0.id == company.id }
-        appState.subscriptions.removeAll { $0.companyId == company.id }
-        appState.institutions.removeAll { $0.companyId == company.id }
-        appState.cards.removeAll { $0.companyId == company.id }
-        appState.loans.removeAll { $0.companyId == company.id }
-        appState.documents.removeAll { $0.companyId == company.id }
-        
         Task {
-            if company.userId != currentUserId {
-                try? await DataRepository.shared.leaveResource(resourceId: company.id, resourceType: "company", resourceName: company.name, ownerId: company.userId)
-            } else {
-                try? await DataRepository.shared.deleteCompany(company.id)
+            do {
+                if company.userId != currentUserId {
+                    try await DataRepository.shared.leaveResource(resourceId: company.id, resourceType: "company", resourceName: company.name, ownerId: company.userId)
+                } else {
+                    try await DataRepository.shared.deleteCompany(company.id)
+                }
+                await MainActor.run { if self.selectedCompany?.id == company.id { self.selectedCompany = nil } }
+            } catch {
+                await MainActor.run { appState.companies = originalCompanies; appState.error = "Failed to delete company." }
             }
         }
-        if selectedCompany?.id == company.id { selectedCompany = nil }
     }
 
     func touchCompany(_ company: Company, appState: AppState) {
+        guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
+        let original = appState.companies[idx]
         var mutableCompany = company
         mutableCompany.lastViewed = Date()
-        if let idx = appState.companies.firstIndex(where: { $0.id == company.id }) {
-            appState.companies[idx] = mutableCompany
+        appState.companies[idx] = mutableCompany
+        Task {
+            do { try await DataRepository.shared.updateCompany(mutableCompany) }
+            catch { await MainActor.run { if let currentIdx = appState.companies.firstIndex(where: { $0.id == company.id }) { appState.companies[currentIdx] = original } } }
         }
-        Task { try? await DataRepository.shared.updateCompany(mutableCompany) }
     }
 
     // CRUD: Subscriptions
@@ -85,17 +93,28 @@ final class AppViewModel {
         var mutableSub = sub
         mutableSub.lastUpdated = Date()
         if let idx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) {
+            let original = appState.subscriptions[idx]
             appState.subscriptions[idx] = mutableSub
-            Task { try? await DataRepository.shared.updateSubscription(mutableSub) }
+            Task {
+                do { try await DataRepository.shared.updateSubscription(mutableSub) }
+                catch { await MainActor.run { if let currentIdx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) { appState.subscriptions[currentIdx] = original }; appState.error = "Failed to update service." } }
+            }
         } else {
             appState.subscriptions.append(mutableSub)
-            Task { try? await DataRepository.shared.insertSubscription(mutableSub) }
+            Task {
+                do { try await DataRepository.shared.insertSubscription(mutableSub) }
+                catch { await MainActor.run { appState.subscriptions.removeAll { $0.id == sub.id }; appState.error = "Failed to save service." } }
+            }
         }
     }
 
     func deleteSub(_ sub: Subscription, appState: AppState) {
+        let original = appState.subscriptions
         appState.subscriptions.removeAll { $0.id == sub.id }
-        Task { try? await DataRepository.shared.deleteSubscription(sub.id) }
+        Task {
+            do { try await DataRepository.shared.deleteSubscription(sub.id) }
+            catch { await MainActor.run { appState.subscriptions = original; appState.error = "Failed to delete service." } }
+        }
     }
 
     // CRUD: Financial Cards
@@ -105,18 +124,29 @@ final class AppViewModel {
 
     func saveCard(_ card: FinancialCard, appState: AppState) {
         if let idx = appState.cards.firstIndex(where: { $0.id == card.id }) {
+            let original = appState.cards[idx]
             appState.cards[idx] = card
-            Task { try? await DataRepository.shared.updateCard(card) }
+            Task {
+                do { try await DataRepository.shared.updateCard(card) }
+                catch { await MainActor.run { if let currentIdx = appState.cards.firstIndex(where: { $0.id == card.id }) { appState.cards[currentIdx] = original }; appState.error = "Failed to update card." } }
+            }
         } else {
             appState.cards.append(card)
-            Task { try? await DataRepository.shared.insertCard(card) }
+            Task {
+                do { try await DataRepository.shared.insertCard(card) }
+                catch { await MainActor.run { appState.cards.removeAll { $0.id == card.id }; appState.error = "Failed to add card." } }
+            }
         }
     }
 
     func deleteCard(_ card: FinancialCard, appState: AppState) {
         cleanUpCustomPaymentMethod(name: card.name)
+        let original = appState.cards
         appState.cards.removeAll { $0.id == card.id }
-        Task { try? await DataRepository.shared.deleteCard(card.id) }
+        Task {
+            do { try await DataRepository.shared.deleteCard(card.id) }
+            catch { await MainActor.run { appState.cards = original; appState.error = "Failed to delete card." } }
+        }
     }
 
     // CRUD: Institutions
@@ -126,45 +156,47 @@ final class AppViewModel {
 
     func saveInstitution(_ inst: Institution, appState: AppState) {
         if let idx = appState.institutions.firstIndex(where: { $0.id == inst.id }) {
+            let original = appState.institutions[idx]
             appState.institutions[idx] = inst
-            Task { try? await DataRepository.shared.updateInstitution(inst) }
+            Task {
+                do { try await DataRepository.shared.updateInstitution(inst) }
+                catch { await MainActor.run { if let currentIdx = appState.institutions.firstIndex(where: { $0.id == inst.id }) { appState.institutions[currentIdx] = original }; appState.error = "Failed to update bank." } }
+            }
         } else {
             appState.institutions.append(inst)
-            Task { try? await DataRepository.shared.insertInstitution(inst) }
+            Task {
+                do { try await DataRepository.shared.insertInstitution(inst) }
+                catch { await MainActor.run { appState.institutions.removeAll { $0.id == inst.id }; appState.error = "Failed to add bank." } }
+            }
         }
     }
 
     func saveFinancialInstitutionCascade(institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState) {
         saveInstitution(institution, appState: appState)
-        for card in cards {
-            saveCard(card, appState: appState)
-        }
-        for loan in loans {
-            saveLoan(loan, appState: appState)
-        }
+        for card in cards { saveCard(card, appState: appState) }
+        for loan in loans { saveLoan(loan, appState: appState) }
     }
 
     func deleteInstitution(_ inst: Institution, appState: AppState) {
+        let original = appState.institutions
         let instName = inst.name
         let instCompanyId = inst.companyId
         
-        for acc in inst.accounts {
-            cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
-        }
+        for acc in inst.accounts { cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name) }
         
         for c in appState.cards where c.companyId == instCompanyId && c.institutionName == instName {
-            cleanUpCustomPaymentMethod(name: c.name)
-            appState.cards.removeAll { $0.id == c.id }
-            Task { try? await DataRepository.shared.deleteCard(c.id) }
+            deleteCard(c, appState: appState)
         }
         
         for l in appState.loans where l.companyId == instCompanyId && l.lender == instName {
-            appState.loans.removeAll { $0.id == l.id }
-            Task { try? await DataRepository.shared.deleteLoan(l.id) }
+            deleteLoan(l, appState: appState)
         }
         
         appState.institutions.removeAll { $0.id == inst.id }
-        Task { try? await DataRepository.shared.deleteInstitution(inst.id) }
+        Task {
+            do { try await DataRepository.shared.deleteInstitution(inst.id) }
+            catch { await MainActor.run { appState.institutions = original; appState.error = "Failed to delete bank." } }
+        }
     }
     
     func cleanUpCustomPaymentMethod(name: String) {
@@ -185,17 +217,28 @@ final class AppViewModel {
 
     func saveLoan(_ loan: Loan, appState: AppState) {
         if let idx = appState.loans.firstIndex(where: { $0.id == loan.id }) {
+            let original = appState.loans[idx]
             appState.loans[idx] = loan
-            Task { try? await DataRepository.shared.updateLoan(loan) }
+            Task {
+                do { try await DataRepository.shared.updateLoan(loan) }
+                catch { await MainActor.run { if let currentIdx = appState.loans.firstIndex(where: { $0.id == loan.id }) { appState.loans[currentIdx] = original }; appState.error = "Failed to update loan." } }
+            }
         } else {
             appState.loans.append(loan)
-            Task { try? await DataRepository.shared.insertLoan(loan) }
+            Task {
+                do { try await DataRepository.shared.insertLoan(loan) }
+                catch { await MainActor.run { appState.loans.removeAll { $0.id == loan.id }; appState.error = "Failed to add loan." } }
+            }
         }
     }
 
     func deleteLoan(_ loan: Loan, appState: AppState) {
+        let original = appState.loans
         appState.loans.removeAll { $0.id == loan.id }
-        Task { try? await DataRepository.shared.deleteLoan(loan.id) }
+        Task {
+            do { try await DataRepository.shared.deleteLoan(loan.id) }
+            catch { await MainActor.run { appState.loans = original; appState.error = "Failed to delete loan." } }
+        }
     }
 
     // CRUD: Documents
@@ -205,17 +248,28 @@ final class AppViewModel {
 
     func saveDoc(_ doc: CompanyDocument, appState: AppState) {
         if let idx = appState.documents.firstIndex(where: { $0.id == doc.id }) {
+            let original = appState.documents[idx]
             appState.documents[idx] = doc
-            Task { try? await DataRepository.shared.updateDocument(doc) }
+            Task {
+                do { try await DataRepository.shared.updateDocument(doc) }
+                catch { await MainActor.run { if let currentIdx = appState.documents.firstIndex(where: { $0.id == doc.id }) { appState.documents[currentIdx] = original }; appState.error = "Failed to update document." } }
+            }
         } else {
             appState.documents.append(doc)
-            Task { try? await DataRepository.shared.insertDocument(doc) }
+            Task {
+                do { try await DataRepository.shared.insertDocument(doc) }
+                catch { await MainActor.run { appState.documents.removeAll { $0.id == doc.id }; appState.error = "Failed to add document." } }
+            }
         }
     }
 
     func deleteDoc(_ doc: CompanyDocument, appState: AppState) {
+        let original = appState.documents
         appState.documents.removeAll { $0.id == doc.id }
-        Task { try? await DataRepository.shared.deleteDocument(doc.id) }
+        Task {
+            do { try await DataRepository.shared.deleteDocument(doc.id) }
+            catch { await MainActor.run { appState.documents = original; appState.error = "Failed to delete document." } }
+        }
     }
 
     // Monthly Burn

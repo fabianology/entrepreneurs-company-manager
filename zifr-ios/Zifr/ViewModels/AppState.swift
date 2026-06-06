@@ -10,6 +10,7 @@ final class AppState {
     var cards: [FinancialCard] = []
     var loans: [Loan] = []
     var documents: [CompanyDocument] = []
+    var transactions: [Transaction] = []
     var resourceShares: [ResourceShare] = []
     var activityLogs: [ActivityLog] = []
     var notifications: [AppNotification] = []

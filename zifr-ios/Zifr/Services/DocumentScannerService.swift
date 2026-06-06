@@ -124,6 +124,7 @@ class DocumentProcessor {
                     image.draw(in: imageRect)
                 }
             }
+            try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: pdfURL.path)
             return pdfURL
         } catch {
             print("Failed to generate PDF: \(error)")

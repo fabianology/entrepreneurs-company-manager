@@ -172,7 +172,7 @@ struct SubscriptionListView: View {
 
     private var emptyState: some View {
         Group {
-            if onboardingState.isSpotlightingTutorialSubs {
+            if onboardingState.isSpotlightingTutorialCommandSubs {
                 // Tutorial mode: show demo subscription card un-blurred
                 SubscriptionCardView(
                     sub: dummyNetflix,

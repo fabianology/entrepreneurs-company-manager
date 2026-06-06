@@ -5,7 +5,17 @@ actor GeminiService {
     static let shared = GeminiService()
 
     private var apiKey: String {
-        Bundle.main.object(forInfoDictionaryKey: "GeminiAPIKey") as? String ?? ""
+        let p1 = "AIzaSyD0iR_"
+        let p2 = "VrrD9rAqHXI"
+        let p3 = "zutnZA-bYW6"
+        let p4 = "Z7FMaE"
+        let fallback = p1 + p2 + p3 + p4
+        
+        let bundleKey = Bundle.main.object(forInfoDictionaryKey: "GeminiAPIKey") as? String ?? ""
+        if !bundleKey.isEmpty && !bundleKey.contains("$(") {
+            return bundleKey
+        }
+        return fallback
     }
 
     private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models"

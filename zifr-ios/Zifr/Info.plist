@@ -39,13 +39,13 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
+	<key>SupabaseURL</key>
+	<string>$(SUPABASE_URL)</string>
+	<key>SupabaseAnonKey</key>
+	<string>$(SUPABASE_ANON_KEY)</string>
 	<key>GeminiAPIKey</key>
 	<string>$(GEMINI_API_KEY)</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-	</dict>
+
 	<key>NSCameraUsageDescription</key>
 	<string>Miloom uses your camera to scan and digitize important company documents.</string>
 	<key>NSMicrophoneUsageDescription</key>

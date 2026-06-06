@@ -51,6 +51,7 @@ struct EntityHomeView: View {
     @State private var editingInst: Institution? = nil
     @State private var editingLoan: Loan? = nil
     @State private var editingDoc: CompanyDocument? = nil
+    @State private var viewingTransactionsFor: String? = nil
 
     // MARK: - ViewModel
     private var model: EntityHomeViewModel {
@@ -69,6 +70,14 @@ struct EntityHomeView: View {
                             .padding(.top, 6)
                             .padding(.bottom, 8)
                             .id("quickAddRow")
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: TutorialFrameKey.self,
+                                        value: ["quickAdd": geo.frame(in: .global)]
+                                    )
+                                }
+                            )
                         
                         // FINANCIAL ACCORDION
                         EntityFinancialSection(
@@ -84,12 +93,20 @@ struct EntityHomeView: View {
                             editingCard: $editingCard,
                             editingInst: $editingInst,
                             editingLoan: $editingLoan,
+                            viewingTransactionsFor: $viewingTransactionsFor,
                             totalDebt: model.totalDebt,
                             totalCreditLimit: model.totalCreditLimit,
                             availableCredit: model.availableCredit
                         )
-                        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancials)
                         .id("financialSection")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialFrameKey.self,
+                                    value: ["financials": geo.frame(in: .global)]
+                                )
+                            }
+                        )
 
                         // SUBSCRIPTIONS (Timeline + Cards)
                         EntitySubscriptionSection(
@@ -105,8 +122,15 @@ struct EntityHomeView: View {
                             coverFlowSnappedIndex: $coverFlowSnappedIndex,
                             flipAnimation: flipAnimation
                         )
-                        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterSubscriptions)
                         .id("subscriptionSection")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialFrameKey.self,
+                                    value: ["subscriptions": geo.frame(in: .global)]
+                                )
+                            }
+                        )
 
                         // DOCUMENTS ACCORDION
                         EntityDocumentSection(
@@ -117,8 +141,15 @@ struct EntityHomeView: View {
                             newDoc: $newDoc,
                             editingDoc: $editingDoc
                         )
-                        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterDocuments)
                         .id("documentSection")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialFrameKey.self,
+                                    value: ["documents": geo.frame(in: .global)]
+                                )
+                            }
+                        )
                         
                         Spacer().frame(height: 40)
                     }
@@ -126,10 +157,16 @@ struct EntityHomeView: View {
                 .onChange(of: onboardingState.currentStep) { _, newStep in
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                         switch newStep {
-                        case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .center)
-                        case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .center)
-                        case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .center)
-                        case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .center)
+                        // Real onboarding scroll targets
+                        case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                        case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .top)
+                        case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                        case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .top)
+                        // Tutorial scroll targets — scroll section header to top so frame capture is correct
+                        case .tutorialCommandQuickAdd:       scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                        case .tutorialCommandFinancials:     scrollProxy.scrollTo("financialSection", anchor: .top)
+                        case .tutorialCommandSubscriptions:  scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                        case .tutorialCommandDocuments:      scrollProxy.scrollTo("documentSection", anchor: .top)
                         default: break
                         }
                     }
@@ -138,10 +175,14 @@ struct EntityHomeView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                             switch onboardingState.currentStep {
-                            case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .center)
-                            case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .center)
-                            case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .center)
-                            case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .center)
+                            case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                            case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .top)
+                            case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                            case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .top)
+                            case .tutorialCommandQuickAdd:    scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                            case .tutorialCommandFinancials:  scrollProxy.scrollTo("financialSection", anchor: .top)
+                            case .tutorialCommandSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                            case .tutorialCommandDocuments:   scrollProxy.scrollTo("documentSection", anchor: .top)
                             default: break
                             }
                         }
@@ -181,6 +222,11 @@ struct EntityHomeView: View {
         }
         .sheet(item: $editingDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: company.structure)
+        }
+        .sheet(isPresented: Binding(get: { viewingTransactionsFor != nil }, set: { if !$0 { viewingTransactionsFor = nil } })) {
+            if let accountId = viewingTransactionsFor {
+                TransactionFeedView(accountId: accountId, vm: vm)
+            }
         }
         .sheet(isPresented: $showReceiptReport) {
             SubscriptionReceiptView(

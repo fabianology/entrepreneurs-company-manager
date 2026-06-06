@@ -100,6 +100,14 @@ struct ZifrApp: App {
             .sheet(isPresented: $authViewModel.isRecoveringPassword) {
                 ResetPasswordSheet(authViewModel: authViewModel)
             }
+            .alert("Error", isPresented: Binding(
+                get: { appState.error != nil },
+                set: { if !$0 { appState.error = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(appState.error ?? "An unknown error occurred.")
+            }
         }
     }
 }

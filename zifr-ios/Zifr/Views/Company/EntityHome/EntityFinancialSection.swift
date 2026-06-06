@@ -14,6 +14,7 @@ struct EntityFinancialSection: View {
     @Binding var editingCard: FinancialCard?
     @Binding var editingInst: Institution?
     @Binding var editingLoan: Loan?
+    @Binding var viewingTransactionsFor: String?
     
     let totalDebt: Double
     let totalCreditLimit: Double
@@ -208,9 +209,11 @@ struct EntityFinancialSection: View {
                                             DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
                                         },
                                         actionButtons: {
-                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingCard = card }
+                                            DashboardActionButton(icon: nil, title: "Details") { editingCard = card }
                                             Divider().background(Color.white.opacity(0.06))
-                                            DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                            DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.id.uuidString }
+                                            Divider().background(Color.white.opacity(0.06))
+                                            DashboardActionButton(icon: nil, title: "Report") {
                                                 showFinancialReceiptReport = true
                                             }
                                         }
@@ -272,9 +275,11 @@ struct EntityFinancialSection: View {
                                             DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
                                         },
                                         actionButtons: {
-                                            DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingLoan = loan }
+                                            DashboardActionButton(icon: nil, title: "Details") { editingLoan = loan }
                                             Divider().background(Color.white.opacity(0.06))
-                                            DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                            DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = loan.id.uuidString }
+                                            Divider().background(Color.white.opacity(0.06))
+                                            DashboardActionButton(icon: nil, title: "Report") {
                                                 showFinancialReceiptReport = true
                                             }
                                         }
@@ -297,6 +302,7 @@ struct EntityFinancialSection: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancials)
         .padding(.horizontal, 20)
     }
     
@@ -448,9 +454,11 @@ struct EntityFinancialSection: View {
                                 )
                             },
                             actionButtons: {
-                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingInst = inst }
+                                DashboardActionButton(icon: nil, title: "Details") { editingInst = inst }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = acc.id }
+                                Divider().background(Color.white.opacity(0.06))
+                                DashboardActionButton(icon: nil, title: "Report") {
                                     showFinancialReceiptReport = true
                                 }
                             }
@@ -521,9 +529,11 @@ struct EntityFinancialSection: View {
                                 DashboardInnerRow(icon: nil, label: "Available Credit", value: formatCurrency(max(0, card.limit - card.balance)))
                             },
                             actionButtons: {
-                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingCard = card }
+                                DashboardActionButton(icon: nil, title: "Details") { editingCard = card }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.id.uuidString }
+                                Divider().background(Color.white.opacity(0.06))
+                                DashboardActionButton(icon: nil, title: "Report") {
                                     showFinancialReceiptReport = true
                                 }
                             }
@@ -586,9 +596,11 @@ struct EntityFinancialSection: View {
                                 DashboardInnerRow(icon: nil, label: "Next Payment", value: formatCurrency(loan.monthlyPayment))
                             },
                             actionButtons: {
-                                DashboardActionButton(icon: "list.bullet.rectangle", title: "View Details") { editingLoan = loan }
+                                DashboardActionButton(icon: nil, title: "Details") { editingLoan = loan }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: "sparkles", title: "Generate Report") {
+                                DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = loan.id.uuidString }
+                                Divider().background(Color.white.opacity(0.06))
+                                DashboardActionButton(icon: nil, title: "Report") {
                                     showFinancialReceiptReport = true
                                 }
                             }
@@ -605,5 +617,100 @@ struct EntityFinancialSection: View {
         if value == 0 { return "$0" }
         if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
         return "$\(String(format: "%.0f", value))"
+    }
+}
+
+struct TransactionFeedView: View {
+    let accountId: String
+    @Bindable var vm: AppViewModel
+    @Environment(AppState.self) private var appState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color(hex: "#141414").ignoresSafeArea()
+                
+                let filtered = appState.transactions.filter { $0.accountId == accountId }.sorted(by: { $0.date > $1.date })
+                
+                if filtered.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.clipboard")
+                            .font(.system(size: 48))
+                            .foregroundStyle(Color.white.opacity(0.2))
+                        Text("No Transactions Yet")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text("Once transactions are synced via Plaid, they will appear here.")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                } else {
+                    List {
+                        ForEach(filtered) { tx in
+                            HStack(spacing: 16) {
+                                ZStack {
+                                    Circle().fill(Color(hex: "#1A7077").opacity(0.2)).frame(width: 40, height: 40)
+                                    Image(systemName: tx.pending ? "clock.fill" : "dollarsign")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(Color(hex: "#1A7077"))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(tx.name)
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+                                    
+                                    HStack {
+                                        Text(tx.date, style: .date)
+                                        if !tx.category.isEmpty {
+                                            Text("•")
+                                            Text(tx.category.first ?? "")
+                                        }
+                                        if tx.pending {
+                                            Text("• Pending")
+                                                .foregroundStyle(Color.orange)
+                                        }
+                                    }
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                                }
+                                Spacer()
+                                
+                                Text(formatCurrency(tx.amount))
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(tx.amount < 0 ? Color.green : .white)
+                            }
+                            .listRowBackground(Color.clear)
+                            .listRowSeparatorTint(Color.white.opacity(0.1))
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .navigationTitle("Transactions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(.body.bold())
+                    .foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.fraction(0.9), .large])
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        return formatter.string(from: NSNumber(value: abs(value))) ?? "$0.00"
     }
 }

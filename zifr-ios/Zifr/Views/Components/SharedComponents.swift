@@ -888,14 +888,16 @@ struct AccountNestedRow<CollapsedHeader: View, InnerRows: View, ActionButtons: V
 }
 
 struct DashboardActionButton: View {
-    let icon: String
+    let icon: String?
     let title: String
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
+                if let icon = icon {
+                    Image(systemName: icon)
+                }
                 Text(title)
             }
             .font(.system(size: 11, weight: .medium))
