@@ -63,116 +63,171 @@ const mockData = {
 };
 
 let currentCompany = "aura";
-let activeView = "dashboard";
+let activeScreen = "home"; // "home" or "details"
+let activeTab = "stack"; // "stack" or "vault" or "assistant"
 
 document.addEventListener("DOMContentLoaded", () => {
-    // --- ELEMENT REFS ---
-    const companyBtn = document.getElementById("company-btn");
-    const companyList = document.getElementById("company-list");
-    const currentCompanyTitle = document.getElementById("current-company-title");
-    const currentCompanyStructure = document.getElementById("current-company-structure");
+    // --- IPHONE APP ELEMENT REFS ---
+    const appBackBtn = document.getElementById("app-back-btn");
+    const appHeaderTitle = document.getElementById("app-header-title");
+    const iphoneTabBar = document.getElementById("iphone-tab-bar");
+    const phoneScreenHome = document.getElementById("phone-screen-home");
+    const phoneScreenDetails = document.getElementById("phone-screen-details");
+    const phoneContentArea = document.getElementById("phone-content-area");
     
-    const statBurn = document.getElementById("stat-burn");
-    const statRunway = document.getElementById("stat-runway");
-    const statStack = document.getElementById("stat-stack");
+    // Details Screen Refs
+    const iosStatBurn = document.getElementById("ios-stat-burn");
+    const iosStatRunway = document.getElementById("ios-stat-runway");
+    const iosStackListBody = document.getElementById("ios-stack-list-body");
+    const iosVaultListBody = document.getElementById("ios-vault-list-body");
     
-    const subTableBody = document.getElementById("sub-table-body");
-    const vaultItemsGrid = document.getElementById("vault-items-grid");
+    // Sub-Views and Tabs
+    const iosTabBtns = document.querySelectorAll(".ios-tab-btn");
+    const iosSubviews = document.querySelectorAll(".ios-subview");
     
-    const btnShowDashboard = document.getElementById("btn-show-dashboard");
-    const btnShowVault = document.getElementById("btn-show-vault");
-    
-    const viewDashboard = document.getElementById("view-dashboard");
-    const viewVault = document.getElementById("view-vault");
-    
-    const aiChatHistory = document.getElementById("ai-chat-history");
+    // Dynamic Island
+    const dynamicIsland = document.getElementById("dynamic-island");
+
+    // Chat
+    const iosChatHistory = document.getElementById("ios-chat-history");
+
+    // --- CONTROLLER ELEMENT REFS ---
+    const ctrlBtnHome = document.getElementById("ctrl-btn-home");
+    const ctrlBtnAura = document.getElementById("ctrl-btn-aura");
+    const ctrlBtnEclipse = document.getElementById("ctrl-btn-eclipse");
     const aiPromptBtns = document.querySelectorAll(".ai-prompt-btn");
     
+    // Waitlist Form
     const waitlistForm = document.getElementById("waitlist-form");
     const formMessage = document.getElementById("form-message");
 
-    // --- RENDER FUNCTIONS ---
-    function renderCompany() {
-        const data = mockData[currentCompany];
-        
-        // Update Title & Badge
-        currentCompanyTitle.textContent = data.name;
-        currentCompanyStructure.textContent = data.structure;
-        
-        // Update Selector Button
-        companyBtn.innerHTML = `
-            <span class="company-color-indicator" style="background-color: ${getCompanyColor(currentCompany)};"></span>
-            <span class="company-name-text">${data.name}</span>
-            <span class="dropdown-chevron">▼</span>
-        `;
-        
-        // Update Stats
-        statBurn.textContent = data.burn;
-        statRunway.textContent = data.runway;
-        statStack.textContent = data.stackCount;
-        
-        // Render Subscriptions
-        subTableBody.innerHTML = "";
-        data.subs.forEach(sub => {
-            const tr = document.createElement("tr");
-            tr.id = `sub-row-${sub.name.toLowerCase().split(' ')[0]}`;
-            tr.innerHTML = `
-                <td>
-                    <div class="sub-name-cell">
-                        <div class="sub-logo" style="background: ${getRandomColorGradient()}"></div>
-                        ${sub.name}
-                    </div>
-                </td>
-                <td class="font-mono font-bold">${sub.cost}</td>
-                <td>${sub.cycle}</td>
-                <td class="text-muted font-mono">${sub.payment}</td>
-                <td>${sub.renewal}</td>
-                <td><span class="status-badge ${sub.status.toLowerCase()}">${sub.status}</span></td>
-            `;
-            subTableBody.appendChild(tr);
+    // --- TRANSITIONS & NAVIGATION ---
+    function navigateToDetails(companyKey) {
+        currentCompany = companyKey;
+        const data = mockData[companyKey];
+
+        // Highlight controller button
+        updateControllerState(companyKey);
+
+        // Update Phone Header
+        appHeaderTitle.textContent = data.name;
+        appBackBtn.classList.remove("hidden");
+        iphoneTabBar.classList.remove("hidden");
+
+        // Update Stats in details screen
+        iosStatBurn.textContent = data.burn;
+        iosStatRunway.textContent = data.runway;
+
+        // Render Stack and Vault
+        renderStack(data.subs);
+        renderVault(data.vault);
+
+        // Switch Views
+        phoneScreenHome.classList.remove("active");
+        phoneScreenDetails.classList.add("active");
+        activeScreen = "details";
+        phoneContentArea.scrollTop = 0;
+
+        // Default to Stack Tab when entering details
+        switchTab("stack");
+    }
+
+    function navigateToHome() {
+        updateControllerState("home");
+
+        appHeaderTitle.textContent = "miloom";
+        appBackBtn.classList.add("hidden");
+        iphoneTabBar.classList.add("hidden");
+
+        phoneScreenDetails.classList.remove("active");
+        phoneScreenHome.classList.add("active");
+        activeScreen = "home";
+        phoneContentArea.scrollTop = 0;
+    }
+
+    function switchTab(tabName) {
+        activeTab = tabName;
+        iosTabBtns.forEach(btn => {
+            if (btn.getAttribute("data-tab") === tabName) {
+                btn.classList.add("active");
+            } else {
+                btn.classList.remove("active");
+            }
         });
-        
-        // Render Vault
-        vaultItemsGrid.innerHTML = "";
-        data.vault.forEach((item, index) => {
-            const card = document.createElement("div");
-            card.className = "vault-card";
-            card.id = `vault-card-${item.name.toLowerCase().split(' ')[0]}`;
-            card.innerHTML = `
-                <div class="vault-card-header">
-                    <span class="vault-card-icon">${item.type === 'API Key' ? '🔑' : '🔒'}</span>
-                    <span class="vault-card-title">${item.name}</span>
-                    <span class="sim-badge" style="margin-left: auto; font-size: 0.6rem;">${item.type}</span>
+
+        iosSubviews.forEach(view => {
+            if (view.id === `ios-subview-${tabName}`) {
+                view.classList.add("active");
+            } else {
+                view.classList.remove("active");
+            }
+        });
+    }
+
+    function updateControllerState(activeItem) {
+        [ctrlBtnHome, ctrlBtnAura, ctrlBtnEclipse].forEach(btn => btn.classList.remove("active"));
+        if (activeItem === "home") ctrlBtnHome.classList.add("active");
+        if (activeItem === "aura") ctrlBtnAura.classList.add("active");
+        if (activeItem === "eclipse") ctrlBtnEclipse.classList.add("active");
+    }
+
+    // --- RENDERING INTERNAL SCREENS ---
+    function renderStack(subs) {
+        iosStackListBody.innerHTML = "";
+        subs.forEach(sub => {
+            const div = document.createElement("div");
+            div.className = "ios-stack-item";
+            div.id = `ios-sub-row-${sub.name.toLowerCase().split(' ')[0]}`;
+            div.innerHTML = `
+                <div class="ios-stack-info">
+                    <div class="ios-stack-logo" style="background: ${getRandomColorGradient()}"></div>
+                    <div>
+                        <div class="ios-stack-name">${sub.name}</div>
+                        <div class="ios-stack-payment">${sub.payment}</div>
+                    </div>
                 </div>
-                <div class="vault-field-group">
-                    <div class="vault-label">Username / Identity</div>
-                    <div class="vault-value-row">
-                        <span class="vault-value">${item.user}</span>
+                <div class="ios-stack-meta">
+                    <div class="ios-stack-cost">${sub.cost}</div>
+                    <div class="ios-stack-renewal">${sub.renewal}</div>
+                    <div class="ios-badge-row"><span class="status-badge ${sub.status.toLowerCase()}">${sub.status}</span></div>
+                </div>
+            `;
+            iosStackListBody.appendChild(div);
+        });
+    }
+
+    function renderVault(vault) {
+        iosVaultListBody.innerHTML = "";
+        vault.forEach((item, index) => {
+            const div = document.createElement("div");
+            div.className = "ios-vault-item";
+            div.id = `ios-vault-card-${item.name.toLowerCase().split(' ')[0]}`;
+            div.innerHTML = `
+                <div class="ios-vault-header">
+                    <div class="ios-vault-title">🔑 ${item.name}</div>
+                    <span class="sim-badge" style="font-size: 0.55rem; padding: 1px 4px;">${item.type}</span>
+                </div>
+                <div class="ios-vault-field">
+                    <div class="ios-vault-label">Identity</div>
+                    <div class="ios-vault-value-row">
+                        <span class="ios-vault-val">${item.user}</span>
                         <button class="vault-btn btn-copy" data-text="${item.user}">📋</button>
                     </div>
                 </div>
-                <div class="vault-field-group">
-                    <div class="vault-label">Password / Value</div>
-                    <div class="vault-value-row">
-                        <span class="vault-value font-mono mask-pwd" id="pwd-${currentCompany}-${index}">••••••••••••</span>
+                <div class="ios-vault-field">
+                    <div class="ios-vault-label">Passcode</div>
+                    <div class="ios-vault-value-row">
+                        <span class="ios-vault-val font-mono mask-pwd" id="ios-pwd-${currentCompany}-${index}">••••••••••••</span>
                         <div class="vault-actions">
-                            <button class="vault-btn btn-reveal" data-target="pwd-${currentCompany}-${index}" data-real="${item.pass}">👁️</button>
+                            <button class="vault-btn btn-reveal" data-target="ios-pwd-${currentCompany}-${index}" data-real="${item.pass}">👁️</button>
                             <button class="vault-btn btn-copy" data-text="${item.pass}">📋</button>
                         </div>
                     </div>
                 </div>
             `;
-            vaultItemsGrid.appendChild(card);
+            iosVaultListBody.appendChild(div);
         });
-
-        // Setup Vault Interactions after rendering
         setupVaultEventHandlers();
-    }
-
-    function getCompanyColor(company) {
-        if (company === "aura") return "#4f46e5";
-        if (company === "eclipse") return "#8b5cf6";
-        return "#10b981";
     }
 
     function getRandomColorGradient() {
@@ -187,10 +242,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // --- VAULT INTERACTION SETUP ---
     function setupVaultEventHandlers() {
-        // Password Reveal Handler
         const revealBtns = document.querySelectorAll(".btn-reveal");
         revealBtns.forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
                 const targetId = btn.getAttribute("data-target");
                 const realVal = btn.getAttribute("data-real");
                 const span = document.getElementById(targetId);
@@ -207,10 +262,10 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
 
-        // Copy Handler
         const copyBtns = document.querySelectorAll(".btn-copy");
         copyBtns.forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
                 const text = btn.getAttribute("data-text");
                 navigator.clipboard.writeText(text).then(() => {
                     const originalText = btn.textContent;
@@ -221,147 +276,151 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- SWITCH VIEWS ---
-    function switchView(view) {
-        activeView = view;
-        if (view === "dashboard") {
-            btnShowDashboard.classList.add("active");
-            btnShowVault.classList.remove("active");
-            viewDashboard.classList.add("active");
-            viewVault.classList.remove("active");
-        } else {
-            btnShowDashboard.classList.remove("active");
-            btnShowVault.classList.add("active");
-            viewDashboard.classList.remove("active");
-            viewVault.classList.add("active");
-        }
-    }
-
-    btnShowDashboard.addEventListener("click", () => switchView("dashboard"));
-    btnShowVault.addEventListener("click", () => switchView("vault"));
-
-    // --- COMPANY DROPDOWN SWITCHER ---
-    companyBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        companyList.classList.toggle("active");
-    });
-
-    document.addEventListener("click", () => {
-        companyList.classList.remove("active");
-    });
-
-    const options = document.querySelectorAll(".company-option");
-    options.forEach(opt => {
-        opt.addEventListener("click", () => {
-            options.forEach(o => o.classList.remove("active"));
-            opt.classList.add("active");
-            currentCompany = opt.getAttribute("data-company");
-            renderCompany();
-        });
-    });
-
-    // --- SIMULATED GEMINI ASSISTANT ---
+    // --- CHAT SYSTEM ---
     function appendChatMessage(sender, text) {
-        const msgDiv = document.createElement("div");
-        msgDiv.className = `ai-msg ${sender}`;
-        msgDiv.textContent = text;
-        aiChatHistory.appendChild(msgDiv);
-        aiChatHistory.scrollTop = aiChatHistory.scrollHeight;
+        const bubble = document.createElement("div");
+        bubble.className = `ios-chat-bubble ${sender}`;
+        bubble.textContent = text;
+        iosChatHistory.appendChild(bubble);
+        iosChatHistory.scrollTop = iosChatHistory.scrollHeight;
     }
 
-    function simulateTypingAndResponse(promptType) {
-        // Clear previous highlight classes
-        document.querySelectorAll(".sim-stat-card, .sim-table tr, .vault-card").forEach(el => {
-            el.classList.remove("highlighted-vault-card");
-            el.style.boxShadow = "none";
-            el.style.borderColor = "var(--border-light)";
+    function triggerGeminiCommand(promptType) {
+        // Switch to the Assistant tab first
+        switchTab("assistant");
+
+        // Clear previous highlights
+        document.querySelectorAll(".ios-stat-card, .ios-stack-item, .ios-vault-item").forEach(el => {
+            el.classList.remove("highlighted-ios-card");
         });
 
-        // 1. Add loading state
-        const loadDiv = document.createElement("div");
-        loadDiv.className = "ai-msg bot typing-indicator";
-        loadDiv.textContent = "Gemini is auditing data...";
-        aiChatHistory.appendChild(loadDiv);
-        aiChatHistory.scrollTop = aiChatHistory.scrollHeight;
+        // 1. Play listening state on Dynamic Island
+        dynamicIsland.classList.add("listening");
+
+        // 2. Add Gemini status indicator
+        const loadBubble = document.createElement("div");
+        loadBubble.className = "ios-chat-bubble bot typing-indicator";
+        loadBubble.textContent = "Auditing financial logs...";
+        iosChatHistory.appendChild(loadBubble);
+        iosChatHistory.scrollTop = iosChatHistory.scrollHeight;
 
         setTimeout(() => {
-            // Remove loading indicator
-            loadDiv.remove();
-
+            loadBubble.remove();
+            dynamicIsland.classList.remove("listening");
+            dynamicIsland.classList.add("alerting");
+            
             let responseText = "";
             const currentName = mockData[currentCompany].name;
 
             if (promptType === "burn") {
-                const burnVal = mockData[currentCompany].burn;
-                responseText = `Based on my real-time audit, ${currentName} currently has a monthly tech stack burn of ${burnVal}/mo across ${mockData[currentCompany].stackCount} active subscriptions.`;
+                responseText = `Monthly stack burn for ${currentName} is ${mockData[currentCompany].burn} across ${mockData[currentCompany].stackCount} active integrations.`;
                 
-                // Highlight Burn Stat Card
-                const card = document.getElementById("stat-burn").parentElement;
-                card.classList.add("highlighted-vault-card");
-                card.style.borderColor = "var(--accent-cyan)";
-                card.style.boxShadow = "0 0 15px rgba(0, 240, 255, 0.2)";
-                
-            } else if (promptType === "stripe") {
-                // Force switch to vault tab
-                switchView("vault");
-                
-                responseText = `I have navigated to the Secure Vault. The credentials card for "Stripe Secret Key" is highlighted for your convenience. You can click the eye icon to reveal the secret token.`;
-                
-                // Highlight Stripe Card
+                // Switch back to Stack to highlight
                 setTimeout(() => {
-                    const stripeCard = document.getElementById("vault-card-stripe");
-                    if (stripeCard) {
-                        stripeCard.classList.add("highlighted-vault-card");
-                        stripeCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    switchTab("stack");
+                    const burnCard = document.getElementById("ios-stat-burn-card");
+                    if (burnCard) {
+                        burnCard.classList.add("highlighted-ios-card");
                     }
-                }, 100);
+                }, 400);
+
+            } else if (promptType === "stripe") {
+                responseText = `Accessing Secure Vault... Stripe credentials for ${currentName} have been located and highlighted below.`;
+                
+                // Switch to Vault tab and highlight Stripe Card
+                setTimeout(() => {
+                    switchTab("vault");
+                    const stripeItem = document.getElementById("ios-vault-card-stripe");
+                    if (stripeItem) {
+                        stripeItem.classList.add("highlighted-ios-card");
+                        stripeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 400);
 
             } else if (promptType === "leak") {
                 if (currentCompany === "aura") {
-                    responseText = `⚠️ MONEY LEAK ALERT: You have an active trial for Figma Design Pro ($45/mo) renewing on Jun 08, 2026 (in 2 days). It is currently billed to Amex •••• 1002, but is not linked to your corporate Google Workspace email (root@aurasaas.com). Recommend cancelling or linking to avoid rogue charges.`;
-                    
-                    // Highlight Figma subscription row
-                    switchView("dashboard");
+                    responseText = `⚠️ LEAK AUDIT: Active trial for Figma ($45/mo) renewing in 2 days. It has not been linked to any corporate email (root@aurasaas.com) yet. Cancel to prevent unwanted renewals.`;
                     setTimeout(() => {
-                        const figmaRow = document.getElementById("sub-row-figma");
+                        switchTab("stack");
+                        const figmaRow = document.getElementById("ios-sub-row-figma");
                         if (figmaRow) {
-                            figmaRow.style.background = "rgba(245, 158, 11, 0.1)";
+                            figmaRow.classList.add("highlighted-ios-card");
                             figmaRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }
-                    }, 100);
+                    }, 400);
                 } else if (currentCompany === "eclipse") {
-                    responseText = `⚠️ TRIAL WARNING: Canva Pro ($30/mo) is on a trial ending in 4 days. HubSpot sync was not detected, which means your marketing team isn't using it. Cancel to save $30/mo.`;
-                    switchView("dashboard");
+                    responseText = `⚠️ LEAK AUDIT: Shopify trial ended. Active billing has started on Visa •••• 8821. Canva Pro trial ($30/mo) is active but hasn't been logged in over 14 days.`;
                     setTimeout(() => {
-                        const row = document.getElementById("sub-row-canva");
-                        if (row) {
-                            row.style.background = "rgba(245, 158, 11, 0.1)";
+                        switchTab("stack");
+                        const canvaRow = document.getElementById("ios-sub-row-canva");
+                        if (canvaRow) {
+                            canvaRow.classList.add("highlighted-ios-card");
                         }
-                    }, 100);
+                    }, 400);
                 } else {
-                    responseText = `All subscriptions for Nexus Consulting are active and matched with your financial institutions. No leaking trials or duplicate SaaS seats detected! Runway is stable at 36 months.`;
+                    responseText = `All 5 stack products match bank logs. No duplicates or active leaks found for Nexus Consulting. Runway is solid at 36 months.`;
                 }
             }
 
             appendChatMessage("bot", responseText);
 
+            // Turn off dynamic island alerting after response finishes
+            setTimeout(() => {
+                dynamicIsland.classList.remove("alerting");
+            }, 1000);
+
         }, 1500);
     }
 
-    aiPromptBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            const promptText = btn.textContent.trim();
-            const promptType = btn.getAttribute("data-prompt");
-            
-            // Add user message
-            appendChatMessage("user", promptText);
-            
-            // Trigger bot response
-            simulateTypingAndResponse(promptType);
+    // --- EVENT LISTENERS ---
+
+    // Click company cards inside phone screen
+    const phoneCompanyCards = document.querySelectorAll(".ios-company-card");
+    phoneCompanyCards.forEach(card => {
+        card.addEventListener("click", () => {
+            const companyKey = card.getAttribute("data-company");
+            navigateToDetails(companyKey);
         });
     });
 
-    // --- WAITLIST FORM FLOW ---
+    // App Back Button
+    appBackBtn.addEventListener("click", navigateToHome);
+
+    // App Tab Buttons
+    iosTabBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            const targetTab = btn.getAttribute("data-tab");
+            switchTab(targetTab);
+        });
+    });
+
+    // Controller: Home Button
+    ctrlBtnHome.addEventListener("click", navigateToHome);
+
+    // Controller: Company Switcher Buttons
+    ctrlBtnAura.addEventListener("click", () => navigateToDetails("aura"));
+    ctrlBtnEclipse.addEventListener("click", () => navigateToDetails("eclipse"));
+
+    // Controller: Gemini Chat Prompt Buttons
+    aiPromptBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+            // First ensure we are in details view
+            if (activeScreen !== "details") {
+                navigateToDetails(currentCompany);
+            }
+            
+            const text = btn.textContent.trim();
+            const promptType = btn.getAttribute("data-prompt");
+
+            // User Chat Bubble
+            appendChatMessage("user", text);
+
+            // Bot Typing Response
+            triggerGeminiCommand(promptType);
+        });
+    });
+
+    // --- WAITLIST FORM HANDLING ---
     if (waitlistForm) {
         waitlistForm.addEventListener("submit", (e) => {
             e.preventDefault();
@@ -370,17 +429,17 @@ document.addEventListener("DOMContentLoaded", () => {
             
             if (!email) return;
 
-            formMessage.textContent = "Securing your invitation slot...";
+            formMessage.textContent = "Securing slot on the private queue...";
             formMessage.className = "form-message";
 
             setTimeout(() => {
-                formMessage.textContent = "✓ Success! You've been added to the exclusive private beta. Check your inbox soon.";
+                formMessage.textContent = "✓ Slot confirmed! We've added your business email to the waitlist.";
                 formMessage.className = "form-message success";
                 emailInput.value = "";
-            }, 1000);
+            }, 1200);
         });
     }
 
-    // --- INITIALIZE DEFAULT STATE ---
-    renderCompany();
+    // Initialize home state
+    navigateToHome();
 });

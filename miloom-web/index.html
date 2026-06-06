@@ -35,163 +35,248 @@
             <p>Miloom aggregates your SaaS stack, tracks recurring burn, secures bank credentials, and answers natural language questions. All in one gorgeous space.</p>
             <div class="hero-actions">
                 <a href="#waitlist" class="btn-primary">Request Early Access</a>
-                <a href="#simulator" class="btn-secondary">Try Interactive Demo</a>
+                <a href="#simulator" class="btn-secondary">Try Simulator Demo</a>
             </div>
         </div>
     </section>
 
-    <!-- Interactive App Simulator Section -->
+    <!-- Interactive App Simulator Section (Xcode Simulator style) -->
     <section id="simulator" class="simulator-section">
         <div class="section-header">
-            <h2 class="section-title">The "Aha" Demo</h2>
-            <p class="section-subtitle">Interact with our live dashboard below. Switch companies, reveal credentials, or ask the AI assistant questions.</p>
+            <h2 class="section-title">The Xcode Simulator</h2>
+            <p class="section-subtitle">Test-drive the actual Miloom iOS app directly in the simulated iPhone below. Click cards to drill in, switch tabs, or use the controller panel.</p>
         </div>
 
-        <div class="simulator-container glass-panel">
-            <!-- App Sidebar Mock -->
-            <div class="sim-sidebar">
-                <div class="sim-app-logo">miloom</div>
+        <div class="simulator-layout">
+            <!-- Left Side: Simulator Controller / Gemini Chat Control -->
+            <div class="controller-panel glass-panel">
+                <div class="panel-header">
+                    <span class="panel-icon">🕹️</span>
+                    <h3>Remote Controller</h3>
+                </div>
+                <p class="panel-description">Click any action below to automatically trigger interactions and watch the iPhone simulator respond in real-time.</p>
                 
-                <div class="sim-nav-group">
-                    <div class="sim-nav-label">Select Company</div>
-                    <div class="company-selector-wrapper">
-                        <button class="company-dropdown-btn" id="company-btn">
-                            <span class="company-color-indicator" style="background-color: #4f46e5;"></span>
-                            <span class="company-name-text">Aura SaaS</span>
-                            <span class="dropdown-chevron">▼</span>
+                <div class="control-group">
+                    <div class="control-label">Quick Actions</div>
+                    <div class="control-buttons">
+                        <button class="ctrl-btn" id="ctrl-btn-home">
+                            <span>🏠</span> Go to Home List
                         </button>
-                        <div class="company-dropdown-list" id="company-list">
-                            <div class="company-option active" data-company="aura">
-                                <span class="company-color-indicator" style="background-color: #4f46e5;"></span>
-                                Aura SaaS
-                            </div>
-                            <div class="company-option" data-company="eclipse">
-                                <span class="company-color-indicator" style="background-color: #8b5cf6;"></span>
-                                Eclipse E-Commerce
-                            </div>
-                            <div class="company-option" data-company="nexus">
-                                <span class="company-color-indicator" style="background-color: #10b981;"></span>
-                                Nexus Consulting
-                            </div>
-                        </div>
+                        <button class="ctrl-btn" id="ctrl-btn-aura">
+                            <span>🚀</span> Open Aura SaaS
+                        </button>
+                        <button class="ctrl-btn" id="ctrl-btn-eclipse">
+                            <span>🛍️</span> Open Eclipse E-Commerce
+                        </button>
                     </div>
                 </div>
 
-                <div class="sim-menu-items">
-                    <button class="sim-menu-item active" id="btn-show-dashboard">
-                        <span>📊</span> Dashboard
-                    </button>
-                    <button class="sim-menu-item" id="btn-show-vault">
-                        <span>🔒</span> Secure Vault
-                    </button>
+                <div class="control-group">
+                    <div class="control-label">Ask Gemini Live</div>
+                    <div class="sim-ai-prompts">
+                        <button class="ai-prompt-btn" data-prompt="burn">
+                            "What is our monthly SaaS burn?"
+                        </button>
+                        <button class="ai-prompt-btn" data-prompt="stripe">
+                            "Show Stripe credentials for Aura SaaS"
+                        </button>
+                        <button class="ai-prompt-btn" data-prompt="leak">
+                            "Find any potential money leaks"
+                        </button>
+                    </div>
                 </div>
 
-                <div class="sim-sidebar-footer">
+                <div class="panel-footer">
                     <div class="sim-burn-bar">
-                        <div class="sim-burn-label">Combined Burn</div>
+                        <div class="sim-burn-label">Consolidated Burn</div>
                         <div class="sim-burn-value">$5,470/mo</div>
                     </div>
                 </div>
             </div>
 
-            <!-- App Main Content Mock -->
-            <div class="sim-main-content">
-                <!-- Top Header -->
-                <div class="sim-header">
-                    <div class="sim-title-area">
-                        <h3 id="current-company-title">Aura SaaS</h3>
-                        <span class="sim-badge" id="current-company-structure">C-Corp</span>
-                    </div>
-                    <div class="sim-keyboard-shortcut">Press <kbd>⌘K</kbd> to search</div>
-                </div>
-
-                <!-- Stats Grid -->
-                <div class="sim-stats-grid">
-                    <div class="sim-stat-card">
-                        <div class="sim-stat-label">Monthly Burn</div>
-                        <div class="sim-stat-value text-purple" id="stat-burn">$1,420</div>
-                        <div class="sim-stat-sub">Across active stack</div>
-                    </div>
-                    <div class="sim-stat-card">
-                        <div class="sim-stat-label">Runway</div>
-                        <div class="sim-stat-value text-green" id="stat-runway">24 Mos</div>
-                        <div class="sim-stat-sub">Based on current cash</div>
-                    </div>
-                    <div class="sim-stat-card">
-                        <div class="sim-stat-label">Active Stack</div>
-                        <div class="sim-stat-value text-blue" id="stat-stack">8 Tools</div>
-                        <div class="sim-stat-sub">1 Trial pending renewal</div>
-                    </div>
-                </div>
-
-                <!-- Interactive App View Area -->
-                <div class="sim-view-container">
-                    <!-- Dashboard View (Subscriptions) -->
-                    <div class="sim-view active" id="view-dashboard">
-                        <h4 class="view-section-title">Tech Stack & Subscriptions</h4>
-                        <div class="sim-table-wrapper">
-                            <table class="sim-table">
-                                <thead>
-                                    <tr>
-                                        <th>Service</th>
-                                        <th>Cost</th>
-                                        <th>Cycle</th>
-                                        <th>Payment</th>
-                                        <th>Next Renewal</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="sub-table-body">
-                                    <!-- Populated dynamically by JS -->
-                                </tbody>
-                            </table>
+            <!-- Center/Right Side: iPhone 15 Pro Device Frame -->
+            <div class="iphone-container">
+                <div class="iphone-frame">
+                    <!-- Screen Container -->
+                    <div class="iphone-screen">
+                        <!-- iOS Status Bar -->
+                        <div class="ios-status-bar">
+                            <div class="ios-time">9:41</div>
+                            <div class="ios-dynamic-island" id="dynamic-island"></div>
+                            <div class="ios-icons">
+                                <span>📶</span>
+                                <span>5G</span>
+                                <span style="font-size: 0.9rem;">🔋</span>
+                            </div>
                         </div>
-                    </div>
 
-                    <!-- Vault View (Credentials & Logins) -->
-                    <div class="sim-view" id="view-vault">
-                        <h4 class="view-section-title">Secure Credential Vault</h4>
-                        <div class="sim-vault-grid" id="vault-items-grid">
-                            <!-- Populated dynamically by JS -->
+                        <!-- iPhone App Navigation Header -->
+                        <div class="iphone-app-header">
+                            <button class="back-btn hidden" id="app-back-btn">◀ Back</button>
+                            <div class="app-header-title" id="app-header-title">miloom</div>
+                            <span class="ios-avatar" id="app-avatar-btn">👤</span>
                         </div>
+
+                        <!-- App Content Area (Inside Phone) -->
+                        <div class="iphone-content-scroll" id="phone-content-area">
+                            
+                            <!-- SCREEN 1: HOME DASHBOARD LIST -->
+                            <div class="phone-screen-view active" id="phone-screen-home">
+                                <div class="quote-card">
+                                    <p class="quote-text">"Make things people want."</p>
+                                    <p class="quote-author">— Paul Graham</p>
+                                </div>
+
+                                <div class="ios-section-header">YOUR ENTITIES</div>
+
+                                <div class="ios-company-list">
+                                    <!-- Aura SaaS Card -->
+                                    <div class="ios-company-card" data-company="aura" style="border-left: 4px solid #4f46e5;">
+                                        <div class="company-card-header">
+                                            <div class="company-card-info">
+                                                <h4>Aura SaaS</h4>
+                                                <span>C-Corp</span>
+                                            </div>
+                                            <div class="card-arrow">➔</div>
+                                        </div>
+                                        <div class="company-card-stats">
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">SaaS Stack</div>
+                                                <div class="card-stat-value text-blue">8 Tools</div>
+                                            </div>
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">Burn</div>
+                                                <div class="card-stat-value text-purple">$1,420</div>
+                                            </div>
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">Runway</div>
+                                                <div class="card-stat-value text-green">24 Mos</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Eclipse Card -->
+                                    <div class="ios-company-card" data-company="eclipse" style="border-left: 4px solid #8b5cf6;">
+                                        <div class="company-card-header">
+                                            <div class="company-card-info">
+                                                <h4>Eclipse E-Commerce</h4>
+                                                <span>LLC</span>
+                                            </div>
+                                            <div class="card-arrow">➔</div>
+                                        </div>
+                                        <div class="company-card-stats">
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">SaaS Stack</div>
+                                                <div class="card-stat-value text-blue">6 Tools</div>
+                                            </div>
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">Burn</div>
+                                                <div class="card-stat-value text-purple">$3,200</div>
+                                            </div>
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">Runway</div>
+                                                <div class="card-stat-value text-green">12 Mos</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Nexus Card -->
+                                    <div class="ios-company-card" data-company="nexus" style="border-left: 4px solid #10b981;">
+                                        <div class="company-card-header">
+                                            <div class="company-card-info">
+                                                <h4>Nexus Consulting</h4>
+                                                <span>Sole Prop</span>
+                                            </div>
+                                            <div class="card-arrow">➔</div>
+                                        </div>
+                                        <div class="company-card-stats">
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">SaaS Stack</div>
+                                                <div class="card-stat-value text-blue">5 Tools</div>
+                                            </div>
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">Burn</div>
+                                                <div class="card-stat-value text-purple">$850</div>
+                                            </div>
+                                            <div class="card-stat">
+                                                <div class="card-stat-label">Runway</div>
+                                                <div class="card-stat-value text-green">36 Mos</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- SCREEN 2: DETAILS VIEW (TABS INSIDE APP) -->
+                            <div class="phone-screen-view" id="phone-screen-details">
+                                <!-- Company Stats Cards -->
+                                <div class="ios-stats-scroller">
+                                    <div class="ios-stat-card" id="ios-stat-burn-card">
+                                        <div class="stat-card-label">Monthly Burn</div>
+                                        <div class="stat-card-value text-purple" id="ios-stat-burn">$1,420</div>
+                                        <div class="stat-card-sub">Active Stack</div>
+                                    </div>
+                                    <div class="ios-stat-card" id="ios-stat-runway-card">
+                                        <div class="stat-card-label">Runway</div>
+                                        <div class="stat-card-value text-green" id="ios-stat-runway">24 Mos</div>
+                                        <div class="stat-card-sub">Est. Cash</div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab Sub-Views (Stack, Vault, Gemini Chat) -->
+                                <div class="ios-tab-content-container">
+                                    <!-- STACK VIEW -->
+                                    <div class="ios-subview active" id="ios-subview-stack">
+                                        <div class="ios-section-header" style="margin-top: 10px;">ACTIVE SAAS PRODUCTS</div>
+                                        <div class="ios-stack-list" id="ios-stack-list-body">
+                                            <!-- Dynamically Populated -->
+                                        </div>
+                                    </div>
+
+                                    <!-- VAULT VIEW -->
+                                    <div class="ios-subview" id="ios-subview-vault">
+                                        <div class="ios-section-header" style="margin-top: 10px;">CREDENTIAL VAULT</div>
+                                        <div class="ios-vault-list" id="ios-vault-list-body">
+                                            <!-- Dynamically Populated -->
+                                        </div>
+                                    </div>
+
+                                    <!-- GEMINI VIEW -->
+                                    <div class="ios-subview" id="ios-subview-assistant">
+                                        <div class="ios-chat-history" id="ios-chat-history">
+                                            <div class="ios-chat-bubble bot">
+                                                ✨ Hello! I am your real-time Gemini finance assistant. Ask me anything about your companies or tech stacks.
+                                            </div>
+                                        </div>
+                                        <div class="ios-chat-input-row">
+                                            <input type="text" placeholder="Ask Gemini..." disabled id="ios-chat-input">
+                                            <button class="ios-chat-send-btn" disabled>➔</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- iPhone App Bottom Tab Bar -->
+                        <div class="iphone-tab-bar hidden" id="iphone-tab-bar">
+                            <button class="ios-tab-btn active" data-tab="stack">
+                                <span class="tab-icon">📊</span>
+                                <span class="tab-label">Stack</span>
+                            </button>
+                            <button class="ios-tab-btn" data-tab="vault">
+                                <span class="tab-icon">🔒</span>
+                                <span class="tab-label">Vault</span>
+                            </button>
+                            <button class="ios-tab-btn" data-tab="assistant">
+                                <span class="tab-icon">✨</span>
+                                <span class="tab-label">Assistant</span>
+                            </button>
+                        </div>
+
+                        <!-- iOS Home Indicator -->
+                        <div class="ios-home-indicator"></div>
                     </div>
-                </div>
-            </div>
-
-            <!-- App AI Assistant Mock -->
-            <div class="sim-ai-panel">
-                <div class="sim-ai-header">
-                    <div class="sim-ai-avatar">✨</div>
-                    <div>
-                        <div class="sim-ai-name">Gemini Command</div>
-                        <div class="sim-ai-status">Ready to audit</div>
-                    </div>
-                </div>
-
-                <!-- AI Chat Area -->
-                <div class="sim-ai-chat" id="ai-chat-history">
-                    <div class="ai-msg bot">
-                        Hello! I am your real-time finance auditor. Click one of the preset prompts below to test my capabilities.
-                    </div>
-                </div>
-
-                <!-- AI Quick Prompts -->
-                <div class="sim-ai-prompts">
-                    <button class="ai-prompt-btn" data-prompt="burn">
-                        "What is our monthly SaaS burn?"
-                    </button>
-                    <button class="ai-prompt-btn" data-prompt="stripe">
-                        "Show Stripe credentials for Aura SaaS"
-                    </button>
-                    <button class="ai-prompt-btn" data-prompt="leak">
-                        "Find any potential money leaks"
-                    </button>
-                </div>
-
-                <!-- AI Input Mock -->
-                <div class="sim-ai-input-wrapper">
-                    <input type="text" placeholder="Ask Gemini about your company..." disabled id="sim-ai-input">
-                    <button class="sim-ai-send" disabled>➔</button>
                 </div>
             </div>
         </div>
