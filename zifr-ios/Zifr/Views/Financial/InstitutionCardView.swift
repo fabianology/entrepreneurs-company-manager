@@ -90,13 +90,11 @@ struct InstitutionCardView: View {
                         .padding(.top, 24)
                         .padding(.bottom, 16)
                     }
-                    .background(Color.black.opacity(0.70))
+                    .background(
+                        UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                            .fill(Color(hex: "#1C1C1E"))
+                    )
                     
-                    Divider()
-                        .background(Color.white.opacity(0.08))
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 12)
-
                     // ── Credentials (tap-to-copy) ────
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
