@@ -5,8 +5,7 @@ project = Xcodeproj::Project.open(project_path)
 target = project.targets.first
 
 files_to_add = [
-    { path: "Zifr/Models/ActivityLog.swift", group: "Zifr/Models" },
-    { path: "Zifr/Views/ActivityLogsView.swift", group: "Zifr/Views" }
+    { path: "Zifr/Views/DeleteAccountView.swift", group: "Zifr/Views" }
 ]
 
 files_to_add.each do |file_info|

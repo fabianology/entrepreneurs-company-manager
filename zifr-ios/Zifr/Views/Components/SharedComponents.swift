@@ -821,53 +821,19 @@ struct InstitutionDashboardCard<CollapsedHeader: View, AccountsContent: View>: V
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .background(
-                Group {
-                    if isExpanded {
-                        UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16)
-                            .fill(Color.black.opacity(0.70))
-                    } else {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.black.opacity(0.70))
-                    }
-                }
-            )
-            .clipShape(
-                isExpanded ? AnyShape(UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16)) : AnyShape(RoundedRectangle(cornerRadius: 16))
-            )
-            .overlay(
-                Group {
-                    if isExpanded {
-                        UnevenRoundedRectangle(topLeadingRadius: 16, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 16)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    } else {
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    }
-                }
-            )
 
             if isExpanded {
                 VStack(spacing: 0) {
                     Divider().background(Color.white.opacity(0.1))
                     accountsContent()
                 }
-                .background(
-                    UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 16, bottomTrailingRadius: 16, topTrailingRadius: 0)
-                        .fill(Color(hex: "#1C1C1E").opacity(0.70))
-                )
-                .clipShape(
-                    UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 16, bottomTrailingRadius: 16, topTrailingRadius: 0)
-                )
-                .overlay(
-                    UnevenRoundedRectangle(topLeadingRadius: 0, bottomLeadingRadius: 16, bottomTrailingRadius: 16, topTrailingRadius: 0)
-                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                )
             }
         }
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isExpanded)
     }
-
 }
 
 struct AccountNestedRow<CollapsedHeader: View, InnerRows: View, ActionButtons: View>: View {

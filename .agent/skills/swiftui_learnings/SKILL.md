@@ -222,3 +222,15 @@ This document summarizes the core SwiftUI architectural lessons and specialized 
 ## 51. Querying IP Addresses in Supabase `auth.sessions`
 - **The Issue**: When writing custom Postgres RPC functions to pull active session metadata directly from Supabase's internal `auth.sessions` table, developers often try to select `s.ip_address`. This throws an `identifier "s.ip_address" does not exist` database error.
 - **The Native Solution**: The correct column name in the Supabase `auth` schema for active sessions is simply `s.ip`. Ensure your SQL views and RPC functions specifically query `ip` to accurately map location data to the UI.
+
+## 52. Safe Swift Codable Decoding for Generic Data Types
+- **The Issue**: When defining an optional `Data?` property in a Codable Swift model mapping to a remote generic JSON payload (like Supabase), the default Swift `JSONDecoder` strictly enforces perfect Base64 formatting. If the remote database accidentally contains a non-null, non-Base64 string (e.g. an empty string `""` or corrupted text), the entire decoding sequence for that list violently fails with `DecodingError.dataCorrupted`, causing the entire dashboard to go blank.
+- **The Native Solution**: Override the struct's `init(from decoder: Decoder)` to intercept the raw string payload. Use `try? container.decodeIfPresent(String.self)` and manually attempt the `Data(base64Encoded:)` conversion, allowing it to gracefully fail and assign `nil` without throwing an unrecoverable exception up to the root array decoder.
+
+## 53. Prioritizing Native Framework Fallbacks over Project Scripting
+- **The Issue**: When attempting to fulfill features relying on external Swift Packages (like RevenueCat) that are not currently mapped in the `project.pbxproj`, attempting to inject the package mechanically via terminal scripts often permanently corrupts the Xcode build configurations.
+- **The Native Solution**: Whenever third-party packages are missing, default immediately to implementing the native iOS equivalent (like `StoreKit 2`) as a temporary drop-in placeholder. Native frameworks require zero dependency resolution and guarantee immediate compile safety, ensuring paywalls and logic can be tested while deferring explicit SPM installations to a manual Xcode UI step.
+
+## 54. In-Line UI Architecture vs Structural TabViews
+- **The Issue**: When replacing complex custom horizontal swiping views (like a "Command Center" dashboard) with Apple's native `TabView`, the standard TabView strictly claims horizontal and vertical swipe precedence, often clashing with internal ScrollViews or demanding an entire structural overhaul of the screen.
+- **The Native Solution**: Respect established view hierarchies. Instead of forcing native structural components, implement feature expansions directly within `.sheet(isPresented:)` modifiers bound directly to contextual inline buttons. This preserves the vertical flow of the existing architecture while neatly abstracting the new layout (like a Transaction Feed) into a dedicated modal stack without introducing horizontal gestural conflicts.
