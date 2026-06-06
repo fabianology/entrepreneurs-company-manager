@@ -376,10 +376,10 @@ struct CompanyDetailView: View {
                         } label: {
                             VStack(spacing: 1) {
                                 Image(systemName: AppViewModel.CompanyTab.home.icon)
-                                    .font(.system(size: 18, weight: vm.activeTab == .home ? .semibold : .medium))
+                                    .font(.system(size: 20, weight: vm.activeTab == .home ? .semibold : .medium))
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                                     .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
-                                    .frame(width: 24, height: 24)
+                                    .frame(width: 32, height: 26)
                                 Text("home")
                                     .font(.system(size: 8, weight: vm.activeTab == .home ? .bold : .medium))
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
@@ -818,18 +818,20 @@ struct CompanyDetailView: View {
             } label: {
                 VStack(spacing: 1) {
                     Image(systemName: tab.icon)
-                        .font(.system(size: 18, weight: isFront ? .semibold : .medium))
+                        .font(.system(size: 20, weight: isFront ? .semibold : .medium))
                         .foregroundStyle(isFront ? tabColor(tab) : .secondary)
                         .symbolEffect(.bounce, value: tabBounces[tab, default: 0])
-                        .frame(width: 24, height: 24)
+                        .frame(width: 32, height: isFront ? 26 : 44)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(Color.black)
                                 .frame(width: 20, height: 20)
                         )
-                    Text(tabLabelText(for: tab))
-                        .font(.system(size: 8, weight: isFront ? .bold : .medium))
-                        .foregroundStyle(isFront ? tabColor(tab) : .secondary)
+                    if isFront {
+                        Text(tabLabelText(for: tab))
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundStyle(tabColor(tab))
+                    }
                 }
                 .frame(width: 32, height: 44)
             }
