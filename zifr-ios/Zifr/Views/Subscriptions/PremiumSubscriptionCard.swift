@@ -298,20 +298,20 @@ struct PremiumSubscriptionCard: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
-                                            Text("-")
-                                                .font(.system(size: 15, weight: .bold))
-                                                .foregroundStyle(Color(hex: "#C1AA78"))
+                                            Circle()
+                                                .fill(ss.status == .active ? Color.zifrGreen : Color.red)
+                                                .frame(width: 6, height: 6)
                                             Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
                                                 .font(.system(size: 15, weight: .semibold))
                                                 .foregroundStyle(.white)
                                         }
                                         
                                         HStack(spacing: 6) {
-                                            Circle()
-                                                .fill(ss.status == .active ? Color.zifrGreen : Color.red)
-                                                .frame(width: 6, height: 6)
-                                            
-                                            statusPipe()
+                                            Text("billing:")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.4))
+                                                .textCase(.uppercase)
+                                                .tracking(0.5)
                                             
                                             Text(ss.paymentMethod.isEmpty ? "No Card" : ss.paymentMethod)
                                                 .font(.system(size: 13, weight: .medium))
