@@ -219,20 +219,20 @@ struct FinancialView: View {
                             .buttonStyle(PremiumButtonStyle())
                             .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
                             
-                            // ── Onboarding Preview Header ──
+                            // ── Demo Bank Connections ──
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Linked Institutions (Preview)")
+                                Text("Demo Bank Connections")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(.white)
                                     .tracking(0.5)
-                                Text("Tap to expand accounts, view active balances, and credentials.")
+                                Text("Sample institutions showing credentials and accounts. Tap to expand details.")
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.4))
+                                    .lineSpacing(4)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 8)
                             
-                            // American Express
                             InstitutionCardView(
                                 institution: dummyAmex,
                                 totalMonthlyPayment: 0,
@@ -244,7 +244,6 @@ struct FinancialView: View {
                                 onEditLoan: { _ in }
                             )
                             
-                            // Chase Bank
                             InstitutionCardView(
                                 institution: dummyChase,
                                 totalMonthlyPayment: dummyLoan.monthlyPayment,

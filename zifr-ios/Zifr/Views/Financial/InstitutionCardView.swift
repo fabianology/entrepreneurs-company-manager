@@ -19,26 +19,14 @@ struct InstitutionCardView: View {
     @State private var accountDraft = InstitutionAccount()
 
     var body: some View {
-        VStack(spacing: 0) {
+        MiloomListCard {
             // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
                     HStack(alignment: .center, spacing: 16) {
-                        // Favicon/Logo ZStack (hides placeholder box if logo is present)
-                        if !(institution.loginUrl ?? "").isEmpty {
-                            FaviconImage(website: institution.loginUrl ?? "", size: 40)
+                        if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
+                            FaviconImage(website: loginUrl, size: 40)
                                 .frame(width: 56, height: 56)
-                                .overlay(
-                                    Group {
-                                        if institution.isDisconnected {
-                                            Circle()
-                                                .fill(Color.red)
-                                                .frame(width: 12, height: 12)
-                                                .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
-                                                .offset(x: 22, y: 22)
-                                        }
-                                    }
-                                )
                         } else {
                             ZStack {
                                 RoundedRectangle(cornerRadius: 16)
@@ -52,17 +40,6 @@ struct InstitutionCardView: View {
                                     .font(.system(size: 22, weight: .semibold))
                                     .foregroundStyle(Color.white.opacity(0.8))
                             }
-                            .overlay(
-                                Group {
-                                    if institution.isDisconnected {
-                                        Circle()
-                                            .fill(Color.red)
-                                            .frame(width: 12, height: 12)
-                                            .overlay(Circle().stroke(Color.black, lineWidth: 1.5))
-                                            .offset(x: 22, y: 22)
-                                    }
-                                }
-                            )
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -113,63 +90,61 @@ struct InstitutionCardView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 24)
                     .padding(.bottom, 24)
+                    .background(
+                        UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                            .fill(Color.black.opacity(0.70))
+                            .overlay(
+                                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    )
+
+                    // ── Credentials (tap-to-copy) ────
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            copyableCredential(
+                                id: institution.id.uuidString,
+                                label: "Login ID",
+                                value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
+                                field: "login"
+                            )
+                            copyableCredential(
+                                id: institution.id.uuidString,
+                                label: "Password",
+                                value: institution.password ?? "",
+                                field: "password",
+                                isPassword: true
+                            )
+                        }
+                        
+                        let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
+                        DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, institution.isDisconnected ? 16 : 24)
+                    
+                    if institution.isDisconnected {
+                        PlaidLinkButton(
+                            companyId: institution.companyId,
+                            institutionId: institution.id,
+                            buttonText: "Reconnect Bank",
+                            isReconnect: true,
+                            onSuccess: { _, _, _ in
+                                var updatedInst = institution
+                                updatedInst.isDisconnected = false
+                                vm.saveInstitution(updatedInst, appState: appState)
+                            }
+                        )
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 24)
+                    }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(PremiumButtonStyle())
-            .background(
-                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                    .fill(Color.black.opacity(0.70)) // Segmented Header at 0.70 Opacity (matching premiumDarkBar)
-            )
 
-            // ── Credentials & Plaid Reconnect (Body block at 0.40 Opacity) ──
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    copyableCredential(
-                        id: institution.id.uuidString,
-                        label: "Login ID",
-                        value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
-                        field: "login"
-                    )
-                    copyableCredential(
-                        id: institution.id.uuidString,
-                        label: "Password",
-                        value: institution.password ?? "",
-                        field: "password",
-                        isPassword: true
-                    )
-                }
-                
-                let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
-                DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
-                
-                if institution.isDisconnected {
-                    PlaidLinkButton(
-                        companyId: institution.companyId,
-                        institutionId: institution.id,
-                        buttonText: "Reconnect Bank",
-                        isReconnect: true,
-                        onSuccess: { _, _, _ in
-                            var updatedInst = institution
-                            updatedInst.isDisconnected = false
-                            vm.saveInstitution(updatedInst, appState: appState)
-                        }
-                    )
-                    .padding(.top, 16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .miloomReportStroke(cornerRadius: 16)
-                            .padding(.top, 16)
-                            .allowsHitTesting(false)
-                    )
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .padding(.bottom, 24)
-            .background(Color.black.opacity(0.40)) // Credentials block at 0.40 Opacity
-
-            // ── Accordion (Sub-Rows at 0.30 Opacity) ───────────────────────
+            // ── Accordion ──────────────────────────────────────────────────
             MiloomAccordion(title: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded, action: {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -206,14 +181,14 @@ struct InstitutionCardView: View {
                                             .foregroundStyle(.white)
                                     }
                                 }
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, 8)
                                 .padding(.vertical, 12)
                                 .background(Color.clear)
                                 
                                 if acc.id != institution.accounts.last?.id || !loans.isEmpty {
                                     Divider()
                                         .background(Color.white.opacity(0.06))
-                                        .padding(.horizontal, 16)
+                                        .padding(.horizontal, 8)
                                 }
                             }
                         }
@@ -257,29 +232,23 @@ struct InstitutionCardView: View {
                                             .foregroundStyle(.white)
                                     }
                                 }
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, 8)
                                 .padding(.vertical, 12)
                                 .background(Color.clear)
                                 
                                 if loan.id != loans.last?.id {
                                     Divider()
                                         .background(Color.white.opacity(0.06))
-                                        .padding(.horizontal, 16)
+                                        .padding(.horizontal, 8)
                                 }
                             }
                         }
                         .buttonStyle(PremiumButtonStyle())
                     }
                 }
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.30)) // Sub-rows at 0.30 Opacity
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,
