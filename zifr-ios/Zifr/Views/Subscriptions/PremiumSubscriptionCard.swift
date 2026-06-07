@@ -296,8 +296,8 @@ struct PremiumSubscriptionCard: View {
                         } label: {
                             VStack(spacing: 0) {
                                 HStack {
-                                    Image(systemName: "puzzlepiece.fill")
-                                        .font(.system(size: 14))
+                                    Text("-")
+                                        .font(.system(size: 14, weight: .bold))
                                         .foregroundStyle(Color(hex: "#C1AA78"))
                                         .frame(width: 24, alignment: .leading)
                                     
@@ -386,8 +386,8 @@ struct PremiumSubscriptionCard: View {
                         } label: {
                             VStack(spacing: 0) {
                                 HStack(alignment: .top) {
-                                    Image(systemName: "envelope.fill")
-                                        .font(.system(size: 14))
+                                    Text("-")
+                                        .font(.system(size: 14, weight: .bold))
                                         .foregroundStyle(Color(hex: "#C1AA78"))
                                         .frame(width: 24, alignment: .leading)
                                         .padding(.top, 2)
