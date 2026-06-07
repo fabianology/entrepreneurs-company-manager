@@ -104,6 +104,31 @@ struct FinancialView: View {
                             interestRate: 6.5,
                             monthlyPayment: 825
                         )
+                        let dummyWells = Institution(
+                            id: UUID(),
+                            userId: UUID(),
+                            companyId: company.id,
+                            name: "Wells Fargo",
+                            loginUrl: "wellsfargo.com",
+                            username: "founder@company.com",
+                            password: "••••••••",
+                            accounts: [
+                                InstitutionAccount(name: "Business Checking", type: "Checking", last4: "8899", balance: 14500, limit: 0)
+                            ],
+                            isDisconnected: true
+                        )
+                        let dummyWellsLoan = Loan(
+                            id: UUID(),
+                            userId: UUID(),
+                            companyId: company.id,
+                            role: "Equipment Loan",
+                            lender: "Wells Fargo",
+                            name: "Equipment Financing",
+                            principalAmount: 25000,
+                            remainingBalance: 12000,
+                            interestRate: 7.25,
+                            monthlyPayment: 450
+                        )
 
                     if onboardingState.isInFinancialTutorial {
                             // Tutorial mode: show full dummy wallet un-blurred
@@ -180,53 +205,117 @@ struct FinancialView: View {
                             .padding(.top, 40)
                             .id("tutorialWallet")
                         } else {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                            showWizard = true
-                        } label: {
-                            ZStack {
-                                // Dummy wallet stack
-                                VStack(spacing: 0) {
-                                    ZStack(alignment: .top) {
-                                        FinancialCardVisual(card: dummyCard1, isPopped: false)
-                                            .frame(height: 110)
-                                            .offset(y: -36)
-                                            .zIndex(2)
-                                        InstitutionCardView(
-                                            institution: dummyAmex,
-                                            totalMonthlyPayment: 0,
-                                            cardCount: 1,
-                                            loanCount: 0,
-                                            loans: [],
-                                            vm: vm,
-                                            onEdit: {},
-                                            onEditLoan: { _ in }
-                                        )
-                                        .zIndex(3)
+                        VStack(spacing: 24) {
+                            // ── Primary Action: Add Bank ──
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                                showWizard = true
+                            } label: {
+                                HStack(spacing: 16) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color(hex: "#C1AA78").opacity(0.15))
+                                            .frame(width: 48, height: 48)
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 18, weight: .bold))
+                                            .foregroundStyle(Color(hex: "#C1AA78"))
                                     }
-                                    .padding(.top, 36)
+                                    
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Connect Financial Institution")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                        Text("Link your accounts via Plaid")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.3))
                                 }
-                                .allowsHitTesting(false)
-                                .blur(radius: 3)
-                                
-                                // Glass overlay
-                                VStack(spacing: 16) {
-                                    Image(systemName: "dollarsign.bank.building")
-                                        .font(.system(size: 28))
-                                        .foregroundStyle(.white)
-                                    Text("ADD YOUR FIRST BANK")
-                                        .font(.system(size: 11, weight: .black))
-                                        .textCase(.uppercase)
-                                        .tracking(2)
-                                        .foregroundStyle(.white)
-                                }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 16)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
+                            .buttonStyle(PremiumButtonStyle())
+                            .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
+                            
+                            // ── Visual Hierarchy Comparison Header ──
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Visual Hierarchy Demos")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .tracking(0.5)
+                                Text("Compare the three card layout alternatives below. Tap to expand accounts & details.")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.4))
+                                    .lineSpacing(4)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 8)
+                            
+                            // Style 1: American Express
+                            VStack(spacing: 12) {
+                                Text("STYLE 1: SEGMENTED HEADER (.premiumDarkBar)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#C1AA78"))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 4)
+                                InstitutionCardView(
+                                    institution: dummyAmex,
+                                    totalMonthlyPayment: 0,
+                                    cardCount: 1,
+                                    loanCount: 0,
+                                    loans: [],
+                                    vm: vm,
+                                    onEdit: {},
+                                    onEditLoan: { _ in }
+                                )
+                            }
+                            
+                            // Style 2: Chase Bank
+                            VStack(spacing: 12) {
+                                Text("STYLE 2: CLEAN BORDERLESS ACCORDION ROWS")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#C1AA78"))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 4)
+                                InstitutionCardView(
+                                    institution: dummyChase,
+                                    totalMonthlyPayment: dummyLoan.monthlyPayment,
+                                    cardCount: 1,
+                                    loanCount: 1,
+                                    loans: [dummyLoan],
+                                    vm: vm,
+                                    onEdit: {},
+                                    onEditLoan: { _ in }
+                                )
+                            }
+                            
+                            // Style 3: Wells Fargo
+                            VStack(spacing: 12) {
+                                Text("STYLE 3: FAVICON STATUS DOT & ANIMATED WARNING STROKE")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#C1AA78"))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 4)
+                                InstitutionCardView(
+                                    institution: dummyWells,
+                                    totalMonthlyPayment: dummyWellsLoan.monthlyPayment,
+                                    cardCount: 0,
+                                    loanCount: 1,
+                                    loans: [dummyWellsLoan],
+                                    vm: vm,
+                                    onEdit: {},
+                                    onEditLoan: { _ in }
+                                )
                             }
                         }
-                        .padding(.top, 40)
-                        .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
+                        .padding(.top, 20)
                         }
                     } else {
                         // Institutions Block

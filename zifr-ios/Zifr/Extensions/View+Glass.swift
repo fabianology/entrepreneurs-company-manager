@@ -69,12 +69,13 @@ struct PremiumDarkBarModifier: ViewModifier {
 
 // MARK: - Miloom Report Stroke Modifier
 struct MiloomReportStrokeModifier: ViewModifier {
+    var cornerRadius: CGFloat = 12
     @State private var rotation: Double = 0.0
 
     func body(content: Content) -> some View {
         content
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(
                         AngularGradient(
                             gradient: Gradient(colors: [
@@ -130,8 +131,8 @@ extension View {
         modifier(PremiumDarkBarModifier(cornerRadius: cornerRadius))
     }
 
-    func miloomReportStroke() -> some View {
-        modifier(MiloomReportStrokeModifier())
+    func miloomReportStroke(cornerRadius: CGFloat = 12) -> some View {
+        modifier(MiloomReportStrokeModifier(cornerRadius: cornerRadius))
     }
 
 
