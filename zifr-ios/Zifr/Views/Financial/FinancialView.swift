@@ -104,31 +104,6 @@ struct FinancialView: View {
                             interestRate: 6.5,
                             monthlyPayment: 825
                         )
-                        let dummyWells = Institution(
-                            id: UUID(),
-                            userId: UUID(),
-                            companyId: company.id,
-                            name: "Wells Fargo",
-                            loginUrl: "wellsfargo.com",
-                            username: "founder@company.com",
-                            password: "••••••••",
-                            accounts: [
-                                InstitutionAccount(name: "Business Checking", type: "Checking", last4: "8899", balance: 14500, limit: 0)
-                            ],
-                            isDisconnected: true
-                        )
-                        let dummyWellsLoan = Loan(
-                            id: UUID(),
-                            userId: UUID(),
-                            companyId: company.id,
-                            role: "Equipment Loan",
-                            lender: "Wells Fargo",
-                            name: "Equipment Financing",
-                            principalAmount: 25000,
-                            remainingBalance: 12000,
-                            interestRate: 7.25,
-                            monthlyPayment: 450
-                        )
 
                     if onboardingState.isInFinancialTutorial {
                             // Tutorial mode: show full dummy wallet un-blurred
@@ -244,76 +219,42 @@ struct FinancialView: View {
                             .buttonStyle(PremiumButtonStyle())
                             .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
                             
-                            // ── Visual Hierarchy Comparison Header ──
+                            // ── Onboarding Preview Header ──
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Visual Hierarchy Demos")
+                                Text("Linked Institutions (Preview)")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(.white)
                                     .tracking(0.5)
-                                Text("Compare the three card layout alternatives below. Tap to expand accounts & details.")
+                                Text("Tap to expand accounts, view active balances, and credentials.")
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.4))
-                                    .lineSpacing(4)
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.top, 8)
                             
-                            // Style 1: American Express
-                            VStack(spacing: 12) {
-                                Text("STYLE 1: SEGMENTED HEADER (.premiumDarkBar)")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#C1AA78"))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 4)
-                                InstitutionCardView(
-                                    institution: dummyAmex,
-                                    totalMonthlyPayment: 0,
-                                    cardCount: 1,
-                                    loanCount: 0,
-                                    loans: [],
-                                    vm: vm,
-                                    onEdit: {},
-                                    onEditLoan: { _ in }
-                                )
-                            }
+                            // American Express
+                            InstitutionCardView(
+                                institution: dummyAmex,
+                                totalMonthlyPayment: 0,
+                                cardCount: 1,
+                                loanCount: 0,
+                                loans: [],
+                                vm: vm,
+                                onEdit: {},
+                                onEditLoan: { _ in }
+                            )
                             
-                            // Style 2: Chase Bank
-                            VStack(spacing: 12) {
-                                Text("STYLE 2: CLEAN BORDERLESS ACCORDION ROWS")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#C1AA78"))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 4)
-                                InstitutionCardView(
-                                    institution: dummyChase,
-                                    totalMonthlyPayment: dummyLoan.monthlyPayment,
-                                    cardCount: 1,
-                                    loanCount: 1,
-                                    loans: [dummyLoan],
-                                    vm: vm,
-                                    onEdit: {},
-                                    onEditLoan: { _ in }
-                                )
-                            }
-                            
-                            // Style 3: Wells Fargo
-                            VStack(spacing: 12) {
-                                Text("STYLE 3: FAVICON STATUS DOT & ANIMATED WARNING STROKE")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#C1AA78"))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 4)
-                                InstitutionCardView(
-                                    institution: dummyWells,
-                                    totalMonthlyPayment: dummyWellsLoan.monthlyPayment,
-                                    cardCount: 0,
-                                    loanCount: 1,
-                                    loans: [dummyWellsLoan],
-                                    vm: vm,
-                                    onEdit: {},
-                                    onEditLoan: { _ in }
-                                )
-                            }
+                            // Chase Bank
+                            InstitutionCardView(
+                                institution: dummyChase,
+                                totalMonthlyPayment: dummyLoan.monthlyPayment,
+                                cardCount: 1,
+                                loanCount: 1,
+                                loans: [dummyLoan],
+                                vm: vm,
+                                onEdit: {},
+                                onEditLoan: { _ in }
+                            )
                         }
                         .padding(.top, 20)
                         }
