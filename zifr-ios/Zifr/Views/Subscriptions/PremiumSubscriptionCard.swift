@@ -313,7 +313,7 @@ struct PremiumSubscriptionCard: View {
                                                 .textCase(.uppercase)
                                                 .tracking(0.5)
                                             
-                                            Text(ss.paymentMethod.isEmpty ? "No Card" : ss.paymentMethod)
+                                            Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss.paymentMethod))
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.6))
 
@@ -659,6 +659,35 @@ struct PremiumSubscriptionCard: View {
                 }
             }
         }
+    }
+
+    private func paymentMethodWithInstitution(for method: String) -> String {
+        guard !method.isEmpty else { return "" }
+        let normalizedMethod = method.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(method)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(method)"
+                    }
+                }
+            }
+        }
+        return method
     }
 }
 
