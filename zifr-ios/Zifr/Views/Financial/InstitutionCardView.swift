@@ -248,7 +248,6 @@ struct InstitutionCardView: View {
                 }
             }
         }
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,
