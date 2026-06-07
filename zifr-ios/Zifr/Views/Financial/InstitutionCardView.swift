@@ -92,7 +92,7 @@ struct InstitutionCardView: View {
                     .padding(.bottom, 24)
                     .background(
                         UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                            .fill(Color.black.opacity(0.70))
+                            .fill(Color.black)
                             .overlay(
                                 UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)

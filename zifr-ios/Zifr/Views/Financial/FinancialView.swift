@@ -435,8 +435,13 @@ struct FinancialView: View {
                             value: poppedCardId
                         )
                         .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }
+                            if poppedCardId == card.id.uuidString {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                poppedCardId = nil
+                            } else {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                poppedCardId = card.id.uuidString
+                            }
                         }
                         .onLongPressGesture {
                             editingCard = card
@@ -510,8 +515,13 @@ struct FinancialView: View {
                             value: poppedCardId
                         )
                         .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            if poppedCardId == card.id.uuidString { poppedCardId = nil } else { poppedCardId = card.id.uuidString }
+                            if poppedCardId == card.id.uuidString {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                poppedCardId = nil
+                            } else {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                poppedCardId = card.id.uuidString
+                            }
                         }
                         .onLongPressGesture {
                             editingCard = card
