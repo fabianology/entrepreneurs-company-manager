@@ -263,7 +263,7 @@ struct EditSubscriptionSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text((sub.paymentMethod ?? "").isEmpty ? "N/A" : (sub.paymentMethod ?? ""))
+                    Text((sub.paymentMethod ?? "").isEmpty ? "N/A" : paymentMethodWithInstitution)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle((sub.paymentMethod ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
@@ -751,6 +751,35 @@ struct EditSubscriptionSheet: View {
             }
         }
     }
+
+    private var paymentMethodWithInstitution: String {
+        guard let paymentMethod = sub.paymentMethod, !paymentMethod.isEmpty else { return "" }
+        let normalizedMethod = paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in appState.cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(paymentMethod)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(paymentMethod)"
+                    }
+                }
+            }
+        }
+        return paymentMethod
+    }
 }
 
 // MARK: – Supplemental Services Section
@@ -911,7 +940,7 @@ struct SubServiceHUD: View {
                                     showPaymentPicker = true
                                 } label: {
                                     HStack {
-                                        Text(draft.paymentMethod.isEmpty ? "N/A" : draft.paymentMethod)
+                                        Text(draft.paymentMethod.isEmpty ? "N/A" : paymentMethodWithInstitution(for: draft.paymentMethod))
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
                                             .lineLimit(1)
@@ -1105,6 +1134,35 @@ struct SubServiceHUD: View {
                 .presentationCornerRadius(24)
             }
         }
+    }
+
+    private func paymentMethodWithInstitution(for method: String) -> String {
+        guard !method.isEmpty else { return "" }
+        let normalizedMethod = method.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(method)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(method)"
+                    }
+                }
+            }
+        }
+        return method
     }
 }
 

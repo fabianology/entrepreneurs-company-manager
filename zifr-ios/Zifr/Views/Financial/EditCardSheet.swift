@@ -284,7 +284,7 @@ struct EditCardSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text((card.paidFrom ?? "").isEmpty ? "None" : (card.paidFrom ?? ""))
+                    Text((card.paidFrom ?? "").isEmpty ? "None" : paidFromWithInstitution)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle((card.paidFrom ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
@@ -785,5 +785,34 @@ struct EditCardSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
+    }
+
+    private var paidFromWithInstitution: String {
+        guard let paidFrom = card.paidFrom, !paidFrom.isEmpty else { return "" }
+        let normalizedPaidFrom = paidFrom.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in appState.cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedPaidFrom {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(paidFrom)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedPaidFrom {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(paidFrom)"
+                    }
+                }
+            }
+        }
+        return paidFrom
     }
 }

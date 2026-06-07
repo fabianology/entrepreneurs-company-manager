@@ -480,7 +480,7 @@ struct AddSubscriptionWizard: View {
                         } label: {
                             HStack {
                                 Image(systemName: "creditcard.fill").foregroundStyle(Color.white.opacity(0.45))
-                                Text(sub.paymentMethod?.isEmpty == false ? sub.paymentMethod! : "Select Payment Method")
+                                Text(sub.paymentMethod?.isEmpty == false ? paymentMethodWithInstitution : "Select Payment Method")
                                     .font(.system(size: 14, weight: .regular))
                                     .foregroundStyle(sub.paymentMethod?.isEmpty == false ? .white : Color.white.opacity(0.45))
                                 Spacer()
@@ -667,6 +667,35 @@ struct AddSubscriptionWizard: View {
         .disabled(disabled)
         .buttonStyle(MiloomPrimaryButtonStyle())
         .padding(.top, 8)
+    }
+
+    private var paymentMethodWithInstitution: String {
+        guard let paymentMethod = sub.paymentMethod, !paymentMethod.isEmpty else { return "" }
+        let normalizedMethod = paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in appState.cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(paymentMethod)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(paymentMethod)"
+                    }
+                }
+            }
+        }
+        return paymentMethod
     }
 }
 
