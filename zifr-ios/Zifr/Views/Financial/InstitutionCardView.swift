@@ -157,16 +157,16 @@ struct InstitutionCardView: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
                             VStack(spacing: 0) {
-                                HStack {
-                                    Image(systemName: acc.type.lowercased().contains("credit") ? "creditcard" : "building.columns")
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(Color(hex: "#C1AA78"))
-                                        .frame(width: 24, alignment: .leading)
-                                    
+                                HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(acc.name.isEmpty ? "Account" : acc.name)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Text("-")
+                                                .font(.system(size: 15, weight: .bold))
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
+                                            Text(acc.name.isEmpty ? "Account" : acc.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
                                         
                                         HStack(spacing: 6) {
                                             Text(acc.type)
@@ -201,16 +201,16 @@ struct InstitutionCardView: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
                             VStack(spacing: 0) {
-                                HStack {
-                                    Image(systemName: "chart.line.uptrend.xyaxis")
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(Color(hex: "#C1AA78"))
-                                        .frame(width: 24, alignment: .leading)
-                                    
+                                HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Text("-")
+                                                .font(.system(size: 15, weight: .bold))
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
+                                            Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
                                         
                                         HStack(spacing: 6) {
                                             Text(loan.role)
@@ -223,6 +223,17 @@ struct InstitutionCardView: View {
                                             Text("\(rateStr) APR")
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+
+                                        if let notes = loan.notes, !notes.isEmpty {
+                                            HStack(spacing: 6) {
+                                                Text("PURPOSE:")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                Text(notes)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
                                         }
                                     }
                                     Spacer()
