@@ -295,16 +295,16 @@ struct PremiumSubscriptionCard: View {
                             showSubServiceHUD = true
                         } label: {
                             VStack(spacing: 0) {
-                                HStack {
-                                    Text("-")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color(hex: "#C1AA78"))
-                                        .frame(width: 24, alignment: .leading)
-                                    
+                                HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(.white)
+                                        HStack(spacing: 6) {
+                                            Text("-")
+                                                .font(.system(size: 15, weight: .bold))
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
+                                            Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
                                         
                                         HStack(spacing: 6) {
                                             Circle()
@@ -322,6 +322,18 @@ struct PremiumSubscriptionCard: View {
                                             Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+
+                                        if !ss.purpose.isEmpty {
+                                            HStack(spacing: 6) {
+                                                Text("PURPOSE:")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                
+                                                Text(ss.purpose)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
                                         }
                                     }
                                     Spacer()
@@ -386,18 +398,16 @@ struct PremiumSubscriptionCard: View {
                         } label: {
                             VStack(spacing: 0) {
                                 HStack(alignment: .top) {
-                                    Text("-")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color(hex: "#C1AA78"))
-                                        .frame(width: 24, alignment: .leading)
-                                        .padding(.top, 2)
-                                    
                                     VStack(alignment: .leading, spacing: 6) {
-                                        // Email
-                                        Text(email.email.isEmpty ? "No Address" : email.email)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                            .lineLimit(1)
+                                        HStack(spacing: 6) {
+                                            Text("-")
+                                                .font(.system(size: 15, weight: .bold))
+                                                .foregroundStyle(Color(hex: "#C1AA78"))
+                                            Text(email.email.isEmpty ? "No Address" : email.email)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                                .lineLimit(1)
+                                        }
 
                                         dynamicLabels(for: email)
 
