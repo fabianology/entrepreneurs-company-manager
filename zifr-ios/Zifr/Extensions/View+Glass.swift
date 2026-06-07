@@ -34,13 +34,17 @@ struct LiquidGlassModifier: ViewModifier {
     }
 }
 
-// MARK: - Masonry Glass Modifier (70% Opacity)
+// MARK: - Masonry Glass Modifier (Tinted Material Blur)
 struct MasonryGlassModifier: ViewModifier {
     var cornerRadius: CGFloat = 12
 
     func body(content: Content) -> some View {
         content
-            .background(Color(hex: "#1C1C1E").opacity(0.70))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color(hex: "#1C1C1E").opacity(0.40))
+            )
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)

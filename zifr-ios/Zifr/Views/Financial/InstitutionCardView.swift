@@ -52,7 +52,7 @@ struct InstitutionCardView: View {
                                     Text("\(institution.accounts.count)").foregroundStyle(.white)
                                     Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
                                 statusPipe()
@@ -61,7 +61,7 @@ struct InstitutionCardView: View {
                                     Text("\(cardCount)").foregroundStyle(.white)
                                     Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
                                 statusPipe()
@@ -70,7 +70,7 @@ struct InstitutionCardView: View {
                                     Text("\(loanCount)").foregroundStyle(.white)
                                     Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
                                 if let syncedDate = institution.lastSyncedAt {
@@ -88,11 +88,11 @@ struct InstitutionCardView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 24)
-                    .padding(.bottom, 24)
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
                     .background(
                         UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                            .fill(Color.black)
+                            .fill(Color.black.opacity(0.70))
                             .overlay(
                                 UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)

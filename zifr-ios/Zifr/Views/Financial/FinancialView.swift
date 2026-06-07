@@ -22,6 +22,8 @@ struct FinancialView: View {
     @State private var shareResourceTitle: String = "All Financials"
     @State private var showShareSheet = false
     @State private var poppedCardId: String? = nil
+    @State private var pullingUpCardId: String? = nil
+    @State private var zIndexCardId: String? = nil
     
     var body: some View {
         ScrollViewReader { proxy in
@@ -31,7 +33,7 @@ struct FinancialView: View {
                 financialActionBar
                 
                 // ── Main Wallet Stack ──
-                LazyVStack(spacing: 20) {
+                LazyVStack(spacing: 24) {
                     if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()
@@ -114,7 +116,7 @@ struct FinancialView: View {
                                         let isPopped = poppedCardId == dummyCard1Id.uuidString
                                         FinancialCardVisual(card: dummyCard1, isPopped: isPopped)
                                             .frame(height: isPopped ? 210 : 110)
-                                            .offset(y: isPopped ? 16 : -36)
+                                            .offset(y: isPopped ? 16 : -20)
                                             .zIndex(2)
                                             .animation(.spring(response: 0.55, dampingFraction: 0.78), value: isPopped)
                                         InstitutionCardView(
@@ -129,7 +131,7 @@ struct FinancialView: View {
                                         )
                                         .zIndex(3)
                                     }
-                                    .padding(.top, 36)
+                                    .padding(.top, 20)
                                 }
                                 .background(
                                     GeometryReader { geo in
@@ -148,7 +150,7 @@ struct FinancialView: View {
                                     ZStack(alignment: .top) {
                                         FinancialCardVisual(card: dummyCard2, isPopped: false)
                                             .frame(height: 110)
-                                            .offset(y: -36)
+                                            .offset(y: -20)
                                             .zIndex(2)
                                         InstitutionCardView(
                                             institution: dummyChase,
@@ -173,7 +175,7 @@ struct FinancialView: View {
                                             }
                                         )
                                     }
-                                    .padding(.top, 36)
+                                    .padding(.top, 20)
                                 }
                             }
                             .allowsHitTesting(false)
@@ -378,6 +380,64 @@ struct FinancialView: View {
         }
     }
     
+    private func togglePop(for cardId: String) {
+        if poppedCardId == cardId {
+            // Collapsing the current card
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                pullingUpCardId = cardId
+                poppedCardId = nil
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                if pullingUpCardId == cardId {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        pullingUpCardId = nil
+                        zIndexCardId = nil
+                    }
+                }
+            }
+        } else {
+            // If another card is popped, collapse it first
+            let oldPoppedId = poppedCardId
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            
+            if let oldId = oldPoppedId {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    pullingUpCardId = cardId
+                    poppedCardId = nil
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    if pullingUpCardId == cardId {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            poppedCardId = cardId
+                            zIndexCardId = cardId
+                            pullingUpCardId = nil
+                        }
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    if zIndexCardId == oldId {
+                        zIndexCardId = nil
+                    }
+                }
+            } else {
+                // Standard pop open X (no card was popped)
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    pullingUpCardId = cardId
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                    if pullingUpCardId == cardId {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            poppedCardId = cardId
+                            zIndexCardId = cardId
+                            pullingUpCardId = nil
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     private func actionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -397,7 +457,8 @@ struct FinancialView: View {
     
     @ViewBuilder
     private func walletStackForInstitution(inst: Institution, instCards: [FinancialCard], instLoans: [Loan]) -> some View {
-        let peekOffset: CGFloat = 36
+        let foremostPeekOffset: CGFloat = 20
+        let stackedPeekOffset: CGFloat = 40
         let cardH: CGFloat = 110
         let fullCardH: CGFloat = 210
         
@@ -405,11 +466,15 @@ struct FinancialView: View {
             if !instCards.isEmpty {
                 ForEach(Array(instCards.enumerated()), id: \.element.id) { index, card in
                     let isPopped = poppedCardId == card.id.uuidString
-                    let yOffset = isPopped ? 16.0 : -(peekOffset + CGFloat(index) * peekOffset)
-                    let scale = isPopped ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
-                    let rotationAngle: Double = isPopped ? 0 : -4 - Double(index) * 1.5
-                    let shadowRadius: CGFloat = isPopped ? 20 : 4
-                    let shadowOpacity: Double = isPopped ? 0.5 : 0.15
+                    let isPulling = pullingUpCardId == card.id.uuidString
+                    let isFront = zIndexCardId == card.id.uuidString
+                    
+                    let yOffset = isPopped ? 16.0 : (isPulling ? -140.0 : -(foremostPeekOffset + CGFloat(index) * stackedPeekOffset))
+                    let scale = (isPopped || isPulling) ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
+                    let rotationAngle: Double = isPopped ? 0 : (isPulling ? -1.0 : -4 - Double(index) * 1.5)
+                    let shadowRadius: CGFloat = (isPopped || isPulling) ? 20 : 4
+                    let shadowOpacity: Double = (isPopped || isPulling) ? 0.5 : 0.15
+                    let zIndex = (isPopped || isFront) ? 25.0 : Double(instCards.count - index)
                     
                     FinancialCardVisual(card: card, isPopped: isPopped)
                         .id(card.id)
@@ -423,25 +488,11 @@ struct FinancialView: View {
                         )
                         .offset(y: yOffset)
                         .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, y: isPopped ? 12 : 2)
-                        .zIndex(isPopped ? 25 : Double(instCards.count - index))
-                        .animation(
-                            isPopped
-                                ? .spring(response: 0.55, dampingFraction: 0.78, blendDuration: 0.1)
-                                : .spring(response: 0.4, dampingFraction: 0.82, blendDuration: 0.05),
-                            value: isPopped
-                        )
-                        .animation(
-                            .spring(response: 0.5, dampingFraction: 0.8),
-                            value: poppedCardId
-                        )
+                        .zIndex(zIndex)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: poppedCardId)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: pullingUpCardId)
                         .onTapGesture {
-                            if poppedCardId == card.id.uuidString {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                poppedCardId = nil
-                            } else {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                poppedCardId = card.id.uuidString
-                            }
+                            togglePop(for: card.id.uuidString)
                         }
                         .onLongPressGesture {
                             editingCard = card
@@ -450,8 +501,7 @@ struct FinancialView: View {
                             DragGesture(minimumDistance: 10)
                                 .onEnded { value in
                                     if isPopped && value.translation.height < -10 {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        poppedCardId = nil
+                                        togglePop(for: card.id.uuidString)
                                     }
                                 },
                             including: isPopped ? .gesture : .none
@@ -472,8 +522,8 @@ struct FinancialView: View {
             .id(inst.id)
             .zIndex(20)
         }
-        .padding(.top, instCards.isEmpty ? 0 : CGFloat(instCards.count) * peekOffset + 16)
-        .padding(.bottom, 4)
+        .padding(.top, instCards.isEmpty ? 0 : (foremostPeekOffset + CGFloat(instCards.count - 1) * stackedPeekOffset) + 16)
+        .padding(.bottom, 24)
     }
 
     @ViewBuilder

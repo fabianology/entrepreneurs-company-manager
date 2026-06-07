@@ -172,10 +172,10 @@ struct PremiumSubscriptionCard: View {
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.top, 24)
-                        .padding(.bottom, sub.isFree ? 24 : 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 16)
 
-                        // Status row — CiFr dot + pipes style
+                        // Status row — Dot + pipes style
                         if !sub.isFree {
                             Divider()
                                 .background(Color.white.opacity(0.08))
@@ -188,11 +188,11 @@ struct PremiumSubscriptionCard: View {
                                 if sub.status == "Paused" {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(sTuple.top)
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(Color(hex: "#911c26"))
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
-                                                .font(.system(size: 10, weight: .semibold))
+                                                .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(Color(hex: "#911c26").opacity(0.7))
                                         }
                                     }
@@ -201,11 +201,11 @@ struct PremiumSubscriptionCard: View {
                                 } else {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(sTuple.top)
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(.white)
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
-                                                .font(.system(size: 10, weight: .semibold))
+                                                .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(Color(hex: "#C1AA78"))
                                         }
                                     }
@@ -224,19 +224,19 @@ struct PremiumSubscriptionCard: View {
                                         VStack(alignment: .leading, spacing: 3) {
                                             HStack(spacing: 4) {
                                                 Text(accTuple.bank)
-                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .font(.system(size: 11, weight: .medium))
                                                     .foregroundStyle(.white)
                                                 if !accTuple.type.isEmpty {
                                                     Text("·")
                                                         .font(.system(size: 11, weight: .bold))
                                                         .foregroundStyle(Color(hex: "#7D7D7D"))
                                                     Text(accTuple.type)
-                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .font(.system(size: 11, weight: .medium))
                                                         .foregroundStyle(.white)
                                                 }
                                             }
                                             Text(accTuple.account)
-                                                .font(.system(size: 10, weight: .semibold))
+                                                .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(Color(hex: "#C1AA78"))
                                         }
                                         .textCase(.uppercase)
