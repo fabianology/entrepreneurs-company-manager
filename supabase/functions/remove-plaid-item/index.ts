@@ -25,9 +25,9 @@ serve(async (req) => {
     // 2. Parse request body
     const bodyText = await req.text()
     if (!bodyText) throw new Error("Empty request body")
-    const { company_id, institution_id, redirect_uri } = JSON.parse(bodyText)
+    const { institution_id } = JSON.parse(bodyText)
     
-    if (!company_id) throw new Error("Missing company_id")
+    if (!institution_id) throw new Error("Missing institution_id")
 
     // 3. Get Plaid Environment Variables
     const plaidClientId = Deno.env.get('PLAID_CLIENT_ID')
@@ -38,53 +38,49 @@ serve(async (req) => {
       throw new Error('Plaid secrets are missing from Edge Function environment')
     }
 
-    // 4. Check if this is an Update Mode request (has institution_id)
-    let accessToken: string | undefined = undefined
-    if (institution_id) {
-        const { data: itemData, error: itemError } = await supabase
-            .from('plaid_items')
-            .select('access_token')
-            .eq('institution_id', institution_id)
-            .single()
-            
-        if (!itemError && itemData) {
-            accessToken = itemData.access_token
+    // 4. Get the access token for this institution
+    const { data: plaidItem, error: fetchError } = await supabase
+      .from('plaid_items')
+      .select('access_token')
+      .eq('institution_id', institution_id)
+      .single()
+
+    // If there is no plaid item, the user might just be deleting a manual institution.
+    // If there is a Plaid item, we must revoke it on Plaid's end.
+    if (plaidItem && plaidItem.access_token) {
+        // 5. Call Plaid API to remove the item
+        const plaidPayload = {
+            client_id: plaidClientId,
+            secret: plaidSecret,
+            access_token: plaidItem.access_token,
+        }
+
+        const plaidRes = await fetch(`https://${plaidEnv}.plaid.com/item/remove`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(plaidPayload)
+        })
+
+        const plaidData = await plaidRes.json()
+        
+        // Log error if it failed, but continue to delete from our DB anyway
+        if (plaidData.error_code) {
+            console.error(`Plaid item/remove failed for institution ${institution_id}:`, plaidData)
         }
     }
 
-    // 5. Call Plaid API to create link token
-    const plaidPayload: any = {
-      client_id: plaidClientId,
-      secret: plaidSecret,
-      user: { client_user_id: user.id },
-      client_name: 'Miloom',
-      country_codes: ['US'],
-      language: 'en',
-    }
-    
-    if (redirect_uri) {
-        plaidPayload.redirect_uri = redirect_uri
+    // 6. Delete the institution from the database
+    // (This will cascade and delete the plaid_item row automatically)
+    const { error: deleteError } = await supabase
+        .from('institutions')
+        .delete()
+        .eq('id', institution_id)
+
+    if (deleteError) {
+        throw new Error(`Database delete failed: ${deleteError.message}`)
     }
 
-    if (accessToken) {
-      // Update Mode
-      plaidPayload.access_token = accessToken
-    } else {
-      // Standard Mode
-      plaidPayload.products = ['transactions', 'auth']
-      plaidPayload.optional_products = ['liabilities']
-    }
-
-    const plaidRes = await fetch(`https://${plaidEnv}.plaid.com/link/token/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(plaidPayload)
-    })
-
-    const plaidData = await plaidRes.json()
-    if (plaidData.error_code) throw new Error(plaidData.error_message || plaidData.error_code)
-
-    return new Response(JSON.stringify({ link_token: plaidData.link_token }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
     })

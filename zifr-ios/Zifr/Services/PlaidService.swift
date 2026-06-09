@@ -5,14 +5,15 @@ class PlaidService {
     static let shared = PlaidService()
     private var client: SupabaseClient { SupabaseService.shared.client }
     
-    func createLinkToken(companyId: UUID, institutionId: UUID? = nil) async throws -> String {
+    func createLinkToken(companyId: UUID, institutionId: UUID? = nil, redirectUri: String? = nil) async throws -> String {
         struct Request: Encodable { 
             let company_id: UUID 
             let institution_id: UUID?
+            let redirect_uri: String?
         }
         struct Response: Decodable { let link_token: String }
         
-        let payload = try JSONEncoder().encode(Request(company_id: companyId, institution_id: institutionId))
+        let payload = try JSONEncoder().encode(Request(company_id: companyId, institution_id: institutionId, redirect_uri: redirectUri))
         let session = try await client.auth.session
         let options = FunctionInvokeOptions(
             method: .post,
@@ -87,6 +88,41 @@ class PlaidService {
         let type: String
         let subtype: String?
         let balances: PlaidBalances
+        let liability_details: PlaidLiabilityDetails?
+    }
+    
+    struct PlaidLiabilityDetails: Decodable {
+        // Credit Card
+        let aprs: [PlaidAPR]?
+        // Shared
+        let next_payment_due_date: String?
+        let minimum_payment_amount: Double?
+        
+        // Mortgage
+        let next_monthly_payment: Double?
+        let interest_rate: PlaidInterestRate?
+        
+        // Student
+        let interest_rate_percentage: Double?
+        
+        var effectiveAPR: Double? {
+            if let aprs = aprs, let first = aprs.first { return first.apr_percentage }
+            if let interestRate = interest_rate { return interestRate.percentage }
+            if let studentRate = interest_rate_percentage { return studentRate }
+            return nil
+        }
+        
+        var effectiveMinimumPayment: Double? {
+            return minimum_payment_amount ?? next_monthly_payment
+        }
+    }
+    
+    struct PlaidAPR: Decodable {
+        let apr_percentage: Double
+    }
+    
+    struct PlaidInterestRate: Decodable {
+        let percentage: Double
     }
     
     struct PlaidBalances: Decodable {

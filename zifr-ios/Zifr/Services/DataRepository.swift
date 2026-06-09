@@ -143,7 +143,14 @@ class DataRepository {
         try await client.from("institutions").update(secureInst).eq("id", value: inst.id).execute()
     }
     func deleteInstitution(_ id: UUID) async throws {
-        try await client.from("institutions").delete().eq("id", value: id).execute()
+        struct Request: Encodable { let institution_id: UUID }
+        let payload = try JSONEncoder().encode(Request(institution_id: id))
+        let options = FunctionInvokeOptions(
+            method: .post,
+            headers: ["Content-Type": "application/json"],
+            body: payload
+        )
+        try await client.functions.invoke("remove-plaid-item", options: options)
     }
     
     // MARK: - Loans

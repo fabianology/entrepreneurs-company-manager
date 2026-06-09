@@ -16,5 +16,9 @@
 	<array>
 		<string>CloudKit</string>
 	</array>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:miloom.com</string>
+	</array>
 </dict>
 </plist>

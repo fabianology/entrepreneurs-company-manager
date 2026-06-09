@@ -65,16 +65,15 @@ serve(async (req) => {
       item_id: exchangeData.item_id,
       plaid_institution_id: institution_id,
       institution_name,
-      products: ['transactions', 'auth', 'balance'],
+      products: ['transactions', 'auth', 'balance', 'liabilities'],
       status: 'active'
     })
     
     if (insertError) throw new Error(`Database Insert Error: ${insertError.message}`)
 
-    // 6. Immediately fetch initial balances so we can return them to the UI
-    const balanceRes = await fetch(
-      `https://${plaidEnv}.plaid.com/accounts/balance/get`,
-      {
+    // 6. Fetch initial balances AND liabilities so we can return them to the UI concurrently
+    const [balanceRes, liabilitiesRes] = await Promise.all([
+      fetch(`https://${plaidEnv}.plaid.com/accounts/balance/get`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,14 +81,37 @@ serve(async (req) => {
           secret: plaidSecret,
           access_token: exchangeData.access_token
         })
-      }
-    )
+      }),
+      fetch(`https://${plaidEnv}.plaid.com/liabilities/get`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: plaidClientId,
+          secret: plaidSecret,
+          access_token: exchangeData.access_token
+        })
+      })
+    ])
+
     const balanceData = await balanceRes.json()
+    const liabilitiesData = await liabilitiesRes.json()
+    
+    // Merge liabilities into accounts
+    const accounts = balanceData.accounts || []
+    if (liabilitiesData.liabilities) {
+        accounts.forEach((acc: any) => {
+            const creditLiab = liabilitiesData.liabilities.credit?.find((l: any) => l.account_id === acc.account_id)
+            const studentLiab = liabilitiesData.liabilities.student?.find((l: any) => l.account_id === acc.account_id)
+            const mortgageLiab = liabilitiesData.liabilities.mortgage?.find((l: any) => l.account_id === acc.account_id)
+            
+            acc.liability_details = creditLiab || studentLiab || mortgageLiab || null
+        })
+    }
 
     return new Response(JSON.stringify({
       success: true,
       item_id: exchangeData.item_id,
-      accounts: balanceData.accounts || []
+      accounts: accounts
     }), { 
       status: 200,
       headers: { 'Content-Type': 'application/json' } 

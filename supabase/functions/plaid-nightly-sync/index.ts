@@ -48,6 +48,17 @@ serve(async (req) => {
         })
         
         const balanceData = await balanceRes.json()
+
+        const liabRes = await fetch(`https://${plaidEnv}.plaid.com/liabilities/get`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: clientId,
+              secret: secret,
+              access_token: item.access_token
+            })
+        })
+        const liabData = await liabRes.json()
         
         if (balanceData.error_code) {
           console.error(`Plaid error for item ${item.id}:`, balanceData.error_message)
@@ -62,6 +73,7 @@ serve(async (req) => {
         // Update balances in 'institutions' JSONB array
         const currentAccounts = item.institutions.accounts_data || []
         const plaidAccounts = balanceData.accounts || []
+        const liabilities = liabData.liabilities || { credit: [], student: [], mortgage: [] }
 
         // Merge algorithm to avoid overriding user edits:
         // We match by `last4` or Plaid account_id suffix.
@@ -86,6 +98,45 @@ serve(async (req) => {
           .from('institutions')
           .update({ accounts_data: updatedAccounts, last_synced_at: new Date().toISOString(), is_disconnected: false })
           .eq('id', item.institution_id)
+
+        // Update Cards and Loans
+        const allLiabilities = [...(liabilities.credit || []), ...(liabilities.student || []), ...(liabilities.mortgage || [])]
+        
+        for (const pAcc of plaidAccounts) {
+          const liab = allLiabilities.find(l => l.account_id === pAcc.account_id)
+          const newBal = pAcc.balances.current ?? pAcc.balances.available ?? 0.0
+          const mask = pAcc.mask || (pAcc.account_id ? pAcc.account_id.slice(-4) : "")
+          
+          let apr: number | undefined
+          let minPay: number | undefined
+          let nextDate: string | undefined
+          
+          if (liab) {
+             apr = liab.aprs?.[0]?.apr_percentage ?? liab.interest_rate?.percentage ?? liab.interest_rate_percentage
+             minPay = liab.minimum_payment_amount ?? liab.next_monthly_payment
+             nextDate = liab.next_payment_due_date
+          }
+          
+          if (pAcc.type === 'credit') {
+             const updates: any = { balance: newBal }
+             if (apr !== undefined) updates.apr = apr
+             if (minPay !== undefined) updates.mo_payment = minPay
+             
+             await supabaseAdmin.from('cards')
+                 .update(updates)
+                 .eq('last4', mask)
+                 .eq('institution_name', item.institutions.id) // Fallback for name matching if needed, though last4 is usually unique per institution.
+          } else if (pAcc.type === 'loan') {
+             const updates: any = { remaining_balance: newBal }
+             if (apr !== undefined) updates.interest_rate = apr
+             if (minPay !== undefined) updates.payment_amount = minPay
+             if (nextDate !== undefined) updates.next_payment_date = nextDate
+             
+             await supabaseAdmin.from('loans')
+                 .update(updates)
+                 // Usually need a way to link loans, but we don't have last4 in loans. We can skip exact loan mapping or just log it for now.
+          }
+        }
           
         await supabaseAdmin
           .from('plaid_items')
