@@ -26,76 +26,10 @@ struct DocumentListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                // ── Action Bar ──
-                HStack(spacing: 0) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Text("Documents")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                    }
-                    .padding(.leading, 16)
-
-                    Spacer()
-
-                    Menu {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            shareResourceId = company.id
-                            shareResourceType = "all_documents"
-                            shareResourceTitle = "All Documents"
-                            showShareSheet = true
-                        } label: {
-                            Label("All Documents", systemImage: "folder.badge.person.crop")
-                        }
-                        
-                        if !documents.isEmpty {
-                            ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
-                                Section(category) {
-                                    ForEach(grouped[category] ?? []) { doc in
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            shareResourceId = doc.id
-                                            shareResourceType = "document"
-                                            shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                            showShareSheet = true
-                                        } label: {
-                                            Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 1, height: 20)
-
-                    Button {
-                        newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("ADD DOCUMENT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
-                            Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
-                        }
-                        .frame(width: 164, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                }
-                .premiumDarkBar(cornerRadius: 12)
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
+        ZStack(alignment: .top) {
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    Spacer().frame(height: 66)
 
                 VStack(spacing: 12) {
                     // Category Dashboard Grid
@@ -278,6 +212,80 @@ struct DocumentListView: View {
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
+            
+            documentActionBar
+                .zIndex(100)
+        }
+    }
+    
+    private var documentActionBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                Text("Documents")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+            }
+            .padding(.leading, 16)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    shareResourceId = company.id
+                    shareResourceType = "all_documents"
+                    shareResourceTitle = "All Documents"
+                    showShareSheet = true
+                } label: {
+                    Label("All Documents", systemImage: "folder.badge.person.crop")
+                }
+                
+                if !documents.isEmpty {
+                    ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
+                        Section(category) {
+                            ForEach(grouped[category] ?? []) { doc in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    shareResourceId = doc.id
+                                    shareResourceType = "document"
+                                    shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+                                    showShareSheet = true
+                                } label: {
+                                    Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "doc")
+                                }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 1, height: 20)
+
+            Button {
+                newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+            } label: {
+                HStack(spacing: 6) {
+                    Text("ADD DOCUMENT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
+                    Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 164, height: 44)
+                .contentShape(Rectangle())
+            }
+        }
+        .premiumDarkBar(cornerRadius: 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
     }
 
     @State private var dummyDoc = CompanyDocument(

@@ -8,13 +8,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    let body: any = {}
+    try {
+      if (req.method === 'POST') {
+        const text = await req.text()
+        if (text) {
+          body = JSON.parse(text)
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors, just means no body or invalid json
+    }
+
+    const debugErrors: any[] = []
+
     // 1. Fetch active Plaid items with their institution references
-    const { data: plaidItems, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('plaid_items')
       .select(`
         id,
         access_token,
         institution_id,
+        company_id,
+        user_id,
         institutions (
           id,
           accounts_data
@@ -22,6 +38,12 @@ serve(async (req) => {
       `)
       .eq('status', 'active')
       .not('institution_id', 'is', null)
+
+    if (body.institution_id) {
+        query = query.eq('institution_id', body.institution_id)
+    }
+
+    const { data: plaidItems, error } = await query
 
     if (error) throw error
 
@@ -59,9 +81,85 @@ serve(async (req) => {
             })
         })
         const liabData = await liabRes.json()
+
+        const plaidAccounts = balanceData.accounts || []
+
+        // Fallback: Fetch last 90 days of transactions to manually detect subscriptions
+        const d = new Date()
+        const endDate = d.toISOString().split('T')[0]
+        d.setDate(d.getDate() - 90)
+        const startDate = d.toISOString().split('T')[0]
+
+        const txRes = await fetch(`https://${plaidEnv}.plaid.com/transactions/get`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              client_id: clientId,
+              secret: secret,
+              access_token: item.access_token,
+              start_date: startDate,
+              end_date: endDate,
+              options: {
+                count: 500
+              }
+            })
+        })
+        const txData = await txRes.json()
         
-        if (balanceData.error_code) {
-          console.error(`Plaid error for item ${item.id}:`, balanceData.error_message)
+        const outflow_streams: any[] = []
+        if (txData.transactions) {
+            const txByName: Record<string, any[]> = {}
+            for (const tx of txData.transactions) {
+                if (tx.amount <= 0) continue // only expenses
+                const name = tx.merchant_name || tx.name
+                if (!name) continue
+                if (!txByName[name]) txByName[name] = []
+                txByName[name].push(tx)
+            }
+            
+            for (const [name, txs] of Object.entries(txByName)) {
+                if (txs.length >= 2) {
+                    const amounts = txs.map(t => t.amount)
+                    const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length
+                    const isSimilar = amounts.every(a => Math.abs(a - avg) / avg < 0.2) // within 20%
+                    
+                    if (isSimilar) {
+                        txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        const latest = txs[0]
+                        const oldest = txs[txs.length - 1]
+                        const daysDiff = (new Date(latest.date).getTime() - new Date(oldest.date).getTime()) / (1000 * 60 * 60 * 24)
+                        
+                        let frequency = 'UNKNOWN'
+                        if (txs.length >= 2 && daysDiff >= 20) {
+                            frequency = 'MONTHLY'
+                        } else if (txs.length >= 2 && daysDiff >= 300) {
+                            frequency = 'ANNUALLY'
+                        }
+                        
+                        if (frequency !== 'UNKNOWN') {
+                            outflow_streams.push({
+                                stream_id: `custom_stream_${encodeURIComponent(name).replace(/%/g, '')}_${latest.account_id}`.substring(0, 64),
+                                account_id: latest.account_id,
+                                frequency: frequency,
+                                merchant_name: name,
+                                last_amount: {
+                                    value: avg,
+                                    iso_currency_code: latest.iso_currency_code || 'USD'
+                                },
+                                is_active: true
+                            })
+                        }
+                    }
+                }
+            }
+        }
+        
+        const recurringData = { outflow_streams }
+        
+        if (!balanceRes.ok || balanceData.error_code) {
+          const errMsg = balanceData.error_message || `HTTP ${balanceRes.status}`
+          console.error(`Plaid error for item ${item.id}:`, errMsg)
+          debugErrors.push({ type: 'balance', item: item.id, error: errMsg, code: balanceData.error_code })
           // Update item status if auth revoked
           if (balanceData.error_code === 'ITEM_LOGIN_REQUIRED') {
             await supabaseAdmin.from('plaid_items').update({ status: 'requires_reauth', error_code: balanceData.error_code }).eq('id', item.id)
@@ -72,7 +170,6 @@ serve(async (req) => {
 
         // Update balances in 'institutions' JSONB array
         const currentAccounts = item.institutions.accounts_data || []
-        const plaidAccounts = balanceData.accounts || []
         const liabilities = liabData.liabilities || { credit: [], student: [], mortgage: [] }
 
         // Merge algorithm to avoid overriding user edits:
@@ -94,11 +191,11 @@ serve(async (req) => {
         })
 
         // Save back to institutions table
-        await supabaseAdmin
-          .from('institutions')
+        const { error: updateInstError } = await supabaseAdmin.from('institutions')
           .update({ accounts_data: updatedAccounts, last_synced_at: new Date().toISOString(), is_disconnected: false })
           .eq('id', item.institution_id)
-
+        if (updateInstError) debugErrors.push({ type: 'update_inst', item: item.id, error: updateInstError })
+        
         // Update Cards and Loans
         const allLiabilities = [...(liabilities.credit || []), ...(liabilities.student || []), ...(liabilities.mortgage || [])]
         
@@ -143,13 +240,60 @@ serve(async (req) => {
           .update({ last_synced_at: new Date().toISOString(), status: 'active', error_code: null })
           .eq('id', item.id)
 
+        // Process Subscriptions (Outflow Streams)
+        if (recurringData.outflow_streams) {
+            for (const stream of recurringData.outflow_streams) {
+                if (!stream.is_active) continue
+                
+                // Only capture things that look like subscriptions (monthly/yearly)
+                const isMonthly = stream.frequency === 'MONTHLY' || stream.frequency === 'SEMI_MONTHLY'
+                const isYearly = stream.frequency === 'ANNUALLY'
+                if (!isMonthly && !isYearly) continue
+
+                const streamId = stream.stream_id
+                const accountId = stream.account_id
+                const amount = stream.last_amount?.value ? Math.abs(stream.last_amount.value) : 0
+                const currency = stream.last_amount?.iso_currency_code || 'USD'
+                const merchantName = stream.merchant_name || stream.description || "Unknown Subscription"
+
+                // Check if we already have this stream
+                const { data: existing } = await supabaseAdmin.from('subscriptions')
+                    .select('id').eq('plaid_stream_id', streamId).single()
+                
+                if (existing) {
+                    // Update existing
+                    await supabaseAdmin.from('subscriptions').update({
+                        cost: amount,
+                        last_updated: new Date().toISOString()
+                    }).eq('id', existing.id)
+                } else {
+                    // Create new
+                    await supabaseAdmin.from('subscriptions').insert({
+                        id: crypto.randomUUID(),
+                        user_id: item.user_id,
+                        company_id: item.company_id,
+                        name: merchantName,
+                        cost: amount,
+                        currency: currency,
+                        billing_cycle: isMonthly ? 'Monthly' : 'Yearly',
+                        status: 'Active',
+                        pricing_model: amount > 0 ? 'paid' : 'free',
+                        renew: 'Auto',
+                        plaid_stream_id: streamId,
+                        plaid_account_id: accountId,
+                        last_updated: new Date().toISOString()
+                    })
+                }
+            }
+        }
+
         syncedCount++
       } catch (err) {
         console.error(`Failed to sync item ${item.id}:`, err)
       }
     }
 
-    return new Response(JSON.stringify({ success: true, synced: syncedCount }), {
+    return new Response(JSON.stringify({ success: true, synced: syncedCount, itemsFound: plaidItems?.length, debugErrors }), {
       headers: { "Content-Type": "application/json" },
       status: 200,
     })

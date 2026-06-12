@@ -19,79 +19,10 @@ struct SubscriptionListView: View {
 
 
     var body: some View {
-        ScrollViewReader { proxy in
-            MiloomListView {
-                // ── Action Bar ──
-                HStack(spacing: 0) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "square.3.layers.3d")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Text("Subscriptions")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                    }
-                    .padding(.leading, 16)
-
-                    Spacer()
-
-                    Menu {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            shareResourceId = company.id
-                            shareResourceType = "all_subscriptions"
-                            shareResourceTitle = "All Subscriptions"
-                            showShareSheet = true
-                        } label: {
-                            Label("All Subscriptions", systemImage: "folder.badge.person.crop")
-                        }
-                        
-                        if !subscriptions.isEmpty {
-                            Section("Subscriptions") {
-                                ForEach(subscriptions) { sub in
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        shareResourceId = sub.id
-                                        shareResourceType = "subscription"
-                                        shareResourceTitle = sub.name.isEmpty ? "Service" : sub.name
-                                        showShareSheet = true
-                                    } label: {
-                                        Label(sub.name.isEmpty ? "Unnamed Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 1, height: 20)
-
-                    Button {
-                        newSub = Subscription(userId: company.userId, companyId: company.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("ADD SERVICE")
-                                .font(.system(size: 13, weight: .bold))
-                                .tracking(1)
-                                .foregroundStyle(.white)
-                            Image(systemName: "plus")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                        }
-                        .frame(width: 164, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                }
-                .premiumDarkBar(cornerRadius: 12)
-                .padding(.top, -10)
-                .padding(.bottom, 8)
+        ZStack(alignment: .top) {
+            ScrollViewReader { proxy in
+                MiloomListView {
+                    Spacer().frame(height: 66)
 
                 if subscriptions.isEmpty {
                     emptyState
@@ -135,6 +66,98 @@ struct SubscriptionListView: View {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
         }
+            
+            subscriptionActionBar
+                .zIndex(100)
+        }
+    }
+    
+    private var subscriptionActionBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.3.layers.3d")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                Text("Subscriptions")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+            }
+            .padding(.leading, 16)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    shareResourceId = company.id
+                    shareResourceType = "all_subscriptions"
+                    shareResourceTitle = "All Subscriptions"
+                    showShareSheet = true
+                } label: {
+                    Label("All Subscriptions", systemImage: "folder.badge.person.crop")
+                }
+                
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Task {
+                        do {
+                            try await PlaidService.shared.syncSubscriptions()
+                            await DataRepository.shared.fetchAllData(appState: appState)
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        } catch {
+                            print("Failed to sync subscriptions: \(error)")
+                        }
+                    }
+                } label: {
+                    Label("Refresh from Bank", systemImage: "arrow.triangle.2.circlepath")
+                }
+                
+                if !subscriptions.isEmpty {
+                    Section("Subscriptions") {
+                        ForEach(subscriptions) { sub in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                shareResourceId = sub.id
+                                shareResourceType = "subscription"
+                                shareResourceTitle = sub.name.isEmpty ? "Service" : sub.name
+                                showShareSheet = true
+                            } label: {
+                                Label(sub.name.isEmpty ? "Unnamed Service" : sub.name, systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 1, height: 20)
+
+            Button {
+                newSub = Subscription(userId: company.userId, companyId: company.id)
+            } label: {
+                HStack(spacing: 6) {
+                    Text("ADD SERVICE")
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(1)
+                        .foregroundStyle(.white)
+                    Image(systemName: "plus")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 164, height: 44)
+                .contentShape(Rectangle())
+            }
+        }
+        .premiumDarkBar(cornerRadius: 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
     }
     
     private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {

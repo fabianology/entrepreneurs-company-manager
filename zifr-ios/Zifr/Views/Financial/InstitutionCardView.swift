@@ -17,7 +17,16 @@ struct InstitutionCardView: View {
 
     @State private var editingAccount: InstitutionAccount? = nil
     @State private var accountDraft = InstitutionAccount()
-
+    
+    private var healthColor: Color {
+        if institution.isDisconnected {
+            return .red
+        }
+        if institution.accounts.contains(where: { $0.status != "Active" }) {
+            return .orange
+        }
+        return .zifrGreen
+    }
     var body: some View {
         MiloomListCard {
             // ── Tappable header (triggers edit sheet) ──────────────────────
@@ -43,9 +52,16 @@ struct InstitutionCardView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(institution.name.isEmpty ? "Bank" : institution.name)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(healthColor)
+                                    .frame(width: 8, height: 8)
+                                    .shadow(color: healthColor, radius: 4)
+                                
+                                Text(institution.name.isEmpty ? "Bank" : institution.name)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
 
                             HStack(spacing: 8) {
                                 HStack(spacing: 4) {
@@ -73,16 +89,6 @@ struct InstitutionCardView: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
-                                if let syncedDate = institution.lastSyncedAt {
-                                    statusPipe()
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                        Text(syncedDate, style: .relative)
-                                            .foregroundStyle(Color(hex: "#C1AA78"))
-                                    }
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                }
                             }
                         }
                         Spacer(minLength: 0)
@@ -160,10 +166,7 @@ struct InstitutionCardView: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
-                                            Text("-")
-                                                .font(.system(size: 15, weight: .bold))
-                                                .foregroundStyle(Color(hex: "#C1AA78"))
-                                            Text(acc.name.isEmpty ? "Account" : acc.name)
+                                            Text(acc.name.isEmpty ? "Account" : acc.name.cleanAccountName)
                                                 .font(.system(size: 15, weight: .semibold))
                                                 .foregroundStyle(.white)
                                         }
@@ -204,9 +207,6 @@ struct InstitutionCardView: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
-                                            Text("-")
-                                                .font(.system(size: 15, weight: .bold))
-                                                .foregroundStyle(Color(hex: "#C1AA78"))
                                             Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
                                                 .font(.system(size: 15, weight: .semibold))
                                                 .foregroundStyle(.white)

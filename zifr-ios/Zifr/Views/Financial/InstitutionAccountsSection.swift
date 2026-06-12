@@ -31,12 +31,9 @@ struct InstitutionAccountsSection: View {
                     let acc = institution.accounts[i]
                     Button { onEdit(i, acc) } label: {
                         HStack(spacing: 12) {
-                            Circle()
-                                .fill(acc.type == "Credit Card" ? Color.orange : (acc.type == "Checking" ? Color.white.opacity(0.6) : Color.green))
-                                .frame(width: 8, height: 8)
-                            
+
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(acc.name.isEmpty ? "Unnamed Account" : acc.name)
+                                Text(acc.name.isEmpty ? "Unnamed Account" : acc.name.cleanAccountName)
                                     .font(.system(size: 14, weight: .bold))
                                     .foregroundStyle(.white)
                                 HStack(spacing: 6) {

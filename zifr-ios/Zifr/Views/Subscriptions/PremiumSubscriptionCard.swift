@@ -147,6 +147,18 @@ struct PremiumSubscriptionCard: View {
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundStyle(.white)
 
+                                if let accountId = sub.plaidAccountId {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "building.columns.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color(hex: "#4A90E2"))
+                                        Text("Auto-synced from Plaid")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color(hex: "#4A90E2").opacity(0.8))
+                                    }
+                                    .padding(.top, 1)
+                                }
+
                                 if sub.isFree {
                                     HStack(spacing: 5) {
                                         Circle()
@@ -400,9 +412,6 @@ struct PremiumSubscriptionCard: View {
                                 HStack(alignment: .top) {
                                     VStack(alignment: .leading, spacing: 6) {
                                         HStack(spacing: 6) {
-                                            Text("-")
-                                                .font(.system(size: 15, weight: .bold))
-                                                .foregroundStyle(Color(hex: "#C1AA78"))
                                             Text(email.email.isEmpty ? "No Address" : email.email)
                                                 .font(.system(size: 15, weight: .semibold))
                                                 .foregroundStyle(.white)

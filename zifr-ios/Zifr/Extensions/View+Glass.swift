@@ -63,6 +63,7 @@ struct PremiumDarkBarModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(Color.black.opacity(0.70))
             )
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)

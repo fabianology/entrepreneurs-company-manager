@@ -1,5 +1,15 @@
 import Foundation
 
+extension String {
+    var cleanAccountName: String {
+        var str = self
+        while str.hasPrefix("-") || str.hasPrefix(" ") {
+            str.removeFirst()
+        }
+        return str
+    }
+}
+
 struct InstitutionAccount: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
     var name: String = ""

@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct AddFinancialWizard: View {
     @State var institution: Institution
@@ -253,10 +254,17 @@ struct AddFinancialWizard: View {
         
         if let plaidItemId = linkedPlaidItemId {
             Task {
-                try? await SupabaseService.shared.client.from("plaid_items")
-                    .update(["institution_id": instToSave.id.uuidString])
-                    .eq("item_id", value: plaidItemId)
-                    .execute()
+                struct LinkRequest: Encodable {
+                    let item_id: String
+                    let institution_id: String
+                }
+                do {
+                    let req = LinkRequest(item_id: plaidItemId, institution_id: instToSave.id.uuidString)
+                    let options = FunctionInvokeOptions(body: try JSONEncoder().encode(req))
+                    try await SupabaseService.shared.client.functions.invoke("link-plaid-institution", options: options)
+                } catch {
+                    print("Failed to link plaid item: \(error)")
+                }
             }
         }
         

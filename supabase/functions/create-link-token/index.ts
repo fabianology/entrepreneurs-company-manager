@@ -71,7 +71,7 @@ serve(async (req) => {
       plaidPayload.access_token = accessToken
     } else {
       // Standard Mode
-      plaidPayload.products = ['transactions', 'auth']
+      plaidPayload.products = ['transactions']
       plaidPayload.optional_products = ['liabilities']
     }
 

@@ -26,15 +26,14 @@ struct FinancialView: View {
     @State private var zIndexCardId: String? = nil
     
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-            VStack(spacing: 0) {
-                // ── Action Bar ──
-                financialActionBar
-                
-                // ── Main Wallet Stack ──
-                LazyVStack(spacing: 24) {
-                    if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
+        ZStack(alignment: .top) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // ── Main Wallet Stack ──
+                        LazyVStack(spacing: 24) {
+                            Spacer().frame(height: 66) // Offset for the pinned action bar
+                            if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()
                         let dummyCard1Id = UUID()
@@ -349,7 +348,11 @@ struct FinancialView: View {
                 }
             default: break
             }
+            }
         }
+            
+            financialActionBar
+                .zIndex(100)
         }
     }
     

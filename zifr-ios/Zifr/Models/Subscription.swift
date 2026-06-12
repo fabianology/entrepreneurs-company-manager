@@ -56,6 +56,8 @@ struct Subscription: Identifiable, Codable, Hashable {
     var lastUpdated: Date
     var showSubServicesTab: Bool
     var showLinkedEmailsTab: Bool
+    var plaidStreamId: String?
+    var plaidAccountId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -82,6 +84,8 @@ struct Subscription: Identifiable, Codable, Hashable {
         case lastUpdated = "last_updated"
         case showSubServicesTab = "show_sub_services_tab"
         case showLinkedEmailsTab = "show_linked_emails_tab"
+        case plaidStreamId = "plaid_stream_id"
+        case plaidAccountId = "plaid_account_id"
     }
 
     init(
@@ -108,7 +112,9 @@ struct Subscription: Identifiable, Codable, Hashable {
         pricingModel: String = "paid",
         lastUpdated: Date = Date(),
         showSubServicesTab: Bool = true,
-        showLinkedEmailsTab: Bool = true
+        showLinkedEmailsTab: Bool = true,
+        plaidStreamId: String? = nil,
+        plaidAccountId: String? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -134,6 +140,8 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.lastUpdated = lastUpdated
         self.showSubServicesTab = showSubServicesTab
         self.showLinkedEmailsTab = showLinkedEmailsTab
+        self.plaidStreamId = plaidStreamId
+        self.plaidAccountId = plaidAccountId
     }
 
     var subServices: [SubService] {

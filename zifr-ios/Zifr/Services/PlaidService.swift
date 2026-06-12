@@ -76,6 +76,42 @@ class PlaidService {
         }
     }
     
+    func syncSubscriptions(institutionId: UUID? = nil) async throws {
+        let session = try await client.auth.session
+        var bodyData = Data()
+        if let instId = institutionId {
+            struct SyncReq: Encodable { let institution_id: UUID }
+            bodyData = try JSONEncoder().encode(SyncReq(institution_id: instId))
+        }
+        
+        let options = FunctionInvokeOptions(
+            method: .post,
+            headers: [
+                "Content-Type": "application/json",
+                "Authorization": "Bearer \(session.accessToken)"
+            ],
+            body: bodyData
+        )
+        
+        struct SyncResponse: Decodable {
+            let success: Bool
+            let synced: Int
+        }
+        
+        do {
+            let response: SyncResponse = try await client.functions.invoke("plaid-nightly-sync", options: options)
+            if response.synced == 0 {
+                throw NSError(domain: "PlaidService", code: 404, userInfo: [NSLocalizedDescriptionKey: "No active Plaid connection found for this bank. Plaid sync is only available for officially linked accounts."])
+            }
+        } catch let FunctionsError.httpError(code, data) {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let errorMsg = json["error"] as? String {
+                throw NSError(domain: "PlaidService", code: code, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            }
+            throw FunctionsError.httpError(code: code, data: data)
+        }
+    }
+    
     struct ExchangeResponse: Decodable {
         let success: Bool
         let item_id: String
