@@ -440,6 +440,139 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    // --- 3D CARD STACK INTERACTION ---
+    const deck = document.getElementById("interactive-deck");
+    let cards = Array.from(deck.querySelectorAll(".stack-card"));
+    let startX = 0;
+    let startY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let isDragging = false;
+    let activeCard = null;
+
+    function arrangeCards() {
+        cards.forEach((card, i) => {
+            // Reset classes
+            card.className = "stack-card glass-panel";
+            card.style.zIndex = 10 - i;
+            
+            if (i === 0) {
+                // Top card
+                card.style.transform = `translate3d(0, 0, 0) scale(1) rotate(0deg)`;
+                card.style.opacity = 1;
+                card.style.pointerEvents = "auto";
+            } else if (i < 3) {
+                // Secondary layered cards
+                card.style.transform = `translate3d(0, ${i * 14}px, ${-i * 30}px) scale(${1 - i * 0.05}) rotate(0deg)`;
+                card.style.opacity = 0.9 - i * 0.15;
+                card.style.pointerEvents = "none";
+            } else {
+                // Hidden deep stack cards
+                card.style.transform = `translate3d(0, 42px, -90px) scale(0.85) rotate(0deg)`;
+                card.style.opacity = 0;
+                card.style.pointerEvents = "none";
+            }
+        });
+        
+        // Re-bind listener to new top card
+        if (activeCard) {
+            removePointerListeners(activeCard);
+        }
+        if (cards.length > 0) {
+            activeCard = cards[0];
+            addPointerListeners(activeCard);
+        }
+    }
+
+    function addPointerListeners(card) {
+        card.addEventListener("pointerdown", onPointerDown);
+    }
+
+    function removePointerListeners(card) {
+        card.removeEventListener("pointerdown", onPointerDown);
+    }
+
+    function onPointerDown(e) {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        
+        activeCard.classList.add("dragging");
+        activeCard.setPointerCapture(e.pointerId);
+        
+        activeCard.addEventListener("pointermove", onPointerMove);
+        activeCard.addEventListener("pointerup", onPointerUp);
+        activeCard.addEventListener("pointercancel", onPointerUp);
+    }
+
+    function onPointerMove(e) {
+        if (!isDragging) return;
+        
+        currentX = e.clientX - startX;
+        currentY = e.clientY - startY;
+        
+        // Rotate slightly based on horizontal drag distance
+        const rotate = currentX * 0.08;
+        activeCard.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) rotate(${rotate}deg) scale(1.02)`;
+
+        // Visual feedback: subtly scale up the card beneath
+        if (cards[1]) {
+            const progress = Math.min(Math.abs(currentX) / 150, 1);
+            const nextScale = 0.95 + progress * 0.05;
+            const nextTranslateY = 14 - progress * 14;
+            const nextTranslateZ = -30 + progress * 30;
+            cards[1].style.transform = `translate3d(0, ${nextTranslateY}px, ${nextTranslateZ}px) scale(${nextScale})`;
+            cards[1].style.opacity = 0.75 + progress * 0.25;
+        }
+    }
+
+    function onPointerUp(e) {
+        if (!isDragging) return;
+        isDragging = false;
+        
+        activeCard.classList.remove("dragging");
+        activeCard.releasePointerCapture(e.pointerId);
+        
+        activeCard.removeEventListener("pointermove", onPointerMove);
+        activeCard.removeEventListener("pointerup", onPointerUp);
+        activeCard.removeEventListener("pointercancel", onPointerUp);
+
+        // Swipe threshold (120px)
+        if (Math.abs(currentX) > 120) {
+            dismissCard(currentX > 0 ? 1 : -1);
+        } else {
+            // Reset/Snap back to top
+            activeCard.style.transform = "translate3d(0, 0, 0) scale(1) rotate(0deg)";
+            if (cards[1]) {
+                cards[1].style.transform = `translate3d(0, 14px, -30px) scale(0.95)`;
+                cards[1].style.opacity = 0.75;
+            }
+        }
+        
+        currentX = 0;
+        currentY = 0;
+    }
+
+    function dismissCard(direction) {
+        const flyX = direction * 500;
+        const flyY = currentY * 1.5;
+        const rotate = direction * 35;
+        
+        activeCard.style.transform = `translate3d(${flyX}px, ${flyY}px, 0) rotate(${rotate}deg)`;
+        activeCard.style.opacity = 0;
+
+        // Move to the back of the deck after transition completes
+        setTimeout(() => {
+            const popped = cards.shift();
+            cards.push(popped);
+            arrangeCards();
+        }, 300);
+    }
+
+    // Initialize Card Stack
+    arrangeCards();
+
     // Initialize home state
     navigateToHome();
 });
+
