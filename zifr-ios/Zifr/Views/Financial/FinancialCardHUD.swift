@@ -206,7 +206,7 @@ struct FinancialCardHUD: View {
                     VStack(spacing: 2) {
                         Text(draft.name.isEmpty ? (isNew ? "Add Card" : "Edit Card") : draft.name)
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(hex: "#C1AA78"))
                         Text(institutionName)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.5))

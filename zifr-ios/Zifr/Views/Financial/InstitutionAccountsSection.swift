@@ -85,7 +85,7 @@ struct InstitutionAccountsSection: View {
                     .font(.system(size: 12, weight: .black))
                     .tracking(1.5)
             }
-            .foregroundStyle(Color.white.opacity(0.6))
+            .foregroundStyle(Color(hex: "#C1AA78"))
             .padding(.top, 24)
             .padding(.bottom, 8)
         }

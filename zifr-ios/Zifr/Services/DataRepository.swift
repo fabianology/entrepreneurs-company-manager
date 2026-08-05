@@ -9,8 +9,11 @@ class DataRepository {
     
     // MARK: - Fetch All Data
     private func safeFetchTransactions() async -> [Transaction] {
-        do { return try await client.from("transactions").select().execute().value }
-        catch { return [] }
+        do { return try await client.from("plaid_transactions").select().execute().value }
+        catch { 
+            print("Failed to fetch transactions: \(error)")
+            return [] 
+        }
     }
 
     func fetchAllData(appState: AppState) async {
@@ -360,13 +363,13 @@ class DataRepository {
 struct Transaction: Identifiable, Codable, Equatable {
     var id: UUID = UUID()
     var userId: UUID
-    var companyId: UUID
-    var institutionId: UUID
+    var companyId: UUID? = nil
+    var institutionId: UUID? = nil
     var accountId: String
     var amount: Double
     var date: Date
     var name: String
-    var category: [String]
+    var category: [String]? = nil
     var pending: Bool
     
     enum CodingKeys: String, CodingKey {

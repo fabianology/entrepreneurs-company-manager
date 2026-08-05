@@ -656,6 +656,11 @@ struct EditSubscriptionSheet: View {
                 )
             }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(sub.name.isEmpty ? "New Service" : sub.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
@@ -1107,6 +1112,11 @@ struct SubServiceHUD: View {
             .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(draft.name.isEmpty ? "New Service" : draft.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
@@ -1600,6 +1610,11 @@ struct LinkedEmailHUD: View {
             .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(draft.email.isEmpty ? "New Email" : draft.email)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
@@ -2011,6 +2026,13 @@ struct PaymentMethodPickerView: View {
         .background(Color(hex: "#1C1C1E"))
         .navigationTitle("Paid From")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Paid From")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+            }
+        }
         .alert("Edit Custom Entry", isPresented: $showEditAlert) {
             TextField("Entry Name", text: $editedItemName)
             Button("Cancel", role: .cancel) {

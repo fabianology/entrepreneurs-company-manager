@@ -313,6 +313,11 @@ struct EditCompanySheet: View {
             .navigationTitle(isEditing ? "Edit Business" : "New Business")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(isEditing ? "Edit Business" : "New Business")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()

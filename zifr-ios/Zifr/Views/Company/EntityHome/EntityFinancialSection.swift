@@ -214,7 +214,7 @@ struct EntityFinancialSection: View {
                                         actionButtons: {
                                             DashboardActionButton(icon: nil, title: "Details") { editingCard = card }
                                             Divider().background(Color.white.opacity(0.06))
-                                            DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.id.uuidString }
+                                            DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.plaidAccountId ?? card.id.uuidString }
                                             Divider().background(Color.white.opacity(0.06))
                                             DashboardActionButton(icon: nil, title: "Report") {
                                                 showFinancialReceiptReport = true
@@ -535,7 +535,7 @@ struct EntityFinancialSection: View {
                             actionButtons: {
                                 DashboardActionButton(icon: nil, title: "Details") { editingCard = card }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.id.uuidString }
+                                DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.plaidAccountId ?? card.id.uuidString }
                                 Divider().background(Color.white.opacity(0.06))
                                 DashboardActionButton(icon: nil, title: "Report") {
                                     showFinancialReceiptReport = true
@@ -635,7 +635,17 @@ struct TransactionFeedView: View {
             ZStack {
                 Color(hex: "#141414").ignoresSafeArea()
                 
-                let filtered = appState.transactions.filter { $0.accountId == accountId }.sorted(by: { $0.date > $1.date })
+                let matchingCard = appState.cards.first { $0.id.uuidString == accountId || $0.plaidAccountId == accountId }
+                let matchingInstAcc = appState.institutions.flatMap(\.accounts).first { $0.id == accountId }
+                
+                let targetPlaidAccountId = matchingCard?.plaidAccountId ?? matchingInstAcc?.id ?? accountId
+                let targetLast4 = matchingCard?.last4 ?? matchingInstAcc?.last4
+                
+                let filtered = appState.transactions.filter { tx in
+                    if tx.accountId == targetPlaidAccountId || tx.accountId == accountId { return true }
+                    if let l4 = targetLast4, !l4.isEmpty, tx.accountId.hasSuffix(l4) { return true }
+                    return false
+                }.sorted(by: { $0.date > $1.date })
                 
                 if filtered.isEmpty {
                     VStack(spacing: 16) {
@@ -670,9 +680,9 @@ struct TransactionFeedView: View {
                                     
                                     HStack {
                                         Text(tx.date, style: .date)
-                                        if !tx.category.isEmpty {
+                                        if let cat = tx.category, !cat.isEmpty {
                                             Text("•")
-                                            Text(tx.category.first ?? "")
+                                            Text(cat.first ?? "")
                                         }
                                         if tx.pending {
                                             Text("• Pending")

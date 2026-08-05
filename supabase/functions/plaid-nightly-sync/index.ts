@@ -107,21 +107,51 @@ serve(async (req) => {
         const txData = await txRes.json()
         
         const outflow_streams: any[] = []
-        if (txData.transactions) {
+        if (txData.transactions && txData.transactions.length > 0) {
+            const dbTxs = txData.transactions.map((tx: any) => ({
+                user_id: item.user_id,
+                plaid_item_id: item.id,
+                plaid_transaction_id: tx.transaction_id,
+                account_id: tx.account_id,
+                amount: tx.amount,
+                currency: tx.iso_currency_code || 'USD',
+                category: tx.category || [],
+                merchant_name: tx.merchant_name || tx.name,
+                name: tx.name || tx.merchant_name,
+                date: tx.date,
+                pending: tx.pending || false,
+                company_id: item.company_id,
+                institution_id: item.institution_id
+            }))
+
+            const { error: txErr } = await supabaseAdmin.from('plaid_transactions').upsert(dbTxs, { onConflict: 'plaid_transaction_id' })
+            if (txErr) console.error(`Error saving plaid_transactions for item ${item.id}:`, txErr)
+
+            const normalizeMerchantName = (rawName: string): string => {
+                if (!rawName) return ""
+                let clean = rawName.toUpperCase()
+                clean = clean.replace(/^(SQ \*|TST\*|PAYPAL \*|AMZN MKT|SP \*)/g, '')
+                clean = clean.replace(/(\.COM|DIG SERVICES|DIGITAL|SERVICE|INC|LLC|CORP|LTD|CO|PAYMENT|AUTOPAY|BILLING|RECURRING|\#\d+)/g, ' ')
+                clean = clean.replace(/[^A-Z0-9\s]/g, '')
+                clean = clean.replace(/\s+/g, ' ').trim()
+                return clean || rawName.toUpperCase()
+            }
+
             const txByName: Record<string, any[]> = {}
             for (const tx of txData.transactions) {
                 if (tx.amount <= 0) continue // only expenses
-                const name = tx.merchant_name || tx.name
-                if (!name) continue
-                if (!txByName[name]) txByName[name] = []
-                txByName[name].push(tx)
+                const rawName = tx.merchant_name || tx.name
+                if (!rawName) continue
+                const key = normalizeMerchantName(rawName)
+                if (!txByName[key]) txByName[key] = []
+                txByName[key].push(tx)
             }
             
-            for (const [name, txs] of Object.entries(txByName)) {
+            for (const [key, txs] of Object.entries(txByName)) {
                 if (txs.length >= 2) {
                     const amounts = txs.map(t => t.amount)
                     const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length
-                    const isSimilar = amounts.every(a => Math.abs(a - avg) / avg < 0.2) // within 20%
+                    const isSimilar = amounts.every(a => Math.abs(a - avg) / avg < 0.25) // within 25%
                     
                     if (isSimilar) {
                         txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -130,18 +160,19 @@ serve(async (req) => {
                         const daysDiff = (new Date(latest.date).getTime() - new Date(oldest.date).getTime()) / (1000 * 60 * 60 * 24)
                         
                         let frequency = 'UNKNOWN'
-                        if (txs.length >= 2 && daysDiff >= 20) {
+                        if (txs.length >= 2 && daysDiff >= 15) {
                             frequency = 'MONTHLY'
                         } else if (txs.length >= 2 && daysDiff >= 300) {
                             frequency = 'ANNUALLY'
                         }
                         
                         if (frequency !== 'UNKNOWN') {
+                            const displayName = latest.merchant_name || latest.name || key
                             outflow_streams.push({
-                                stream_id: `custom_stream_${encodeURIComponent(name).replace(/%/g, '')}_${latest.account_id}`.substring(0, 64),
+                                stream_id: `custom_stream_${encodeURIComponent(key).replace(/%/g, '')}_${latest.account_id}`.substring(0, 64),
                                 account_id: latest.account_id,
                                 frequency: frequency,
-                                merchant_name: name,
+                                merchant_name: displayName,
                                 last_amount: {
                                     value: avg,
                                     iso_currency_code: latest.iso_currency_code || 'USD'
@@ -215,14 +246,23 @@ serve(async (req) => {
           }
           
           if (pAcc.type === 'credit') {
-             const updates: any = { balance: newBal }
+             const updates: any = { balance: newBal, plaid_account_id: pAcc.account_id }
              if (apr !== undefined) updates.apr = apr
              if (minPay !== undefined) updates.mo_payment = minPay
+             if (pAcc.mask) updates.last4 = pAcc.mask
              
-             await supabaseAdmin.from('cards')
-                 .update(updates)
-                 .eq('last4', mask)
-                 .eq('institution_name', item.institutions.id) // Fallback for name matching if needed, though last4 is usually unique per institution.
+             const { data: cardsToUpdate } = await supabaseAdmin.from('financial_cards')
+                 .select('id')
+                 .eq('company_id', item.company_id)
+                 .or(`plaid_account_id.eq.${pAcc.account_id},last4.eq.${mask},last4.eq.${pAcc.account_id.slice(-4)}`)
+
+             if (cardsToUpdate && cardsToUpdate.length > 0) {
+                 for (const c of cardsToUpdate) {
+                     await supabaseAdmin.from('financial_cards')
+                         .update(updates)
+                         .eq('id', c.id)
+                 }
+             }
           } else if (pAcc.type === 'loan') {
              const updates: any = { remaining_balance: newBal }
              if (apr !== undefined) updates.interest_rate = apr

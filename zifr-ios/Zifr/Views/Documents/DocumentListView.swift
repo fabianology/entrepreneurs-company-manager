@@ -707,6 +707,11 @@ struct EditDocumentSheet: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(isNew ? "New Document" : "Edit Document")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { 
                         if isNew { 

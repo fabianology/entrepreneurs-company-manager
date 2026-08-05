@@ -123,6 +123,7 @@ class PlaidService {
         let name: String
         let type: String
         let subtype: String?
+        let mask: String?
         let balances: PlaidBalances
         let liability_details: PlaidLiabilityDetails?
     }

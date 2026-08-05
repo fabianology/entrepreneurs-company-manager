@@ -11,6 +11,7 @@
 		07549C6F481951A912F9ECEC /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C594CA72D48122B0D50169 /* ActivityLog.swift */; };
 		09BE6FE2E56BFD9B7C1144A2 /* InstitutionAccountHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4DFF2E12CA02748A1371FB /* InstitutionAccountHUD.swift */; };
 		0BFFDDE1FF715E861E2482EB /* CompanyAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AFA05E28920F297646C677 /* CompanyAvatar.swift */; };
+		0E12DFAC3B1D3B37EB2CE882 /* CardScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */; };
 		0E12DFAB3B1D3B37EB2CE881 /* EditCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721AAFA5C0FA7BE0DD68 /* EditCardSheet.swift */; };
 		0FCDDFBF48121C0333B66A5B /* EditInstitutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDBCB5764099D4AE9682B4E0 /* EditInstitutionSheet.swift */; };
 		11C307B50284B8741303CEFA /* LoanPaymentsLedgerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */; };
@@ -156,6 +157,7 @@
 		7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Glass.swift"; sourceTree = "<group>"; };
 		7B71EF771688F43D6934DFB6 /* SharedItemCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedItemCardView.swift; sourceTree = "<group>"; };
 		7D5A707FAC0A5EAF6CD9EDA1 /* ActivityLogsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogsView.swift; sourceTree = "<group>"; };
+		80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScannerView.swift; sourceTree = "<group>"; };
 		80C5721AAFA5C0FA7BE0DD68 /* EditCardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCardSheet.swift; sourceTree = "<group>"; };
 		82874C2FA810A11EFA0AFE8B /* ActivityLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
 		8420D6DD0A4EDC3376B8642A /* InstitutionCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionCardView.swift; sourceTree = "<group>"; };
@@ -265,6 +267,7 @@
 			children = (
 				8C7D524ABF1B87C51AF7A4F0 /* AddFinancialWizard.swift */,
 				80C5721AAFA5C0FA7BE0DD68 /* EditCardSheet.swift */,
+				80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */,
 				BDBCB5764099D4AE9682B4E0 /* EditInstitutionSheet.swift */,
 				C8AE50B1DF4829E44C696A33 /* EditLoanSheet.swift */,
 				0B3404CEE7CFA7CC4809F14D /* FinancialCardHUD.swift */,
@@ -587,6 +590,7 @@
 				F583B5C82FBD983E6CA21FB5 /* DocumentListView.swift in Sources */,
 				E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */,
 				0E12DFAB3B1D3B37EB2CE881 /* EditCardSheet.swift in Sources */,
+				0E12DFAC3B1D3B37EB2CE882 /* CardScannerView.swift in Sources */,
 				9E040A6F88CC7D7A62E89E4D /* EditCompanySheet.swift in Sources */,
 				0FCDDFBF48121C0333B66A5B /* EditInstitutionSheet.swift in Sources */,
 				E4899788A1B2E80B89DBC55B /* EditLoanSheet.swift in Sources */,

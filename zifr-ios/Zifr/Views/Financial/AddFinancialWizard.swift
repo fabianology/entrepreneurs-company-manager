@@ -138,6 +138,7 @@ struct AddFinancialWizard: View {
                     draft: $accountDraft,
                     isNew: isNewAccount,
                     institutionName: institution.name.isEmpty ? "New Institution" : institution.name,
+                    availableCards: cards,
                     onSave: {
                         if let idx = accountDraftIndex {
                             accounts[idx] = accountDraft
@@ -262,6 +263,7 @@ struct AddFinancialWizard: View {
                     let req = LinkRequest(item_id: plaidItemId, institution_id: instToSave.id.uuidString)
                     let options = FunctionInvokeOptions(body: try JSONEncoder().encode(req))
                     try await SupabaseService.shared.client.functions.invoke("link-plaid-institution", options: options)
+                    try? await PlaidService.shared.syncSubscriptions(institutionId: instToSave.id)
                 } catch {
                     print("Failed to link plaid item: \(error)")
                 }
@@ -493,7 +495,8 @@ struct AddFinancialWizard: View {
                                 var newCard = FinancialCard(userId: institution.userId, companyId: institution.companyId)
                                 newCard.name = pa.name
                                 newCard.type = "Credit"
-                                newCard.last4 = String(pa.account_id.suffix(4))
+                                newCard.last4 = pa.mask ?? String(pa.account_id.suffix(4))
+                                newCard.plaidAccountId = pa.account_id
                                 newCard.balance = balance
                                 newCard.apr = apr
                                 newCard.moPayment = minPayment
@@ -509,6 +512,7 @@ struct AddFinancialWizard: View {
                                 loans.append(newLoan)
                             } else {
                                 let newAcc = InstitutionAccount(
+                                    id: pa.account_id,
                                     name: pa.name,
                                     type: (pa.subtype ?? pa.type).capitalized,
                                     last4: String(pa.account_id.suffix(4)),

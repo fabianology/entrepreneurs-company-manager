@@ -27,6 +27,7 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
     var paidFrom: String = ""
     var paidOn: String = ""
     var autopay: String = "N/A"
+    var linkedCardId: String? = nil
 
     static let allTypes = [
         "Checking", "Savings", "Investing", "CD",

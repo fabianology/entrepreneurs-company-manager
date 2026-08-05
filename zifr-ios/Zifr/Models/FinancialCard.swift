@@ -26,6 +26,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
     var promoEnds: Date?
     var cardHolderType: String
     var notes: String?
+    var plaidAccountId: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -53,6 +54,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         case promoEnds = "promo_ends"
         case cardHolderType = "card_holder_type"
         case notes
+        case plaidAccountId = "plaid_account_id"
     }
     
     init(
@@ -80,7 +82,8 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         promoApr: Double = 0,
         promoEnds: Date? = nil,
         cardHolderType: String = "Mine",
-        notes: String? = nil
+        notes: String? = nil,
+        plaidAccountId: String? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -107,6 +110,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         self.promoEnds = promoEnds
         self.cardHolderType = cardHolderType
         self.notes = notes
+        self.plaidAccountId = plaidAccountId
     }
 
     static let networks = ["Visa", "Mastercard", "Amex", "Discover", "Other"]

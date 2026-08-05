@@ -219,7 +219,7 @@ struct EditInstitutionSheet: View {
                             .font(.system(size: 12, weight: .black))
                             .tracking(1.5)
                     }
-                    .foregroundStyle(Color.white.opacity(0.6))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                 }
@@ -357,6 +357,11 @@ struct EditInstitutionSheet: View {
             .navigationTitle(institution.name.isEmpty ? "Institution" : institution.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(institution.name.isEmpty ? "Institution" : institution.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         
@@ -392,6 +397,7 @@ struct EditInstitutionSheet: View {
                     draft: $accountDraft,
                     isNew: accountDraftIndex == nil,
                     institutionName: institution.name.isEmpty ? "Institution" : institution.name,
+                    availableCards: appState.cards.filter { $0.companyId == institution.companyId },
                     onSave: {
                         var accs = institution.accounts
                         if let idx = accountDraftIndex {

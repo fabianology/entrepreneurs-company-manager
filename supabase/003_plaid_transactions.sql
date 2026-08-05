@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS plaid_transactions (
     date                DATE,
     pending             BOOLEAN DEFAULT false,
     
+    company_id          UUID,
+    institution_id      UUID,
     created_at          TIMESTAMPTZ DEFAULT NOW()
 );
 

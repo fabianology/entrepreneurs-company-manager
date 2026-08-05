@@ -108,6 +108,11 @@ struct LoanPaymentHUD: View {
             .navigationTitle(isNew ? "Add Payment" : "Edit Payment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(isNew ? "Add Payment" : "Edit Payment")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }

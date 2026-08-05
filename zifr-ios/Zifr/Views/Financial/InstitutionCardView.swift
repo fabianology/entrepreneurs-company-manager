@@ -264,6 +264,7 @@ struct InstitutionCardView: View {
                 draft: $accountDraft,
                 isNew: false,
                 institutionName: institution.name.isEmpty ? "Bank" : institution.name,
+                availableCards: appState.cards.filter { $0.companyId == institution.companyId },
                 onSave: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         var updatedInst = institution

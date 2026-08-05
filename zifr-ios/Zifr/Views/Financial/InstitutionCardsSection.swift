@@ -50,9 +50,24 @@ struct InstitutionCardsSection: View {
                                     }
                                 }
                                 
-                                Text((card.paidFrom ?? "").isEmpty ? "No payment source" : "Paid from \(paidFromWithInstitution(for: card))")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.45))
+                                if card.type.lowercased() == "debit" && hasLinkedAccount(for: card) {
+                                    HStack(spacing: 4) {
+                                        Text("LINKED TO:")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                                        Image(systemName: "link")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Color.zifrGreen)
+                                        Text(linkedAccountText(for: card))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color(hex: "#7D7D7D"))
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                } else {
+                                    Text((card.paidFrom ?? "").isEmpty ? "No payment source" : "Paid from \(paidFromWithInstitution(for: card))")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                }
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -120,5 +135,27 @@ struct InstitutionCardsSection: View {
             }
         }
         return paidFrom
+    }
+    
+    private func hasLinkedAccount(for card: FinancialCard) -> Bool {
+        let cardIdString = card.id.uuidString
+        return appState.institutions.contains { inst in
+            inst.accounts.contains { acc in
+                acc.linkedCardId == cardIdString
+            }
+        }
+    }
+    
+    private func linkedAccountText(for card: FinancialCard) -> String {
+        // Reverse lookup: find any account whose linkedCardId matches this card's ID
+        let cardIdString = card.id.uuidString
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                if let linkedId = acc.linkedCardId, linkedId == cardIdString {
+                    return acc.name.isEmpty ? acc.type : acc.name
+                }
+            }
+        }
+        return ""
     }
 }

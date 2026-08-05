@@ -147,6 +147,11 @@ struct EditLoanSheet: View {
             .navigationTitle(isNew ? "New Loan" : loan.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(isNew ? "New Loan" : loan.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
