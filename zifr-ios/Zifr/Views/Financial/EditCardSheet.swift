@@ -16,12 +16,19 @@ struct EditCardSheet: View {
     @State private var showShareSheet = false
     @State private var showDeleteInstitutionConfirm = false
     @State private var institutionToDelete: Institution? = nil
+    @State private var showCardScanner = false
     
     private var subscriptions: [Subscription] { appState.subscriptions }
+    
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == card.id || $0.resourceId == card.companyId })
+        return share?.role == "Viewer"
+    }
     
     @State private var showFinancials = false
     @State private var showPaymentPicker = false
     @State private var isNewInstitution: Bool = false
+    @State private var showTransactions = false
     
     // Institution Draft
     @State private var instWebsite: String = ""
@@ -184,7 +191,17 @@ struct EditCardSheet: View {
 
     @ViewBuilder private var row2: some View {
         Group {
-            ZifrField(label: "CARD NUMBER", placeholder: "0000 0000 0000 0000", text: Binding(get: { card.cardNumber ?? "" }, set: { card.cardNumber = $0 }), keyboardType: .numberPad)
+            VStack(alignment: .leading, spacing: 10) {
+                ZifrField(
+                    label: "CARD NUMBER",
+                    placeholder: "0000 0000 0000 0000",
+                    text: Binding(get: { card.cardNumber ?? "" }, set: { card.cardNumber = $0 }),
+                    keyboardType: .numberPad,
+                    trailingSystemImage: "camera.fill",
+                    onTrailingTap: {
+                        showCardScanner = true
+                    }
+                )
                 .onChange(of: card.cardNumber) { old, new in
                     let newStr = new ?? ""
                     let filtered = newStr.filter { $0.isNumber }
@@ -204,7 +221,12 @@ struct EditCardSheet: View {
                         card.last4 = filtered
                     }
                 }
-                .padding(.vertical, 4)
+                
+                if hasLinkedAccount {
+                    linkedToRow
+                }
+            }
+            .padding(.vertical, 4)
             
             HStack(spacing: 12) {
                 cardPicker(label: "TYPE", sel: Binding(get: { card.type }, set: { card.type = $0 }), opts: FinancialCard.types)
@@ -279,7 +301,7 @@ struct EditCardSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text((card.paidFrom ?? "").isEmpty ? "None" : (card.paidFrom ?? ""))
+                    Text((card.paidFrom ?? "").isEmpty ? "None" : paidFromWithInstitution)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle((card.paidFrom ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
@@ -411,9 +433,58 @@ struct EditCardSheet: View {
         }
     }
 
+    private var hasLinkedAccount: Bool {
+        let cardIdString = card.id.uuidString
+        return appState.institutions.contains { inst in
+            inst.accounts.contains { acc in
+                acc.linkedCardId == cardIdString
+            }
+        }
+    }
+
+    private var linkedAccountText: String {
+        let cardIdString = card.id.uuidString
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                if let linkedId = acc.linkedCardId, linkedId == cardIdString {
+                    return acc.name.isEmpty ? acc.type : acc.name
+                }
+            }
+        }
+        return ""
+    }
+
+    @ViewBuilder private var linkedToRow: some View {
+        let linkedText = linkedAccountText
+        HStack(alignment: .top, spacing: 6) {
+            Text("LINKED TO:")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+                .textCase(.uppercase)
+                .layoutPriority(1)
+            
+            HStack(alignment: .center, spacing: 4) {
+                Image(systemName: "link")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Color.zifrGreen)
+                
+                Text(linkedText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(hex: "#7D7D7D"))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                SharedItemOverrideBanner(resourceId: card.id, defaultCompanyId: card.companyId)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+
+                Group {
                 if !isInstitutionContext {
                     Section {
                         institutionSelectorRow
@@ -434,6 +505,25 @@ struct EditCardSheet: View {
                         }
                         row5
                         paysForRow
+                        
+                        Button(action: {
+                            showTransactions = true
+                        }) {
+                            HStack {
+                                Text("TRANSACTIONS")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                Spacer()
+                                Image(systemName: "receipt")
+                                    .foregroundStyle(Color.white.opacity(0.3))
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 .listRowBackground(Color.clear)
@@ -594,11 +684,50 @@ struct EditCardSheet: View {
                     .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
+                } // End Group
+                .disabled(isViewer)
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
             .listSectionSpacing(0)
+            .sheet(isPresented: $showCardScanner) {
+                CardScannerView { result in
+                    if let number = result.cardNumber {
+                        card.cardNumber = number
+                        let filtered = number.filter { $0.isNumber }
+                        if let first = filtered.first {
+                            if first == "4" { card.network = "Visa" }
+                            else if first == "5" { card.network = "Mastercard" }
+                            else if first == "3" { card.network = "Amex" }
+                            else if first == "6" { card.network = "Discover" }
+                        }
+                        let maxLen = card.network == "Amex" ? 5 : 4
+                        if filtered.count >= maxLen {
+                            card.last4 = String(filtered.suffix(maxLen))
+                        } else {
+                            card.last4 = filtered
+                        }
+                    }
+                    if let expiry = result.expiry {
+                        card.expiry = expiry
+                    }
+                    if let holder = result.cardHolder {
+                        card.cardHolder = holder
+                    }
+                    if let net = result.network {
+                        card.network = net
+                    }
+                }
+            }
+            .sheet(isPresented: $showTransactions) {
+                TransactionFeedView(
+                                    accountId: card.plaidAccountId ?? card.id.uuidString,
+                                    cardId: card.id,
+                                    cardName: card.name,
+                                    vm: vm
+                                )
+            }
             .onAppear {
                 if isNew {
                     isNewInstitution = institutions.isEmpty
@@ -610,6 +739,11 @@ struct EditCardSheet: View {
             .navigationTitle(customTitle ?? (isNew ? "New Card" : card.name))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(customTitle ?? (isNew ? "New Card" : card.name))
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
@@ -635,13 +769,15 @@ struct EditCardSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        saveInstitutionData()
-                        vm.saveCard(card, appState: appState)
-                        dismiss()
+                    if !isViewer {
+                        Button("Save") {
+                            saveInstitutionData()
+                            vm.saveCard(card, appState: appState)
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
                     }
-                    .fontWeight(.semibold)
-                    .tint(isDirty ? .green : nil)
                 }
             }
             .interactiveDismissDisabled(isNew)
@@ -740,11 +876,11 @@ struct EditCardSheet: View {
             let instName = (card.institutionName ?? "").lowercased()
             if !instName.isEmpty {
                 if var existing = institutions.first(where: { $0.name.lowercased() == instName }) {
-                    existing.loginUrl = instWebsite
-                    existing.username = instLogin
-                    existing.password = instPass
-                    existing.email = instEmail
-                    existing.twoFactor = instTwoFactor
+                    if !instWebsite.isEmpty { existing.loginUrl = instWebsite }
+                    if !instLogin.isEmpty { existing.username = instLogin }
+                    if !instPass.isEmpty { existing.password = instPass }
+                    if !instEmail.isEmpty { existing.email = instEmail }
+                    if !instTwoFactor.isEmpty { existing.twoFactor = instTwoFactor }
                     vm.saveInstitution(existing, appState: appState)
                 }
             }
@@ -771,5 +907,34 @@ struct EditCardSheet: View {
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
         }
+    }
+
+    private var paidFromWithInstitution: String {
+        guard let paidFrom = card.paidFrom, !paidFrom.isEmpty else { return "" }
+        let normalizedPaidFrom = paidFrom.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in appState.cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedPaidFrom {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(paidFrom)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedPaidFrom {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(paidFrom)"
+                    }
+                }
+            }
+        }
+        return paidFrom
     }
 }

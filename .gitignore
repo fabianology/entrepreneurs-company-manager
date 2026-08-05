@@ -26,3 +26,33 @@ dist-ssr
 test-models.js
 zifr-ios/DerivedData/
 *.local.xcconfig
+
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+zifr-ios/DerivedData/
+zifr-ios/build/
+build/
+*.dylib
+*.dSYM
+xcuserdata/
+
+# Debug scripts and test files (local only)
+debug_out.json
+dump.sql
+plaid_debug.json
+print_tx.swift
+query_db.js
+query_with_auth.js
+test.js
+test_date_decode.swift
+test_supabase.js
+xcodebuild_output.log
+zifr-ios/xcodebuild_output.log
+zifr-ios/simulator_build_log*.txt
+zifr-ios/*.rb
+zifr-ios/dump_linkkit.swift
+zifr-ios/fix_paths.rb
+zifr-ios/build_log_test.txt
+zifr-ios/build_output_error.txt
