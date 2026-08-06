@@ -669,6 +669,16 @@ struct TransactionFeedView: View {
         }.sorted(by: { $0.date > $1.date })
     }
 
+    private var trackedSubscriptionNames: Set<String> {
+        Set(appState.subscriptions.map { SubscriptionDetector.normalize($0.name) })
+    }
+
+    private func isTrackedSubscription(_ tx: Transaction) -> Bool {
+        guard let name = tx.name, !name.isEmpty else { return false }
+        let key = SubscriptionDetector.normalize(name)
+        return trackedSubscriptionNames.contains(key)
+    }
+
     private var detectedSubscriptions: [DetectedSubscription] {
         let target = resolvedAccountId()
         return SubscriptionDetector.detect(
@@ -770,10 +780,27 @@ struct TransactionFeedView: View {
                                 }
 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(tx.name ?? "Unknown Transaction")
-                                        .font(.system(size: 15, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .lineLimit(1)
+                                    HStack(spacing: 6) {
+                                        Text(tx.name ?? "Unknown Transaction")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .lineLimit(1)
+
+                                        if isTrackedSubscription(tx) {
+                                            HStack(spacing: 3) {
+                                                Image(systemName: "arrow.triangle.2.circlepath")
+                                                    .font(.system(size: 9, weight: .bold))
+                                                Text("Sub")
+                                                    .font(.system(size: 10, weight: .bold))
+                                            }
+                                            .foregroundStyle(Color(hex: "#2070BD"))
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color(hex: "#2070BD").opacity(0.18))
+                                            .clipShape(Capsule())
+                                            .overlay(Capsule().stroke(Color(hex: "#2070BD").opacity(0.35), lineWidth: 1))
+                                        }
+                                    }
 
                                     HStack(spacing: 4) {
                                         Text(formatDate(tx.date))

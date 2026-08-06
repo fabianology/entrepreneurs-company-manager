@@ -41,9 +41,6 @@ struct SubscriptionDetector {
         for (key, txs) in txByKey {
             guard txs.count >= 2 else { continue }
             
-            // Skip if already in subscriptions
-            if existingNames.contains(key) { continue }
-            
             let amounts = txs.compactMap { $0.amount }
             let avg = amounts.reduce(0, +) / Double(amounts.count)
             
@@ -84,7 +81,7 @@ struct SubscriptionDetector {
         return results.sorted { $0.amount > $1.amount }
     }
     
-    private static func normalize(_ raw: String) -> String {
+    static func normalize(_ raw: String) -> String {
         var s = raw.lowercased()
         // Strip common prefixes
         for prefix in ["sq *", "tst*", "paypal *", "amzn mkt", "sp *", "apl*", "apl *", "apple.com/bill"] {
@@ -335,6 +332,13 @@ struct DetectedSubscriptionsSheet: View {
             )
         }
         .onAppear {
+            let existingNames = Set(appState.subscriptions.map { SubscriptionDetector.normalize($0.name) })
+            let existingStreams = Set(appState.subscriptions.compactMap { $0.plaidStreamId })
+            for det in detected {
+                if existingNames.contains(det.id) || existingStreams.contains("detected_\(det.id)") {
+                    _ = added.insert(det.id)
+                }
+            }
             if snapshot.isEmpty {
                 snapshot = detected
             }
