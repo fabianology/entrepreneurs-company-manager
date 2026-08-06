@@ -668,14 +668,16 @@ struct EditCardSheet: View {
                             }
                             Button("Cancel", role: .cancel) {}
                         }
-                        .confirmationDialog("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm, titleVisibility: .visible) {
+                        .alert("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm) {
                             Button("Yes, Delete", role: .destructive) {
                                 if let inst = institutionToDelete {
                                     vm.deleteInstitution(inst, appState: appState)
                                 }
                                 dismiss()
                             }
-                            Button("No, Keep It", role: .cancel) { dismiss() }
+                            Button("No, Keep Institution", role: .cancel) {
+                                dismiss()
+                            }
                         } message: {
                             Text("This was the last item for \(institutionToDelete?.name ?? "this institution"). Do you want to delete the institution profile too?")
                         }
