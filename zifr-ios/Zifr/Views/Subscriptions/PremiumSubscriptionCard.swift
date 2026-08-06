@@ -310,12 +310,19 @@ struct PremiumSubscriptionCard: View {
                                 HStack(alignment: .firstTextBaseline) {
                                     VStack(alignment: .leading, spacing: 4) {
                                         HStack(spacing: 6) {
-                                            Circle()
-                                                .fill(ss.status == .active ? Color.zifrGreen : Color.red)
-                                                .frame(width: 6, height: 6)
                                             Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
                                                 .font(.system(size: 15, weight: .semibold))
                                                 .foregroundStyle(.white)
+
+                                            statusPipe()
+
+                                            Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+
+                                            Circle()
+                                                .fill(ss.autoPay == .auto ? Color.zifrGreen : Color(hex: "#EBC351"))
+                                                .frame(width: 6, height: 6)
                                         }
                                         
                                         HStack(spacing: 6) {
@@ -326,12 +333,6 @@ struct PremiumSubscriptionCard: View {
                                                 .tracking(0.5)
                                             
                                             Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss.paymentMethod))
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
-
-                                            statusPipe()
-                                            
-                                            Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.6))
                                         }
