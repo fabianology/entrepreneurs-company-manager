@@ -628,9 +628,22 @@ struct TransactionFeedView: View {
     let accountId: String
     var cardId: UUID? = nil
     var cardName: String? = nil
+    var companyId: UUID? = nil
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+
+    private var resolvedCompanyId: UUID? {
+        if let companyId { return companyId }
+        if let cardId, let card = appState.cards.first(where: { $0.id == cardId }) {
+            return card.companyId
+        }
+        let target = resolvedAccountId()
+        if let card = appState.cards.first(where: { $0.plaidAccountId == target }) {
+            return card.companyId
+        }
+        return appState.companies.first?.id
+    }
 
     @State private var isSyncing = false
     @State private var syncError: String? = nil
@@ -736,7 +749,7 @@ struct TransactionFeedView: View {
                                     detected: detectedSubscriptions,
                                     cardId: cardId,
                                     cardName: cardName,
-                                    companyId: company.id,
+                                    companyId: resolvedCompanyId,
                                     vm: vm
                                 )
                                 .listRowInsets(EdgeInsets())

@@ -225,7 +225,7 @@ struct EntityHomeView: View {
         }
         .sheet(isPresented: Binding(get: { viewingTransactionsFor != nil }, set: { if !$0 { viewingTransactionsFor = nil } })) {
             if let accountId = viewingTransactionsFor {
-                TransactionFeedView(accountId: accountId, vm: vm)
+                TransactionFeedView(accountId: accountId, companyId: company.id, vm: vm)
             }
         }
         .sheet(isPresented: $showReceiptReport) {

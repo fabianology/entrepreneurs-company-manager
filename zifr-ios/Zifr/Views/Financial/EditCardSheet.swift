@@ -725,6 +725,7 @@ struct EditCardSheet: View {
                                     accountId: card.plaidAccountId ?? card.id.uuidString,
                                     cardId: card.id,
                                     cardName: card.name,
+                                    companyId: card.companyId,
                                     vm: vm
                                 )
             }
