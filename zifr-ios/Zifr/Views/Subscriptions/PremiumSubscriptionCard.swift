@@ -1,5 +1,15 @@
 import SwiftUI
 
+enum CardRevealLevel: Int, Comparable {
+    case headerOnly = 0
+    case statusRevealed = 1
+    case full = 2
+
+    static func < (lhs: CardRevealLevel, rhs: CardRevealLevel) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
 struct PremiumSubscriptionCard: View {
     let sub: Subscription
     let allSubscriptions: [Subscription]
@@ -8,6 +18,7 @@ struct PremiumSubscriptionCard: View {
     let onEdit: () -> Void
     var onBankTapped: ((UUID) -> Void)? = nil
     var onSave: ((Subscription) -> Void)? = nil
+    var revealLevel: CardRevealLevel = .full
 
     @State private var expanded = false
     @State private var showSubServices = false
@@ -116,11 +127,16 @@ struct PremiumSubscriptionCard: View {
     }
 
     var body: some View {
-        MiloomListCard {
-            Button(action: onEdit) {
+        let innerShape = UnevenRoundedRectangle(
+            topLeadingRadius: 24,
+            bottomLeadingRadius: revealLevel == .full ? 24 : 0,
+            bottomTrailingRadius: revealLevel == .full ? 24 : 0,
+            topTrailingRadius: 24
+        )
+        VStack(spacing: 0) {
+            VStack(spacing: 0) {
                 VStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        // Logo + Name + Cost row
+                    // Logo + Name + Cost row
                         HStack(alignment: .top, spacing: 16) {
                             // Logo
                             if let website = sub.website, !website.isEmpty {
@@ -147,18 +163,6 @@ struct PremiumSubscriptionCard: View {
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundStyle(.white)
 
-                                if let accountId = sub.plaidAccountId {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "building.columns.fill")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(Color(hex: "#4A90E2"))
-                                        Text("Auto-synced from Plaid")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color(hex: "#4A90E2").opacity(0.8))
-                                    }
-                                    .padding(.top, 1)
-                                }
-
                                 if sub.isFree {
                                     HStack(spacing: 5) {
                                         Circle()
@@ -184,11 +188,15 @@ struct PremiumSubscriptionCard: View {
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 24)
-                        .padding(.top, 16)
-                        .padding(.bottom, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 10)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onEdit()
+                        }
 
                         // Status row — Dot + pipes style
-                        if !sub.isFree {
+                        if revealLevel >= .statusRevealed && !sub.isFree {
                             Divider()
                                 .background(Color.white.opacity(0.08))
                                 .padding(.horizontal, 24)
@@ -259,7 +267,7 @@ struct PremiumSubscriptionCard: View {
                                 Spacer()
                             }
                             .padding(.horizontal, 24)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 10)
                             .frame(maxWidth: .infinity)
                         }
                     }
@@ -273,25 +281,25 @@ struct PremiumSubscriptionCard: View {
                     )
 
                     // Credentials row — tap-to-copy
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 12) {
-                            copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
-                            copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
+                    if revealLevel == .full {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 12) {
+                                copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
+                                copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
+                            }
+                            .padding(.top, 4)
+                            
+                            DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                         }
-                        .padding(.top, 4)
-                        
-                        DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 24)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .padding(.bottom, 24)
                 }
                 .contentShape(Rectangle())
-            }
-            .buttonStyle(PremiumButtonStyle())
 
             // ── Supplemental Services accordion ─────────────────────────
-            if sub.showSubServicesTab {
+            if revealLevel == .full && sub.showSubServicesTab {
                 MiloomAccordion(title: "Supplemental Services", count: sub.subServices.count, expanded: showSubServices, action: {
                     withAnimation(.easeInOut(duration: 0.2)) { showSubServices.toggle() }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -412,7 +420,7 @@ struct PremiumSubscriptionCard: View {
             }
 
             // ── Linked Emails accordion ──────────────────────────────────
-            if sub.showLinkedEmailsTab {
+            if revealLevel == .full && sub.showLinkedEmailsTab {
                 MiloomAccordion(title: "Linked Emails", count: sub.linkedEmails.count, expanded: showLinkedEmails, action: {
                     withAnimation(.easeInOut(duration: 0.2)) { showLinkedEmails.toggle() }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -486,6 +494,16 @@ struct PremiumSubscriptionCard: View {
                 }
             }
         }
+        .background(
+            innerShape
+                .fill(Color(hex: "#1C1C1E").opacity(0.40))
+        )
+        .background(.regularMaterial, in: innerShape)
+        .clipShape(innerShape)
+        .overlay(
+            innerShape
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
         // ── Sub-service HUD ───────────────────────────────────────────────
         .sheet(isPresented: $showSubServiceHUD) {
             SubServiceHUD(

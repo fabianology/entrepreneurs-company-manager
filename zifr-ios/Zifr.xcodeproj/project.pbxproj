@@ -11,8 +11,8 @@
 		07549C6F481951A912F9ECEC /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C594CA72D48122B0D50169 /* ActivityLog.swift */; };
 		09BE6FE2E56BFD9B7C1144A2 /* InstitutionAccountHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4DFF2E12CA02748A1371FB /* InstitutionAccountHUD.swift */; };
 		0BFFDDE1FF715E861E2482EB /* CompanyAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96AFA05E28920F297646C677 /* CompanyAvatar.swift */; };
-		0E12DFAC3B1D3B37EB2CE882 /* CardScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */; };
 		0E12DFAB3B1D3B37EB2CE881 /* EditCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721AAFA5C0FA7BE0DD68 /* EditCardSheet.swift */; };
+		0E12DFAC3B1D3B37EB2CE882 /* CardScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */; };
 		0FCDDFBF48121C0333B66A5B /* EditInstitutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDBCB5764099D4AE9682B4E0 /* EditInstitutionSheet.swift */; };
 		11C307B50284B8741303CEFA /* LoanPaymentsLedgerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */; };
 		1220409E829B6826E5F98B62 /* make_symbol.py in Resources */ = {isa = PBXBuildFile; fileRef = 2F29D9FCB918B70318DBED51 /* make_symbol.py */; };
@@ -26,7 +26,6 @@
 		24A7E43856B3A1263C086E64 /* SharedItemOverrideBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E67F6233E34F02957BC04A3 /* SharedItemOverrideBanner.swift */; };
 		24BD94852802E5649BA31668 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E1FB05FF46D194404F4544A /* AppState.swift */; };
 		2B70095DAD91F32DD56DE591 /* PlaidLinkButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2977C629E97631FFAE00EEFD /* PlaidLinkButton.swift */; };
-		BB11223344556677889900BB /* DetectedSubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900AA /* DetectedSubscriptionsView.swift */; };
 		2C3A0A6F5F8542F4BC590FC1 /* SandboxSeeder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A535B55E87E3170B0FCDF4C /* SandboxSeeder.swift */; };
 		2D36949DE96309F0EA2BEEB1 /* FinancialCardHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B3404CEE7CFA7CC4809F14D /* FinancialCardHUD.swift */; };
 		35D7AD052A31B0416172216F /* miloom.console.svg in Resources */ = {isa = PBXBuildFile; fileRef = 92717522EB1C824EB367EF4D /* miloom.console.svg */; };
@@ -82,6 +81,7 @@
 		B4E35BB704A7A07FF4050F2A /* AssistantOnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AD7276DE1CE262ED62428E /* AssistantOnboardingView.swift */; };
 		B6582BA1C78A9599865EC1D8 /* AppNotification.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF914A66D8DE13EC1D9C345 /* AppNotification.swift */; };
 		BA57027EA5350F4639B6C911 /* Company.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75FA7DD2F2423504DA06F6D9 /* Company.swift */; };
+		BB11223344556677889900BB /* DetectedSubscriptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11223344556677889900AA /* DetectedSubscriptionsView.swift */; };
 		BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9602D7532DE04DFA8294ACAE /* DashboardView.swift */; };
 		C039D8C90239DB0F79A528D1 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 9C3A87C6A9399B175E90556D /* GoogleSignIn */; };
 		C0602B559E7624043CF0A151 /* Color+Zifr.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3141954F83AF71011D282471 /* Color+Zifr.swift */; };
@@ -129,7 +129,6 @@
 		246C3FC623F0712EFC4736F7 /* InstitutionCardsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionCardsSection.swift; sourceTree = "<group>"; };
 		28AA97D0931C9A2302F11955 /* CompanyMetaSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyMetaSheet.swift; sourceTree = "<group>"; };
 		2977C629E97631FFAE00EEFD /* PlaidLinkButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaidLinkButton.swift; sourceTree = "<group>"; };
-		AA11223344556677889900AA /* DetectedSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedSubscriptionsView.swift; sourceTree = "<group>"; };
 		2CF48E4CD47CB8708C09D8A6 /* EntityHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityHomeView.swift; sourceTree = "<group>"; };
 		2E23D2AE452D41F40D63BCAE /* Zifr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Zifr.entitlements; sourceTree = "<group>"; };
 		2E25EDBCCD886BA5EE5BA4F7 /* GeminiLiveModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveModels.swift; sourceTree = "<group>"; };
@@ -159,8 +158,8 @@
 		7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Glass.swift"; sourceTree = "<group>"; };
 		7B71EF771688F43D6934DFB6 /* SharedItemCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedItemCardView.swift; sourceTree = "<group>"; };
 		7D5A707FAC0A5EAF6CD9EDA1 /* ActivityLogsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogsView.swift; sourceTree = "<group>"; };
-		80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScannerView.swift; sourceTree = "<group>"; };
 		80C5721AAFA5C0FA7BE0DD68 /* EditCardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCardSheet.swift; sourceTree = "<group>"; };
+		80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardScannerView.swift; sourceTree = "<group>"; };
 		82874C2FA810A11EFA0AFE8B /* ActivityLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
 		8420D6DD0A4EDC3376B8642A /* InstitutionCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstitutionCardView.swift; sourceTree = "<group>"; };
 		87AD7276DE1CE262ED62428E /* AssistantOnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantOnboardingView.swift; sourceTree = "<group>"; };
@@ -181,6 +180,7 @@
 		9E67F6233E34F02957BC04A3 /* SharedItemOverrideBanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedItemOverrideBanner.swift; sourceTree = "<group>"; };
 		A16D6BBDF83C69BAE06B41FC /* PremiumUpgradeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PremiumUpgradeView.swift; sourceTree = "<group>"; };
 		A805E3AF7A5C2535E780EF24 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		AA11223344556677889900AA /* DetectedSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedSubscriptionsView.swift; sourceTree = "<group>"; };
 		AC3CC8DCAA09EB5F037AA043 /* .svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = .svg; sourceTree = "<group>"; };
 		AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoanPaymentsLedgerView.swift; sourceTree = "<group>"; };
 		AF3E68AC8EB242191A2179B1 /* patch_svg2.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch_svg2.py; sourceTree = "<group>"; };
@@ -234,7 +234,6 @@
 				5B13CF9B64BA8A6907DE1803 /* SpotlightOverlay.swift */,
 				59350929451728D7E6E54F26 /* TutorialSheetView.swift */,
 			);
-			name = Onboarding;
 			path = Onboarding;
 			sourceTree = "<group>";
 		};
@@ -671,7 +670,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = WYYJ6FGYRP;
 				INFOPLIST_FILE = Zifr/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Miloom;
@@ -692,7 +691,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Zifr/Zifr.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = WYYJ6FGYRP;
 				INFOPLIST_FILE = Zifr/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Miloom;
