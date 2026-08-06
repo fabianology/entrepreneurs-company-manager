@@ -197,12 +197,17 @@ struct DetectedSubscriptionsSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     
+    @State private var snapshot: [DetectedSubscription] = []
     @State private var added: Set<String> = []
     @State private var skipped: Set<String> = []
     @State private var isAdding: String? = nil
     
+    private var displayItems: [DetectedSubscription] {
+        snapshot.isEmpty ? detected : snapshot
+    }
+    
     private var remaining: [DetectedSubscription] {
-        detected.filter { !skipped.contains($0.id) }
+        displayItems.filter { !skipped.contains($0.id) }
     }
     
     private var unaddedCount: Int {
@@ -328,6 +333,11 @@ struct DetectedSubscriptionsSheet: View {
                 .font(.system(size: 15, weight: .medium))
                 .foregroundColor(Color(hex: "#C1AA78"))
             )
+        }
+        .onAppear {
+            if snapshot.isEmpty {
+                snapshot = detected
+            }
         }
         .presentationDetents([.fraction(0.85), .large])
         .presentationDragIndicator(.visible)
