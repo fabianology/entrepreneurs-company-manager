@@ -316,13 +316,23 @@ struct PremiumSubscriptionCard: View {
 
                                             statusPipe()
 
-                                            Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
-                                                .font(.system(size: 13, weight: .medium))
-                                                .foregroundStyle(Color.white.opacity(0.6))
+                                            if ss.status == .paused {
+                                                Text("Paused")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.red)
 
-                                            Circle()
-                                                .fill(ss.autoPay == .auto ? Color.zifrGreen : Color(hex: "#EBC351"))
-                                                .frame(width: 6, height: 6)
+                                                Circle()
+                                                    .fill(Color.red)
+                                                    .frame(width: 6, height: 6)
+                                            } else {
+                                                Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+
+                                                Circle()
+                                                    .fill(ss.autoPay == .auto ? Color.zifrGreen : Color(hex: "#EBC351"))
+                                                    .frame(width: 6, height: 6)
+                                            }
                                         }
                                         
                                         HStack(spacing: 6) {
