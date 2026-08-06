@@ -83,6 +83,7 @@ serve(async (req) => {
         // ── B. Fetch Transactions (last 90 days) ────────────────────────
         const endDate = new Date().toISOString().split('T')[0]
         const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        console.log(`Fetching transactions for item ${item.id}, range: ${startDate} to ${endDate}, env: ${plaidEnv}`)
 
         let allTransactions: any[] = []
         let hasMore = true
@@ -102,18 +103,21 @@ serve(async (req) => {
             })
           })
           const txData = await txRes.json()
+          console.log(`Plaid /transactions/get response for item ${item.id}: status=${txRes.status}, total=${txData.total_transactions}, batch=${(txData.transactions||[]).length}, error=${txData.error_code||'none'}, msg=${txData.error_message||'none'}`)
 
           if (txData.error_code) {
-            console.error(`Plaid transactions error for item ${item.id}:`, txData.error_message)
+            console.error(`Plaid transactions error for item ${item.id}: code=${txData.error_code} msg=${txData.error_message}`)
             break
           }
 
           const batch = txData.transactions || []
           allTransactions = allTransactions.concat(batch)
-          hasMore = allTransactions.length < (txData.total_transactions || 0)
+          const total = txData.total_transactions || 0
+          hasMore = total > 0 && allTransactions.length < total
           offset += batch.length
           if (batch.length === 0) break
         }
+        console.log(`Total transactions fetched for item ${item.id}: ${allTransactions.length}`)
 
         if (allTransactions.length > 0) {
           // Map Plaid account_id to our institution account
