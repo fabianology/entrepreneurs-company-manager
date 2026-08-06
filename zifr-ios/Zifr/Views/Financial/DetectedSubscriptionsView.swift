@@ -202,7 +202,11 @@ struct DetectedSubscriptionsSheet: View {
     @State private var isAdding: String? = nil
     
     private var remaining: [DetectedSubscription] {
-        detected.filter { !added.contains($0.id) && !skipped.contains($0.id) }
+        detected.filter { !skipped.contains($0.id) }
+    }
+    
+    private var unaddedCount: Int {
+        remaining.filter { !added.contains($0.id) }.count
     }
     
     var body: some View {
@@ -244,7 +248,7 @@ struct DetectedSubscriptionsSheet: View {
                                 Text("Detected Subscriptions")
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundStyle(.white)
-                                Text("Found \(remaining.count) recurring charge\(remaining.count == 1 ? "" : "s") on \(cardName ?? "your card"). Add them to track automatically.")
+                                Text("Found \(detected.count) recurring charge\(detected.count == 1 ? "" : "s") on \(cardName ?? "your card"). Add them to track automatically.")
                                     .font(.system(size: 13))
                                     .foregroundStyle(Color.white.opacity(0.55))
                                     .multilineTextAlignment(.center)
@@ -254,26 +258,41 @@ struct DetectedSubscriptionsSheet: View {
                             .padding(.bottom, 16)
                             
                             // Add All button
-                            Button {
-                                Task {
-                                    for det in remaining {
-                                        await addSubscription(det)
+                            if unaddedCount > 0 {
+                                Button {
+                                    Task {
+                                        for det in remaining where !added.contains(det.id) {
+                                            await addSubscription(det)
+                                        }
                                     }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "plus.circle.fill")
+                                        Text(added.isEmpty ? "Add All \(unaddedCount)" : "Add Remaining \(unaddedCount)")
+                                            .font(.system(size: 15, weight: .semibold))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(Color(hex: "#C1AA78"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .padding(.horizontal, 20)
                                 }
-                            } label: {
+                                .padding(.bottom, 12)
+                            } else {
                                 HStack(spacing: 8) {
-                                    Image(systemName: "plus.circle.fill")
-                                    Text("Add All \(remaining.count)")
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("All \(added.count) Added")
                                         .font(.system(size: 15, weight: .semibold))
                                 }
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 13)
-                                .background(Color(hex: "#C1AA78"))
+                                .background(Color(hex: "#30D158"))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .padding(.horizontal, 20)
+                                .padding(.bottom, 12)
                             }
-                            .padding(.bottom, 12)
                             
                             Divider().background(Color.white.opacity(0.08)).padding(.horizontal, 20)
                             
@@ -302,12 +321,12 @@ struct DetectedSubscriptionsSheet: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarItems(trailing:
-                Button("Skip All") {
+                Button("Done") {
                     onDismissAll()
                     dismiss()
                 }
-                .font(.system(size: 15))
-                .foregroundColor(.white.opacity(0.5))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(Color(hex: "#C1AA78"))
             )
         }
         .presentationDetents([.fraction(0.85), .large])
