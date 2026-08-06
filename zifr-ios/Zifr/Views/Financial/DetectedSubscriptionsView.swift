@@ -220,7 +220,7 @@ struct DetectedSubscriptionsSheet: View {
                     VStack(spacing: 16) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 56))
-                            .foregroundStyle(Color(hex: "#30D158"))
+                            .foregroundStyle(Color.zifrGreen)
                         Text("All Done!")
                             .font(.system(size: 22, weight: .bold))
                             .foregroundStyle(.white)
@@ -290,7 +290,7 @@ struct DetectedSubscriptionsSheet: View {
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 13)
-                                .background(Color(hex: "#30D158"))
+                                .background(Color.zifrGreen)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 12)
@@ -473,7 +473,7 @@ struct DetectedSubscriptionCard: View {
                         }
                     }
                     .frame(width: 32, height: 32)
-                    .background(isAdded ? Color(hex: "#30D158") : Color(hex: "#C1AA78"))
+                    .background(isAdded ? Color.zifrGreen : Color(hex: "#C1AA78"))
                     .clipShape(Circle())
                 }
                 .disabled(isAdding || isAdded)
