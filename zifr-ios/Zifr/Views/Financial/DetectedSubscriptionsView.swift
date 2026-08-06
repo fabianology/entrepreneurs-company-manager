@@ -122,6 +122,7 @@ struct DetectedSubscriptionsBanner: View {
     let detected: [DetectedSubscription]
     let cardId: UUID?
     let cardName: String?
+    var companyId: UUID? = nil
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
     
@@ -174,6 +175,7 @@ struct DetectedSubscriptionsBanner: View {
                     detected: detected,
                     cardId: cardId,
                     cardName: cardName,
+                    companyId: companyId,
                     vm: vm,
                     onDismissAll: { dismissed = true }
                 )
@@ -188,6 +190,7 @@ struct DetectedSubscriptionsSheet: View {
     let detected: [DetectedSubscription]
     let cardId: UUID?
     let cardName: String?
+    var companyId: UUID? = nil
     @Bindable var vm: AppViewModel
     let onDismissAll: () -> Void
     
@@ -315,11 +318,6 @@ struct DetectedSubscriptionsSheet: View {
     private func addSubscription(_ det: DetectedSubscription) async {
         isAdding = det.id
         
-        guard let company = appState.companies.first else {
-            isAdding = nil
-            return
-        }
-        
         let session = try? await SupabaseService.shared.client.auth.session
         guard let userId = session?.user.id else {
             isAdding = nil
@@ -330,9 +328,14 @@ struct DetectedSubscriptionsSheet: View {
         let matchCard = cardId != nil ? appState.cards.first(where: { $0.id == cardId }) :
             appState.cards.first(where: { $0.plaidAccountId == det.accountId })
         
+        guard let targetCompanyId = companyId ?? matchCard?.companyId ?? appState.companies.first?.id else {
+            isAdding = nil
+            return
+        }
+        
         let newSub = Subscription(
             userId: userId,
-            companyId: company.id,
+            companyId: targetCompanyId,
             name: det.name,
             cost: det.amount,
             currency: det.currency,

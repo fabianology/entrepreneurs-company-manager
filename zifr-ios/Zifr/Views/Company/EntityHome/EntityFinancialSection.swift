@@ -736,6 +736,7 @@ struct TransactionFeedView: View {
                                     detected: detectedSubscriptions,
                                     cardId: cardId,
                                     cardName: cardName,
+                                    companyId: company.id,
                                     vm: vm
                                 )
                                 .listRowInsets(EdgeInsets())
