@@ -330,7 +330,7 @@ struct DetectedSubscriptionsSheet: View {
         let matchCard = cardId != nil ? appState.cards.first(where: { $0.id == cardId }) :
             appState.cards.first(where: { $0.plaidAccountId == det.accountId })
         
-        var newSub = Subscription(
+        let newSub = Subscription(
             userId: userId,
             companyId: company.id,
             name: det.name,
@@ -346,13 +346,20 @@ struct DetectedSubscriptionsSheet: View {
             plaidAccountId: det.accountId
         )
         
-        vm.saveSub(newSub, appState: appState)
-        
-        // Wait a beat for optimistic update
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        
-        withAnimation(.spring(response: 0.35)) {
-            added.insert(det.id)
+        do {
+            // Insert directly so we get the real error if it fails
+            try await DataRepository.shared.insertSubscription(newSub)
+            await MainActor.run {
+                appState.subscriptions.append(newSub)
+                withAnimation(.spring(response: 0.35)) {
+                    _ = added.insert(det.id)
+                }
+            }
+        } catch {
+            print("DetectedSubs addSubscription error: \(error)")
+            await MainActor.run {
+                appState.error = "Save failed: \(error.localizedDescription)"
+            }
         }
         isAdding = nil
     }
