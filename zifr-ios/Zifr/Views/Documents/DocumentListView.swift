@@ -1,11 +1,14 @@
 import SwiftUI
 import SafariServices
+import PhotosUI
+import PDFKit
 
 struct DocumentListView: View {
     let company: Company
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
@@ -23,81 +26,10 @@ struct DocumentListView: View {
     }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                // ── Action Bar ──
-                HStack(spacing: 0) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                        Text("Documents")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                    }
-                    .padding(.leading, 16)
-
-                    Spacer()
-
-                    Menu {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            shareResourceId = company.id
-                            shareResourceType = "all_documents"
-                            shareResourceTitle = "All Documents"
-                            showShareSheet = true
-                        } label: {
-                            Label("All Documents", systemImage: "folder.badge.person.crop")
-                        }
-                        
-                        if !documents.isEmpty {
-                            ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
-                                Section(category) {
-                                    ForEach(grouped[category] ?? []) { doc in
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            shareResourceId = doc.id
-                                            shareResourceType = "document"
-                                            shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                            showShareSheet = true
-                                        } label: {
-                                            Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "person.crop.circle.badge.plus")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(Color(hex: "#A2A2A2"))
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 1, height: 20)
-
-                    Button {
-                        newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("ADD DOCUMENT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
-                            Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
-                        }
-                        .frame(width: 164, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(hex: "#1C1C1E").opacity(0.70))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                .padding(.horizontal, 20)
-                .padding(.top, 6)
+        ZStack(alignment: .top) {
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    Spacer().frame(height: 66)
 
                 VStack(spacing: 12) {
                     // Category Dashboard Grid
@@ -160,8 +92,15 @@ struct DocumentListView: View {
                                         DocumentRow(doc: doc) {
                                             editingDoc = doc
                                         } onOpen: {
-                                            if let u = URL(string: (doc.url ?? "").hasPrefix("http") ? (doc.url ?? "") : "https://\((doc.url ?? ""))") {
-                                                openURL = IdentifiableURL(url: u)
+                                            if let docUrl = doc.url {
+                                                if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
+                                                    let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
+                                                    if let u = URL(string: cleanPath) {
+                                                        openURL = IdentifiableURL(url: u)
+                                                    }
+                                                } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
+                                                    openURL = IdentifiableURL(url: u)
+                                                }
                                             }
                                         }
                                         .padding(.horizontal, 20)
@@ -189,8 +128,15 @@ struct DocumentListView: View {
                                     DocumentRow(doc: doc) {
                                         editingDoc = doc
                                     } onOpen: {
-                                        if let u = URL(string: (doc.url ?? "").hasPrefix("http") ? (doc.url ?? "") : "https://\((doc.url ?? ""))") {
-                                            openURL = IdentifiableURL(url: u)
+                                        if let docUrl = doc.url {
+                                            if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
+                                                let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
+                                                if let u = URL(string: cleanPath) {
+                                                    openURL = IdentifiableURL(url: u)
+                                                }
+                                            } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
+                                                openURL = IdentifiableURL(url: u)
+                                            }
                                         }
                                     }
                                     .padding(.horizontal, 20)
@@ -261,11 +207,85 @@ struct DocumentListView: View {
             EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: company.structure)
         }
         .sheet(item: $openURL) { wrapper in
-            SafariView(url: wrapper.url)
+            DocumentViewerView(url: wrapper.url)
         }
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
+            
+            documentActionBar
+                .zIndex(100)
+        }
+    }
+    
+    private var documentActionBar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                Text("Documents")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+            }
+            .padding(.leading, 16)
+
+            Spacer()
+
+            Menu {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    shareResourceId = company.id
+                    shareResourceType = "all_documents"
+                    shareResourceTitle = "All Documents"
+                    showShareSheet = true
+                } label: {
+                    Label("All Documents", systemImage: "folder.badge.person.crop")
+                }
+                
+                if !documents.isEmpty {
+                    ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
+                        Section(category) {
+                            ForEach(grouped[category] ?? []) { doc in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    shareResourceId = doc.id
+                                    shareResourceType = "document"
+                                    shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+                                    showShareSheet = true
+                                } label: {
+                                    Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "doc")
+                                }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 1, height: 20)
+
+            Button {
+                newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+            } label: {
+                HStack(spacing: 6) {
+                    Text("ADD DOCUMENT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
+                    Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
+                }
+                .frame(width: 164, height: 44)
+                .contentShape(Rectangle())
+            }
+        }
+        .premiumDarkBar(cornerRadius: 12)
+        .padding(.horizontal, 20)
+        .padding(.top, 6)
     }
 
     @State private var dummyDoc = CompanyDocument(
@@ -307,6 +327,7 @@ struct DocumentListView: View {
             }
         }
         .padding(.top, 40)
+        .spotlightTarget(isActive: onboardingState.isSpotlightingNotes)
     }
 
     private func processScan(_ images: [UIImage]) {
@@ -416,6 +437,16 @@ struct EditDocumentSheet: View {
     @State private var showDelete = false
     @State private var showShareSheet = false
     
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var showFileImporter = false
+    @State private var isUploading = false
+    @State private var uploadError: String? = nil
+    
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == doc.id || $0.resourceId == doc.companyId })
+        return share?.role == "Viewer"
+    }
+    
     struct Snapshot: Equatable {
         var name, type, url, uploadDate, notes: String
     }
@@ -435,6 +466,9 @@ struct EditDocumentSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
+                    SharedItemOverrideBanner(resourceId: doc.id, defaultCompanyId: doc.companyId)
+                    
+                    Group {
                     ZifrField(label: "Document Name", placeholder: "Articles of Incorporation", text: Binding(get: { doc.name }, set: { doc.name = $0 }))
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Document Type").zifrLabel()
@@ -448,6 +482,98 @@ struct EditDocumentSheet: View {
                         }
                         .cifrField()
                     }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Document File or Photo").zifrLabel()
+                        
+                        VStack(spacing: 12) {
+                            if !(doc.url ?? "").isEmpty {
+                                HStack {
+                                    Image(systemName: (doc.url ?? "").hasPrefix("http") ? "link.circle.fill" : "doc.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundStyle(Color.zifrBlue)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text((doc.url ?? "").hasPrefix("http") ? "Online Link" : "Local File / Scan")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text(doc.url ?? "")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                            .lineLimit(1)
+                                    }
+                                    Spacer()
+                                    
+                                    Button(role: .destructive) {
+                                        doc.url = nil
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundStyle(.red)
+                                            .font(.system(size: 16))
+                                    }
+                                }
+                                .padding(12)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    showFileImporter = true
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "folder.badge.plus")
+                                        Text("Choose File")
+                                        Spacer()
+                                    }
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, 12)
+                                    .background(Color.white.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                                
+                                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "photo.badge.plus")
+                                        Text("Choose Photo")
+                                        Spacer()
+                                    }
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.vertical, 12)
+                                    .background(Color.white.opacity(0.1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                            }
+                            
+                            if isUploading {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .tint(.zifrBlue)
+                                    Text("Uploading document...")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(Color.white.opacity(0.6))
+                                }
+                                .padding(.top, 4)
+                            }
+                            
+                            if let err = uploadError {
+                                Text(err)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.red)
+                                    .padding(.top, 4)
+                            }
+                        }
+                        .padding(12)
+                        .background(Color.white.opacity(0.03))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                    }
+                    
                     ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url ?? "" }, set: { doc.url = $0 }), keyboardType: .URL)
                     ZifrField(label: "Upload Date", placeholder: "April 15, 2026", text: Binding(get: { doc.uploadDate ?? "" }, set: { doc.uploadDate = $0 }))
                     VStack(alignment: .leading, spacing: 6) {
@@ -496,6 +622,8 @@ struct EditDocumentSheet: View {
                             }
                         }
                     }
+                    } // Close Group
+                    .disabled(isViewer)
                 }
                 .padding(20).padding(.bottom, 40)
             }
@@ -505,7 +633,85 @@ struct EditDocumentSheet: View {
             .onAppear {
                 snapshot = currentSnapshot
             }
+            .onChange(of: selectedPhotoItem) { _, item in
+                guard let item = item else { return }
+                isUploading = true
+                uploadError = nil
+                
+                Task {
+                    do {
+                        if let data = try? await item.loadTransferable(type: Data.self) {
+                            let fileName = "Photo_\(Int(Date().timeIntervalSince1970)).jpg"
+                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: "image/jpeg")
+                            
+                            await MainActor.run {
+                                doc.url = uploadUrl.absoluteString
+                                if doc.name.isEmpty || doc.name == "New Document" {
+                                    doc.name = "Photo - \(doc.type)"
+                                }
+                                isUploading = false
+                            }
+                        } else {
+                            throw NSError(domain: "App", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load photo data."])
+                        }
+                    } catch {
+                        await MainActor.run {
+                            uploadError = "Upload failed: \(error.localizedDescription)"
+                            isUploading = false
+                        }
+                    }
+                }
+            }
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.pdf, .image, .plainText, .data],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    guard let url = urls.first else { return }
+                    isUploading = true
+                    uploadError = nil
+                    
+                    Task {
+                        do {
+                            guard url.startAccessingSecurityScopedResource() else {
+                                throw NSError(domain: "App", code: -2, userInfo: [NSLocalizedDescriptionKey: "Permission denied for this file."])
+                            }
+                            defer { url.stopAccessingSecurityScopedResource() }
+                            
+                            let data = try Data(contentsOf: url)
+                            let fileName = url.lastPathComponent
+                            
+                            let uti = url.pathExtension.lowercased()
+                            let contentType = uti == "pdf" ? "application/pdf" : (uti == "png" ? "image/png" : "image/jpeg")
+                            
+                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: contentType)
+                            
+                            await MainActor.run {
+                                doc.url = uploadUrl.absoluteString
+                                if doc.name.isEmpty || doc.name == "New Document" {
+                                    doc.name = url.deletingPathExtension().lastPathComponent
+                                }
+                                isUploading = false
+                            }
+                        } catch {
+                            await MainActor.run {
+                                uploadError = "Upload failed: \(error.localizedDescription)"
+                                isUploading = false
+                            }
+                        }
+                    }
+                case .failure(let error):
+                    uploadError = "Failed to select file: \(error.localizedDescription)"
+                }
+            }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(isNew ? "New Document" : "Edit Document")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { 
                         if isNew { 
@@ -523,9 +729,11 @@ struct EditDocumentSheet: View {
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { vm.saveDoc(doc, appState: appState); dismiss() }
-                        .font(.system(size: 15, weight: .black))
-                        .foregroundStyle(isDirty ? Color.green : .white)
+                    if !isViewer {
+                        Button("Save") { vm.saveDoc(doc, appState: appState); dismiss() }
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(isDirty ? Color.green : .white)
+                    }
                 }
             }
             .interactiveDismissDisabled(isNew)
@@ -534,6 +742,83 @@ struct EditDocumentSheet: View {
             }
         }
     }
+}
+
+// MARK: - Document Viewer
+struct DocumentViewerView: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    
+    var isLocalFile: Bool {
+        url.isFileURL
+    }
+    
+    var isPDF: Bool {
+        url.pathExtension.lowercased() == "pdf"
+    }
+    
+    var body: some View {
+        if isLocalFile {
+            NavigationStack {
+                ZStack {
+                    Color(hex: "#171717").ignoresSafeArea()
+                    
+                    Group {
+                        if isPDF {
+                            PDFKitView(url: url)
+                        } else if let uiImage = UIImage(contentsOfFile: url.path) {
+                            ScrollView([.horizontal, .vertical]) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFit()
+                            }
+                        } else {
+                            VStack(spacing: 12) {
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(.white.opacity(0.4))
+                                Text("Unsupported offline file format")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white.opacity(0.6))
+                            }
+                        }
+                    }
+                }
+                .navigationTitle(url.lastPathComponent)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Close") {
+                            dismiss()
+                        }
+                        .foregroundStyle(Color.white.opacity(0.6))
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        ShareLink(item: url) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundStyle(Color.zifrBlue)
+                        }
+                    }
+                }
+            }
+        } else {
+            SafariView(url: url)
+        }
+    }
+}
+
+struct PDFKitView: UIViewRepresentable {
+    let url: URL
+    
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+        pdfView.document = PDFDocument(url: url)
+        pdfView.autoScales = true
+        pdfView.backgroundColor = UIColor(red: 0.09, green: 0.09, blue: 0.09, alpha: 1.0)
+        return pdfView
+    }
+    
+    func updateUIView(_ uiView: PDFView, context: Context) {}
 }
 
 // MARK: - Safari View

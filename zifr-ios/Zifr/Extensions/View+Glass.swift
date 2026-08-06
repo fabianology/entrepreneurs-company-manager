@@ -34,13 +34,17 @@ struct LiquidGlassModifier: ViewModifier {
     }
 }
 
-// MARK: - Masonry Glass Modifier (70% Opacity)
+// MARK: - Masonry Glass Modifier (Tinted Material Blur)
 struct MasonryGlassModifier: ViewModifier {
     var cornerRadius: CGFloat = 12
 
     func body(content: Content) -> some View {
         content
-            .background(Color(hex: "#1C1C1E").opacity(0.70))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color(hex: "#1C1C1E").opacity(0.40))
+            )
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
@@ -48,6 +52,58 @@ struct MasonryGlassModifier: ViewModifier {
             )
     }
 }
+
+// MARK: - Premium Dark Bar Modifier (70% Opacity Black)
+struct PremiumDarkBarModifier: ViewModifier {
+    var cornerRadius: CGFloat = 12
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.black.opacity(0.70))
+            )
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            )
+    }
+}
+
+// MARK: - Miloom Report Stroke Modifier
+struct MiloomReportStrokeModifier: ViewModifier {
+    var cornerRadius: CGFloat = 12
+    @State private var rotation: Double = 0.0
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(colors: [
+                                Color(hex: "#4f609a"), // Miloom Primary Start
+                                Color(hex: "#f2ac5b"), // Miloom Primary End
+                                Color(hex: "#15566a"), // Miloom Secondary Start
+                                Color(hex: "#00544e"), // Miloom Secondary End
+                                Color(hex: "#4f609a")  // Seamless loop point
+                            ]),
+                            center: .center,
+                            angle: .degrees(rotation)
+                        ),
+                        lineWidth: 1.2
+                    )
+            )
+            .onAppear {
+                withAnimation(.linear(duration: 6.0).repeatForever(autoreverses: false)) {
+                    rotation = 360.0
+                }
+            }
+    }
+}
+
 
 // MARK: - CiFr Modal Field style
 struct CifrFieldModifier: ViewModifier {
@@ -75,6 +131,15 @@ extension View {
     func masonryGlass(cornerRadius: CGFloat = 12) -> some View {
         modifier(MasonryGlassModifier(cornerRadius: cornerRadius))
     }
+
+    func premiumDarkBar(cornerRadius: CGFloat = 12) -> some View {
+        modifier(PremiumDarkBarModifier(cornerRadius: cornerRadius))
+    }
+
+    func miloomReportStroke(cornerRadius: CGFloat = 12) -> some View {
+        modifier(MiloomReportStrokeModifier(cornerRadius: cornerRadius))
+    }
+
 
     func cifrField() -> some View {
         modifier(CifrFieldModifier())

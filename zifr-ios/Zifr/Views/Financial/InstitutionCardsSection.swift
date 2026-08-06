@@ -3,6 +3,7 @@ import SwiftData
 
 // MARK: - Institution Cards Section
 struct InstitutionCardsSection: View {
+    @Environment(AppState.self) private var appState
     let cards: [FinancialCard]
     let onAdd: () -> Void
     let onEdit: (FinancialCard) -> Void
@@ -49,9 +50,24 @@ struct InstitutionCardsSection: View {
                                     }
                                 }
                                 
-                                Text((card.paidFrom ?? "").isEmpty ? "No payment source" : "Paid from \((card.paidFrom ?? ""))")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.45))
+                                if card.type.lowercased() == "debit" && hasLinkedAccount(for: card) {
+                                    HStack(spacing: 4) {
+                                        Text("LINKED TO:")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                                        Image(systemName: "link")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundStyle(Color.zifrGreen)
+                                        Text(linkedAccountText(for: card))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color(hex: "#7D7D7D"))
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                } else {
+                                    Text((card.paidFrom ?? "").isEmpty ? "No payment source" : "Paid from \(paidFromWithInstitution(for: card))")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                }
                             }
                             Spacer()
                             Image(systemName: "chevron.right")
@@ -90,5 +106,56 @@ struct InstitutionCardsSection: View {
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
         .listRowSeparator(.hidden)
+    }
+    
+    private func paidFromWithInstitution(for card: FinancialCard) -> String {
+        guard let paidFrom = card.paidFrom, !paidFrom.isEmpty else { return "" }
+        let normalizedPaidFrom = paidFrom.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in appState.cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedPaidFrom {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(paidFrom)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedPaidFrom {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(paidFrom)"
+                    }
+                }
+            }
+        }
+        return paidFrom
+    }
+    
+    private func hasLinkedAccount(for card: FinancialCard) -> Bool {
+        let cardIdString = card.id.uuidString
+        return appState.institutions.contains { inst in
+            inst.accounts.contains { acc in
+                acc.linkedCardId == cardIdString
+            }
+        }
+    }
+    
+    private func linkedAccountText(for card: FinancialCard) -> String {
+        // Reverse lookup: find any account whose linkedCardId matches this card's ID
+        let cardIdString = card.id.uuidString
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                if let linkedId = acc.linkedCardId, linkedId == cardIdString {
+                    return acc.name.isEmpty ? acc.type : acc.name
+                }
+            }
+        }
+        return ""
     }
 }

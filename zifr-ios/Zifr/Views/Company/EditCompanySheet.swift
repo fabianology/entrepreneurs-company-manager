@@ -5,6 +5,7 @@ struct EditCompanySheet: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(OnboardingStateManager.self) private var onboardingState
     @Bindable var vm: AppViewModel
     var company: Company?
 
@@ -20,10 +21,52 @@ struct EditCompanySheet: View {
 
     var isEditing: Bool { company != nil }
 
+    private var isViewer: Bool {
+        shareRole == "Viewer"
+    }
+
+    private var shareRole: String? {
+        guard let cId = company?.id else { return nil }
+        return appState.resourceShares.first(where: { $0.resourceId == cId })?.role
+    }
+
+    private var sharedBy: String? {
+        guard let cId = company?.id else { return nil }
+        return appState.resourceShares.first(where: { $0.resourceId == cId })?.senderEmail
+    }
+
+    private var isSharedWithMe: Bool {
+        guard let company = company, let currentUserId = authViewModel.currentUser?.id else { return false }
+        return company.userId != currentUserId
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    if isSharedWithMe {
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.2.fill")
+                            Text("Shared with you • \(shareRole ?? "Viewer")")
+                            Spacer()
+                            if let sender = sharedBy {
+                                Text(sender)
+                                    .lineLimit(1)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color(hex: "#818cf8"))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color(hex: "#4f46e5").opacity(0.15))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, -8)
+                    }
+
+                    Group {
                     // Entity Name Row
                     HStack(spacing: 16) {
                         ZStack {
@@ -68,7 +111,7 @@ struct EditCompanySheet: View {
                         }
                         
                         formSection {
-                            PremiumInputField(label: "ENTITY NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
+                            PremiumInputField(label: "BUSINESS NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
                         }
                     }
                     .padding(.top, 8)
@@ -106,7 +149,7 @@ struct EditCompanySheet: View {
 
                     // Entity Category
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ENTITY CATEGORY")
+                        Text("BUSINESS CATEGORY")
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.horizontal, 4)
@@ -127,7 +170,7 @@ struct EditCompanySheet: View {
 
                     // Structure Picker
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("ENTITY STRUCTURE")
+                        Text("BUSINESS STRUCTURE")
                             .font(.system(size: 12, weight: .regular))
                             .foregroundStyle(Color.white.opacity(0.45))
                             .padding(.horizontal, 4)
@@ -152,6 +195,8 @@ struct EditCompanySheet: View {
                             UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         })
                     }
+                    } // End Group
+                    .disabled(isViewer)
 
                     VStack(spacing: 30) {
                         // App Navigators
@@ -163,11 +208,19 @@ struct EditCompanySheet: View {
                             
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                dismiss()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    // Pop back to DashboardView, then start tutorial
+                                    vm.path = NavigationPath()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                        onboardingState.startTutorial(appState: appState, userId: authViewModel.currentUser?.id ?? UUID())
+                                    }
+                                }
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "play.circle")
                                         .font(.system(size: 14))
-                                    Text("Help & Guide")
+                                    Text("Tutorial")
                                         .font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundStyle(.white)
@@ -180,30 +233,20 @@ struct EditCompanySheet: View {
                             .buttonStyle(.plain)
                             .padding(.bottom, 4)
                             
-                            HStack(spacing: 12) {
-                                navButton(icon: "square.3.layers.3d", color: Color(hex: "#2070BD"), text: "Subscriptions") {
-                                    if let company { vm.selectedCompany = company; vm.activeTab = .subscriptions; dismiss() }
-                                }
-                                navButton(icon: "dollarsign.bank.building", color: Color(hex: "#1A7077"), text: "Financials") {
-                                    if let company { vm.selectedCompany = company; vm.activeTab = .financial; dismiss() }
-                                }
-                                navButton(icon: "doc.text", color: Color(hex: "#918457"), text: "Docs") {
-                                    if let company { vm.selectedCompany = company; vm.activeTab = .documents; dismiss() }
-                                }
-                            }
+
                         }
 
 
 
                         // Share Entity
-                        if isEditing {
+                        if isEditing && !isViewer {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 showShareSheet = true
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "person.crop.circle.badge.plus")
-                                    Text("Share Entity")
+                                    Text("Share Business")
                                 }
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(Color(hex: "#4f46e5"))
@@ -224,8 +267,8 @@ struct EditCompanySheet: View {
                             } label: {
                                 HStack {
                                     Spacer()
-                                    Image(systemName: "trash")
-                                    Text("Delete \(name.isEmpty ? "Entity" : name)")
+                                    Image(systemName: company?.userId != authViewModel.currentUser?.id ? "rectangle.portrait.and.arrow.right" : "trash")
+                                    Text(company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \(name.isEmpty ? "Business" : name)")
                                     Spacer()
                                 }
                                 .font(.system(size: 15, weight: .semibold))
@@ -236,17 +279,21 @@ struct EditCompanySheet: View {
                             }
                             .buttonStyle(.plain)
                             .confirmationDialog(
-                                "Delete \"\(name.isEmpty ? "this entity" : name)\"?",
+                                company?.userId != authViewModel.currentUser?.id ? "Leave Company" : "Delete \"\(name.isEmpty ? "this business" : name)\"?",
                                 isPresented: $showDeleteConfirm,
                                 titleVisibility: .visible
                             ) {
-                                Button("Delete Entity", role: .destructive) {
-                                    if let company { vm.deleteCompany(company, appState: appState) }
+                                Button(company?.userId != authViewModel.currentUser?.id ? "Leave" : "Delete Business", role: .destructive) {
+                                    if let company { vm.deleteCompany(company, appState: appState, currentUserId: authViewModel.currentUser?.id) }
                                     dismiss()
                                 }
                                 Button("Cancel", role: .cancel) {}
                             } message: {
-                                Text("This will permanently delete this entity and all associated data. This action cannot be undone.")
+                                if company?.userId != authViewModel.currentUser?.id {
+                                    Text("Are you sure you want to leave this company? It will be removed from your dashboard.")
+                                } else {
+                                    Text("This will permanently delete this entity and all associated data for everyone. This action cannot be undone.")
+                                }
                             }
                         }
                     }
@@ -263,16 +310,22 @@ struct EditCompanySheet: View {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                     }
             )
-            .navigationTitle(isEditing ? "Edit Entity" : "New Entity")
+            .navigationTitle(isEditing ? "Edit Business" : "New Business")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(isEditing ? "Edit Business" : "New Business")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
+                    if !isViewer {
+                        Button("Save") {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         save()
                         dismiss()
@@ -280,6 +333,7 @@ struct EditCompanySheet: View {
                     .fontWeight(.semibold)
                     .tint((hasChanges && !name.isEmpty) ? .green : nil)
                     .disabled(!hasChanges || name.isEmpty)
+                    }
                 }
             }
         }
@@ -333,27 +387,7 @@ struct EditCompanySheet: View {
         }
     }
 
-    private func navButton(icon: String, color: Color, text: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundStyle(color)
-                Text(text)
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(Color.black)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(.plain)
-    }
+
 }
 
 // MARK: - Helpers
@@ -371,6 +405,7 @@ struct ShareEntitySheet: View {
     let resourceTitle: String
     
     @State private var email: String = ""
+    @State private var senderDisplayName: String = ""
     @State private var role: String = "Viewer"
     @State private var isSending = false
     @State private var successMessage: String?
@@ -382,6 +417,9 @@ struct ShareEntitySheet: View {
         NavigationStack {
             ZStack {
                 Color.black.ignoresSafeArea()
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -438,6 +476,30 @@ struct ShareEntitySheet: View {
                                 )
                             }
                             
+                            // Send As Field
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Send As (Optional)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .textCase(.uppercase)
+                                
+                                HStack {
+                                    Image(systemName: "person.text.rectangle")
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    TextField("e.g. Kris from Miloom", text: $senderDisplayName)
+                                        .textInputAutocapitalization(.words)
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(16)
+                                .background(Color(hex: "#1A1A1C"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                            }
+                            
                             // Role Picker
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Permission Level")
@@ -473,6 +535,10 @@ struct ShareEntitySheet: View {
                         
                         Spacer(minLength: 40)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -503,14 +569,16 @@ struct ShareEntitySheet: View {
     }
     
     private func sendInvite() {
-        guard !email.isEmpty else { return }
+        let cleanedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !cleanedEmail.isEmpty else { return }
         isSending = true
         errorMessage = nil
         successMessage = nil
         
         Task {
             do {
-                try await DataRepository.shared.inviteUser(email: email, role: role, resourceId: resourceId, resourceType: resourceType)
+                try await DataRepository.shared.inviteUser(email: cleanedEmail, role: role, resourceId: resourceId, resourceType: resourceType, senderDisplayName: senderDisplayName.isEmpty ? nil : senderDisplayName)
+                await DataRepository.shared.logSecurityEvent(title: "Resource Shared", message: "You shared \(resourceTitle) with \(cleanedEmail).")
                 await MainActor.run {
                     isSending = false
                     successMessage = "Invitation sent successfully!"

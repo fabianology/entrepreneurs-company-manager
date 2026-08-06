@@ -22,6 +22,7 @@ struct EntityHomeView: View {
     private let homeColor   = Color.white.opacity(0.85)
 
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var expandedInstitutions: Set<String> = []
     @State private var expandedAccounts: Set<String> = []
@@ -50,6 +51,7 @@ struct EntityHomeView: View {
     @State private var editingInst: Institution? = nil
     @State private var editingLoan: Loan? = nil
     @State private var editingDoc: CompanyDocument? = nil
+    @State private var viewingTransactionsFor: String? = nil
 
     // MARK: - ViewModel
     private var model: EntityHomeViewModel {
@@ -59,62 +61,132 @@ struct EntityHomeView: View {
     // MARK: - Body
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 32) {
-                    quickAddRow
-                        .padding(.top, 6)
-                        .padding(.bottom, 8)
-                    
-                    if model.isZeroState {
-                        zeroStateBanner
+            ScrollViewReader { scrollProxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
+                        quickAddRow
+                            .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterQuickAdd)
                             .padding(.horizontal, 20)
+                            .padding(.top, 6)
+                            .padding(.bottom, 8)
+                            .id("quickAddRow")
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: TutorialFrameKey.self,
+                                        value: ["quickAdd": geo.frame(in: .global)]
+                                    )
+                                }
+                            )
+                        
+                        // FINANCIAL ACCORDION
+                        EntityFinancialSection(
+                            company: company,
+                            institutions: institutions,
+                            cards: cards,
+                            loans: loans,
+                            subscriptions: subscriptions,
+                            vm: vm,
+                            expandedInstitutions: $expandedInstitutions,
+                            expandedAccounts: $expandedAccounts,
+                            showFinancialReceiptReport: $showFinancialReceiptReport,
+                            editingCard: $editingCard,
+                            editingInst: $editingInst,
+                            editingLoan: $editingLoan,
+                            viewingTransactionsFor: $viewingTransactionsFor,
+                            totalDebt: model.totalDebt,
+                            totalCreditLimit: model.totalCreditLimit,
+                            availableCredit: model.availableCredit
+                        )
+                        .id("financialSection")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialFrameKey.self,
+                                    value: ["financials": geo.frame(in: .global)]
+                                )
+                            }
+                        )
+                        
+                        // SUBSCRIPTIONS (Timeline + Cards)
+                        EntitySubscriptionSection(
+                            company: company,
+                            activeSubscriptions: model.activeSubscriptions,
+                            subscriptions: subscriptions,
+                            institutions: institutions,
+                            cards: cards,
+                            monthlyBurn: model.monthlyBurn,
+                            vm: vm,
+                            flippedHeroIndex: $flippedHeroIndex,
+                            showReceiptReport: $showReceiptReport,
+                            coverFlowSnappedIndex: $coverFlowSnappedIndex,
+                            flipAnimation: flipAnimation
+                        )
+                        .id("subscriptionSection")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialFrameKey.self,
+                                    value: ["subscriptions": geo.frame(in: .global)]
+                                )
+                            }
+                        )
+
+                        // DOCUMENTS ACCORDION
+                        EntityDocumentSection(
+                            company: company,
+                            documents: documents,
+                            vm: vm,
+                            expandedCategories: $expandedCategories,
+                            newDoc: $newDoc,
+                            editingDoc: $editingDoc
+                        )
+                        .id("documentSection")
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: TutorialFrameKey.self,
+                                    value: ["documents": geo.frame(in: .global)]
+                                )
+                            }
+                        )
+                        
+                        Spacer().frame(height: 40)
                     }
-
-                    // FINANCIAL ACCORDION
-                    EntityFinancialSection(
-                        company: company,
-                        institutions: institutions,
-                        cards: cards,
-                        loans: loans,
-                        subscriptions: subscriptions,
-                        vm: vm,
-                        expandedInstitutions: $expandedInstitutions,
-                        expandedAccounts: $expandedAccounts,
-                        showFinancialReceiptReport: $showFinancialReceiptReport,
-                        editingCard: $editingCard,
-                        editingInst: $editingInst,
-                        editingLoan: $editingLoan,
-                        totalDebt: model.totalDebt,
-                        totalCreditLimit: model.totalCreditLimit,
-                        availableCredit: model.availableCredit
-                    )
-
-                    // SUBSCRIPTIONS (Timeline + Cards)
-                    EntitySubscriptionSection(
-                        company: company,
-                        activeSubscriptions: model.activeSubscriptions,
-                        subscriptions: subscriptions,
-                        institutions: institutions,
-                        cards: cards,
-                        monthlyBurn: model.monthlyBurn,
-                        vm: vm,
-                        flippedHeroIndex: $flippedHeroIndex,
-                        showReceiptReport: $showReceiptReport,
-                        coverFlowSnappedIndex: $coverFlowSnappedIndex,
-                        flipAnimation: flipAnimation
-                    )
-
-                    // DOCUMENTS ACCORDION
-                    EntityDocumentSection(
-                        company: company,
-                        documents: documents,
-                        vm: vm,
-                        expandedCategories: $expandedCategories,
-                        newDoc: $newDoc,
-                        editingDoc: $editingDoc
-                    )
-                    
-                    Spacer().frame(height: 40)
+                }
+                .onChange(of: onboardingState.currentStep) { _, newStep in
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                        switch newStep {
+                        // Real onboarding scroll targets
+                        case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                        case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .top)
+                        case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                        case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .top)
+                        // Tutorial scroll targets — scroll section header to top so frame capture is correct
+                        case .tutorialCommandQuickAdd:       scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                        case .tutorialCommandFinancials:     scrollProxy.scrollTo("financialSection", anchor: .top)
+                        case .tutorialCommandSubscriptions:  scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                        case .tutorialCommandDocuments:      scrollProxy.scrollTo("documentSection", anchor: .top)
+                        default: break
+                        }
+                    }
+                }
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                            switch onboardingState.currentStep {
+                            case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                            case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .top)
+                            case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                            case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .top)
+                            case .tutorialCommandQuickAdd:    scrollProxy.scrollTo("quickAddRow", anchor: .top)
+                            case .tutorialCommandFinancials:  scrollProxy.scrollTo("financialSection", anchor: .top)
+                            case .tutorialCommandSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
+                            case .tutorialCommandDocuments:   scrollProxy.scrollTo("documentSection", anchor: .top)
+                            default: break
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -150,6 +222,11 @@ struct EntityHomeView: View {
         }
         .sheet(item: $editingDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: company.structure)
+        }
+        .sheet(isPresented: Binding(get: { viewingTransactionsFor != nil }, set: { if !$0 { viewingTransactionsFor = nil } })) {
+            if let accountId = viewingTransactionsFor {
+                TransactionFeedView(accountId: accountId, vm: vm)
+            }
         }
         .sheet(isPresented: $showReceiptReport) {
             SubscriptionReceiptView(
@@ -284,11 +361,10 @@ struct EntityHomeView: View {
         .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#1C1C1E").opacity(0.70))
+                .fill(Color.black.opacity(0.70))
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-        .padding(.horizontal, 20)
     }
     
     private func quickAddButton(icon: String, title: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -308,26 +384,7 @@ struct EntityHomeView: View {
         .buttonStyle(.plain)
     }
 
-    private var zeroStateBanner: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: "sparkles")
-                    .foregroundStyle(Color.zifrGreen)
-                Text("Command Center Active")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-                Spacer()
-            }
-            Text("Begin adding your entity's services, banks, cards, or documents using the tabs below to populate your dashboards.")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.6))
-                .lineSpacing(4)
-        }
-        .padding(16)
-        .background(dimSurface)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.zifrGreen.opacity(0.2), lineWidth: 1))
-    }
+
 }
 
 

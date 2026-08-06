@@ -179,7 +179,7 @@ struct LoanHUD: View {
                     VStack(spacing: 2) {
                         Text(draft.name.isEmpty ? (isNew ? "Add Loan" : "Edit Loan") : draft.name)
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color(hex: "#C1AA78"))
                         Text(institutionName)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.5))

@@ -13,8 +13,6 @@ struct GlobalSearchView: View {
     @Environment(AppState.self) private var appState
     @FocusState private var searchFocused: Bool
     @State private var visiblePasswords: Set<UUID> = []
-    @State private var isThinking = false
-    @State private var aiResponse: String? = nil
     
     enum SearchScope { case global, company }
     @State private var searchScope: SearchScope = .global
@@ -92,63 +90,7 @@ struct GlobalSearchView: View {
                     ScrollView {
                         LazyVStack(spacing: 10) {
                             
-                            // MARK: - Gemini Trigger
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                Task {
-                                    isThinking = true
-                                    aiResponse = await vm.askGeminiSearch(query: vm.searchQuery, appState: appState)
-                                    isThinking = false
-                                }
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Text("✨").font(.system(size: 16))
-                                    Text("Ask Gemini:")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(Color.zifrGold)
-                                    Text("\"\(vm.searchQuery)\"")
-                                        .font(.system(size: 14, weight: .regular))
-                                        .foregroundStyle(.white)
-                                        .lineLimit(1)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.2))
-                                }
-                                .padding(14)
-                                .glassCard(cornerRadius: 16)
-                            }
-                            .buttonStyle(.plain)
-                            
-                            // MARK: - Gemini Response
-                            if isThinking {
-                                HStack {
-                                    Spacer()
-                                    Text("✨ Gemini is analyzing...")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    Spacer()
-                                }
-                                .padding(20)
-                                .glassCard(cornerRadius: 16)
-                            } else if let response = aiResponse {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
-                                        Text("✨")
-                                        Text("Gemini Insights")
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundStyle(Color.zifrGold)
-                                        Spacer()
-                                    }
-                                    Text(.init(response))
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundStyle(.white)
-                                        .tint(.blue)
-                                }
-                                .padding(16)
-                                .glassCard(cornerRadius: 16)
-                            }
-                            
+
                             if results.isEmpty {
                                 VStack(spacing: 12) {
                                     Text("No local results for")
@@ -196,10 +138,7 @@ struct GlobalSearchView: View {
                     .foregroundStyle(Color.white.opacity(0.5))
                 }
             }
-            .onChange(of: vm.searchQuery) { _, _ in
-                isThinking = false
-                aiResponse = nil
-            }
+
         }
         .onAppear {
             searchFocused = true
@@ -364,6 +303,7 @@ struct GlobalSearchView: View {
                 Button {
                     UIPasteboard.general.string = pwd
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password for '\(result.title)' was copied to your clipboard.") }
                 } label: {
                     Label("Copy Password", systemImage: "key.fill")
                 }

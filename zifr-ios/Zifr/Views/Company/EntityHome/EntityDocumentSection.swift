@@ -5,12 +5,13 @@ struct EntityDocumentSection: View {
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
+    @Environment(OnboardingStateManager.self) private var onboardingState
     
     @Binding var expandedCategories: Set<String>
     @Binding var newDoc: CompanyDocument?
     @Binding var editingDoc: CompanyDocument?
 
-    private let docsColor = Color(hex: "#23414B")
+    private let docsColor = Color(hex: "#918457")
 
     private var docCategories: [String] {
         ["Incorporation", "Taxes", "Bank Statements", "Contracts", "IP", "Payroll", "Insurance", "Misc"]
@@ -21,17 +22,19 @@ struct EntityDocumentSection: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             // Header
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 vm.activeTab = .documents
             } label: {
                 VStack(spacing: 8) {
-                    HStack {
+                    HStack(spacing: 0) {
                         Image(systemName: "doc.text")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(docsColor)
+                            .padding(.trailing, 8)
+                        
                         Text("DOCUMENTS")
                             .font(.system(size: 13, weight: .black))
                             .tracking(1.5)
@@ -59,7 +62,8 @@ struct EntityDocumentSection: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(Color.white.opacity(0.1))
-                                Capsule().fill(docsColor)
+                                Capsule()
+                                    .fill(LinearGradient(colors: [docsColor, docsColor.opacity(0.7)], startPoint: .leading, endPoint: .trailing))
                                     .frame(width: geo.size.width * CGFloat(completionRatio))
                             }
                         }
@@ -73,7 +77,7 @@ struct EntityDocumentSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.black.opacity(0.3))
+                .background(Color.black.opacity(0.70))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom
@@ -81,8 +85,9 @@ struct EntityDocumentSection: View {
             }
             .buttonStyle(.plain)
 
-            // Categories Accordion
-            VStack(spacing: 8) {
+            VStack(spacing: 16) {
+                // Categories Accordion
+                VStack(spacing: 8) {
                 ForEach(docCategories.filter { coveredCategories.contains($0) }, id: \.self) { category in
                     let docsInCategory = documents.filter { $0.type == category }
                     let isExpanded = expandedCategories.contains(category)
@@ -145,22 +150,28 @@ struct EntityDocumentSection: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
                     Text("Generate Report")
                 }
                 .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
+                .background(Color.white.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .miloomReportStroke()
             }
-            .buttonStyle(MiloomSecondaryButtonStyle())
+            .buttonStyle(PremiumButtonStyle())
             .padding(.horizontal, 16)
         }
+        .padding(.top, 16)
         .padding(.bottom, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#1C1C1E").opacity(0.70))
-        )
+        .background(Color(hex: "#1C1C1E").opacity(0.70))
+        .frame(maxWidth: .infinity)
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterDocuments)
         .padding(.horizontal, 20)
     }
 }

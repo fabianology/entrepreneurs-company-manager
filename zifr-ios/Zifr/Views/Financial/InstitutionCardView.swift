@@ -17,34 +17,58 @@ struct InstitutionCardView: View {
 
     @State private var editingAccount: InstitutionAccount? = nil
     @State private var accountDraft = InstitutionAccount()
-
+    
+    private var healthColor: Color {
+        if institution.isDisconnected {
+            return .red
+        }
+        if institution.accounts.contains(where: { $0.status != "Active" }) {
+            return .orange
+        }
+        return .zifrGreen
+    }
     var body: some View {
         MiloomListCard {
             // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
-                    HStack(alignment: .top, spacing: 16) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16).fill(Color.clear).frame(width: 56, height: 56)
-                            if !(institution.loginUrl ?? "").isEmpty {
-                                FaviconImage(website: institution.loginUrl ?? "", size: 36)
-                            } else {
+                    HStack(alignment: .center, spacing: 16) {
+                        if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
+                            FaviconImage(website: loginUrl, size: 40)
+                                .frame(width: 56, height: 56)
+                        } else {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.white.opacity(0.06))
+                                    .frame(width: 56, height: 56)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                    )
                                 Image(systemName: "building.columns")
                                     .font(.system(size: 22, weight: .semibold))
                                     .foregroundStyle(Color.white.opacity(0.8))
                             }
                         }
+
                         VStack(alignment: .leading, spacing: 6) {
-                            Text(institution.name.isEmpty ? "Institution" : institution.name)
-                                .font(.system(size: 17, weight: .semibold))
-                                .foregroundStyle(.white)
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(healthColor)
+                                    .frame(width: 8, height: 8)
+                                    .shadow(color: healthColor, radius: 4)
+                                
+                                Text(institution.name.isEmpty ? "Bank" : institution.name)
+                                    .font(.system(size: 17, weight: .semibold))
+                                    .foregroundStyle(.white)
+                            }
 
                             HStack(spacing: 8) {
                                 HStack(spacing: 4) {
                                     Text("\(institution.accounts.count)").foregroundStyle(.white)
                                     Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
                                 statusPipe()
@@ -53,7 +77,7 @@ struct InstitutionCardView: View {
                                     Text("\(cardCount)").foregroundStyle(.white)
                                     Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
                                 statusPipe()
@@ -62,33 +86,24 @@ struct InstitutionCardView: View {
                                     Text("\(loanCount)").foregroundStyle(.white)
                                     Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 12, weight: .medium))
                                 .tracking(0.3)
                                 
-                                if let syncedDate = institution.lastSyncedAt {
-                                    statusPipe()
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                        Text(syncedDate, style: .relative)
-                                            .foregroundStyle(Color(hex: "#C1AA78"))
-                                    }
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                }
                             }
                         }
-                        .padding(.top, 8)
                         Spacer(minLength: 0)
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 24)
-                    .padding(.bottom, 6)
-                    
-                    Rectangle()
-                        .frame(height: 1)
-                        .foregroundStyle(Color.white.opacity(0.08))
-                        .frame(width: UIScreen.main.bounds.width * 0.8)
-                        .padding(.bottom, 12)
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
+                    .background(
+                        UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                            .fill(Color.black.opacity(0.70))
+                            .overlay(
+                                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    )
 
                     // ── Credentials (tap-to-copy) ────
                     VStack(alignment: .leading, spacing: 8) {
@@ -112,6 +127,7 @@ struct InstitutionCardView: View {
                         DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
                     }
                     .padding(.horizontal, 24)
+                    .padding(.top, 16)
                     .padding(.bottom, institution.isDisconnected ? 16 : 24)
                     
                     if institution.isDisconnected {
@@ -139,37 +155,45 @@ struct InstitutionCardView: View {
                 withAnimation(.spring(response: 0.35)) { expanded.toggle() }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             }) {
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     ForEach(institution.accounts) { acc in
                         Button {
                             accountDraft = acc
                             editingAccount = acc
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(acc.name.isEmpty ? "Account" : acc.name)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    
-                                    HStack(spacing: 6) {
-                                        Text(acc.type)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
+                            VStack(spacing: 0) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Text(acc.name.isEmpty ? "Account" : acc.name.cleanAccountName)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
+                                        
+                                        HStack(spacing: 6) {
+                                            Text(acc.type)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text(acc.balance.currencyString)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(.white)
                                     }
                                 }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text(acc.balance.currencyString)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 12)
+                                .background(Color.clear)
+                                
+                                if acc.id != institution.accounts.last?.id || !loans.isEmpty {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 8)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(PremiumButtonStyle())
                     }
@@ -179,49 +203,68 @@ struct InstitutionCardView: View {
                             onEditLoan(loan)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    
-                                    HStack(spacing: 6) {
-                                        Text(loan.role)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
-                                        Text("|")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.2))
-                                        let rateStr = String(format: loan.interestRate.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.2f%%", loan.interestRate)
-                                        Text("\(rateStr) APR")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
+                            VStack(spacing: 0) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
+                                        
+                                        HStack(spacing: 6) {
+                                            Text(loan.role)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                            Text("|")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.2))
+                                            let rateStr = String(format: loan.interestRate.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.2f%%", loan.interestRate)
+                                            Text("\(rateStr) APR")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+
+                                        if let notes = loan.notes, !notes.isEmpty {
+                                            HStack(spacing: 6) {
+                                                Text("PURPOSE:")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                Text(notes)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
+                                        }
+                                    }
+                                    Spacer()
+                                    VStack(alignment: .trailing, spacing: 4) {
+                                        Text(loan.principalAmount.currencyString)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(.white)
                                     }
                                 }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 4) {
-                                    Text(loan.principalAmount.currencyString)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 12)
+                                .background(Color.clear)
+                                
+                                if loan.id != loans.last?.id {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 8)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(PremiumButtonStyle())
                     }
                 }
             }
         }
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,
                 isNew: false,
-                institutionName: institution.name.isEmpty ? "Institution" : institution.name,
+                institutionName: institution.name.isEmpty ? "Bank" : institution.name,
+                availableCards: appState.cards.filter { $0.companyId == institution.companyId },
                 onSave: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         var updatedInst = institution

@@ -10,30 +10,63 @@ struct PlaidLinkButton: View {
     
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var linkHandler: Handler?
+    @State private var linkHandler: LinkKit.Handler?
+    
+    @State private var isExchangingToken = false
     
     var body: some View {
-        Button {
-            Task { await startLink() }
-        } label: {
-            HStack(spacing: 12) {
-                if isLoading {
-                    ProgressView().tint(isReconnect ? Color(hex: "#C1AA78") : .white)
-                } else {
-                    Image(systemName: isReconnect ? "exclamationmark.triangle.fill" : "building.columns.fill")
-                        .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : .white)
+        Group {
+            if isExchangingToken {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "#C1AA78")))
+                        .scaleEffect(1.5)
+                        .padding(.bottom, 4)
+                    
+                    Text("Connecting bank...")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                    
+                    Text("Almost done. Securing your connection.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .multilineTextAlignment(.center)
                 }
-                Text(isLoading ? (isReconnect ? "Reconnecting..." : "Connecting...") : buttonText)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            } else {
+                Button {
+                    Task { await startLink() }
+                } label: {
+                    HStack(spacing: 12) {
+                        if isLoading {
+                            ProgressView().tint(isReconnect ? Color(hex: "#C1AA78") : .white)
+                        } else {
+                            Image(systemName: isReconnect ? "exclamationmark.triangle.fill" : "building.columns.fill")
+                                .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : .white)
+                        }
+                        Text(isLoading ? (isReconnect ? "Preparing connection..." : "Preparing connection...") : buttonText)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : .white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: isReconnect ? 44 : 56)
+                    .background(isReconnect ? Color(hex: "#C1AA78").opacity(0.15) : Color(red: 59/255, green: 130/255, blue: 246/255))
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+                .disabled(isLoading)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: isReconnect ? 44 : 56)
-            .background(isReconnect ? Color(hex: "#C1AA78").opacity(0.15) : Color(red: 59/255, green: 130/255, blue: 246/255))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
         }
-        .disabled(isLoading)
-        .alert("Plaid Error", isPresented: .constant(errorMessage != nil)) {
+        .alert("Plaid Error", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             if let errorMessage { Text(errorMessage) }
@@ -45,16 +78,23 @@ struct PlaidLinkButton: View {
         defer { isLoading = false }
         
         do {
-            let linkToken = try await PlaidService.shared.createLinkToken(companyId: companyId, institutionId: institutionId)
+            let linkToken = try await PlaidService.shared.createLinkToken(
+                companyId: companyId,
+                institutionId: institutionId
+            )
             
             var config = LinkTokenConfiguration(token: linkToken) { success in
                 // Clear handler when done
                 self.linkHandler = nil
+                self.isExchangingToken = true
                 
                 Task {
                     if isReconnect {
                         // Update mode complete, no token exchange needed
-                        await MainActor.run { onSuccess(success.metadata.institution.name, [], nil) }
+                        await MainActor.run { 
+                            self.isExchangingToken = false
+                            onSuccess(success.metadata.institution.name, [], nil) 
+                        }
                     } else {
                         do {
                             let result = try await PlaidService.shared.exchangePublicToken(
@@ -63,9 +103,16 @@ struct PlaidLinkButton: View {
                                 institutionId: success.metadata.institution.id,
                                 companyId: companyId
                             )
-                            await MainActor.run { onSuccess(success.metadata.institution.name, result.accounts, result.item_id) }
+                            await MainActor.run { 
+                                self.isExchangingToken = false
+                                onSuccess(success.metadata.institution.name, result.accounts, result.item_id) 
+                            }
                         } catch {
-                            await MainActor.run { errorMessage = error.localizedDescription }
+                            print("Plaid Exchange Error:", error)
+                            await MainActor.run { 
+                                self.isExchangingToken = false
+                                errorMessage = error.localizedDescription 
+                            }
                         }
                     }
                 }
@@ -77,7 +124,7 @@ struct PlaidLinkButton: View {
                 
                 if let error = exit.error {
                     DispatchQueue.main.async {
-                        errorMessage = "Plaid exited: \(error.localizedDescription)"
+                        errorMessage = "Plaid exited: \(error.errorMessage)"
                     }
                 }
             }

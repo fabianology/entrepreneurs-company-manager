@@ -15,10 +15,12 @@ struct EntitySubscriptionSection: View {
     
     var flipAnimation: Namespace.ID
 
+    @Environment(OnboardingStateManager.self) private var onboardingState
+
     private let subsColor = Color(hex: "#2070BD")
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             // Header
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -27,8 +29,10 @@ struct EntitySubscriptionSection: View {
                 VStack(spacing: 8) {
                     HStack {
                         Image(systemName: "square.3.layers.3d")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(subsColor)
+                            .padding(.trailing, 4)
+                        
                         Text("SUBSCRIPTIONS")
                             .font(.system(size: 13, weight: .black))
                             .tracking(1.5)
@@ -57,13 +61,15 @@ struct EntitySubscriptionSection: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 Capsule().fill(Color.white.opacity(0.1))
-                                Capsule().fill(subsColor)
+                                Capsule()
+                                    .fill(LinearGradient(colors: [subsColor, subsColor.opacity(0.7)], startPoint: .leading, endPoint: .trailing))
                                     .frame(width: geo.size.width * CGFloat(autoRenewRatio))
                             }
                         }
                         .frame(height: 4)
                         
-                        Text("\(autoRenewPct)% Auto-Renew")
+                        let pctString = String(autoRenewPct)
+                        Text("\(pctString)% Auto-Renew")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
@@ -71,7 +77,7 @@ struct EntitySubscriptionSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.black.opacity(0.3))
+                .background(Color.black.opacity(0.70))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom
@@ -79,7 +85,8 @@ struct EntitySubscriptionSection: View {
             }
             .buttonStyle(.plain)
 
-            VStack(spacing: 0) {
+            VStack(spacing: 16) {
+                VStack(spacing: 0) {
                 if activeSubscriptions.isEmpty {
                     Text("No subscriptions")
                         .foregroundStyle(.gray)
@@ -147,21 +154,28 @@ struct EntitySubscriptionSection: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .bold))
                     Text("Generate Report")
                 }
                 .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 12)
+                .background(Color.white.opacity(0.03))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .miloomReportStroke()
             }
-            .buttonStyle(MiloomSecondaryButtonStyle())
+            .buttonStyle(PremiumButtonStyle())
             .padding(.horizontal, 16)
         }
+        .padding(.top, 16)
         .padding(.bottom, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#1C1C1E").opacity(0.70))
-        )
+        .background(Color(hex: "#1C1C1E").opacity(0.70))
+        .frame(maxWidth: .infinity)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterSubscriptions)
         .padding(.horizontal, 20)
         .zIndex(1)
         .sheet(isPresented: $showReceiptReport) {

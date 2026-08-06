@@ -15,9 +15,18 @@ struct EditInstitutionSheet: View {
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == institution.id || $0.resourceId == institution.companyId })
+        return share?.role == "Viewer"
+    }
+
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
     @State private var showShareSheet = false
+    
+    @State private var isSyncing = false
+    @State private var syncSuccess = false
+    @State private var syncErrorMsg: String?
     
     struct Snapshot: Equatable {
         var name, loginUrl, username, email, password, twoFactor: String
@@ -55,6 +64,10 @@ struct EditInstitutionSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                SharedItemOverrideBanner(resourceId: institution.id, defaultCompanyId: institution.companyId)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                Group {
                 // MARK: - Bank Identity
                 Section {
                     VStack(spacing: 16) {
@@ -135,6 +148,67 @@ struct EditInstitutionSheet: View {
                                 text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
                             )
                         }
+                        
+                        // Sync Latest Data
+                        if !isNew {
+                            Button {
+                                guard !isSyncing else { return }
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                isSyncing = true
+                                syncSuccess = false
+                                Task {
+                                    do {
+                                        try await PlaidService.shared.syncSubscriptions(institutionId: institution.id)
+                                        await DataRepository.shared.fetchAllData(appState: appState)
+                                        if let updatedInst = appState.institutions.first(where: { $0.id == institution.id }) {
+                                            self.institution = updatedInst
+                                        }
+                                        isSyncing = false
+                                        syncSuccess = true
+                                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                                        syncSuccess = false
+                                    } catch {
+                                        isSyncing = false
+                                        syncErrorMsg = error.localizedDescription
+                                        print("Failed to sync bank data: \(error)")
+                                    }
+                                }
+                            } label: {
+                                VStack(spacing: 4) {
+                                    HStack(spacing: 6) {
+                                    if isSyncing {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .scaleEffect(0.8)
+                                        Text("Syncing...")
+                                    } else if syncSuccess {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(Color.zifrGreen)
+                                        Text("Sync Complete")
+                                            .foregroundStyle(Color.zifrGreen)
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Text("Sync Latest Data")
+                                    }
+                                    }
+                                    .font(.system(size: 13, weight: .semibold))
+                                    Text(isSyncing || syncSuccess ? "Updates may take a few moments to appear" : "Pull newest balances and subscriptions from Plaid")
+                                        .font(.system(size: 10, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.6))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                            }
+                            .buttonStyle(MiloomSecondaryButtonStyle())
+                            .padding(.top, 8)
+                            
+                            Text("Last synced on: \(institution.lastSyncedAt?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, 4)
+                        }
                     }
                     .padding(.vertical, 4)
                 } header: {
@@ -145,7 +219,7 @@ struct EditInstitutionSheet: View {
                             .font(.system(size: 12, weight: .black))
                             .tracking(1.5)
                     }
-                    .foregroundStyle(Color.white.opacity(0.6))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
                     .padding(.top, 16)
                     .padding(.bottom, 8)
                 }
@@ -269,6 +343,8 @@ struct EditInstitutionSheet: View {
                     .listRowInsets(EdgeInsets(top: 32, leading: 20, bottom: 20, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
+                } // End Group
+                .disabled(isViewer)
 
             }
             .scrollDismissesKeyboard(.interactively)
@@ -281,6 +357,11 @@ struct EditInstitutionSheet: View {
             .navigationTitle(institution.name.isEmpty ? "Institution" : institution.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(institution.name.isEmpty ? "Institution" : institution.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         
@@ -297,12 +378,14 @@ struct EditInstitutionSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        vm.saveInstitution(institution, appState: appState)
-                        dismiss()
+                    if !isViewer {
+                        Button("Save") {
+                            vm.saveInstitution(institution, appState: appState)
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
                     }
-                    .fontWeight(.semibold)
-                    .tint(isDirty ? .green : nil)
                 }
             }
             .interactiveDismissDisabled(isNew)
@@ -314,6 +397,7 @@ struct EditInstitutionSheet: View {
                     draft: $accountDraft,
                     isNew: accountDraftIndex == nil,
                     institutionName: institution.name.isEmpty ? "Institution" : institution.name,
+                    availableCards: appState.cards.filter { $0.companyId == institution.companyId },
                     onSave: {
                         var accs = institution.accounts
                         if let idx = accountDraftIndex {
@@ -353,6 +437,14 @@ struct EditInstitutionSheet: View {
                 loanDraft = nil 
             }) { ld in
                 EditLoanSheet(loan: ld, vm: vm, isNew: ld.name.isEmpty && ld.monthlyPayment == 0, institutions: institutions, cards: cards, isInstitutionContext: true)
+            }
+            .alert("Sync Failed", isPresented: Binding(
+                get: { syncErrorMsg != nil },
+                set: { if !$0 { syncErrorMsg = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(syncErrorMsg ?? "An unknown error occurred.")
             }
         }
     }

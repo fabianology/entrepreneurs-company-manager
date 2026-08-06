@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct AddFinancialWizard: View {
     @State var institution: Institution
@@ -137,6 +138,7 @@ struct AddFinancialWizard: View {
                     draft: $accountDraft,
                     isNew: isNewAccount,
                     institutionName: institution.name.isEmpty ? "New Institution" : institution.name,
+                    availableCards: cards,
                     onSave: {
                         if let idx = accountDraftIndex {
                             accounts[idx] = accountDraft
@@ -253,10 +255,18 @@ struct AddFinancialWizard: View {
         
         if let plaidItemId = linkedPlaidItemId {
             Task {
-                try? await SupabaseService.shared.client.from("plaid_items")
-                    .update(["institution_id": instToSave.id.uuidString])
-                    .eq("item_id", value: plaidItemId)
-                    .execute()
+                struct LinkRequest: Encodable {
+                    let item_id: String
+                    let institution_id: String
+                }
+                do {
+                    let req = LinkRequest(item_id: plaidItemId, institution_id: instToSave.id.uuidString)
+                    let options = FunctionInvokeOptions(body: try JSONEncoder().encode(req))
+                    try await SupabaseService.shared.client.functions.invoke("link-plaid-institution", options: options)
+                    try? await PlaidService.shared.syncSubscriptions(institutionId: instToSave.id)
+                } catch {
+                    print("Failed to link plaid item: \(error)")
+                }
             }
         }
         
@@ -467,16 +477,50 @@ struct AddFinancialWizard: View {
                         institution.password = "••••••••"
                         hasManuallyEditedWebsite = true
                         
-                        // Convert Plaid accounts to our domain model
-                        let mappedAccounts: [InstitutionAccount] = plaidAccounts.map { pa in
-                            InstitutionAccount(
-                                name: pa.name,
-                                type: (pa.subtype ?? pa.type).capitalized,
-                                last4: String(pa.account_id.suffix(4)),
-                                balance: pa.balances.current ?? pa.balances.available ?? 0.0
-                            )
+                        // Convert Plaid accounts to our domain models
+                        for pa in plaidAccounts {
+                            let balance = pa.balances.current ?? pa.balances.available ?? 0.0
+                            let apr = pa.liability_details?.effectiveAPR ?? 0.0
+                            let minPayment = pa.liability_details?.effectiveMinimumPayment ?? 0.0
+                            
+                            let nextPaymentDateStr = pa.liability_details?.next_payment_due_date
+                            var nextDate: Date? = nil
+                            if let ds = nextPaymentDateStr {
+                                let df = DateFormatter()
+                                df.dateFormat = "yyyy-MM-dd"
+                                nextDate = df.date(from: ds)
+                            }
+                            
+                            if pa.type == "credit" {
+                                var newCard = FinancialCard(userId: institution.userId, companyId: institution.companyId)
+                                newCard.name = pa.name
+                                newCard.type = "Credit"
+                                newCard.last4 = pa.mask ?? String(pa.account_id.suffix(4))
+                                newCard.plaidAccountId = pa.account_id
+                                newCard.balance = balance
+                                newCard.apr = apr
+                                newCard.moPayment = minPayment
+                                newCard.institutionName = instName
+                                cards.append(newCard)
+                            } else if pa.type == "loan" {
+                                var newLoan = Loan(userId: institution.userId, companyId: institution.companyId)
+                                newLoan.name = pa.name
+                                newLoan.lender = instName
+                                newLoan.remainingBalance = balance
+                                newLoan.interestRate = apr
+                                newLoan.monthlyPayment = minPayment
+                                loans.append(newLoan)
+                            } else {
+                                let newAcc = InstitutionAccount(
+                                    id: pa.account_id,
+                                    name: pa.name,
+                                    type: (pa.subtype ?? pa.type).capitalized,
+                                    last4: String(pa.account_id.suffix(4)),
+                                    balance: balance
+                                )
+                                accounts.append(newAcc)
+                            }
                         }
-                        accounts.append(contentsOf: mappedAccounts)
                         
                         // Skip to step 2 automatically
                         advanceToStep(2)

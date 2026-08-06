@@ -17,6 +17,11 @@ struct EditSubscriptionSheet: View {
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
+    private var isViewer: Bool {
+        let share = appState.resourceShares.first(where: { $0.resourceId == sub.id || $0.resourceId == sub.companyId })
+        return share?.role == "Viewer"
+    }
+
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
     @State private var showSecurity = false
@@ -258,7 +263,7 @@ struct EditSubscriptionSheet: View {
                 showPaymentPicker = true
             } label: {
                 HStack {
-                    Text((sub.paymentMethod ?? "").isEmpty ? "N/A" : (sub.paymentMethod ?? ""))
+                    Text((sub.paymentMethod ?? "").isEmpty ? "N/A" : paymentMethodWithInstitution)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle((sub.paymentMethod ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
                         .lineLimit(1)
@@ -280,8 +285,12 @@ struct EditSubscriptionSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                SharedItemOverrideBanner(resourceId: sub.id, defaultCompanyId: sub.companyId)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
 
-                // MARK: – Top Controls
+                Group {
+                    // MARK: – Top Controls
                 VStack(spacing: 12) {
                     CustomSegmentedControl(options: ["paid", "free"], selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 }))
                 }
@@ -610,6 +619,8 @@ struct EditSubscriptionSheet: View {
                     .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
                     .listRowSeparator(.hidden)
                 }
+                } // End Group
+                .disabled(isViewer)
             }
             .scrollDismissesKeyboard(.interactively)
             .scrollContentBackground(.hidden)
@@ -645,6 +656,11 @@ struct EditSubscriptionSheet: View {
                 )
             }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(sub.name.isEmpty ? "New Service" : sub.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         if isNew { 
@@ -671,14 +687,16 @@ struct EditSubscriptionSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        vm.saveSub(sub, appState: appState)
-                        onSave?()
-                        dismiss()
+                    if !isViewer {
+                        Button("Save") {
+                            vm.saveSub(sub, appState: appState)
+                            onSave?()
+                            dismiss()
+                        }
+                        .fontWeight(.semibold)
+                        .tint(isDirty ? .green : nil)
+                        .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
-                    .fontWeight(.semibold)
-                    .tint(isDirty ? .green : nil)
-                    .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             .interactiveDismissDisabled(isNew)
@@ -737,6 +755,35 @@ struct EditSubscriptionSheet: View {
                 ShareEntitySheet(resourceId: sub.id, resourceType: "subscription", resourceTitle: sub.name.isEmpty ? "Subscription" : sub.name)
             }
         }
+    }
+
+    private var paymentMethodWithInstitution: String {
+        guard let paymentMethod = sub.paymentMethod, !paymentMethod.isEmpty else { return "" }
+        let normalizedMethod = paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in appState.cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(paymentMethod)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in appState.institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(paymentMethod)"
+                    }
+                }
+            }
+        }
+        return paymentMethod
     }
 }
 
@@ -898,7 +945,7 @@ struct SubServiceHUD: View {
                                     showPaymentPicker = true
                                 } label: {
                                     HStack {
-                                        Text(draft.paymentMethod.isEmpty ? "N/A" : draft.paymentMethod)
+                                        Text(draft.paymentMethod.isEmpty ? "N/A" : paymentMethodWithInstitution(for: draft.paymentMethod))
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
                                             .lineLimit(1)
@@ -1065,6 +1112,11 @@ struct SubServiceHUD: View {
             .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(draft.name.isEmpty ? "New Service" : draft.name)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
@@ -1092,6 +1144,35 @@ struct SubServiceHUD: View {
                 .presentationCornerRadius(24)
             }
         }
+    }
+
+    private func paymentMethodWithInstitution(for method: String) -> String {
+        guard !method.isEmpty else { return "" }
+        let normalizedMethod = method.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(method)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(method)"
+                    }
+                }
+            }
+        }
+        return method
     }
 }
 
@@ -1529,6 +1610,11 @@ struct LinkedEmailHUD: View {
             .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(draft.email.isEmpty ? "New Email" : draft.email)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
                 }
@@ -1940,6 +2026,13 @@ struct PaymentMethodPickerView: View {
         .background(Color(hex: "#1C1C1E"))
         .navigationTitle("Paid From")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Paid From")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+            }
+        }
         .alert("Edit Custom Entry", isPresented: $showEditAlert) {
             TextField("Entry Name", text: $editedItemName)
             Button("Cancel", role: .cancel) {

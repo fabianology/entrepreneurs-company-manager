@@ -42,17 +42,18 @@ struct LoanCardView: View {
                 // Progress Bar
                 VStack(spacing: 8) {
                     GeometryReader { geo in
-                        HStack(spacing: 0) {
-                            Rectangle()
-                                .fill(Color(hex: "#545454"))
-                                .frame(width: geo.size.width * (amort.principalPct / 100))
-                            Rectangle()
-                                .fill(Color(hex: "#742C2D"))
+                        ZStack(alignment: .leading) {
+                            // Track
+                            Capsule()
+                                .fill(Color.white.opacity(0.1))
+                            
+                            // Fill (Vibrant Gradient)
+                            Capsule()
+                                .fill(LinearGradient(colors: [Color(hex: "#4f46e5"), Color(hex: "#818cf8")], startPoint: .leading, endPoint: .trailing))
+                                .frame(width: max(0, geo.size.width * (amort.principalPct / 100)))
                         }
                     }
                     .frame(height: 8)
-                    .clipShape(Capsule())
-                    .background(Color.white.opacity(0.05))
                 }
 
                 HStack {
@@ -77,7 +78,9 @@ struct LoanCardView: View {
                 }
             }
             .padding(16)
-            .background(Color(hex: "#2C2C2E")).clipShape(RoundedRectangle(cornerRadius: 10)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            .background(Color(hex: "#1C1C1E"))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }

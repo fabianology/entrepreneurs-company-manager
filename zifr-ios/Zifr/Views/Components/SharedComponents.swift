@@ -8,6 +8,8 @@ struct ZifrField: View {
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
+    var trailingSystemImage: String? = nil
+    var onTrailingTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -17,20 +19,34 @@ struct ZifrField: View {
                     .foregroundStyle(Color.white.opacity(0.45))
                     .textCase(.uppercase)
             }
-            Group {
-                if isSecure {
-                    SecureField(placeholder, text: $text)
-                        .textContentType(textContentType)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .keyboardType(keyboardType)
-                        .textContentType(textContentType)
+            HStack(spacing: 8) {
+                Group {
+                    if isSecure {
+                        SecureField(placeholder, text: $text)
+                            .textContentType(textContentType)
+                    } else {
+                        TextField(placeholder, text: $text)
+                            .keyboardType(keyboardType)
+                            .textContentType(textContentType)
+                    }
+                }
+                .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
+                .autocorrectionDisabled()
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(.white)
+
+                if let icon = trailingSystemImage {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onTrailingTap?()
+                    } label: {
+                        Image(systemName: icon)
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Color(hex: "#1FE400"))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .textInputAutocapitalization(keyboardType == .URL || keyboardType == .emailAddress ? .never : .sentences)
-            .autocorrectionDisabled()
-            .font(.system(size: 14, weight: .regular))
-            .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .frame(height: 44)
             .background(Color(hex: "#2C2C2E"))
@@ -73,6 +89,9 @@ struct CopyableField: View {
                 guard !value.isEmpty else { return }
                 UIPasteboard.general.string = value
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                if isPassword {
+                    Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password was copied to your clipboard.") }
+                }
                 withAnimation { copied = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                     withAnimation { copied = false }
@@ -149,26 +168,75 @@ struct FaviconImage: View {
     let website: String
     var size: CGFloat = 32
 
+    private var cleanDomain: String {
+        var str = website.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if str.isEmpty { return "" }
+        if !str.hasPrefix("http://") && !str.hasPrefix("https://") {
+            str = "https://\(str)"
+        }
+        if let url = URL(string: str), let host = url.host {
+            return host.replacingOccurrences(of: "www.", with: "")
+        }
+        var raw = website.lowercased().replacingOccurrences(of: "www.", with: "")
+        if let slashIdx = raw.firstIndex(of: "/") {
+            raw = String(raw[..<slashIdx])
+        }
+        return raw
+    }
+
+    private var primaryLogoURL: URL? {
+        guard !cleanDomain.isEmpty else { return nil }
+        return URL(string: "https://logo.clearbit.com/\(cleanDomain)")
+    }
+
+    private var fallbackFaviconURL: URL? {
+        guard !cleanDomain.isEmpty else { return nil }
+        return URL(string: "https://www.google.com/s2/favicons?domain=\(cleanDomain)&sz=256")
+    }
+
     var body: some View {
-        AsyncImage(url: faviconURL) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFit()
-                    .frame(width: size, height: size)
-            default:
-                Image(systemName: "globe")
-                    .font(.system(size: size * 0.55))
-                    .foregroundStyle(Color.white.opacity(0.4))
+        ZStack {
+            if let primary = primaryLogoURL {
+                AsyncImage(url: primary) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable()
+                            .scaledToFit()
+                            .frame(width: size, height: size)
+                            .clipShape(RoundedRectangle(cornerRadius: max(4, size * 0.2)))
+                    default:
+                        if let fallback = fallbackFaviconURL {
+                            AsyncImage(url: fallback) { fallbackPhase in
+                                switch fallbackPhase {
+                                case .success(let fallbackImg):
+                                    fallbackImg.resizable()
+                                        .scaledToFit()
+                                        .frame(width: size, height: size)
+                                        .clipShape(RoundedRectangle(cornerRadius: max(4, size * 0.2)))
+                                default:
+                                    globeFallback
+                                }
+                            }
+                        } else {
+                            globeFallback
+                        }
+                    }
+                }
+            } else {
+                globeFallback
             }
         }
         .frame(width: size, height: size)
     }
 
-    private var faviconURL: URL? {
-        var host = website
-        if !host.hasPrefix("http") { host = "https://\(host)" }
-        guard let url = URL(string: host), let h = url.host else { return nil }
-        return URL(string: "https://www.google.com/s2/favicons?domain=\(h)&sz=128")
+    private var globeFallback: some View {
+        ZStack {
+            Circle().fill(Color.white.opacity(0.08))
+            Image(systemName: "globe")
+                .font(.system(size: size * 0.55))
+                .foregroundStyle(Color.white.opacity(0.4))
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -334,6 +402,7 @@ struct ProContextMenuModifier: ViewModifier {
                     Button {
                         UIPasteboard.general.string = pwd
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password was copied to your clipboard.") }
                     } label: {
                         Label("Copy Password", systemImage: "key.fill")
                     }
@@ -884,14 +953,16 @@ struct AccountNestedRow<CollapsedHeader: View, InnerRows: View, ActionButtons: V
 }
 
 struct DashboardActionButton: View {
-    let icon: String
+    let icon: String?
     let title: String
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: icon)
+                if let icon = icon {
+                    Image(systemName: icon)
+                }
                 Text(title)
             }
             .font(.system(size: 11, weight: .medium))
@@ -909,6 +980,9 @@ struct DashboardInnerRow: View {
     let value: String
     var valueColor: Color = .white
     var trailingView: AnyView? = nil
+    var copyValue: String? = nil
+    
+    @State private var isCopied = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -927,9 +1001,25 @@ struct DashboardInnerRow: View {
             
             Text(value)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(valueColor)
+                .foregroundStyle(isCopied ? Color(hex: "#818cf8") : valueColor)
+                .animation(.easeOut(duration: 0.15), value: isCopied)
             
-            if let trailingView = trailingView {
+            if let copyValue = copyValue {
+                Button {
+                    UIPasteboard.general.string = copyValue
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    
+                    isCopied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        isCopied = false
+                    }
+                } label: {
+                    Image(systemName: isCopied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 11))
+                        .foregroundStyle(isCopied ? Color(hex: "#818cf8") : Color.white.opacity(0.4))
+                }
+                .buttonStyle(.plain)
+            } else if let trailingView = trailingView {
                 trailingView
             }
         }

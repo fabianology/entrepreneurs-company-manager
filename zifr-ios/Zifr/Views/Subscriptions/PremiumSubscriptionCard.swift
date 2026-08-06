@@ -117,72 +117,82 @@ struct PremiumSubscriptionCard: View {
 
     var body: some View {
         MiloomListCard {
-            // ── Top: tap opens edit ──────────────────────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
-                    // Logo + Name + Cost row
-                    HStack(alignment: .top, spacing: 16) {
-                        // Logo — 56×56 rounded-16 rgba(255,255,255,0.05) bg
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.clear)
-                                .frame(width: 56, height: 56)
-                            if !(sub.website ?? "").isEmpty {
-                                FaviconImage(website: (sub.website ?? ""), size: 36)
+                    VStack(spacing: 0) {
+                        // Logo + Name + Cost row
+                        HStack(alignment: .top, spacing: 16) {
+                            // Logo
+                            if let website = sub.website, !website.isEmpty {
+                                FaviconImage(website: website, size: 40)
+                                    .frame(width: 56, height: 56)
                             } else {
-                                Text(sub.name.isEmpty ? "?" : String(sub.name.prefix(1)).uppercased())
-                                    .font(.system(size: 22, weight: .black))
-                                    .foregroundStyle(Color.white.opacity(0.8))
-                            }
-                        }
-
-                        // Name + costs
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(sub.name.isEmpty ? "Service" : sub.name)
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(.white)
-
-                            if sub.isFree {
-                                HStack(spacing: 5) {
-                                    Circle()
-                                        .fill(Color.zifrGreen)
-                                        .frame(width: 6, height: 6)
-                                        .shadow(color: Color.zifrGreen, radius: 3)
-                                    Text("FREE")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.4))
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(width: 56, height: 56)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                        )
+                                    Text(sub.name.isEmpty ? "?" : String(sub.name.prefix(1)).uppercased())
+                                        .font(.system(size: 22, weight: .black))
+                                        .foregroundStyle(Color.white.opacity(0.8))
                                 }
-                                .padding(.top, 2)
-                            } else {
-                                HStack(spacing: 14) {
-                                    costColumn(value: primaryTotal, label: primaryLabel)
-                                    if secondaryTotal > 0 {
-                                        dividerLine()
-                                        costColumn(value: secondaryTotal, label: secondaryLabel)
+                            }
+
+                            // Name + costs
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(sub.name.isEmpty ? "Service" : sub.name)
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.white)
+
+                                if let accountId = sub.plaidAccountId {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "building.columns.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(Color(hex: "#4A90E2"))
+                                        Text("Auto-synced from Plaid")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color(hex: "#4A90E2").opacity(0.8))
+                                    }
+                                    .padding(.top, 1)
+                                }
+
+                                if sub.isFree {
+                                    HStack(spacing: 5) {
+                                        Circle()
+                                            .fill(Color.zifrGreen)
+                                            .frame(width: 6, height: 6)
+                                            .shadow(color: Color.zifrGreen, radius: 3)
+                                        Text("FREE")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                    }
+                                    .padding(.top, 2)
+                                } else {
+                                    HStack(spacing: 14) {
+                                        costColumn(value: primaryTotal, label: primaryLabel)
+                                        if secondaryTotal > 0 {
+                                            dividerLine()
+                                            costColumn(value: secondaryTotal, label: secondaryLabel)
+                                        }
                                     }
                                 }
                             }
+                            .padding(.top, 8)
+                            Spacer(minLength: 0)
                         }
-                        .padding(.top, 8)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 10)
-                    .padding(.bottom, sub.isFree ? 4 : 10)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 16)
 
-                    if sub.isFree {
-                        // 80% width divider under logo row
-                        Rectangle()
-                            .fill(Color.white.opacity(0.1))
-                            .frame(height: 1)
-                            .padding(.leading, 24)
-                            .padding(.trailing, 70) // Rough 80% of card width
-                            .padding(.bottom, 10)
-                    }
-
-                    // Status row — CiFr dot + pipes style
-                    if !sub.isFree {
-                        VStack(spacing: 0) {
+                        // Status row — Dot + pipes style
+                        if !sub.isFree {
+                            Divider()
+                                .background(Color.white.opacity(0.08))
+                                .padding(.horizontal, 24)
+                            
                             HStack(spacing: 8) {
                                 statusDot(sub: sub)
                                 
@@ -190,11 +200,11 @@ struct PremiumSubscriptionCard: View {
                                 if sub.status == "Paused" {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(sTuple.top)
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(Color(hex: "#911c26"))
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
-                                                .font(.system(size: 10, weight: .semibold))
+                                                .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(Color(hex: "#911c26").opacity(0.7))
                                         }
                                     }
@@ -203,11 +213,11 @@ struct PremiumSubscriptionCard: View {
                                 } else {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(sTuple.top)
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(.white)
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
-                                                .font(.system(size: 10, weight: .semibold))
+                                                .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(Color(hex: "#C1AA78"))
                                         }
                                     }
@@ -226,19 +236,19 @@ struct PremiumSubscriptionCard: View {
                                         VStack(alignment: .leading, spacing: 3) {
                                             HStack(spacing: 4) {
                                                 Text(accTuple.bank)
-                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .font(.system(size: 11, weight: .medium))
                                                     .foregroundStyle(.white)
                                                 if !accTuple.type.isEmpty {
                                                     Text("·")
                                                         .font(.system(size: 11, weight: .bold))
                                                         .foregroundStyle(Color(hex: "#7D7D7D"))
                                                     Text(accTuple.type)
-                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .font(.system(size: 11, weight: .medium))
                                                         .foregroundStyle(.white)
                                                 }
                                             }
                                             Text(accTuple.account)
-                                                .font(.system(size: 10, weight: .semibold))
+                                                .font(.system(size: 10, weight: .medium))
                                                 .foregroundStyle(Color(hex: "#C1AA78"))
                                         }
                                         .textCase(.uppercase)
@@ -249,18 +259,18 @@ struct PremiumSubscriptionCard: View {
                                 Spacer()
                             }
                             .padding(.horizontal, 24)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .frame(maxWidth: .infinity)
-                            .background(Color.white.opacity(0.05))
-                            .overlay(
-                                Rectangle()
-                                    .frame(height: 1)
-                                    .foregroundStyle(Color.white.opacity(0.06)),
-                                alignment: .top
-                            )
                         }
-                        .padding(.bottom, 12)
                     }
+                    .background(
+                        UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                            .fill(Color.black.opacity(0.70))
+                            .overlay(
+                                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                            )
+                    )
 
                     // Credentials row — tap-to-copy
                     VStack(alignment: .leading, spacing: 4) {
@@ -273,6 +283,7 @@ struct PremiumSubscriptionCard: View {
                         DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                     }
                     .padding(.horizontal, 24)
+                    .padding(.top, 16)
                     .padding(.bottom, 24)
                 }
                 .contentShape(Rectangle())
@@ -285,7 +296,7 @@ struct PremiumSubscriptionCard: View {
                     withAnimation(.easeInOut(duration: 0.2)) { showSubServices.toggle() }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }) {
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     ForEach(sub.subServices.indices, id: \.self) { i in
                         let ss = sub.subServices[i]
                         Button {
@@ -295,45 +306,68 @@ struct PremiumSubscriptionCard: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             showSubServiceHUD = true
                         } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(.white)
-                                    
-                                    HStack(spacing: 6) {
-                                        Circle()
-                                            .fill(ss.status == .active ? Color.zifrGreen : Color.red)
-                                            .frame(width: 6, height: 6)
+                            VStack(spacing: 0) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack(spacing: 6) {
+                                            Circle()
+                                                .fill(ss.status == .active ? Color.zifrGreen : Color.red)
+                                                .frame(width: 6, height: 6)
+                                            Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                        }
                                         
-                                        statusPipe()
-                                        
-                                        Text(ss.paymentMethod.isEmpty ? "No Card" : ss.paymentMethod)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
+                                        HStack(spacing: 6) {
+                                            Text("billing:")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.4))
+                                                .textCase(.uppercase)
+                                                .tracking(0.5)
+                                            
+                                            Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss.paymentMethod))
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
 
-                                        statusPipe()
-                                        
-                                        Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
+                                            statusPipe()
+                                            
+                                            Text(ss.autoPay == .auto ? "Auto Pay" : "Manual")
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+
+                                        if !ss.purpose.isEmpty {
+                                            HStack(spacing: 6) {
+                                                Text("PURPOSE:")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                
+                                                Text(ss.purpose)
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
+                                        }
+                                    }
+                                    Spacer()
+                                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                                        Text("$\(String(format: "%.0f", ss.cost))")
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundStyle(ss.status == .active ? .white : Color.white.opacity(0.4))
+                                        Text("/\(ss.billingCycle == .monthly ? "mo" : "yr")")
                                             .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
+                                            .foregroundStyle(Color.white.opacity(0.5))
                                     }
                                 }
-                                Spacer()
-                                HStack(alignment: .firstTextBaseline, spacing: 2) {
-                                    Text("$\(String(format: "%.0f", ss.cost))")
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .foregroundStyle(ss.status == .active ? .white : Color.white.opacity(0.4))
-                                    Text("/\(ss.billingCycle == .monthly ? "mo" : "yr")")
-                                        .font(.system(size: 13, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.5))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 12)
+                                .background(Color.clear)
+                                
+                                if i < sub.subServices.count - 1 {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 8)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(PremiumButtonStyle())
                     }
@@ -353,7 +387,7 @@ struct PremiumSubscriptionCard: View {
                         .frame(height: 36)
                     }
                     .buttonStyle(MiloomSecondaryButtonStyle())
-                    .padding(.top, sub.subServices.isEmpty ? 0 : 4)
+                    .padding(.top, sub.subServices.isEmpty ? 0 : 12)
                 }
                 }
             }
@@ -364,7 +398,7 @@ struct PremiumSubscriptionCard: View {
                     withAnimation(.easeInOut(duration: 0.2)) { showLinkedEmails.toggle() }
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }) {
-                VStack(spacing: 12) {
+                VStack(spacing: 0) {
                     ForEach(sub.linkedEmails.indices, id: \.self) { i in
                         let email = sub.linkedEmails[i]
                         Button {
@@ -374,34 +408,41 @@ struct PremiumSubscriptionCard: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             showEmailHUD = true
                         } label: {
-                            HStack(alignment: .top) {
-                                VStack(alignment: .leading, spacing: 6) {
-                                    // Email
-                                    Text(email.email.isEmpty ? "No Address" : email.email)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundStyle(.white)
-                                        .lineLimit(1)
+                            VStack(spacing: 0) {
+                                HStack(alignment: .top) {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(spacing: 6) {
+                                            Text(email.email.isEmpty ? "No Address" : email.email)
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                                .lineLimit(1)
+                                        }
 
-                                    dynamicLabels(for: email)
+                                        dynamicLabels(for: email)
 
-                                    // Role row
-                                    HStack(spacing: 6) {
-                                        Text("USED FOR:")
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                        
-                                        Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.6))
+                                        // Role row
+                                        HStack(spacing: 6) {
+                                            Text("USED FOR:")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.4))
+                                            
+                                            Text(email.usedFor.isEmpty ? "Unassigned" : email.usedFor)
+                                                .font(.system(size: 13, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
                                     }
+                                    Spacer()
                                 }
-                                Spacer()
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 12)
+                                .background(Color.clear)
+                                
+                                if i < sub.linkedEmails.count - 1 {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.horizontal, 8)
+                                }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(PremiumButtonStyle())
                     }
@@ -421,7 +462,7 @@ struct PremiumSubscriptionCard: View {
                         .frame(height: 36)
                     }
                     .buttonStyle(MiloomSecondaryButtonStyle())
-                    .padding(.top, sub.linkedEmails.isEmpty ? 0 : 4)
+                    .padding(.top, sub.linkedEmails.isEmpty ? 0 : 12)
                 }
                 }
             }
@@ -627,6 +668,35 @@ struct PremiumSubscriptionCard: View {
                 }
             }
         }
+    }
+
+    private func paymentMethodWithInstitution(for method: String) -> String {
+        guard !method.isEmpty else { return "" }
+        let normalizedMethod = method.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. Search in cards
+        for c in cards {
+            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
+                if !instName.isEmpty {
+                    return "\(instName) · \(method)"
+                }
+            }
+        }
+        
+        // 2. Search in institutions accounts
+        for inst in institutions {
+            for acc in inst.accounts {
+                let accName = acc.name.isEmpty ? acc.type : acc.name
+                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
+                    let instName = inst.name.isEmpty ? "" : inst.name
+                    if !instName.isEmpty {
+                        return "\(instName) · \(method)"
+                    }
+                }
+            }
+        }
+        return method
     }
 }
 

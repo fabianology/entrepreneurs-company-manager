@@ -48,6 +48,40 @@ struct Company: Identifiable, Codable, Hashable {
         self.lastModified = lastModified
         self.lastViewed = lastViewed
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        userId = try container.decode(UUID.self, forKey: .userId)
+        name = try container.decode(String.self, forKey: .name)
+        structure = try container.decode(String.self, forKey: .structure)
+        companyDescription = try container.decodeIfPresent(String.self, forKey: .companyDescription)
+        colorHex = try container.decode(String.self, forKey: .colorHex)
+        website = try container.decodeIfPresent(String.self, forKey: .website)
+        lastModified = try container.decode(Date.self, forKey: .lastModified)
+        lastViewed = try container.decode(Date.self, forKey: .lastViewed)
+        
+        // SAFE DECODE: gracefully fail if logo_data is not valid Base64
+        if let base64String = try? container.decodeIfPresent(String.self, forKey: .logoData) {
+            logoData = Data(base64Encoded: base64String)
+        } else {
+            logoData = try? container.decodeIfPresent(Data.self, forKey: .logoData)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(userId, forKey: .userId)
+        try container.encode(name, forKey: .name)
+        try container.encode(structure, forKey: .structure)
+        try container.encodeIfPresent(companyDescription, forKey: .companyDescription)
+        try container.encode(colorHex, forKey: .colorHex)
+        try container.encodeIfPresent(logoData?.base64EncodedString(), forKey: .logoData)
+        try container.encodeIfPresent(website, forKey: .website)
+        try container.encode(lastModified, forKey: .lastModified)
+        try container.encode(lastViewed, forKey: .lastViewed)
+    }
 }
 
 // MARK: - Supporting Types
@@ -77,6 +111,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
     var email: String
     var role: String
     var invitedBy: UUID
+    var senderEmail: String?
+    var senderDisplayName: String?
     var createdAt: Date
     var status: String
     
@@ -87,6 +123,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
         case email
         case role
         case invitedBy = "invited_by"
+        case senderEmail = "sender_email"
+        case senderDisplayName = "sender_display_name"
         case createdAt = "created_at"
         case status
     }
@@ -98,6 +136,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
         email: String,
         role: String = "Viewer",
         invitedBy: UUID,
+        senderEmail: String? = nil,
+        senderDisplayName: String? = nil,
         createdAt: Date = Date(),
         status: String = "Pending"
     ) {
@@ -107,6 +147,8 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
         self.email = email
         self.role = role
         self.invitedBy = invitedBy
+        self.senderEmail = senderEmail
+        self.senderDisplayName = senderDisplayName
         self.createdAt = createdAt
         self.status = status
     }
@@ -118,6 +160,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
     var resourceType: String
     var userId: UUID
     var role: String
+    var senderEmail: String?
+    var senderDisplayName: String?
     var createdAt: Date
     
     enum CodingKeys: String, CodingKey {
@@ -126,6 +170,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         case resourceType = "resource_type"
         case userId = "user_id"
         case role
+        case senderEmail = "sender_email"
+        case senderDisplayName = "sender_display_name"
         case createdAt = "created_at"
     }
     
@@ -135,6 +181,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         resourceType: String,
         userId: UUID,
         role: String = "Viewer",
+        senderEmail: String? = nil,
+        senderDisplayName: String? = nil,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -142,6 +190,8 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         self.resourceType = resourceType
         self.userId = userId
         self.role = role
+        self.senderEmail = senderEmail
+        self.senderDisplayName = senderDisplayName
         self.createdAt = createdAt
     }
 }
