@@ -331,22 +331,30 @@ struct PremiumSubscriptionCard: View {
                                                 .foregroundStyle(Color.white.opacity(0.4))
                                                 .textCase(.uppercase)
                                                 .tracking(0.5)
+                                                .layoutPriority(1)
                                             
                                             Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss.paymentMethod))
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.6))
+                                                .lineLimit(1)
+                                                .truncationMode(.tail)
                                         }
+                                        .lineLimit(1)
 
                                         if !ss.purpose.isEmpty {
                                             HStack(spacing: 6) {
                                                 Text("PURPOSE:")
                                                     .font(.system(size: 11, weight: .semibold))
                                                     .foregroundStyle(Color.white.opacity(0.4))
+                                                    .layoutPriority(1)
                                                 
                                                 Text(ss.purpose)
                                                     .font(.system(size: 13, weight: .medium))
                                                     .foregroundStyle(Color.white.opacity(0.6))
+                                                    .lineLimit(1)
+                                                    .truncationMode(.tail)
                                             }
+                                            .lineLimit(1)
                                         }
                                     }
                                     Spacer()
