@@ -85,4 +85,22 @@ class PlaidService {
         let current: Double?
         let available: Double?
     }
+    
+    // MARK: - Sync
+    /// Calls the plaid-nightly-sync Edge Function to fetch transactions + update balances
+    func syncSubscriptions() async throws {
+        struct SyncResponse: Decodable {
+            let success: Bool
+            let synced: Int?
+            let transactions_saved: Int?
+            let error: String?
+        }
+        let response: SyncResponse = try await client.functions.invoke("plaid-nightly-sync")
+        if let err = response.error {
+            throw NSError(domain: "PlaidService", code: 0, userInfo: [NSLocalizedDescriptionKey: err])
+        }
+        let txCount = response.transactions_saved ?? 0
+        let itemCount = response.synced ?? 0
+        print("PlaidService.syncSubscriptions: synced \(itemCount) items, \(txCount) transactions saved")
+    }
 }
