@@ -10,7 +10,6 @@ struct EntitySubscriptionSection: View {
     @Bindable var vm: AppViewModel
 
     @Binding var flippedHeroIndex: Int?
-    @Binding var showReceiptReport: Bool
     @Binding var coverFlowSnappedIndex: Int
     
     var flipAnimation: Namespace.ID
@@ -85,91 +84,72 @@ struct EntitySubscriptionSection: View {
             }
             .buttonStyle(.plain)
 
-            VStack(spacing: 16) {
+            VStack(spacing: 10) {
                 VStack(spacing: 0) {
                 if activeSubscriptions.isEmpty {
                     Text("No subscriptions")
                         .foregroundStyle(.gray)
                         .padding(.vertical, 20)
                 } else {
-                    // Simple slider – center card scales up, side cards slightly smaller & behind
-                    let cardWidth: CGFloat = 170
-                    let cardSpacing: CGFloat = -34 // 20% overlap
                     let loopCount = max(5, 150 / max(1, activeSubscriptions.count))
                     let infiniteSubs = Array(repeating: activeSubscriptions, count: loopCount).flatMap { $0 }
                     let startIndex = (loopCount / 2) * activeSubscriptions.count
                     ScrollViewReader { proxy in
                         ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: cardSpacing) {
+                            HStack(spacing: 8) {
                                 ForEach(Array(infiniteSubs.enumerated()), id: \.offset) { index, sub in
-                                    GeometryReader { geo in
-                                        let midX = geo.frame(in: .global).midX
-                                        let screenMid = UIScreen.main.bounds.width / 2
-                                        let signedDist = midX - screenMid
-                                        let distance = abs(signedDist)
-                                        let scale = max(0.85, 1.0 - distance / 600)
-                                        let shadowOpacity = distance < 30 ? 0.35 : 0.0
-                                        // Gentle tilt — max ±25° for a subtle cover flow feel
-                                        let rotation = min(25, max(-25, Double(-signedDist) / 8))
-                                        DemoFlipCard(sub: sub, index: index, flippedHeroIndex: $flippedHeroIndex, animation: flipAnimation)
-                                            .frame(width: cardWidth, height: 120)
-                                            .rotation3DEffect(
-                                                .degrees(rotation),
-                                                axis: (x: 0, y: 1, z: 0),
-                                                perspective: 0.3
-                                            )
-                                            .scaleEffect(scale)
-                                            .shadow(color: Color(hex: "#46246B").opacity(shadowOpacity), radius: 12, y: 4)
-                                            .id(index)
-                                            .preference(key: CoverFlowCenterPreference.self,
-                                                        value: [CoverFlowItem(index: index, distance: distance)])
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                            flippedHeroIndex = index
+                                        }
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            if let website = sub.website, !website.isEmpty {
+                                                FaviconImage(website: website, size: 24)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                            } else {
+                                                ZStack {
+                                                    RoundedRectangle(cornerRadius: 6).fill(brandColor(sub.name).opacity(0.2)).frame(width: 24, height: 24)
+                                                    Text(sub.name.prefix(1).uppercased()).font(.system(size: 10, weight: .black)).foregroundStyle(brandColor(sub.name))
+                                                }
+                                            }
+                                            
+                                            Text(sub.name)
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                                .lineLimit(1)
+                                            
+                                            Text(formatCurrency(sub.cost))
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundStyle(.white.opacity(0.8))
+                                        }
+                                        .padding(8)
+                                        .frame(width: 80, height: 90, alignment: .leading)
+                                        .background(Color(hex: "#1C1C1E"))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                        .matchedGeometryEffect(id: "flipBg-\(index)", in: flipAnimation)
                                     }
-                                    .frame(width: cardWidth, height: 130)
-                                    // Center card on top — distance from snapped index determines layer
-                                    .zIndex(index == coverFlowSnappedIndex ? 100 : 0)
+                                    .buttonStyle(.plain)
+                                    .id(index)
                                 }
                             }
                             .scrollTargetLayout()
-                            .padding(.horizontal, (UIScreen.main.bounds.width - cardWidth) / 2)
+                            .padding(.horizontal, 20)
                         }
                         .scrollTargetBehavior(.viewAligned)
-                        .frame(height: 150)
-                        .onPreferenceChange(CoverFlowCenterPreference.self) { items in
-                            guard let closest = items.min(by: { $0.distance < $1.distance }) else { return }
-                            if closest.index != coverFlowSnappedIndex {
-                                coverFlowSnappedIndex = closest.index
-                                UISelectionFeedbackGenerator().selectionChanged()
-                            }
-                        }
+                        .frame(height: 106)
                         .onAppear {
                             proxy.scrollTo(startIndex, anchor: .center)
-                            coverFlowSnappedIndex = startIndex
                         }
                     }
                 }
             }
             
-            Button {
-                showReceiptReport = true
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 11, weight: .bold))
-                    Text("Generate Report")
-                }
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
-                .background(Color.white.opacity(0.03))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .miloomReportStroke()
-            }
-            .buttonStyle(PremiumButtonStyle())
-            .padding(.horizontal, 16)
         }
-        .padding(.top, 16)
-        .padding(.bottom, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
         .background(Color(hex: "#1C1C1E").opacity(0.70))
         .frame(maxWidth: .infinity)
         }
@@ -178,9 +158,6 @@ struct EntitySubscriptionSection: View {
         .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterSubscriptions)
         .padding(.horizontal, 20)
         .zIndex(1)
-        .sheet(isPresented: $showReceiptReport) {
-            SubscriptionReceiptView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards)
-        }
     }
     
     private func formatCurrency(_ value: Double) -> String {

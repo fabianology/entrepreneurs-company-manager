@@ -261,12 +261,16 @@ struct FinancialView: View {
                     } else {
                         // Institutions Block
                         if !institutions.isEmpty {
-                                ForEach(institutions) { inst in
-                                    let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == inst.name.lowercased() }
-                                    let instLoans = loans.filter { ($0.lender ?? "").lowercased() == inst.name.lowercased() }
-                                    walletStackForInstitution(inst: inst, instCards: instCards, instLoans: instLoans)
-                                }
-                            }
+                            StackedInstitutionDeckView(
+                                institutions: institutions,
+                                cards: cards,
+                                loans: loans,
+                                vm: vm,
+                                onEditInst: { editingInst = $0 },
+                                onEditCard: { editingCard = $0 },
+                                onEditLoan: { editingLoan = $0 }
+                            )
+                        }
                         
                         // Remaining standalone accounts block
                         let standaloneCards = cards.filter { c in !institutions.contains { ($0.name ?? "").lowercased() == (c.institutionName ?? "").lowercased() } }

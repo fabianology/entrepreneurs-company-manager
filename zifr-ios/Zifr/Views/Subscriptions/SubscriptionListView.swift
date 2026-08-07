@@ -294,7 +294,13 @@ struct StackedSubscriptionDeckView: View {
                             onEdit: { onEdit(sub) },
                             onBankTapped: onBankTapped,
                             onSave: onSave,
-                            revealLevel: currentLevel
+                            revealLevel: currentLevel,
+                            onDragChanged: { value in
+                                handleDragChange(value: value, index: index, sub: sub)
+                            },
+                            onDragEnded: { value in
+                                handleDragEnd(value: value, index: index, sub: sub)
+                            }
                         )
                         .frame(maxWidth: .infinity)
                         .clipShape(cardShape)
@@ -303,8 +309,8 @@ struct StackedSubscriptionDeckView: View {
                                 .stroke(
                                     LinearGradient(
                                         colors: [
-                                            Color(hex: "#6C47FF"),
-                                            currentLevel == .full ? Color(hex: "#16161E").opacity(0.3) : Color.clear
+                                            Color(hex: "#3A2D6E"),
+                                            currentLevel == .full ? Color(hex: "#16161E").opacity(0.2) : Color.clear
                                         ],
                                         startPoint: .top,
                                         endPoint: .bottom
@@ -327,15 +333,6 @@ struct StackedSubscriptionDeckView: View {
                         }
                         .offset(y: yOffset)
                         .zIndex(Double(index))
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 4)
-                                .onChanged { value in
-                                    handleDragChange(value: value, index: index, sub: sub)
-                                }
-                                .onEnded { value in
-                                    handleDragEnd(value: value, index: index, sub: sub)
-                                }
-                        )
                         .id(sub.id)
                         .spotlightTarget(isActive: onboardingState.isSpotlightingReview && index == 0)
                     }

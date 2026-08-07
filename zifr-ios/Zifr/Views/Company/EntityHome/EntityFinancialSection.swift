@@ -10,7 +10,6 @@ struct EntityFinancialSection: View {
     
     @Binding var expandedInstitutions: Set<String>
     @Binding var expandedAccounts: Set<String>
-    @Binding var showFinancialReceiptReport: Bool
     @Binding var editingCard: FinancialCard?
     @Binding var editingInst: Institution?
     @Binding var editingLoan: Loan?
@@ -22,6 +21,7 @@ struct EntityFinancialSection: View {
     
     private let finColor = Color(hex: "#1A7077")
     
+    @State private var showFinancialReceiptReport = false
     @Environment(OnboardingStateManager.self) private var onboardingState
     
     var body: some View {
@@ -88,7 +88,7 @@ struct EntityFinancialSection: View {
             .buttonStyle(.plain)
             .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsHeader)
 
-            VStack(spacing: 16) {
+            VStack(spacing: 10) {
                 // Institutions
             VStack(spacing: 12) {
                 ForEach(institutions) { inst in
@@ -216,9 +216,7 @@ struct EntityFinancialSection: View {
                                             Divider().background(Color.white.opacity(0.06))
                                             DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.plaidAccountId ?? card.id.uuidString }
                                             Divider().background(Color.white.opacity(0.06))
-                                            DashboardActionButton(icon: nil, title: "Report") {
-                                                showFinancialReceiptReport = true
-                                            }
+                                            DashboardActionButton(icon: nil, title: "Report") { showFinancialReceiptReport = true }
                                         }
                                     )
                                 }
@@ -282,9 +280,7 @@ struct EntityFinancialSection: View {
                                             Divider().background(Color.white.opacity(0.06))
                                             DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = loan.id.uuidString }
                                             Divider().background(Color.white.opacity(0.06))
-                                            DashboardActionButton(icon: nil, title: "Report") {
-                                                showFinancialReceiptReport = true
-                                            }
+                                            DashboardActionButton(icon: nil, title: "Report") { showFinancialReceiptReport = true }
                                         }
                                     )
                                 }
@@ -295,11 +291,9 @@ struct EntityFinancialSection: View {
                 }
             }
             .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsAccounts)
-            
-            financialReportButton
         }
-        .padding(.top, 16)
-        .padding(.bottom, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
         .background(Color(hex: "#1C1C1E").opacity(0.70))
         .frame(maxWidth: .infinity)
         }
@@ -307,28 +301,15 @@ struct EntityFinancialSection: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancials)
         .padding(.horizontal, 20)
-    }
-    
-    private var financialReportButton: some View {
-        Button {
-            showFinancialReceiptReport = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11, weight: .bold))
-                Text("Generate Report")
-            }
-            .font(.system(size: 12, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(Color.white.opacity(0.03))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .miloomReportStroke()
+        .sheet(isPresented: $showFinancialReceiptReport) {
+            FinancialReceiptView(
+                company: company,
+                institutions: institutions,
+                cards: cards,
+                loans: loans,
+                subscriptions: subscriptions
+            )
         }
-        .buttonStyle(PremiumButtonStyle())
-        .padding(.horizontal, 16)
-        .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancialsReport)
     }
     
     private func institutionRow(_ inst: Institution) -> some View {
@@ -462,9 +443,7 @@ struct EntityFinancialSection: View {
                                 Divider().background(Color.white.opacity(0.06))
                                 DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = acc.id }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: nil, title: "Report") {
-                                    showFinancialReceiptReport = true
-                                }
+                                DashboardActionButton(icon: nil, title: "Report") { showFinancialReceiptReport = true }
                             }
                         )
                     }
@@ -537,9 +516,7 @@ struct EntityFinancialSection: View {
                                 Divider().background(Color.white.opacity(0.06))
                                 DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = card.plaidAccountId ?? card.id.uuidString }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: nil, title: "Report") {
-                                    showFinancialReceiptReport = true
-                                }
+                                DashboardActionButton(icon: nil, title: "Report") { showFinancialReceiptReport = true }
                             }
                         )
                     }
@@ -604,9 +581,7 @@ struct EntityFinancialSection: View {
                                 Divider().background(Color.white.opacity(0.06))
                                 DashboardActionButton(icon: nil, title: "Transactions") { viewingTransactionsFor = loan.id.uuidString }
                                 Divider().background(Color.white.opacity(0.06))
-                                DashboardActionButton(icon: nil, title: "Report") {
-                                    showFinancialReceiptReport = true
-                                }
+                                DashboardActionButton(icon: nil, title: "Report") { showFinancialReceiptReport = true }
                             }
                         )
                     }

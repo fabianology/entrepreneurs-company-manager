@@ -19,6 +19,8 @@ struct PremiumSubscriptionCard: View {
     var onBankTapped: ((UUID) -> Void)? = nil
     var onSave: ((Subscription) -> Void)? = nil
     var revealLevel: CardRevealLevel = .full
+    var onDragChanged: ((DragGesture.Value) -> Void)? = nil
+    var onDragEnded: ((DragGesture.Value) -> Void)? = nil
 
     @State private var expanded = false
     @State private var showSubServices = false
@@ -194,6 +196,15 @@ struct PremiumSubscriptionCard: View {
                         .onTapGesture {
                             onEdit()
                         }
+                        .simultaneousGesture(
+                            DragGesture(minimumDistance: 4)
+                                .onChanged { value in
+                                    onDragChanged?(value)
+                                }
+                                .onEnded { value in
+                                    onDragEnded?(value)
+                                }
+                        )
 
                         // Status row — Dot + pipes style
                         if revealLevel >= .statusRevealed && !sub.isFree {
@@ -202,14 +213,15 @@ struct PremiumSubscriptionCard: View {
                                 .padding(.horizontal, 24)
                             
                             HStack(spacing: 8) {
-                                statusDot(sub: sub)
-                                
                                 let sTuple = statusRowTuple
                                 if sub.status == "Paused" {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(sTuple.top)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color(hex: "#911c26"))
+                                        HStack(alignment: .center, spacing: 5) {
+                                            Text(sTuple.top)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(Color(hex: "#911c26"))
+                                            statusDot(sub: sub)
+                                        }
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
                                                 .font(.system(size: 10, weight: .medium))
@@ -220,9 +232,12 @@ struct PremiumSubscriptionCard: View {
                                     .tracking(0.3)
                                 } else {
                                     VStack(alignment: .leading, spacing: 3) {
-                                        Text(sTuple.top)
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(.white)
+                                        HStack(alignment: .center, spacing: 5) {
+                                            Text(sTuple.top)
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(.white)
+                                            statusDot(sub: sub)
+                                        }
                                         if !sTuple.bottom.isEmpty {
                                             Text(sTuple.bottom)
                                                 .font(.system(size: 10, weight: .medium))
@@ -274,6 +289,7 @@ struct PremiumSubscriptionCard: View {
                     .background(
                         UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
                             .fill(Color.black.opacity(0.70))
+                            .padding(.bottom, revealLevel == .full ? 0 : -80)
                             .overlay(
                                 UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
                                     .stroke(Color.white.opacity(0.1), lineWidth: 1)

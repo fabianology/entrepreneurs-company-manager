@@ -99,6 +99,7 @@
 		E30DF1991208D368B9CFA9B6 /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94404D955B8D06F50A12AB6D /* EditProfileView.swift */; };
 		E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED204010D74AB9325095BD9A /* DocumentScannerService.swift */; };
 		E4899788A1B2E80B89DBC55B /* EditLoanSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8AE50B1DF4829E44C696A33 /* EditLoanSheet.swift */; };
+		E86994340C958D7C23B0A92A /* StackedInstitutionDeckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFBEB3A6723B073A9EA5CEFD /* StackedInstitutionDeckView.swift */; };
 		E8C0EDD7920B1ECC3814BB0E /* FinancialReceiptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F564E5574B9B03EDA84362FA /* FinancialReceiptView.swift */; };
 		E9C91760B61AA7765091D5E9 /* SpotlightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B13CF9B64BA8A6907DE1803 /* SpotlightOverlay.swift */; };
 		F2ECD35FF479C6DACC511E83 /* patch2.py in Resources */ = {isa = PBXBuildFile; fileRef = 0ACC52E30ED6C458351E1CC0 /* patch2.py */; };
@@ -194,6 +195,7 @@
 		C9E5CF10B11366A7F77DE656 /* DataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepository.swift; sourceTree = "<group>"; };
 		CB6907BC498BB2697B95920A /* ResetPasswordSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ResetPasswordSheet.swift; sourceTree = "<group>"; };
 		CC66ED993A18713ED859F4C2 /* ActivityLogsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogsView.swift; sourceTree = "<group>"; };
+		CFBEB3A6723B073A9EA5CEFD /* StackedInstitutionDeckView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StackedInstitutionDeckView.swift; sourceTree = "<group>"; };
 		D1A73D787862A2955DEB8BEA /* OnboardingStateManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingStateManager.swift; sourceTree = "<group>"; };
 		D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialView.swift; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */,
 				2977C629E97631FFAE00EEFD /* PlaidLinkButton.swift */,
 				AA11223344556677889900AA /* DetectedSubscriptionsView.swift */,
+				CFBEB3A6723B073A9EA5CEFD /* StackedInstitutionDeckView.swift */,
 			);
 			path = Financial;
 			sourceTree = "<group>";
@@ -658,6 +661,7 @@
 				E9C91760B61AA7765091D5E9 /* SpotlightOverlay.swift in Sources */,
 				72BC06A839A641B99C1899EF /* TutorialSheetView.swift in Sources */,
 				2C3A0A6F5F8542F4BC590FC1 /* SandboxSeeder.swift in Sources */,
+				E86994340C958D7C23B0A92A /* StackedInstitutionDeckView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

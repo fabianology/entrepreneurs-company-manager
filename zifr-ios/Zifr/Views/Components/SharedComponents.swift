@@ -881,7 +881,7 @@ struct InstitutionDashboardCard<CollapsedHeader: View, AccountsContent: View>: V
                 onToggle()
             }) {
                 collapsedHeader()
-                    .padding(.vertical, 14)
+                    .padding(.vertical, 10)
                     .padding(.horizontal, 16)
                     .contentShape(Rectangle())
             }

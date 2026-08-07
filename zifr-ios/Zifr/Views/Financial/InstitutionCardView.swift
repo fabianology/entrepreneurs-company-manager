@@ -28,7 +28,7 @@ struct InstitutionCardView: View {
         return .zifrGreen
     }
     var body: some View {
-        MiloomListCard {
+        VStack(spacing: 0) {
             // ── Tappable header (triggers edit sheet) ──────────────────────
             Button(action: onEdit) {
                 VStack(spacing: 0) {
@@ -259,6 +259,26 @@ struct InstitutionCardView: View {
                 }
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(hex: "#1C1C1E").opacity(0.40))
+        )
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#3A2D6E"),
+                            Color(hex: "#16161E").opacity(0.2)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,

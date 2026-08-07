@@ -58,6 +58,8 @@ struct CompanyDetailView: View {
     @State private var wizardInstitution: Institution? = nil
     @State private var showAssistant = false
     @State private var assistantStrokeRotation: Double = 0.0
+    @State private var showFinancialReport = false
+    @State private var showSubscriptionReport = false
 
     // Tutorial frame targets — populated by TutorialFrameKey preferences
     @State private var tutFrameHeader: CGRect = .zero
@@ -143,6 +145,23 @@ struct CompanyDetailView: View {
         }
         .sheet(item: $newLoan) { l in
             EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards)
+        }
+        .sheet(isPresented: $showFinancialReport) {
+            FinancialReceiptView(
+                company: company,
+                institutions: institutions,
+                cards: cards,
+                loans: loans,
+                subscriptions: subscriptions
+            )
+        }
+        .sheet(isPresented: $showSubscriptionReport) {
+            SubscriptionReceiptView(
+                company: company,
+                subscriptions: subscriptions,
+                institutions: institutions,
+                cards: cards
+            )
         }
         .fullScreenCover(isPresented: $showAssistant) {
             AssistantOnboardingView(vm: vm)
@@ -524,6 +543,24 @@ struct CompanyDetailView: View {
                 metricSubLine
             }
             Spacer()
+            
+            Menu {
+                Button {
+                    showFinancialReport = true
+                } label: {
+                    Label("Financial Report", systemImage: "dollarsign.circle")
+                }
+                Button {
+                    showSubscriptionReport = true
+                } label: {
+                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+                }
+            } label: {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .frame(width: 32, height: 32)
+            }
         }
         .padding(.vertical, 12)
         .padding(.leading, 12)
@@ -549,11 +586,23 @@ struct CompanyDetailView: View {
     private var metricSubLine: some View {
         switch vm.activeTab {
         case .home:
+            let cashAccounts = institutions.flatMap(\.accounts).filter { ["Checking", "Savings"].contains($0.type) }
+            let totalCash = cashAccounts.reduce(0.0) { $0 + $1.balance }
+
             HStack(spacing: 6) {
                 Text("HOME")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color(hex: "#C1AA78"))
                     .tracking(2)
+                if totalCash > 0 {
+                    Text("·").foregroundStyle(Color.white.opacity(0.3))
+                    Text(formatHeaderCurrency(totalCash))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("cash")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
             }
 
         case .subscriptions:
@@ -625,7 +674,10 @@ struct CompanyDetailView: View {
         .minimumScaleFactor(0.8)
     }
 
-
+    private func formatHeaderCurrency(_ value: Double) -> String {
+        if value >= 1000 { return "$\(String(format: "%.1fk", value / 1000))" }
+        return "$\(String(format: "%.0f", value))"
+    }
 
     private func tabColor(_ tab: AppViewModel.CompanyTab) -> Color {
         switch tab {

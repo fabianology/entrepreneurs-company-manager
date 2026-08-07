@@ -42,8 +42,6 @@ struct EntityHomeView: View {
     
     @State private var flippedHeroIndex: Int? = nil
     @Namespace private var flipAnimation
-    @State private var showReceiptReport = false
-    @State private var showFinancialReceiptReport = false
     @State private var coverFlowSnappedIndex: Int = 0
 
     // Edit Item States
@@ -52,6 +50,7 @@ struct EntityHomeView: View {
     @State private var editingLoan: Loan? = nil
     @State private var editingDoc: CompanyDocument? = nil
     @State private var viewingTransactionsFor: String? = nil
+    @State private var selectedDocCategory: String? = nil
 
     // MARK: - ViewModel
     private var model: EntityHomeViewModel {
@@ -63,12 +62,12 @@ struct EntityHomeView: View {
         VStack(spacing: 0) {
             ScrollViewReader { scrollProxy in
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 32) {
+                    VStack(spacing: 16) {
                         quickAddRow
                             .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterQuickAdd)
                             .padding(.horizontal, 20)
-                            .padding(.top, 6)
-                            .padding(.bottom, 8)
+                            .padding(.top, 2)
+                            .padding(.bottom, 4)
                             .id("quickAddRow")
                             .background(
                                 GeometryReader { geo in
@@ -89,7 +88,6 @@ struct EntityHomeView: View {
                             vm: vm,
                             expandedInstitutions: $expandedInstitutions,
                             expandedAccounts: $expandedAccounts,
-                            showFinancialReceiptReport: $showFinancialReceiptReport,
                             editingCard: $editingCard,
                             editingInst: $editingInst,
                             editingLoan: $editingLoan,
@@ -118,7 +116,6 @@ struct EntityHomeView: View {
                             monthlyBurn: model.monthlyBurn,
                             vm: vm,
                             flippedHeroIndex: $flippedHeroIndex,
-                            showReceiptReport: $showReceiptReport,
                             coverFlowSnappedIndex: $coverFlowSnappedIndex,
                             flipAnimation: flipAnimation
                         )
@@ -139,7 +136,8 @@ struct EntityHomeView: View {
                             vm: vm,
                             expandedCategories: $expandedCategories,
                             newDoc: $newDoc,
-                            editingDoc: $editingDoc
+                            editingDoc: $editingDoc,
+                            selectedCategory: $selectedDocCategory
                         )
                         .id("documentSection")
                         .background(
@@ -151,7 +149,7 @@ struct EntityHomeView: View {
                             }
                         )
                         
-                        Spacer().frame(height: 40)
+                        Spacer().frame(height: 16)
                     }
                 }
                 .onChange(of: onboardingState.currentStep) { _, newStep in
@@ -228,23 +226,6 @@ struct EntityHomeView: View {
                 TransactionFeedView(accountId: accountId, companyId: company.id, vm: vm)
             }
         }
-        .sheet(isPresented: $showReceiptReport) {
-            SubscriptionReceiptView(
-                company: company,
-                subscriptions: subscriptions,
-                institutions: institutions,
-                cards: cards
-            )
-        }
-        .sheet(isPresented: $showFinancialReceiptReport) {
-            FinancialReceiptView(
-                company: company,
-                institutions: institutions,
-                cards: cards,
-                loans: loans,
-                subscriptions: subscriptions
-            )
-        }
         .overlay {
             if let heroId = expandedHeroSubId, let sub = model.activeSubscriptions.first(where: { $0.id == heroId }) {
                 ZStack {
@@ -307,7 +288,7 @@ struct EntityHomeView: View {
                         Color.black.opacity(0.6)
                             .ignoresSafeArea()
                             .onTapGesture {
-                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                     flippedHeroIndex = nil
                                 }
                             }
@@ -325,10 +306,164 @@ struct EntityHomeView: View {
                                 sheetSub = sub
                             }
                         )
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
                     }
                     .zIndex(2)
                 }
             }
+            // Document category popup
+            if let category = selectedDocCategory {
+                documentCategoryPopup(category: category)
+            }
+        }
+    }
+
+    // MARK: - Document Category Popup
+    @ViewBuilder
+    private func documentCategoryPopup(category: String) -> some View {
+        let docsColor = Color(hex: "#918457")
+        let docsInCategory = documents.filter { $0.type == category }
+        ZStack {
+            Color.black.opacity(0.6)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedDocCategory = nil
+                    }
+                }
+            
+            documentPopupCard(category: category, docs: docsInCategory, docsColor: docsColor)
+        }
+        .zIndex(10)
+    }
+    
+    @ViewBuilder
+    private func documentPopupCard(category: String, docs: [CompanyDocument], docsColor: Color) -> some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(docsColor.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: CompanyDocument.icon(for: category))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(docsColor)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(category)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(.white)
+                    let suffix = docs.count == 1 ? "" : "s"
+                    Text("\(docs.count) document\(suffix)")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+            
+            Divider().background(Color.white.opacity(0.1)).padding(.horizontal, 16)
+            
+            // Document list
+            if docs.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundStyle(Color.white.opacity(0.25))
+                    Text("No documents yet")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else {
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(docs) { doc in
+                            docPopupRow(doc: doc, isLast: doc.id == docs.last?.id, docsColor: docsColor)
+                        }
+                    }
+                }
+                .frame(maxHeight: 280)
+            }
+            
+            Divider().background(Color.white.opacity(0.1)).padding(.horizontal, 16)
+            
+            // Actions
+            HStack(spacing: 0) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    selectedDocCategory = nil
+                    newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                        Text("Add Document")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(docsColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                }
+                
+                Divider().background(Color.white.opacity(0.06)).frame(height: 20)
+                
+                Button {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedDocCategory = nil
+                    }
+                } label: {
+                    Text("Close")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                }
+            }
+        }
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .padding(.horizontal, 24)
+        .transition(.scale(scale: 0.9).combined(with: .opacity))
+    }
+    
+    @ViewBuilder
+    private func docPopupRow(doc: CompanyDocument, isLast: Bool, docsColor: Color) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            selectedDocCategory = nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                editingDoc = doc
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(docsColor.opacity(0.8))
+                    .frame(width: 20)
+                
+                Text(doc.name.isEmpty ? "Untitled" : doc.name)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.3))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        
+        if !isLast {
+            Divider().background(Color.white.opacity(0.06)).padding(.leading, 52)
         }
     }
 
@@ -501,7 +636,7 @@ struct DemoFlipCardExpanded: View {
                 .background(Color(hex: "#1C1C1E"))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                .opacity(isFlipped ? 0 : 1)
+                .opacity(0)
                 
                 // Back
                 VStack(spacing: 0) {
@@ -595,28 +730,14 @@ struct DemoFlipCardExpanded: View {
                 .background(Color(hex: "#1C1C1E"))
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
-                .opacity(isFlipped ? 1 : 0)
+                .opacity(1)
             }
             .matchedGeometryEffect(id: "flipBg-\(index)", in: animation)
             .frame(width: geo.size.width * 0.85, height: 230)
-            .rotation3DEffect(.degrees(isFlipped ? 180 : 0), axis: (x: 0, y: 1, z: 0))
             .position(x: geo.size.width / 2, y: geo.size.height / 2)
-            .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        isFlipped = true
-                    }
-                }
-            }
             .onTapGesture {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                    isFlipped = false
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        flippedHeroIndex = nil
-                    }
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    flippedHeroIndex = nil
                 }
             }
         }
