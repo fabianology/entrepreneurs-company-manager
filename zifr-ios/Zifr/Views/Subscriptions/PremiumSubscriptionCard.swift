@@ -19,6 +19,8 @@ struct PremiumSubscriptionCard: View {
     var onBankTapped: ((UUID) -> Void)? = nil
     var onSave: ((Subscription) -> Void)? = nil
     var revealLevel: CardRevealLevel = .full
+    var isExplicitlyFull: Bool = true
+    var onExpand: (() -> Void)? = nil
     var onDragChanged: ((DragGesture.Value) -> Void)? = nil
     var onDragEnded: ((DragGesture.Value) -> Void)? = nil
 
@@ -194,7 +196,11 @@ struct PremiumSubscriptionCard: View {
                         .padding(.bottom, 10)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            onEdit()
+                            if revealLevel == .full && isExplicitlyFull {
+                                onEdit()
+                            } else {
+                                onExpand?()
+                            }
                         }
                         .simultaneousGesture(
                             DragGesture(minimumDistance: 4)

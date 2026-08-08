@@ -28,8 +28,8 @@ struct DocumentListView: View {
     var body: some View {
         ZStack(alignment: .top) {
             ScrollView {
-                LazyVStack(spacing: 24) {
-                    Spacer().frame(height: 66)
+                VStack(spacing: 0) {
+                    Spacer().frame(height: 70)
 
                 VStack(spacing: 12) {
                     // Category Dashboard Grid

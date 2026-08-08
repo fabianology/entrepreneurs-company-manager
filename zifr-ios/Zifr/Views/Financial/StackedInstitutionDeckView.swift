@@ -56,6 +56,7 @@ struct StackedInstitutionDeckView: View {
             }
         }
         .frame(height: totalStackHeight, alignment: .top)
+        .padding(.bottom, 120)
         .onPreferenceChange(InstitutionHeightKey.self) { value in
             institutionHeights.merge(value, uniquingKeysWith: { $1 })
         }
@@ -84,26 +85,6 @@ struct StackedInstitutionDeckView: View {
                     .transition(.opacity)
             }
         }
-        .background(
-            InstitutionCardView(
-                institution: inst,
-                totalMonthlyPayment: instLoans.reduce(0) { $0 + $1.monthlyPayment },
-                cardCount: instCards.count,
-                loanCount: instLoans.count,
-                loans: instLoans,
-                vm: vm,
-                onEdit: { },
-                onEditLoan: { _ in }
-            )
-            .fixedSize(horizontal: false, vertical: true)
-            .opacity(0)
-            .allowsHitTesting(false)
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: InstitutionHeightKey.self, value: [inst.id: geo.size.height])
-                }
-            )
-        )
         .frame(maxWidth: .infinity, alignment: .top)
         .padding(.top, cardPeekHeight)
         .offset(y: yOffset)
@@ -204,27 +185,27 @@ struct StackedInstitutionDeckView: View {
             topTrailingRadius: 24
         )
 
-        return HStack(alignment: .center, spacing: 12) {
+        return HStack(alignment: .center, spacing: 16) {
             // Logo
             if let loginUrl = inst.loginUrl, !loginUrl.isEmpty {
-                FaviconImage(website: loginUrl, size: 32)
-                    .frame(width: 44, height: 44)
+                FaviconImage(website: loginUrl, size: 40)
+                    .frame(width: 56, height: 56)
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 16)
                         .fill(Color.white.opacity(0.06))
-                        .frame(width: 44, height: 44)
+                        .frame(width: 56, height: 56)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
+                            RoundedRectangle(cornerRadius: 16)
                                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
                         )
                     Image(systemName: "building.columns")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.8))
                 }
             }
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 // Name with health dot
                 HStack(spacing: 8) {
                     Circle()
@@ -233,7 +214,7 @@ struct StackedInstitutionDeckView: View {
                         .shadow(color: healthColor, radius: 4)
                     
                     Text(inst.name.isEmpty ? "Bank" : inst.name)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
                 }
                 
@@ -267,8 +248,8 @@ struct StackedInstitutionDeckView: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 24)
+        .padding(.vertical, 10)
         .frame(height: collapsedHeight, alignment: .center)
         .frame(maxWidth: .infinity)
         .frame(height: isLast ? collapsedHeight : collapsedHeight + 80, alignment: .top)
@@ -294,8 +275,11 @@ struct StackedInstitutionDeckView: View {
         .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 4)
         .contentShape(Rectangle())
         .onTapGesture {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            onEditInst(inst)
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                expandedInstId = inst.id
+                poppedCardId = nil
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 4)
@@ -328,14 +312,27 @@ struct StackedInstitutionDeckView: View {
             onEdit: { onEditInst(inst) },
             onEditLoan: { onEditLoan($0) }
         )
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: InstitutionHeightKey.self, value: [inst.id: geo.size.height])
+            }
+        )
         .overlay(alignment: .top) {
             // Drag overlay over top header area for pull expand/collapse
             Color.clear
                 .frame(height: collapsedHeight)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    onEditInst(inst)
+                    if expandedInstId == inst.id {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        onEditInst(inst)
+                    } else {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                            expandedInstId = inst.id
+                            poppedCardId = nil
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        }
+                    }
                 }
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 4)

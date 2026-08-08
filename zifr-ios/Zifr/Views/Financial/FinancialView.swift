@@ -31,8 +31,8 @@ struct FinancialView: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         // ── Main Wallet Stack ──
-                        LazyVStack(spacing: 24) {
-                            Spacer().frame(height: 66) // Offset for the pinned action bar
+                        VStack(spacing: 0) {
+                            Spacer().frame(height: 70) // Offset for the pinned action bar
                             if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()

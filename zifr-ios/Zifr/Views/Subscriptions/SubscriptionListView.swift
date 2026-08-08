@@ -295,6 +295,13 @@ struct StackedSubscriptionDeckView: View {
                             onBankTapped: onBankTapped,
                             onSave: onSave,
                             revealLevel: currentLevel,
+                            isExplicitlyFull: revealLevels[sub.id] == .full,
+                            onExpand: {
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                                    revealLevels[sub.id] = .full
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+                            },
                             onDragChanged: { value in
                                 handleDragChange(value: value, index: index, sub: sub)
                             },
