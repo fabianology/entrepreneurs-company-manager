@@ -42,25 +42,38 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
     }
 
     static let businessTypes = [
-        "Formation & Governance",
-        "Tax & IRS",
+        "Formation",
+        "Taxes",
         "Legal & IP",
-        "Contracts & HR",
-        "Compliance & Insurance",
-        "Identity & Vital Records",
-        "Property & Assets",
-        "Estate & Medical",
+        "Contracts",
+        "Compliance",
+        "Identity",
+        "Property",
+        "Estate",
         "Other"
     ]
 
     static let personalTypes = [
         "Medical",
-        "Identity & Vital Docs",
+        "Identity",
         "Legal",
         "Taxes",
-        "Property & Estate",
+        "Property",
         "Other"
     ]
+
+    static func normalizeType(_ type: String) -> String {
+        switch type {
+        case "Formation & Governance": return "Formation"
+        case "Tax & IRS": return "Taxes"
+        case "Contracts & HR": return "Contracts"
+        case "Compliance & Insurance": return "Compliance"
+        case "Identity & Vital Records", "Identity & Vital Docs": return "Identity"
+        case "Property & Assets", "Property & Estate": return "Property"
+        case "Estate & Medical": return "Estate"
+        default: return type
+        }
+    }
 
     static func types(for structure: String) -> [String] {
         if structure == "Personal" {
@@ -72,14 +85,14 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
 
     static func icon(for type: String) -> String {
         switch type {
-        case "Formation & Governance": return "building.2.fill"
-        case "Tax & IRS", "Taxes": return "dollarsign.circle"
+        case "Formation", "Formation & Governance": return "building.2.fill"
+        case "Taxes", "Tax & IRS": return "dollarsign.circle"
         case "Legal & IP", "Legal": return "scale.3d"
-        case "Contracts & HR": return "signature"
-        case "Compliance & Insurance": return "checkmark.shield"
-        case "Identity & Vital Records", "Identity & Vital Docs": return "person.text.rectangle"
-        case "Property & Assets", "Property & Estate": return "house.fill"
-        case "Estate & Medical", "Medical": return "cross.case.fill"
+        case "Contracts", "Contracts & HR": return "signature"
+        case "Compliance", "Compliance & Insurance": return "checkmark.shield"
+        case "Identity", "Identity & Vital Records", "Identity & Vital Docs": return "person.text.rectangle"
+        case "Property", "Property & Assets", "Property & Estate": return "house.fill"
+        case "Estate", "Estate & Medical", "Medical": return "cross.case.fill"
         default: return "doc"
         }
     }

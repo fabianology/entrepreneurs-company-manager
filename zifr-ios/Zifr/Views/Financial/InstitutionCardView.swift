@@ -52,16 +52,9 @@ struct InstitutionCardView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 8) {
-                                Circle()
-                                    .fill(healthColor)
-                                    .frame(width: 8, height: 8)
-                                    .shadow(color: healthColor, radius: 4)
-                                
-                                Text(institution.name.isEmpty ? "Bank" : institution.name)
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundStyle(.white)
-                            }
+                            Text(institution.name.isEmpty ? "Bank" : institution.name)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
 
                             HStack(spacing: 8) {
                                 HStack(spacing: 4) {

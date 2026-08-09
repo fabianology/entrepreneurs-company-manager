@@ -207,16 +207,9 @@ struct StackedInstitutionDeckView: View {
             
             VStack(alignment: .leading, spacing: 6) {
                 // Name with health dot
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(healthColor)
-                        .frame(width: 8, height: 8)
-                        .shadow(color: healthColor, radius: 4)
-                    
-                    Text(inst.name.isEmpty ? "Bank" : inst.name)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
+                Text(inst.name.isEmpty ? "Bank" : inst.name)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
                 
                 // Counts with pipe separators — exact match
                 HStack(spacing: 8) {

@@ -22,16 +22,160 @@ struct DocumentListView: View {
     @State private var shareResourceTitle: String = "All Documents"
 
     var grouped: [String: [CompanyDocument]] {
-        Dictionary(grouping: documents, by: \.type)
+        Dictionary(grouping: documents, by: { CompanyDocument.normalizeType($0.type) })
     }
 
     var body: some View {
         ZStack(alignment: .top) {
+            // Scrollable Document Rows List (Background layer scrolling behind header)
             ScrollView {
                 VStack(spacing: 0) {
-                    Spacer().frame(height: 70)
+                    // Offset for top action bar + anchored category tabs header (328pt header + 12pt gap)
+                    Spacer().frame(height: 340)
+
+                    Group {
+                        if documents.isEmpty {
+                            emptyState.padding(.horizontal, 20)
+                        } else {
+                            if selectedType == "All" {
+                                VStack(spacing: 10) {
+                                    ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
+                                        if let docs = grouped[type], !docs.isEmpty {
+                                            ForEach(docs) { doc in
+                                                DocumentRow(doc: doc) {
+                                                    editingDoc = doc
+                                                } onOpen: {
+                                                    if let docUrl = doc.url {
+                                                        if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
+                                                            let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
+                                                            if let u = URL(string: cleanPath) {
+                                                                openURL = IdentifiableURL(url: u)
+                                                            }
+                                                        } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
+                                                            openURL = IdentifiableURL(url: u)
+                                                        }
+                                                    }
+                                                }
+                                                .padding(.horizontal, 20)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Show only selected category
+                                let docs = grouped[selectedType] ?? []
+                                if docs.isEmpty {
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "folder")
+                                            .font(.system(size: 32))
+                                            .foregroundStyle(Color.white.opacity(0.2))
+                                        Text("No Documents")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 60)
+                                } else {
+                                    VStack(spacing: 10) {
+                                        ForEach(docs) { doc in
+                                            DocumentRow(doc: doc) {
+                                                editingDoc = doc
+                                            } onOpen: {
+                                                if let docUrl = doc.url {
+                                                    if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
+                                                        let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
+                                                        if let u = URL(string: cleanPath) {
+                                                            openURL = IdentifiableURL(url: u)
+                                                        }
+                                                    } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
+                                                        openURL = IdentifiableURL(url: u)
+                                                    }
+                                                }
+                                            }
+                                            .padding(.horizontal, 20)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.bottom, 120)
+                }
+            }
+            .scrollIndicators(.hidden)
+            .mask(
+                VStack(spacing: 0) {
+                    // Completely transparent above halfway point of bottom tab row (288pt)
+                    Color.clear.frame(height: 288)
+                    
+                    // Fast 30pt dissolve gradient from grid bottom (318pt) up to halfway mark (288pt)
+                    LinearGradient(
+                        colors: [.clear, .black],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 30)
+                    
+                    // Fully visible list area below category tabs
+                    Rectangle().fill(Color.black)
+                }
+            )
+
+            // Fixed Header with Tabs (anchored, does not move when scrolling)
+            VStack(spacing: 0) {
+                Spacer().frame(height: 62)
 
                 VStack(spacing: 12) {
+                    // All Documents Box (Full Width)
+                    let isAllSelected = selectedType == "All"
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        selectedType = "All"
+                    } label: {
+                        HStack {
+                            Text("ALL DOCUMENTS")
+                                .font(.system(size: 12, weight: .bold))
+                                .tracking(1)
+                                .foregroundStyle(isAllSelected ? Color(hex: "#918457") : .white)
+                            Spacer()
+                            if documents.count > 0 {
+                                Text("\(documents.count)")
+                                    .font(.system(size: 10, weight: .black))
+                                    .foregroundStyle(isAllSelected ? Color(hex: "#918457") : .white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(isAllSelected ? Color(hex: "#918457").opacity(0.15) : Color.white.opacity(0.15))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 40)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(isAllSelected ? Color.black.opacity(0.40) : Color.black.opacity(0.70))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: isAllSelected ? [
+                                            Color(hex: "#918457"),
+                                            Color(hex: "#918457").opacity(0.3)
+                                        ] : [
+                                            Color(hex: "#3A2D6E"),
+                                            Color(hex: "#16161E").opacity(0.2)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: isAllSelected ? Color(hex: "#918457").opacity(0.2) : Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                    }
+
                     // Category Dashboard Grid
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                         ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
@@ -51,105 +195,14 @@ struct DocumentListView: View {
                             }
                         }
                     }
-
-                    // All Documents Box
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        selectedType = "All"
-                    } label: {
-                        HStack {
-                            Text("ALL DOCUMENTS")
-                                .font(.system(size: 12, weight: .bold))
-                                .tracking(1)
-                                .foregroundStyle(selectedType == "All" ? Color(hex: "#918457") : .white)
-                            Spacer()
-                            if documents.count > 0 {
-                                Text("\(documents.count)")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundStyle(selectedType == "All" ? Color(hex: "#918457") : .white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(selectedType == "All" ? Color(hex: "#918457").opacity(0.15) : Color.white.opacity(0.15))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(height: 40)
-                        .background(Color.clear)
-                        .liquidGlass(cornerRadius: 12)
-                    }
                 }
                 .padding(.horizontal, 20)
-
-                if documents.isEmpty {
-                    emptyState.padding(.horizontal, 20)
-                } else {
-                    if selectedType == "All" {
-                        VStack(spacing: 10) {
-                            ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
-                                if let docs = grouped[type], !docs.isEmpty {
-                                    ForEach(docs) { doc in
-                                        DocumentRow(doc: doc) {
-                                            editingDoc = doc
-                                        } onOpen: {
-                                            if let docUrl = doc.url {
-                                                if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
-                                                    let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
-                                                    if let u = URL(string: cleanPath) {
-                                                        openURL = IdentifiableURL(url: u)
-                                                    }
-                                                } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
-                                                    openURL = IdentifiableURL(url: u)
-                                                }
-                                            }
-                                        }
-                                        .padding(.horizontal, 20)
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Show only selected category
-                        let docs = grouped[selectedType] ?? []
-                        if docs.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "folder")
-                                    .font(.system(size: 32))
-                                    .foregroundStyle(Color.white.opacity(0.2))
-                                Text("No Documents")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 60)
-                        } else {
-                            VStack(spacing: 10) {
-                                ForEach(docs) { doc in
-                                    DocumentRow(doc: doc) {
-                                        editingDoc = doc
-                                    } onOpen: {
-                                        if let docUrl = doc.url {
-                                            if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
-                                                let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
-                                                if let u = URL(string: cleanPath) {
-                                                    openURL = IdentifiableURL(url: u)
-                                                }
-                                            } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
-                                                openURL = IdentifiableURL(url: u)
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
-                                }
-                            }
-                        }
-                    }
-                }
+                .padding(.bottom, 10)
             }
-            .padding(.bottom, 120)
-        }
-        .scrollIndicators(.hidden)
-        .overlay(alignment: .bottom) {
+            
+            documentActionBar
+                .zIndex(100)
+        }.overlay(alignment: .bottom) {
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 isScanning = true
@@ -188,18 +241,6 @@ struct DocumentListView: View {
                 }
             }
         }
-        .fullScreenCover(isPresented: $isScanning) {
-            DocumentScannerView {
-                isScanning = false
-            } onComplete: { images in
-                isScanning = false
-                processScan(images)
-            } onError: { error in
-                isScanning = false
-                print("Scanner error: \(error)")
-            }
-            .ignoresSafeArea()
-        }
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
@@ -211,10 +252,6 @@ struct DocumentListView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
-        }
-            
-            documentActionBar
-                .zIndex(100)
         }
     }
     
@@ -385,45 +422,65 @@ struct DocumentRow: View {
     let onOpen: () -> Void
 
     var body: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.zifrBlue.opacity(0.15))
-                    .frame(width: 40, height: 40)
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onEdit()
+        } label: {
+            HStack(spacing: 14) {
                 Image(systemName: doc.typeIcon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.zifrBlue)
-            }
-            VStack(alignment: .leading, spacing: 3) {
-                Text(doc.name.isEmpty ? "Document" : doc.name)
-                    .font(.system(size: 14, weight: .black)).foregroundStyle(.white)
-                if !(doc.uploadDate ?? "").isEmpty {
-                    Text("Added \(doc.uploadDate ?? "")").zifrLabel()
-                }
-                if !(doc.notes ?? "").isEmpty {
-                    Text(doc.notes ?? "")
-                        .font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.4))
-                        .lineLimit(1)
-                }
-            }
-            Spacer()
-            HStack(spacing: 10) {
-                if !(doc.url ?? "").isEmpty {
-                    Button(action: onOpen) {
-                        Image(systemName: "arrow.up.right.square")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.zifrBlue)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(doc.name.isEmpty ? "Document" : doc.name)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                    if !(doc.uploadDate ?? "").isEmpty {
+                        Text("Added \(doc.uploadDate ?? "")")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    }
+                    if !(doc.notes ?? "").isEmpty {
+                        Text(doc.notes ?? "")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .lineLimit(1)
                     }
                 }
-                Button(action: onEdit) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 14))
-                        .foregroundStyle(Color.white.opacity(0.25))
+                Spacer()
+                if !(doc.url ?? "").isEmpty {
+                    Button(action: onOpen) {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#918457"))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black.opacity(0.40))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: Color(hex: "#918457").opacity(0.2), radius: 6, x: 0, y: 3)
         }
-        .padding(14)
-        .glassCard(cornerRadius: 18)
+        .buttonStyle(.plain)
     }
 }
 
@@ -865,15 +922,35 @@ struct CategoryGridCard: View {
                 Text(title)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(isSelected ? Color(hex: "#918457") : Color.white.opacity(0.7))
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
             }
-            .padding(10)
-            .frame(height: 75)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 13)
+            .frame(height: 60)
             .frame(maxWidth: .infinity)
-            .background(Color.clear)
-            .liquidGlass(cornerRadius: 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isSelected ? Color.black.opacity(0.40) : Color.black.opacity(0.70))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: isSelected ? [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ] : [
+                                Color(hex: "#3A2D6E"),
+                                Color(hex: "#16161E").opacity(0.2)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: isSelected ? Color(hex: "#918457").opacity(0.2) : Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
         }
     }
 }
