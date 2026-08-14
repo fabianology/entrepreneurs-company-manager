@@ -70,6 +70,8 @@ struct CompanyDetailView: View {
     @State private var tutFrameTabBar: CGRect = .zero
     @State private var tutFrameFinancialActionBar: CGRect = .zero
 
+    // Control Center Tab State
+    @State private var activeInternalTab: EntityHomeTab = .financial
     
     private var currentTabIndex: Int {
         AppViewModel.CompanyTab.allCases.firstIndex(of: vm.activeTab) ?? 0
@@ -112,7 +114,8 @@ struct CompanyDetailView: View {
                         allSubscriptions: allSubscriptions,
                         allCards: allCards,
                         allLoans: allLoans,
-                        vm: vm
+                        vm: vm,
+                        activeInternalTab: $activeInternalTab
                     )
                 case .subscriptions:
                     SubscriptionListView(company: company, subscriptions: subscriptions, institutions: institutions, cards: cards, vm: vm)
@@ -382,6 +385,10 @@ struct CompanyDetailView: View {
                                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                             company = c
                                             vm.touchCompany(c, appState: appState)
+                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                                vm.activeTab = .home
+                                            }
+                                            tabBounces[.home, default: 0] += 1
                                         } label: {
                                             if c.id == company.id {
                                                 Label(c.name, systemImage: "checkmark")
@@ -399,23 +406,12 @@ struct CompanyDetailView: View {
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                                     .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
                                     .frame(width: 32, height: 26)
-                                Text("home")
+                                Text("entities")
                                     .font(.system(size: 8, weight: vm.activeTab == .home ? .bold : .medium))
                                     .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
                             }
                             .frame(width: 32, height: 44)
-                        } primaryAction: {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                vm.activeTab = .home
-                            }
-                            tabBounces[.home, default: 0] += 1
                         }
-                        .simultaneousGesture(
-                            LongPressGesture(minimumDuration: 0.4).onEnded { _ in
-                                UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                            }
-                        )
                     }
                     .padding(.trailing, 12)
                 }
@@ -544,23 +540,7 @@ struct CompanyDetailView: View {
             }
             Spacer()
             
-            Menu {
-                Button {
-                    showFinancialReport = true
-                } label: {
-                    Label("Financial Report", systemImage: "dollarsign.circle")
-                }
-                Button {
-                    showSubscriptionReport = true
-                } label: {
-                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
-                }
-            } label: {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
-                    .frame(width: 32, height: 32)
-            }
+            headerActionMenu
         }
         .padding(.vertical, 12)
         .padding(.leading, 12)
@@ -583,28 +563,100 @@ struct CompanyDetailView: View {
     }
 
     @ViewBuilder
-    private var metricSubLine: some View {
-        switch vm.activeTab {
-        case .home:
-            let cashAccounts = institutions.flatMap(\.accounts).filter { ["Checking", "Savings"].contains($0.type) }
-            let totalCash = cashAccounts.reduce(0.0) { $0 + $1.balance }
-
-            HStack(spacing: 6) {
-                Text("HOME")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color(hex: "#C1AA78"))
-                    .tracking(2)
-                if totalCash > 0 {
-                    Text("·").foregroundStyle(Color.white.opacity(0.3))
-                    Text(formatHeaderCurrency(totalCash))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text("cash")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.5))
+    private var headerActionMenu: some View {
+        if vm.activeTab == .home {
+            switch activeInternalTab {
+            case .financial:
+                Menu {
+                    Button {
+                        wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                        showFinancialWizard = true
+                    } label: {
+                        Label("Add Account", systemImage: "building.columns")
+                    }
+                    if !institutions.isEmpty {
+                        Button {
+                            newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                        } label: {
+                            Label("Add Card", systemImage: "creditcard")
+                        }
+                        Button {
+                            newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
+                        } label: {
+                            Label("Add Loan", systemImage: "dollarsign.circle")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(activeInternalTab.color)
+                        .frame(width: 32, height: 32)
+                        .background(activeInternalTab.color.opacity(0.15))
+                        .clipShape(Circle())
+                }
+            case .subscriptions:
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(activeInternalTab.color)
+                        .frame(width: 32, height: 32)
+                        .background(activeInternalTab.color.opacity(0.15))
+                        .clipShape(Circle())
+                }
+            case .documents:
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundStyle(activeInternalTab.color)
+                        .frame(width: 32, height: 32)
+                        .background(activeInternalTab.color.opacity(0.15))
+                        .clipShape(Circle())
                 }
             }
+        } else {
+            Menu {
+                Button {
+                    showFinancialReport = true
+                } label: {
+                    Label("Financial Report", systemImage: "dollarsign.circle")
+                }
+                Button {
+                    showSubscriptionReport = true
+                } label: {
+                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+                }
+            } label: {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                    .frame(width: 32, height: 32)
+            }
+        }
+    }
 
+    @ViewBuilder
+    private var metricSubLine: some View {
+        let effectiveTab: AppViewModel.CompanyTab = {
+            if vm.activeTab == .home {
+                switch activeInternalTab {
+                case .financial: return .financial
+                case .subscriptions: return .subscriptions
+                case .documents: return .documents
+                }
+            } else {
+                return vm.activeTab
+            }
+        }()
+
+        switch effectiveTab {
+        case .home:
+            EmptyView()
         case .subscriptions:
             let active = subscriptions.filter { $0.status == "Active" }
             let moTotal = active.reduce(0.0) { $0 + $1.monthlyTotal }
@@ -640,7 +692,7 @@ struct CompanyDetailView: View {
                 Image(systemName: "folder.fill")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(tabColor(.documents))
-                Text("Document Vault")
+                Text("\(documents.count) Documents")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color(hex: "#C1AA78"))
             }
@@ -800,7 +852,7 @@ struct CompanyDetailView: View {
 
     private func tabLabelText(for tab: AppViewModel.CompanyTab) -> String {
         switch tab {
-        case .home: return "home"
+        case .home: return "entities"
         case .subscriptions: return "subs"
         case .financial: return "finance"
         case .documents: return "docs"

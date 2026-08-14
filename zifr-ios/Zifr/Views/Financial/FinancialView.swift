@@ -6,6 +6,8 @@ struct FinancialView: View {
     let institutions: [Institution]
     let loans: [Loan]
     @Bindable var vm: AppViewModel
+    var hideActionBar: Bool = false
+    
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
 
@@ -32,7 +34,7 @@ struct FinancialView: View {
                     VStack(spacing: 0) {
                         // ── Main Wallet Stack ──
                         VStack(spacing: 0) {
-                            Spacer().frame(height: 70) // Offset for the pinned action bar
+                            Spacer().frame(height: hideActionBar ? 98 : 70) // Offset for tabs or action bar
                             if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()
@@ -295,10 +297,32 @@ struct FinancialView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 120)
             }
-    }
+        }
         .scrollIndicators(.hidden)
+        .mask(
+            Group {
+                if hideActionBar {
+                    Rectangle().fill(Color.black)
+                } else {
+                    VStack(spacing: 0) {
+                        // Completely transparent above top of action bar area (25pt)
+                        Color.clear.frame(height: 25)
+                        
+                        // Fast dissolve gradient across action bar height (from 60pt down to 25pt)
+                        LinearGradient(
+                            colors: [.clear, .black],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: 35)
+                        
+                        // Fully visible list area below action bar
+                        Rectangle().fill(Color.black)
+                    }
+                }
+            }
+        )
         .onChange(of: onboardingState.currentStep) { _, step in
             // Scroll wallet into view for tutorial steps 11-13
             switch step {
@@ -355,8 +379,10 @@ struct FinancialView: View {
             }
         }
             
-            financialActionBar
-                .zIndex(100)
+            if !hideActionBar {
+                financialActionBar
+                    .zIndex(100)
+            }
         }
     }
     

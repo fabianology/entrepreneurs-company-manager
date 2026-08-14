@@ -251,8 +251,8 @@ function AnimatedTabIcon({ pillX, index, icon, color, isActive }: {
   );
 }
 
-const TAB_WIDTH = 180;
-const TAB_COUNT = 3;
+const TAB_WIDTH = 240;
+const TAB_COUNT = 4;
 const SLOT_WIDTH = TAB_WIDTH / TAB_COUNT; // 60px each
 const PILL_WIDTH = 52;
 const PILL_OFFSET = (SLOT_WIDTH - PILL_WIDTH) / 2; // centers pill in slot
@@ -260,6 +260,7 @@ const MIN_X = PILL_OFFSET;
 const MAX_X = TAB_WIDTH - PILL_WIDTH - PILL_OFFSET;
 
 const TAB_CONFIGS = [
+  { name: 'control-center', icon: 'grid' as const, color: '#a855f7' },
   { name: 'subscriptions', icon: 'layers' as const, color: '#60A5FA' },
   { name: 'financials', icon: 'card' as const, color: '#22c55e' },
   { name: 'documents', icon: 'document-text' as const, color: '#FBBF24' },
@@ -480,7 +481,7 @@ export default function TabLayout() {
     setSelectedCompanyId(id);
     setActiveView('company');
     setShowMenu(false);
-    router.push('/subscriptions');
+    router.push('/control-center');
   };
 
   const handleSelectDashboard = () => {
@@ -495,7 +496,7 @@ export default function TabLayout() {
     setActiveView('company');
     setShowSearch(false);
     setSearchQuery('');
-    router.push('/subscriptions');
+    router.push('/control-center');
   };
 
   const handleSelectFinancial = (id: string, companyId: string) => {
@@ -503,7 +504,7 @@ export default function TabLayout() {
     setActiveView('company');
     setShowSearch(false);
     setSearchQuery('');
-    router.push('/financials');
+    router.push('/control-center');
   };
 
   const handleSelectCompanyFromSearch = (id: string) => {
@@ -515,7 +516,7 @@ export default function TabLayout() {
   };
 
   const BOTTOM = insets.bottom + 12;
-  const TABS = ['subscriptions', 'financials', 'documents'];
+  const TABS = ['control-center', 'subscriptions', 'financials', 'documents'];
 
   // Edge-swipe navigation — only fires when gesture begins within 60px of screen edge
   const swipeStartX = useRef(0);
@@ -562,12 +563,12 @@ export default function TabLayout() {
     <GestureDetector gesture={edgeSwipeGesture}>
     <View style={{ flex: 1, backgroundColor: '#000' }}>
       <Tabs
-        sceneContainerStyle={{ backgroundColor: 'transparent' }}
         tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,
         }}>
         <Tabs.Screen name="index" options={{ href: null }} />
+        <Tabs.Screen name="control-center" options={{}} />
         <Tabs.Screen name="subscriptions" options={{}} />
         <Tabs.Screen name="financials" options={{}} />
         <Tabs.Screen name="documents" options={{}} />

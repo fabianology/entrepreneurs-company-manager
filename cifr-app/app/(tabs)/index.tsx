@@ -185,7 +185,7 @@ export default function DashboardScreen() {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                   handleUpdateCompany(company.id, { lastViewed: Date.now() });
                   setSelectedCompanyId(company.id);
-                  router.push('/financials');
+                  router.push('/control-center');
                 }}
                 className="bg-[#1C1C1E] border border-white/5 p-5 rounded-3xl mb-4 overflow-hidden relative"
               >

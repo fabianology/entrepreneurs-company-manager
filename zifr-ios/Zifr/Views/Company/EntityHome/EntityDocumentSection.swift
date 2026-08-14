@@ -20,7 +20,7 @@ struct EntityDocumentSection: View {
     }
     
     private var coveredCategories: Set<String> {
-        Set(documents.map { $0.type })
+        Set(documents.map { CompanyDocument.normalizeType($0.type) })
     }
 
     var body: some View {
@@ -87,59 +87,7 @@ struct EntityDocumentSection: View {
             }
             .buttonStyle(.plain)
 
-            // Category chips — horizontal scroll
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(docCategories, id: \.self) { category in
-                        let docsInCategory = documents.filter { $0.type == category }
-                        let count = docsInCategory.count
-                        let hasDocs = count > 0
-                        
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                selectedCategory = category
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Image(systemName: CompanyDocument.icon(for: category))
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(hasDocs ? docsColor : Color.white.opacity(0.25))
-                                    .frame(width: 24, height: 24)
-                                
-                                Text(categoryShortName(category))
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(hasDocs ? .white : Color.white.opacity(0.35))
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.8)
-                                
-                                Text("\(count)")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(hasDocs ? docsColor : Color.white.opacity(0.2))
-                                +
-                                Text(" doc\(count == 1 ? "" : "s")")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(hasDocs ? 0.5 : 0.2))
-                            }
-                            .padding(8)
-                            .frame(width: 80, height: 90, alignment: .leading)
-                            .background(hasDocs ? Color(hex: "#1C1C1E") : Color(hex: "#1C1C1E").opacity(0.4))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(hasDocs ? docsColor.opacity(0.3) : Color.white.opacity(0.06), lineWidth: 1)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .frame(height: 106)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
-            .background(Color(hex: "#1C1C1E").opacity(0.70))
-            .frame(maxWidth: .infinity)
+
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
@@ -149,7 +97,7 @@ struct EntityDocumentSection: View {
     
     @ViewBuilder
     private func categoryPopup(category: String) -> some View {
-        let docsInCategory = documents.filter { $0.type == category }
+        let docsInCategory = documents.filter { CompanyDocument.normalizeType($0.type) == category }
         ZStack {
             Color.black.opacity(0.6)
                 .ignoresSafeArea()

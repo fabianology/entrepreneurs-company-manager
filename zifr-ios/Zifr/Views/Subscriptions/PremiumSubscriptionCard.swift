@@ -21,6 +21,7 @@ struct PremiumSubscriptionCard: View {
     var revealLevel: CardRevealLevel = .full
     var isExplicitlyFull: Bool = true
     var onExpand: (() -> Void)? = nil
+    var onCollapse: (() -> Void)? = nil
     var onDragChanged: ((DragGesture.Value) -> Void)? = nil
     var onDragEnded: ((DragGesture.Value) -> Void)? = nil
 
@@ -141,6 +142,7 @@ struct PremiumSubscriptionCard: View {
             VStack(spacing: 0) {
                 VStack(spacing: 0) {
                     // Logo + Name + Cost row
+                    HStack(alignment: .center, spacing: 16) {
                         HStack(alignment: .top, spacing: 16) {
                             // Logo
                             if let website = sub.website, !website.isEmpty {
@@ -191,26 +193,46 @@ struct PremiumSubscriptionCard: View {
                             .padding(.top, 8)
                             Spacer(minLength: 0)
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 10)
-                        .padding(.bottom, 10)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if revealLevel == .full && isExplicitlyFull {
-                                onEdit()
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            if isExplicitlyFull {
+                                if let onCollapse = onCollapse {
+                                    onCollapse()
+                                } else {
+                                    onExpand?()
+                                }
                             } else {
                                 onExpand?()
                             }
                         }
-                        .simultaneousGesture(
-                            DragGesture(minimumDistance: 4)
-                                .onChanged { value in
-                                    onDragChanged?(value)
-                                }
-                                .onEnded { value in
-                                    onDragEnded?(value)
-                                }
-                        )
+
+                        if isExplicitlyFull {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onEdit()
+                            } label: {
+                                Image(systemName: "line.3.horizontal")
+                                    .font(.system(size: 24, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.8))
+                                    .frame(width: 40, height: 40)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 10)
+                    .padding(.bottom, 10)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 4)
+                            .onChanged { value in
+                                onDragChanged?(value)
+                            }
+                            .onEnded { value in
+                                onDragEnded?(value)
+                            }
+                    )
 
                         // Status row — Dot + pipes style
                         if revealLevel >= .statusRevealed && !sub.isFree {

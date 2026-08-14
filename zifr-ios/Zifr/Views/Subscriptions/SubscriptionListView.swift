@@ -6,6 +6,7 @@ struct SubscriptionListView: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
+    var hideActionBar: Bool = false
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
 
@@ -39,10 +40,24 @@ struct SubscriptionListView: View {
                             },
                             onSave: { modifiedSub in
                                 vm.saveSub(modifiedSub, appState: appState)
-                            }
+                            },
+                            hideActionBar: hideActionBar
                         )
                     }
                 }
+                .mask(
+                    Group {
+                        if hideActionBar {
+                            Rectangle().fill(Color.black)
+                        } else {
+                            VStack(spacing: 0) {
+                                Color.clear.frame(height: 25)
+                                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 35)
+                                Rectangle().fill(Color.black)
+                            }
+                        }
+                    }
+                )
                 .sheet(item: $editingSub) { sub in
                     EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
                 }
@@ -61,8 +76,10 @@ struct SubscriptionListView: View {
                 }
             }
 
-            subscriptionActionBar
-                .zIndex(100)
+            if !hideActionBar {
+                subscriptionActionBar
+                    .zIndex(100)
+            }
         }
     }
     
@@ -256,6 +273,7 @@ struct StackedSubscriptionDeckView: View {
     let onEdit: (Subscription) -> Void
     let onBankTapped: (UUID) -> Void
     let onSave: (Subscription) -> Void
+    var hideActionBar: Bool = false
     
     @Environment(OnboardingStateManager.self) private var onboardingState
 
@@ -273,7 +291,7 @@ struct StackedSubscriptionDeckView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Spacer().frame(height: 70)
+                Spacer().frame(height: hideActionBar ? 98 : 70)
 
                 ZStack(alignment: .top) {
                     ForEach(Array(subscriptions.enumerated()), id: \.element.id) { index, sub in
@@ -299,6 +317,12 @@ struct StackedSubscriptionDeckView: View {
                             onExpand: {
                                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                                     revealLevels[sub.id] = .full
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                }
+                            },
+                            onCollapse: {
+                                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                                    revealLevels.removeValue(forKey: sub.id)
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 }
                             },

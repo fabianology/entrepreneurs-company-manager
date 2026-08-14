@@ -195,7 +195,25 @@ class DataRepository {
         }
         try await client.from("company_documents").update(doc).eq("id", value: doc.id).execute()
     }
-    func deleteDocument(_ id: UUID) async throws {
+    func deleteDocument(_ id: UUID, fileURL: String? = nil) async throws {
+        // Clean up the associated file before deleting the database record
+        if let fileURL = fileURL, !fileURL.isEmpty {
+            if fileURL.hasPrefix("file://") || fileURL.hasPrefix("/") {
+                // Local file — delete from filesystem
+                let path = fileURL.hasPrefix("file://")
+                    ? URL(string: fileURL)?.path ?? fileURL
+                    : fileURL
+                try? FileManager.default.removeItem(atPath: path)
+            } else if fileURL.contains("/CompanyDocuments/") {
+                // Supabase storage — extract the storage path after "CompanyDocuments/"
+                if let range = fileURL.range(of: "/CompanyDocuments/") {
+                    let storagePath = String(fileURL[range.upperBound...])
+                    try? await client.storage
+                        .from("CompanyDocuments")
+                        .remove(paths: [storagePath])
+                }
+            }
+        }
         try await client.from("company_documents").delete().eq("id", value: id).execute()
     }
     

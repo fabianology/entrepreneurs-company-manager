@@ -188,7 +188,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "building.columns", title: "Banks", count: institutionsCount, color: Color(hex: "#1A7077"))
+                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: Color(hex: "#1A7077"))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapInstitutions?()

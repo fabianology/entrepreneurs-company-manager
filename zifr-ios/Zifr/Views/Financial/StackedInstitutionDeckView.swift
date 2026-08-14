@@ -210,33 +210,35 @@ struct StackedInstitutionDeckView: View {
                 Text(inst.name.isEmpty ? "Bank" : inst.name)
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 
                 // Counts with pipe separators — exact match
-                HStack(spacing: 8) {
-                    HStack(spacing: 4) {
+                HStack(spacing: 6) {
+                    HStack(spacing: 3) {
                         Text("\(inst.accounts.count)").foregroundStyle(.white)
                         Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
                     }
                     .font(.system(size: 12, weight: .medium))
-                    .tracking(0.3)
+                    .fixedSize(horizontal: true, vertical: false)
                     
                     Text("|").font(.system(size: 10)).foregroundStyle(Color.white.opacity(0.2))
                     
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Text("\(instCards.count)").foregroundStyle(.white)
                         Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
                     }
                     .font(.system(size: 12, weight: .medium))
-                    .tracking(0.3)
+                    .fixedSize(horizontal: true, vertical: false)
                     
                     Text("|").font(.system(size: 10)).foregroundStyle(Color.white.opacity(0.2))
                     
-                    HStack(spacing: 4) {
+                    HStack(spacing: 3) {
                         Text("\(instLoans.count)").foregroundStyle(.white)
                         Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
                     }
                     .font(.system(size: 12, weight: .medium))
-                    .tracking(0.3)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
             }
             Spacer(minLength: 0)
@@ -294,6 +296,8 @@ struct StackedInstitutionDeckView: View {
             cardFanOut(instCards: instCards)
         }
         
+        let isExpanded = expandedInstId == inst.id
+
         // Full InstitutionCardView
         InstitutionCardView(
             institution: inst,
@@ -303,40 +307,35 @@ struct StackedInstitutionDeckView: View {
             loans: instLoans,
             vm: vm,
             onEdit: { onEditInst(inst) },
-            onEditLoan: { onEditLoan($0) }
+            onEditLoan: { onEditLoan($0) },
+            isExpanded: isExpanded,
+            onCollapse: {
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                    if isExpanded {
+                        expandedInstId = nil
+                        poppedCardId = nil
+                    } else {
+                        expandedInstId = inst.id
+                        poppedCardId = nil
+                    }
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+            }
         )
         .background(
             GeometryReader { geo in
                 Color.clear.preference(key: InstitutionHeightKey.self, value: [inst.id: geo.size.height])
             }
         )
-        .overlay(alignment: .top) {
-            // Drag overlay over top header area for pull expand/collapse
-            Color.clear
-                .frame(height: collapsedHeight)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    if expandedInstId == inst.id {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        onEditInst(inst)
-                    } else {
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                            expandedInstId = inst.id
-                            poppedCardId = nil
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        }
-                    }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { value in
+                    handleDragChange(value: value, inst: inst)
                 }
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 4)
-                        .onChanged { value in
-                            handleDragChange(value: value, inst: inst)
-                        }
-                        .onEnded { value in
-                            handleDragEnd(value: value, index: index, inst: inst)
-                        }
-                )
-        }
+                .onEnded { value in
+                    handleDragEnd(value: value, index: index, inst: inst)
+                }
+        )
         .zIndex(10)
     }
     

@@ -11,6 +11,8 @@ struct InstitutionCardView: View {
     @Bindable var vm: AppViewModel
     let onEdit: () -> Void
     let onEditLoan: (Loan) -> Void
+    var isExpanded: Bool = true
+    var onCollapse: (() -> Void)? = nil
     @State private var expanded = false
     @State private var copiedField: String? = nil
     @State private var passwordRevealed = false
@@ -29,11 +31,10 @@ struct InstitutionCardView: View {
     }
     var body: some View {
         VStack(spacing: 0) {
-            // ── Tappable header (triggers edit sheet) ──────────────────────
-            Button(action: onEdit) {
-                VStack(spacing: 0) {
-                    HStack(alignment: .center, spacing: 16) {
-                        if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
+            // ── Tappable header ──────────────────────
+            HStack(alignment: .center, spacing: 16) {
+                HStack(alignment: .center, spacing: 16) {
+                    if let loginUrl = institution.loginUrl, !loginUrl.isEmpty {
                             FaviconImage(website: loginUrl, size: 40)
                                 .frame(width: 56, height: 56)
                         } else {
@@ -55,48 +56,73 @@ struct InstitutionCardView: View {
                             Text(institution.name.isEmpty ? "Bank" : institution.name)
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
 
-                            HStack(spacing: 8) {
-                                HStack(spacing: 4) {
+                            HStack(spacing: 6) {
+                                HStack(spacing: 3) {
                                     Text("\(institution.accounts.count)").foregroundStyle(.white)
                                     Text("Accounts").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
                                 .font(.system(size: 12, weight: .medium))
-                                .tracking(0.3)
+                                .fixedSize(horizontal: true, vertical: false)
                                 
                                 statusPipe()
                                 
-                                HStack(spacing: 4) {
+                                HStack(spacing: 3) {
                                     Text("\(cardCount)").foregroundStyle(.white)
                                     Text("Cards").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
                                 .font(.system(size: 12, weight: .medium))
-                                .tracking(0.3)
+                                .fixedSize(horizontal: true, vertical: false)
                                 
                                 statusPipe()
                                 
-                                HStack(spacing: 4) {
+                                HStack(spacing: 3) {
                                     Text("\(loanCount)").foregroundStyle(.white)
                                     Text("Loans").foregroundStyle(Color(hex: "#C1AA78"))
                                 }
                                 .font(.system(size: 12, weight: .medium))
-                                .tracking(0.3)
-                                
+                                .fixedSize(horizontal: true, vertical: false)
                             }
                         }
                         Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .padding(.bottom, 16)
-                    .background(
-                        UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                            .fill(Color.black.opacity(0.70))
-                            .overlay(
-                                UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
-                                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                            )
-                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        if let onCollapse = onCollapse {
+                            onCollapse()
+                        } else {
+                            onEdit()
+                        }
+                    }
+
+                    if isExpanded {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            onEdit()
+                        } label: {
+                            Image(systemName: "line.3.horizontal")
+                                .font(.system(size: 24, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.8))
+                                .frame(width: 40, height: 40)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 16)
+                .background(
+                    UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                        .fill(Color.black.opacity(0.70))
+                        .overlay(
+                            UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
+                                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                )
 
                     // ── Credentials (tap-to-copy) ────
                     VStack(alignment: .leading, spacing: 8) {
@@ -138,10 +164,6 @@ struct InstitutionCardView: View {
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
                     }
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(PremiumButtonStyle())
 
             // ── Accordion ──────────────────────────────────────────────────
             MiloomAccordion(title: expanded ? "Hide Accounts" : "Loans & Accounts", count: institution.accounts.count + loanCount, expanded: expanded, action: {

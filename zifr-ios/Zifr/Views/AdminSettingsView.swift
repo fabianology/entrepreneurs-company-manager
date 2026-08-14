@@ -9,6 +9,7 @@ struct AdminSettingsView: View {
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
+    @AppStorage("aiConsentStatus") private var aiConsentStatus: String = "unset"
     @State private var showingExportAlert: Bool = false
     @State private var showingDeleteAccountSheet: Bool = false
     @State private var showingEditProfile: Bool = false
@@ -222,6 +223,17 @@ struct AdminSettingsView: View {
                             } label: {
                                 SettingsRow(icon: "square.and.arrow.down.fill", title: "Export My Data", value: "")
                             }
+                            
+                            Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
+                            
+                            ToggleRow(
+                                icon: "wand.and.stars", 
+                                title: "AI Document Processing", 
+                                isOn: Binding(
+                                    get: { aiConsentStatus == "yes" },
+                                    set: { aiConsentStatus = $0 ? "yes" : "no" }
+                                )
+                            )
                         }
                         .masonryGlass(cornerRadius: 24)
                         .padding(.horizontal, 20)

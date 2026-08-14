@@ -1,32 +1,23 @@
 import Foundation
 
-// MARK: - Gemini REST API Service
+// MARK: - Gemini REST API Service (via Edge Function Proxy)
 actor GeminiService {
     static let shared = GeminiService()
 
-    private var apiKey: String {
-        let p1 = "AIzaSyD0iR_"
-        let p2 = "VrrD9rAqHXI"
-        let p3 = "zutnZA-bYW6"
-        let p4 = "Z7FMaE"
-        let fallback = p1 + p2 + p3 + p4
-        
-        let bundleKey = Bundle.main.object(forInfoDictionaryKey: "GeminiAPIKey") as? String ?? ""
-        if !bundleKey.isEmpty && !bundleKey.contains("$(") {
-            return bundleKey
+    // MARK: - Generic Generate (via Supabase Edge Function)
+    private func generate(model: String = "gemini-2.0-flash", prompt: String) async throws -> String {
+        guard let session = try? await SupabaseService.shared.client.auth.session else {
+            throw NSError(domain: "GeminiService", code: 401, userInfo: [NSLocalizedDescriptionKey: "Not authenticated"])
         }
-        return fallback
-    }
-
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models"
-
-    // MARK: - Generic Generate
-    private func generate(model: String = "gemini-flash-latest", prompt: String) async throws -> String {
-        let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)")!
-        var request = URLRequest(url: url)
+        
+        let proxyURL = URL(string: "\(SupabaseService.shared.urlString)/functions/v1/gemini-rest-proxy")!
+        var request = URLRequest(url: proxyURL)
         request.httpMethod = "POST"
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
         let body: [String: Any] = [
+            "model": model,
             "contents": [["parts": [["text": prompt]]]],
             "generationConfig": ["temperature": 0.8]
         ]

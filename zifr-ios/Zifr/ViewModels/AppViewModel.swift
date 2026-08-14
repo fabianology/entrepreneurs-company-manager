@@ -270,7 +270,7 @@ final class AppViewModel {
         let original = appState.documents
         appState.documents.removeAll { $0.id == doc.id }
         Task {
-            do { try await DataRepository.shared.deleteDocument(doc.id) }
+            do { try await DataRepository.shared.deleteDocument(doc.id, fileURL: doc.url) }
             catch { await MainActor.run { appState.documents = original; appState.error = "Failed to delete document." } }
         }
     }

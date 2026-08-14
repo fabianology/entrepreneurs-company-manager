@@ -29,6 +29,8 @@ struct EntityHomeView: View {
     @State private var expandedSubscriptions: Set<String> = []
     @State private var expandedCategories: Set<String> = []
     
+    @Binding var activeInternalTab: EntityHomeTab
+    
     // Quick Add States
     @State private var newSub: Subscription? = nil
     @State private var newCard: FinancialCard? = nil
@@ -59,134 +61,70 @@ struct EntityHomeView: View {
 
     // MARK: - Body
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollViewReader { scrollProxy in
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        quickAddRow
-                            .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterQuickAdd)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 2)
-                            .padding(.bottom, 4)
-                            .id("quickAddRow")
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear.preference(
-                                        key: TutorialFrameKey.self,
-                                        value: ["quickAdd": geo.frame(in: .global)]
-                                    )
-                                }
-                            )
-                        
-                        // FINANCIAL ACCORDION
-                        EntityFinancialSection(
-                            company: company,
-                            institutions: institutions,
-                            cards: cards,
-                            loans: loans,
-                            subscriptions: subscriptions,
-                            vm: vm,
-                            expandedInstitutions: $expandedInstitutions,
-                            expandedAccounts: $expandedAccounts,
-                            editingCard: $editingCard,
-                            editingInst: $editingInst,
-                            editingLoan: $editingLoan,
-                            viewingTransactionsFor: $viewingTransactionsFor,
-                            totalDebt: model.totalDebt,
-                            totalCreditLimit: model.totalCreditLimit,
-                            availableCredit: model.availableCredit
-                        )
-                        .id("financialSection")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: TutorialFrameKey.self,
-                                    value: ["financials": geo.frame(in: .global)]
-                                )
-                            }
-                        )
-                        
-                        // SUBSCRIPTIONS (Timeline + Cards)
-                        EntitySubscriptionSection(
-                            company: company,
-                            activeSubscriptions: model.activeSubscriptions,
-                            subscriptions: subscriptions,
-                            institutions: institutions,
-                            cards: cards,
-                            monthlyBurn: model.monthlyBurn,
-                            vm: vm,
-                            flippedHeroIndex: $flippedHeroIndex,
-                            coverFlowSnappedIndex: $coverFlowSnappedIndex,
-                            flipAnimation: flipAnimation
-                        )
-                        .id("subscriptionSection")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: TutorialFrameKey.self,
-                                    value: ["subscriptions": geo.frame(in: .global)]
-                                )
-                            }
-                        )
-
-                        // DOCUMENTS ACCORDION
-                        EntityDocumentSection(
-                            company: company,
-                            documents: documents,
-                            vm: vm,
-                            expandedCategories: $expandedCategories,
-                            newDoc: $newDoc,
-                            editingDoc: $editingDoc,
-                            selectedCategory: $selectedDocCategory
-                        )
-                        .id("documentSection")
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: TutorialFrameKey.self,
-                                    value: ["documents": geo.frame(in: .global)]
-                                )
-                            }
-                        )
-                        
-                        Spacer().frame(height: 16)
-                    }
-                }
-                .onChange(of: onboardingState.currentStep) { _, newStep in
-                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                        switch newStep {
-                        // Real onboarding scroll targets
-                        case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .top)
-                        case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .top)
-                        case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
-                        case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .top)
-                        // Tutorial scroll targets — scroll section header to top so frame capture is correct
-                        case .tutorialCommandQuickAdd:       scrollProxy.scrollTo("quickAddRow", anchor: .top)
-                        case .tutorialCommandFinancials:     scrollProxy.scrollTo("financialSection", anchor: .top)
-                        case .tutorialCommandSubscriptions:  scrollProxy.scrollTo("subscriptionSection", anchor: .top)
-                        case .tutorialCommandDocuments:      scrollProxy.scrollTo("documentSection", anchor: .top)
-                        default: break
-                        }
-                    }
-                }
-                .onAppear {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                            switch onboardingState.currentStep {
-                            case .needsCommandCenterQuickAdd: scrollProxy.scrollTo("quickAddRow", anchor: .top)
-                            case .needsCommandCenterFinancialsHeader, .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport: scrollProxy.scrollTo("financialSection", anchor: .top)
-                            case .needsCommandCenterSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
-                            case .needsCommandCenterDocuments: scrollProxy.scrollTo("documentSection", anchor: .top)
-                            case .tutorialCommandQuickAdd:    scrollProxy.scrollTo("quickAddRow", anchor: .top)
-                            case .tutorialCommandFinancials:  scrollProxy.scrollTo("financialSection", anchor: .top)
-                            case .tutorialCommandSubscriptions: scrollProxy.scrollTo("subscriptionSection", anchor: .top)
-                            case .tutorialCommandDocuments:   scrollProxy.scrollTo("documentSection", anchor: .top)
-                            default: break
-                            }
-                        }
-                    }
+        ZStack(alignment: .top) {
+            // ACTIVE TAB CONTENT (scrolls behind tabs)
+            Group {
+                switch activeInternalTab {
+                case .financial:
+                    FinancialView(
+                        company: company,
+                        cards: cards,
+                        institutions: institutions,
+                        loans: loans,
+                        vm: vm,
+                        hideActionBar: true
+                    )
+                    .id("financialSection")
+                    
+                case .subscriptions:
+                    SubscriptionListView(
+                        company: company,
+                        subscriptions: subscriptions,
+                        institutions: institutions,
+                        cards: cards,
+                        vm: vm,
+                        hideActionBar: true
+                    )
+                    .id("subscriptionSection")
+                    
+                case .documents:
+                    DocumentListView(
+                        company: company,
+                        documents: documents,
+                        vm: vm,
+                        hideActionBar: true
+                    )
+                    .id("documentSection")
                 }
             }
+            .mask(
+                VStack(spacing: 0) {
+                    // Dissolve zone: cards fade out behind tabs
+                    // Tab selector is ~88pt (8 top + 70 height + 10 bottom)
+                    Color.clear.frame(height: 58)
+                    LinearGradient(
+                        colors: [.clear, .black],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 30)
+                    // Fully visible below
+                    Rectangle().fill(Color.black)
+                }
+            )
+            
+            // TAB SELECTOR (floating on top)
+            ControlCenterTabSelector(
+                activeTab: $activeInternalTab,
+                institutions: institutions,
+                loans: loans,
+                subscriptions: subscriptions,
+                activeSubscriptions: model.activeSubscriptions,
+                documents: documents,
+                totalDebt: model.totalDebt
+            )
+            .padding(.top, 8)
+            .padding(.bottom, 10)
         }
         .background(Color.clear)
         .sheet(item: $newSub) { sub in
