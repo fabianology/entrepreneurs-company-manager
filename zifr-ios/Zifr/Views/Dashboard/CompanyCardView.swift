@@ -7,6 +7,7 @@ struct CompanyCardView: View {
     let subscriptionsCount: Int
     let docsCount: Int
     let onEdit: () -> Void
+    var onShare: (() -> Void)? = nil
     var shareRole: String? = nil
     var isSharedWithMe: Bool = false
     var isSharedByMe: Bool = false
@@ -24,6 +25,7 @@ struct CompanyCardView: View {
         subscriptionsCount: Int, 
         docsCount: Int, 
         onEdit: @escaping () -> Void, 
+        onShare: (() -> Void)? = nil,
         shareRole: String? = nil, 
         isSharedWithMe: Bool = false, 
         isSharedByMe: Bool = false, 
@@ -38,6 +40,7 @@ struct CompanyCardView: View {
         self.subscriptionsCount = subscriptionsCount
         self.docsCount = docsCount
         self.onEdit = onEdit
+        self.onShare = onShare
         self.shareRole = shareRole
         self.isSharedWithMe = isSharedWithMe
         self.isSharedByMe = isSharedByMe
@@ -49,17 +52,7 @@ struct CompanyCardView: View {
     }
 
     private var resolvedBrandColor: Color {
-        let hex = company.colorHex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if hex == "#000000" || hex == "#000" || hex == "" {
-            // Stable integer hash from the UUID string to guarantee consistency across app launches
-            let uuidString = company.id.uuidString
-            let charSum = uuidString.utf8.reduce(0) { $0 + Int($1) }
-            // Vibrant modern color options: Indigo, Emerald, Amber, Scarlet, Teal, Violet, Blue, Pink
-            let fallbackColors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#14b8a6", "#8b5cf6", "#3b82f6", "#ec4899"]
-            let chosen = fallbackColors[charSum % fallbackColors.count]
-            return Color(hex: chosen)
-        }
-        return Color(hex: company.colorHex)
+        company.brandColor
     }
 
     var body: some View {
@@ -115,15 +108,29 @@ struct CompanyCardView: View {
                     onTapMain?()
                 }
                 
-                Image(systemName: "pencil")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.7))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        onEdit()
+                HStack(spacing: 2) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.7))
+                        .frame(width: 36, height: 44)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onEdit()
+                        }
+
+                    if let onShare = onShare {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                            .frame(width: 36, height: 44)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                onShare()
+                            }
                     }
+                }
             }
             .frame(minHeight: 58)
             .padding(.horizontal, 16)

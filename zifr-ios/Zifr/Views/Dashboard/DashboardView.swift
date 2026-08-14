@@ -52,84 +52,80 @@ struct DashboardView: View {
                 AnimatedHeaderBackground()
                     .ignoresSafeArea(edges: .top)
 
-                List {
-                // Header Group
                 VStack(spacing: 0) {
+                    // Sticky Header (Miloom Logo & Quote)
                     headerSection
-                        .padding(.top, 8)
-                        .padding(.bottom, 40)
+                        .padding(.top, 12)
+                        .padding(.bottom, 28)
 
-                    if let firstCompany = appState.companies.first, SandboxSeeder.isSandbox(companyId: firstCompany.id) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "lightbulb.fill")
-                                .font(.system(size: 16))
-                                .foregroundStyle(Color(hex: "#5AC8FA"))
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Demo Mode Active")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Text("Explore features or set up your real business.")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.white.opacity(0.6))
-                            }
-                            
-                            Spacer()
-                            
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                showAddCompany = true
-                            } label: {
-                                Text("Set Up")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [Color(hex: "#5AC8FA"), Color(hex: "#0A84FF")],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
+                    List {
+                        if let firstCompany = appState.companies.first, SandboxSeeder.isSandbox(companyId: firstCompany.id) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "lightbulb.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(Color(hex: "#5AC8FA"))
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Demo Mode Active")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    Text("Explore features or set up your real business.")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.white.opacity(0.6))
+                                }
+                                
+                                Spacer()
+                                
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    showAddCompany = true
+                                } label: {
+                                    Text("Set Up")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color(hex: "#5AC8FA"), Color(hex: "#0A84FF")],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
                                         )
-                                    )
-                                    .clipShape(Capsule())
+                                        .clipShape(Capsule())
+                                }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#1C1C1E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#5AC8FA").opacity(0.3), lineWidth: 1))
+                            .padding(.bottom, 16)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(hex: "#1C1C1E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#5AC8FA").opacity(0.3), lineWidth: 1))
-                        .padding(.bottom, 20)
-                    }
-
-                    dashboardHeader
-                        .premiumDarkBar(cornerRadius: 12)
-                        .padding(.bottom, 16)
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 0, trailing: 20))
 
                 ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
                     let row = companyCardRow(for: company)
                     let withFrame = row.background(tutorialFrameCapture(index: index))
-                    withFrame
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
-                        .swipeActions(edge: .leading) {
-                            Button { editingCompany = company } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            .tint(Color.indigo)
+                    SwipeableCompanyCardView(
+                        company: company,
+                        onEdit: { editingCompany = company },
+                        onShare: { companyToShare = company },
+                        onDelete: { companyToDelete = company }
+                    ) {
+                        withFrame
+                    }
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) { companyToDelete = company } label: {
+                            Image(systemName: "trash")
                         }
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                            Button(role: .destructive) { companyToDelete = company } label: {
-                                Image(systemName: "trash")
-                            }
-                            .tint(.red)
-                        }
+                        .tint(.red)
+                    }
                 }
 
                 // Add company button / tutorial demo card
@@ -376,6 +372,7 @@ struct DashboardView: View {
                     break
                 }
             }
+            }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 10) {
                     Button {
@@ -383,13 +380,30 @@ struct DashboardView: View {
                         generator.impactOccurred()
                         vm.path.append(AppViewModel.AppRoute.adminSettings)
                     } label: {
-                        Image(systemName: "person.crop.circle")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, height: 44)
-                            .background(Color(hex: "#1C1C1E"))
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                        ZStack {
+                            Circle()
+                                .fill(Color.black.opacity(0.70))
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(hex: "#3A2D6E"),
+                                                    Color(hex: "#16161E").opacity(0.2)
+                                                ],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                )
+                                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                            Image(systemName: "person.crop.circle")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.85))
+                        }
+                        .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
 
@@ -397,20 +411,36 @@ struct DashboardView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         vm.showSearch = true
                     } label: {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 8) {
                             Image(systemName: "magnifyingglass")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            Text("Search")
-                                .font(.system(size: 15))
-                                .foregroundStyle(.secondary)
-                            Spacer()
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.85))
+                            Text("search")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                            Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 16)
                         .frame(height: 44)
-                        .background(Color(hex: "#1C1C1E"))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 0.5))
+                        .background(
+                            Capsule()
+                                .fill(Color.black.opacity(0.70))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: "#3A2D6E"),
+                                            Color(hex: "#252528")
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
                     }
                     .buttonStyle(.plain)
                     .background(
@@ -428,38 +458,51 @@ struct DashboardView: View {
                     )
                     
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         showAssistant = true
                     } label: {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [Color(hex: "#5AC8FA"), Color(hex: "#0A84FF")]),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                        ZStack {
+                            Circle()
+                                .fill(Color.black.opacity(0.70))
+                                .overlay(
+                                    Circle()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(hex: "#3A2D6E"),
+                                                    Color(hex: "#16161E").opacity(0.2)
+                                                ],
+                                                startPoint: .top,
+                                                endPoint: .bottom
+                                            ),
+                                            lineWidth: 1.5
+                                        )
                                 )
-                            )
-                            .clipShape(Circle())
-                            .shadow(color: Color(hex: "#0A84FF").opacity(0.6), radius: 8, x: 0, y: 0)
+                                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                            Image(systemName: "apple.intelligence")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.85))
+                        }
+                        .frame(width: 44, height: 44)
                     }
                     .buttonStyle(.plain)
-                    .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
-                    .background(
-                        Group {
-                            if onboardingState.isTutorialActive {
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        tutorialAssistantFrame = geo.frame(in: .global)
-                                    }.onChange(of: geo.frame(in: .global)) { _, f in
-                                        tutorialAssistantFrame = f
+
+                    plusCommandMenu
+                        .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
+                        .background(
+                            Group {
+                                if onboardingState.isTutorialActive {
+                                    GeometryReader { geo in
+                                        Color.clear.onAppear {
+                                            tutorialAssistantFrame = geo.frame(in: .global)
+                                        }.onChange(of: geo.frame(in: .global)) { _, f in
+                                            tutorialAssistantFrame = f
+                                        }
                                     }
                                 }
                             }
-                        }
-                    )
+                        )
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -573,74 +616,48 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private var dashboardHeader: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 6) {
-                Image(systemName: "square.grid.2x2.fill")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color(hex: "#A2A2A2"))
-                Text("Dashboard")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color(hex: "#A2A2A2"))
-            }
-            .padding(.leading, 16)
-            .allowsHitTesting(false)
-
-            Spacer()
-
-            // Share Button
-            shareMenu
-
-            Rectangle()
-                .fill(Color.white.opacity(0.08))
-                .frame(width: 1, height: 20)
-
-            // Add Button
-            addButton
-        }
-    }
-
-    @ViewBuilder
-    private var shareMenu: some View {
+    private var plusCommandMenu: some View {
         Menu {
-            ForEach(companies) { company in
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    companyToShare = company
-                } label: {
-                    if company.name.isEmpty {
-                        Label("Share Business", systemImage: "person.crop.circle.badge.plus")
-                    } else {
-                        Label("Share \(company.name)", systemImage: "person.crop.circle.badge.plus")
+            if !companies.isEmpty {
+                Section("Share Entity") {
+                    ForEach(companies) { company in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            companyToShare = company
+                        } label: {
+                            Label(company.name.isEmpty ? "New Business" : company.name, systemImage: "square.and.arrow.up")
+                        }
                     }
                 }
             }
         } label: {
-            Image(systemName: "square.and.arrow.up")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color(hex: "#A2A2A2"))
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.70))
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#3A2D6E"),
+                                        Color(hex: "#16161E").opacity(0.2)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
 
-    @ViewBuilder
-    private var addButton: some View {
-        Button {
-            showAddCompany = true
-        } label: {
-            HStack(spacing: 6) {
-                Text("ADD BUSINESS")
-                    .font(.system(size: 13, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(.white)
                 Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
             }
-            .frame(width: 164, height: 44)
-            .contentShape(Rectangle())
+            .frame(width: 44, height: 44)
+        } primaryAction: {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            showAddCompany = true
         }
         .buttonStyle(.plain)
     }
@@ -710,7 +727,7 @@ struct DashboardView: View {
     }
 
     private var headerSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             if let uiImage = UIImage(named: "logo.png") {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -779,6 +796,7 @@ struct DashboardView: View {
             subscriptionsCount: sCount,
             docsCount: dCount,
             onEdit: { editingCompany = company },
+            onShare: { companyToShare = company },
             shareRole: role,
             isSharedWithMe: isSharedWithMe,
             isSharedByMe: isSharedByMe,
@@ -1058,6 +1076,245 @@ struct MiloomFolderView: View {
         case "Loan": return "dollarsign.circle"
         case "Document": return "doc.text"
         default: return "doc"
+        }
+    }
+}
+
+// MARK: - Swipeable Company Card Component
+
+struct SwipeableCompanyCardView<Content: View>: View {
+    let company: Company
+    let onEdit: () -> Void
+    let onShare: () -> Void
+    let onDelete: () -> Void
+    let content: Content
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var revealedState: RevealState = .none
+
+    enum RevealState {
+        case none
+        case leftActions
+        case rightAction
+    }
+
+    private let leftRevealWidth: CGFloat = 72
+    private let rightRevealWidth: CGFloat = -72
+
+    init(
+        company: Company,
+        onEdit: @escaping () -> Void,
+        onShare: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.company = company
+        self.onEdit = onEdit
+        self.onShare = onShare
+        self.onDelete = onDelete
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            // Edit & Share Action Buttons revealed on sliding right (left side)
+            if dragOffset > 0 || revealedState == .leftActions {
+                HStack {
+                    VStack(spacing: 12) {
+                        // Edit button (top)
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                dragOffset = 0
+                                revealedState = .none
+                            }
+                            onEdit()
+                        } label: {
+                            VStack(spacing: 4) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.70))
+                                        .overlay(
+                                            Circle()
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            company.brandColor.opacity(0.95),
+                                                            company.brandColor.opacity(0.35)
+                                                        ],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 1.5
+                                                )
+                                        )
+                                        .shadow(color: company.brandColor.opacity(0.30), radius: 6, x: 0, y: 2)
+
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.9))
+                                }
+                                .frame(width: 44, height: 44)
+
+                                Text("Edit")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        // Share button (below edit icon)
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                dragOffset = 0
+                                revealedState = .none
+                            }
+                            onShare()
+                        } label: {
+                            VStack(spacing: 4) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(0.70))
+                                        .overlay(
+                                            Circle()
+                                                .stroke(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            company.brandColor.opacity(0.95),
+                                                            company.brandColor.opacity(0.35)
+                                                        ],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    ),
+                                                    lineWidth: 1.5
+                                                )
+                                        )
+                                        .shadow(color: company.brandColor.opacity(0.30), radius: 6, x: 0, y: 2)
+
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.9))
+                                }
+                                .frame(width: 44, height: 44)
+
+                                Text("Share")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.7))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.leading, 6)
+                    .opacity(min(1.0, Double(max(0, dragOffset) / 40.0)))
+
+                    Spacer()
+                }
+            }
+
+            // Delete Action Button revealed on sliding left (right side)
+            if dragOffset < 0 || revealedState == .rightAction {
+                HStack {
+                    Spacer()
+
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            dragOffset = 0
+                            revealedState = .none
+                        }
+                        onDelete()
+                    } label: {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.70))
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color.red.opacity(0.95),
+                                                        Color.red.opacity(0.35)
+                                                    ],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: Color.red.opacity(0.30), radius: 6, x: 0, y: 2)
+
+                                Image(systemName: "trash")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(Color.red.opacity(0.9))
+                            }
+                            .frame(width: 44, height: 44)
+
+                            Text("Delete")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.red.opacity(0.8))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 6)
+                    .opacity(min(1.0, Double(abs(min(0, dragOffset)) / 40.0)))
+                }
+            }
+
+            // Company card content
+            content
+                .offset(x: dragOffset)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 15)
+                        .onChanged { value in
+                            let translation = value.translation.width
+                            if revealedState == .none {
+                                if translation > 0 {
+                                    dragOffset = min(leftRevealWidth + 15, translation)
+                                } else {
+                                    dragOffset = max(rightRevealWidth - 15, translation)
+                                }
+                            } else if revealedState == .leftActions {
+                                dragOffset = max(0, min(leftRevealWidth + 15, leftRevealWidth + translation))
+                            } else if revealedState == .rightAction {
+                                dragOffset = min(0, max(rightRevealWidth - 15, rightRevealWidth + translation))
+                            }
+                        }
+                        .onEnded { value in
+                            let translation = value.translation.width
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if revealedState == .none {
+                                    if translation > 30 {
+                                        dragOffset = leftRevealWidth
+                                        revealedState = .leftActions
+                                    } else if translation < -30 {
+                                        dragOffset = rightRevealWidth
+                                        revealedState = .rightAction
+                                    } else {
+                                        dragOffset = 0
+                                        revealedState = .none
+                                    }
+                                } else if revealedState == .leftActions {
+                                    if translation < -20 {
+                                        dragOffset = 0
+                                        revealedState = .none
+                                    } else {
+                                        dragOffset = leftRevealWidth
+                                        revealedState = .leftActions
+                                    }
+                                } else if revealedState == .rightAction {
+                                    if translation > 20 {
+                                        dragOffset = 0
+                                        revealedState = .none
+                                    } else {
+                                        dragOffset = rightRevealWidth
+                                        revealedState = .rightAction
+                                    }
+                                }
+                            }
+                        }
+                )
         }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 struct Company: Identifiable, Codable, Hashable {
     var id: UUID
@@ -11,6 +12,18 @@ struct Company: Identifiable, Codable, Hashable {
     var website: String?
     var lastModified: Date
     var lastViewed: Date
+
+    var brandColor: Color {
+        let hex = colorHex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if hex == "#000000" || hex == "#000" || hex == "" {
+            let uuidString = id.uuidString
+            let charSum = uuidString.utf8.reduce(0) { $0 + Int($1) }
+            let fallbackColors = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#14b8a6", "#8b5cf6", "#3b82f6", "#ec4899"]
+            let chosen = fallbackColors[charSum % fallbackColors.count]
+            return Color(hex: chosen)
+        }
+        return Color(hex: colorHex)
+    }
 
     enum CodingKeys: String, CodingKey {
         case id

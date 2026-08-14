@@ -244,192 +244,68 @@ struct CompanyDetailView: View {
         }
         // Popover moved to the button
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 0) {
-                Divider().background(Color.white.opacity(0.1))
-                HStack {
-                    HStack(spacing: 20) { // Grouping left utilities
-                        // Menu Button
-                        Menu {
-                            ControlGroup {
-                                Button {
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
-                                    vm.path.append(AppViewModel.AppRoute.adminSettings)
-                                } label: {
-                                    Label("Admin", systemImage: "person.crop.circle")
-                                }
-                                Button {
-                                    let generator = UIImpactFeedbackGenerator(style: .heavy)
-                                    generator.impactOccurred()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { generator.impactOccurred() }
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { generator.impactOccurred() }
-                                    
-                                    dismiss()
-                                } label: {
-                                    Label("Dashboard", systemImage: "square.grid.2x2")
-                                }
-                            }
-                            
-                        } label: {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(.secondary)
-                                .frame(width: 32, height: 44) // slightly narrower footprint
-                        }
+            HStack(spacing: 10) {
+                // 1. Profile / Admin Button (far left)
+                profileControlButton
 
-                        // Search Button
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            vm.showSearch = true
-                            searchBounce += 1
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(vm.showSearch ? .primary : .secondary)
-                                .symbolEffect(.bounce, value: searchBounce)
-                                .frame(width: 32, height: 44)
-                        }
-
-                        // Assistant Button
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showAssistant = true
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "sparkles")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                Text("Assistant")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(height: 34)
-                            .background(Color.black)
-                            .clipShape(Capsule())
-                            .overlay(
-                                Capsule().stroke(
-                                    AngularGradient(
-                                        gradient: Gradient(stops: [
-                                            .init(color: Color.gray.opacity(0.8), location: 0.0),
-                                            .init(color: Color.black, location: 0.25),
-                                            .init(color: Color(hex: "#9333EA"), location: 0.5),
-                                            .init(color: Color.black, location: 0.75),
-                                            .init(color: Color.gray.opacity(0.8), location: 1.0)
-                                        ]),
-                                        center: .center,
-                                        angle: .degrees(assistantStrokeRotation)
-                                    ),
-                                    lineWidth: 0.8
-                                )
-                            )
-                            .onAppear {
-                                withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
-                                    assistantStrokeRotation = 360.0
-                                }
-                            }
-                        }
+                // 2. Search Button (center pill)
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    vm.showSearch = true
+                    searchBounce += 1
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(Color.white.opacity(0.85))
+                        Text("search")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                        Spacer(minLength: 0)
                     }
-
-                    Spacer()
-
-                    // Tab Controls (Pages icons) aligned to the right
-                    HStack(spacing: 28) { // Distributed equally
-                        if vm.activeTab != .home {
-                            let pageTabs: [AppViewModel.CompanyTab] = [.subscriptions, .financial, .documents]
-                            let activeIndex = pageTabs.firstIndex(of: vm.activeTab) ?? 0
-                            
-                            ZStack {
-                                ForEach(Array(pageTabs.enumerated()), id: \.element) { index, tab in
-                                    let offsetIndex = (index - activeIndex + 3) % 3
-                                    let isFront = offsetIndex == 0
-                                    let scale: CGFloat = isFront ? 1.0 : 0.8
-                                    let xOffset: CGFloat = isFront ? 0 : (offsetIndex == 1 ? 14 : -14)
-                                    let opacity: Double = isFront ? 1.0 : 0.4
-                                    let zIdx: Double = isFront ? 3 : 2
-                                    tabIconView(tab: tab, isFront: isFront, scale: scale, xOffset: xOffset, opacity: opacity, layerZIndex: zIdx)
-                                }
-                            }
-                            .frame(width: 32, height: 44)
-                            .transition(.scale.combined(with: .opacity))
-                            .highPriorityGesture(
-                                DragGesture(minimumDistance: 10, coordinateSpace: .local)
-                                    .onEnded { value in
-                                        let transX = value.translation.width
-                                        if abs(transX) > 10 {
-                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                            var nextTab = vm.activeTab
-                                            if transX < 0 {
-                                                if vm.activeTab == .subscriptions { nextTab = .financial }
-                                                else if vm.activeTab == .financial { nextTab = .documents }
-                                                else if vm.activeTab == .documents { nextTab = .subscriptions }
-                                            } else {
-                                                if vm.activeTab == .subscriptions { nextTab = .documents }
-                                                else if vm.activeTab == .financial { nextTab = .subscriptions }
-                                                else if vm.activeTab == .documents { nextTab = .financial }
-                                            }
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                vm.activeTab = nextTab
-                                            }
-                                            tabBounces[nextTab, default: 0] += 1
-                                        }
-                                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 44)
+                    .background(
+                        Capsule()
+                            .fill(Color.black.opacity(0.70))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#3A2D6E"),
+                                        Color(hex: "#252528")
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
                             )
-                        }
-                        
-                        Menu {
-                            if !allCompanies.isEmpty {
-                                Section("Jump to Entity") {
-                                    ForEach(allCompanies) { c in
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            company = c
-                                            vm.touchCompany(c, appState: appState)
-                                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                                vm.activeTab = .home
-                                            }
-                                            tabBounces[.home, default: 0] += 1
-                                        } label: {
-                                            if c.id == company.id {
-                                                Label(c.name, systemImage: "checkmark")
-                                            } else {
-                                                Text(c.name)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            VStack(spacing: 1) {
-                                Image(systemName: AppViewModel.CompanyTab.home.icon)
-                                    .font(.system(size: 20, weight: vm.activeTab == .home ? .semibold : .medium))
-                                    .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
-                                    .symbolEffect(.bounce, value: tabBounces[.home, default: 0])
-                                    .frame(width: 32, height: 26)
-                                Text("entities")
-                                    .font(.system(size: 8, weight: vm.activeTab == .home ? .bold : .medium))
-                                    .foregroundStyle(vm.activeTab == .home ? .white : .secondary)
-                            }
-                            .frame(width: 32, height: 44)
-                        }
-                    }
-                    .padding(.trailing, 12)
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
                 }
-                .padding(.horizontal, 20)
-                .frame(height: 49) // Standard HIG TabBar Height
-                .background(
-                    Group {
-                        if onboardingState.isInFinancialTutorial || onboardingState.isInCommandCenterTutorial {
-                            GeometryReader { geo in
-                                Color.clear
-                                    .onAppear { tutFrameTabBar = geo.frame(in: .global) }
-                                    .onChange(of: geo.frame(in: .global)) { _, f in tutFrameTabBar = f }
-                            }
+                .buttonStyle(.plain)
+
+                // 3. Entities Button (instead of Apple Intelligence)
+                entitiesControlMenu
+
+                // 4. Plus Button (far right quick add menu)
+                plusControlMenu
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+            .background(
+                Group {
+                    if onboardingState.isInFinancialTutorial || onboardingState.isInCommandCenterTutorial {
+                        GeometryReader { geo in
+                            Color.clear
+                                .onAppear { tutFrameTabBar = geo.frame(in: .global) }
+                                .onChange(of: geo.frame(in: .global)) { _, f in tutFrameTabBar = f }
                         }
                     }
-                )
-            }
-            .background(Color.black)
+                }
+            )
         }
         // ── Tutorial spotlight overlay — placed AFTER safeAreaInset so it draws above the tab bar ──
         .overlay {
@@ -637,6 +513,186 @@ struct CompanyDetailView: View {
                     .foregroundStyle(Color.white.opacity(0.5))
                     .frame(width: 32, height: 32)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var profileControlButton: some View {
+        Button {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            vm.path.append(AppViewModel.AppRoute.adminSettings)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.70))
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#3A2D6E"),
+                                        Color(hex: "#16161E").opacity(0.2)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var entitiesControlMenu: some View {
+        Menu {
+            if !allCompanies.isEmpty {
+                Section("Jump to Entity") {
+                    ForEach(allCompanies) { c in
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            company = c
+                            vm.touchCompany(c, appState: appState)
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                vm.activeTab = .home
+                            }
+                        } label: {
+                            if c.id == company.id {
+                                Label(c.name, systemImage: "checkmark")
+                            } else {
+                                Text(c.name)
+                            }
+                        }
+                    }
+                }
+            }
+            Button {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                dismiss()
+            } label: {
+                Label("All Entities", systemImage: "square.grid.2x2")
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.70))
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#3A2D6E"),
+                                        Color(hex: "#16161E").opacity(0.2)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                Image(systemName: "circle.grid.3x3.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var currentTabContext: AppViewModel.CompanyTab {
+        if vm.activeTab == .home {
+            switch activeInternalTab {
+            case .financial: return .financial
+            case .subscriptions: return .subscriptions
+            case .documents: return .documents
+            }
+        } else {
+            return vm.activeTab
+        }
+    }
+
+    private var plusButtonLabel: some View {
+        ZStack {
+            Circle()
+                .fill(Color.black.opacity(0.70))
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#3A2D6E"),
+                                    Color(hex: "#16161E").opacity(0.2)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    @ViewBuilder
+    private var plusControlMenu: some View {
+        switch currentTabContext {
+        case .financial, .home:
+            Menu {
+                Button {
+                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                    showFinancialWizard = true
+                } label: {
+                    Label("Add Account", systemImage: "building.columns")
+                }
+                if !institutions.isEmpty {
+                    Button {
+                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Card", systemImage: "creditcard")
+                    }
+                    Button {
+                        newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Loan", systemImage: "dollarsign.circle")
+                    }
+                }
+            } label: {
+                plusButtonLabel
+            }
+            .buttonStyle(.plain)
+
+        case .subscriptions:
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                newSub = Subscription(userId: company.userId, companyId: company.id)
+            } label: {
+                plusButtonLabel
+            }
+            .buttonStyle(.plain)
+
+        case .documents:
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                newDoc = CompanyDocument(userId: company.userId, companyId: company.id)
+            } label: {
+                plusButtonLabel
+            }
+            .buttonStyle(.plain)
         }
     }
 
