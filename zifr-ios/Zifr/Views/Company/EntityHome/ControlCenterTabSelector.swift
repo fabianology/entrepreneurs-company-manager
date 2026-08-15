@@ -2,7 +2,7 @@ import SwiftUI
 
 enum EntityHomeTab: String, CaseIterable {
     case financial = "Financial"
-    case subscriptions = "Subscriptions"
+    case subscriptions = "Services"
     case documents = "Vault"
     
     var icon: String {
