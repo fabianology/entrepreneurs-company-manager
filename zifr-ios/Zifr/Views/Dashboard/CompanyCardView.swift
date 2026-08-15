@@ -181,7 +181,7 @@ struct CompanyCardView: View {
             HStack {
                 Spacer()
                 
-                statusItem(icon: "square.3.layers.3d", title: "Subscriptions", count: subscriptionsCount, color: Color(hex: "#2070BD"))
+                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: Color(hex: "#2070BD"))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapSubscriptions?()
