@@ -34,7 +34,7 @@ struct FinancialView: View {
                     VStack(spacing: 0) {
                         // ── Main Wallet Stack ──
                         VStack(spacing: 0) {
-                            Spacer().frame(height: hideActionBar ? 98 : 70) // Offset for tabs or action bar
+                            Spacer().frame(height: hideActionBar ? 110 : 70) // Offset for tabs or action bar
                             if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()
@@ -384,6 +384,7 @@ struct FinancialView: View {
                     .zIndex(100)
             }
         }
+        .frame(width: UIScreen.main.bounds.width)
     }
     
     private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
@@ -503,7 +504,7 @@ struct FinancialView: View {
                     let isFront = zIndexCardId == card.id.uuidString
                     
                     let yOffset = isPopped ? 16.0 : (isPulling ? -140.0 : -(foremostPeekOffset + CGFloat(index) * stackedPeekOffset))
-                    let scale = (isPopped || isPulling) ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
+                    let scale = (isPopped || isPulling) ? 1.0 : max(0.88, 1.0 - CGFloat(index) * 0.03)
                     let rotationAngle: Double = isPopped ? 0 : (isPulling ? -1.0 : -4 - Double(index) * 1.5)
                     let shadowRadius: CGFloat = (isPopped || isPulling) ? 20 : 4
                     let shadowOpacity: Double = (isPopped || isPulling) ? 0.5 : 0.15
@@ -511,6 +512,7 @@ struct FinancialView: View {
                     
                     FinancialCardVisual(card: card, isPopped: isPopped)
                         .id(card.id)
+                        .frame(maxWidth: UIScreen.main.bounds.width - 40)
                         .frame(height: isPopped ? fullCardH : cardH)
                         .scaleEffect(scale, anchor: .bottom)
                         .rotation3DEffect(
@@ -569,13 +571,14 @@ struct FinancialView: View {
                 ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                     let isPopped = poppedCardId == card.id.uuidString
                     let yOffset = isPopped ? 0.0 : -(CGFloat(index) * peekOffset)
-                    let scale = isPopped ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
+                    let scale = isPopped ? 1.0 : max(0.88, 1.0 - CGFloat(index) * 0.03)
                     let rotationAngle: Double = isPopped ? 0 : -3 - Double(index) * 1.0
                     let shadowRadius: CGFloat = isPopped ? 20 : 4
                     let shadowOpacity: Double = isPopped ? 0.5 : 0.15
                     
                     FinancialCardVisual(card: card, isPopped: isPopped)
                         .id(card.id)
+                        .frame(maxWidth: UIScreen.main.bounds.width - 40)
                         .frame(height: fullCardH)
                         .scaleEffect(scale, anchor: .bottom)
                         .rotation3DEffect(
@@ -717,23 +720,23 @@ struct FinancialView: View {
                 .frame(width: 1, height: 20)
 
             Menu {
-                Button {
-                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                    showWizard = true
-                } label: {
-                    Label("Add Account", systemImage: "building.columns")
-                }
                 if !institutions.isEmpty {
-                    Button {
-                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        Label("Add Card", systemImage: "creditcard")
-                    }
                     Button {
                         newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
                     } label: {
                         Label("Add Loan", systemImage: "dollarsign.circle")
                     }
+                    Button {
+                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Card", systemImage: "creditcard")
+                    }
+                }
+                Button {
+                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                    showWizard = true
+                } label: {
+                    Label("Add Account", systemImage: "building.columns")
                 }
             } label: {
                 HStack(spacing: 6) {

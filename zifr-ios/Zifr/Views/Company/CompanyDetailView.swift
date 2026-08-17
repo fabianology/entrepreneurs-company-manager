@@ -244,7 +244,7 @@ struct CompanyDetailView: View {
         }
         // Popover moved to the button
         .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 10) {
+            HStack(alignment: .bottom, spacing: 10) {
                 // 1. Profile / Admin Button (far left)
                 profileControlButton
 
@@ -397,7 +397,7 @@ struct CompanyDetailView: View {
             ZStack {
                 CompanyAvatar(company: company, size: 48)
             }
-            .frame(width: 56, height: 56)
+            .frame(width: 52, height: 52)
             .contentShape(Rectangle())
             .onTapGesture {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -405,28 +405,45 @@ struct CompanyDetailView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                // Company name
-                Text(company.name.isEmpty ? "Company" : company.name)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.white)
-                    .lineLimit(1)
+                // Top row: Company name & Receipt Icon
+                HStack(alignment: .center) {
+                    Text(company.name.isEmpty ? "Company" : company.name)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
 
-                // Dynamic metrics sub-line per tab
+                    Spacer(minLength: 8)
+
+                    headerActionMenu
+                }
+
+                // Dynamic metrics sub-line per tab (full width below)
                 metricSubLine
             }
-            Spacer()
-            
-            headerActionMenu
         }
         .padding(.vertical, 12)
         .padding(.leading, 12)
         .padding(.trailing, 16)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#1C1C1E").opacity(0.60))
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.70))
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#3A2D6E"),
+                            Color(hex: "#16161E").opacity(0.2)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
         .contentShape(Rectangle())
         .onTapGesture {
             if vm.activeTab != .home {
@@ -440,79 +457,23 @@ struct CompanyDetailView: View {
 
     @ViewBuilder
     private var headerActionMenu: some View {
-        if vm.activeTab == .home {
-            switch activeInternalTab {
-            case .financial:
-                Menu {
-                    Button {
-                        wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                        showFinancialWizard = true
-                    } label: {
-                        Label("Add Account", systemImage: "building.columns")
-                    }
-                    if !institutions.isEmpty {
-                        Button {
-                            newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                        } label: {
-                            Label("Add Card", systemImage: "creditcard")
-                        }
-                        Button {
-                            newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
-                        } label: {
-                            Label("Add Loan", systemImage: "dollarsign.circle")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(activeInternalTab.color)
-                        .frame(width: 32, height: 32)
-                        .background(activeInternalTab.color.opacity(0.15))
-                        .clipShape(Circle())
-                }
-            case .subscriptions:
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    newSub = vm.addSubscription(appState: appState, userId: company.userId, companyId: company.id)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(activeInternalTab.color)
-                        .frame(width: 32, height: 32)
-                        .background(activeInternalTab.color.opacity(0.15))
-                        .clipShape(Circle())
-                }
-            case .documents:
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(activeInternalTab.color)
-                        .frame(width: 32, height: 32)
-                        .background(activeInternalTab.color.opacity(0.15))
-                        .clipShape(Circle())
-                }
-            }
-        } else {
-            Menu {
-                Button {
-                    showFinancialReport = true
-                } label: {
-                    Label("Financial Report", systemImage: "dollarsign.circle")
-                }
-                Button {
-                    showSubscriptionReport = true
-                } label: {
-                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
-                }
+        Menu {
+            Button {
+                showFinancialReport = true
             } label: {
-                Image(systemName: "doc.text.magnifyingglass")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
-                    .frame(width: 32, height: 32)
+                Label("Financial Report", systemImage: "dollarsign.circle")
             }
+            Button {
+                showSubscriptionReport = true
+            } label: {
+                Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+            }
+        } label: {
+            Image(systemName: "receipt")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.45))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
         }
     }
 
@@ -581,6 +542,58 @@ struct CompanyDetailView: View {
                 Label("All Entities", systemImage: "square.grid.2x2")
             }
         } label: {
+            VStack(spacing: 0) {
+                Color.clear
+                    .frame(width: 44, height: 20)
+
+                ZStack {
+                    Circle()
+                        .fill(Color.black.opacity(0.70))
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(hex: "#3A2D6E"),
+                                            Color(hex: "#16161E").opacity(0.2)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                    Image(systemName: "circle.grid.3x3.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                }
+                .frame(width: 44, height: 44)
+            }
+            .frame(width: 44, height: 64)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var currentTabContext: AppViewModel.CompanyTab {
+        if vm.activeTab == .home {
+            switch activeInternalTab {
+            case .financial: return .financial
+            case .subscriptions: return .subscriptions
+            case .documents: return .documents
+            }
+        } else {
+            return vm.activeTab
+        }
+    }
+
+    private var plusButtonLabel: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(width: 44, height: 20)
+
             ZStack {
                 Circle()
                     .fill(Color.black.opacity(0.70))
@@ -600,52 +613,14 @@ struct CompanyDetailView: View {
                     )
                     .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
 
-                Image(systemName: "circle.grid.3x3.fill")
+                Image(systemName: "plus")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color.white.opacity(0.85))
             }
             .frame(width: 44, height: 44)
         }
-        .buttonStyle(.plain)
-    }
-
-    private var currentTabContext: AppViewModel.CompanyTab {
-        if vm.activeTab == .home {
-            switch activeInternalTab {
-            case .financial: return .financial
-            case .subscriptions: return .subscriptions
-            case .documents: return .documents
-            }
-        } else {
-            return vm.activeTab
-        }
-    }
-
-    private var plusButtonLabel: some View {
-        ZStack {
-            Circle()
-                .fill(Color.black.opacity(0.70))
-                .overlay(
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#3A2D6E"),
-                                    Color(hex: "#16161E").opacity(0.2)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 1.5
-                        )
-                )
-                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-            Image(systemName: "plus")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.85))
-        }
-        .frame(width: 44, height: 44)
+        .frame(width: 44, height: 64)
+        .contentShape(Rectangle())
     }
 
     @ViewBuilder
@@ -653,23 +628,23 @@ struct CompanyDetailView: View {
         switch currentTabContext {
         case .financial, .home:
             Menu {
-                Button {
-                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                    showFinancialWizard = true
-                } label: {
-                    Label("Add Account", systemImage: "building.columns")
-                }
                 if !institutions.isEmpty {
-                    Button {
-                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        Label("Add Card", systemImage: "creditcard")
-                    }
                     Button {
                         newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
                     } label: {
                         Label("Add Loan", systemImage: "dollarsign.circle")
                     }
+                    Button {
+                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Card", systemImage: "creditcard")
+                    }
+                }
+                Button {
+                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                    showFinancialWizard = true
+                } label: {
+                    Label("Add Account", systemImage: "building.columns")
                 }
             } label: {
                 plusButtonLabel

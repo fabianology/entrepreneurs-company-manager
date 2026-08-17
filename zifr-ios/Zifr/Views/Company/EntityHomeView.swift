@@ -126,7 +126,7 @@ struct EntityHomeView: View {
             .padding(.top, 8)
             .padding(.bottom, 10)
         }
-        .frame(maxWidth: UIScreen.main.bounds.width)
+        .frame(width: UIScreen.main.bounds.width)
         .background(Color.clear)
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)

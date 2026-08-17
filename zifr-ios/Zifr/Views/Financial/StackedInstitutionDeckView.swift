@@ -366,7 +366,7 @@ struct StackedInstitutionDeckView: View {
         let isFront = zIndexCardId == card.id.uuidString
         
         let yOffset = isPopped ? 16.0 : (isPulling ? -140.0 : -(foremostPeekOffset + CGFloat(index) * stackedPeekOffset))
-        let scale = (isPopped || isPulling) ? 1.02 : max(0.88, 1.0 - CGFloat(index) * 0.03)
+        let scale = (isPopped || isPulling) ? 1.0 : max(0.88, 1.0 - CGFloat(index) * 0.03)
         let rotationAngle: Double = isPopped ? 0 : (isPulling ? -1.0 : -4 - Double(index) * 1.5)
         let shadowRadius: CGFloat = (isPopped || isPulling) ? 20 : 4
         let shadowOpacity: Double = (isPopped || isPulling) ? 0.5 : 0.15

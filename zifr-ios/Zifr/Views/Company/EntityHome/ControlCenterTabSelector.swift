@@ -7,7 +7,7 @@ enum EntityHomeTab: String, CaseIterable {
     
     var icon: String {
         switch self {
-        case .financial: return "creditcard.fill"
+        case .financial: return "dollarsign.bank.building"
         case .subscriptions: return "square.3.layers.3d"
         case .documents: return "doc.on.doc.fill"
         }
@@ -47,20 +47,20 @@ struct ControlCenterTabSelector: View {
                         HStack(alignment: .top) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(isActive ? tab.color : .white)
+                                .foregroundStyle(isActive ? .white : Color.white.opacity(0.4))
                             
                             Spacer()
                         }
                         
                         Text(tab.rawValue.uppercased())
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(isActive ? tab.color : Color.white.opacity(0.7))
+                            .foregroundStyle(isActive ? .white : Color.white.opacity(0.4))
                             .lineLimit(1)
                         
                         // Micro Summary
                         Text(summaryText(for: tab))
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(isActive ? tab.color.opacity(0.8) : Color.white.opacity(0.4))
+                            .foregroundStyle(isActive ? Color.white.opacity(0.7) : Color.white.opacity(0.25))
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
@@ -69,17 +69,14 @@ struct ControlCenterTabSelector: View {
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(isActive ? Color.black.opacity(0.40) : Color.black.opacity(0.70))
+                            .fill(isActive ? Color.black.opacity(0.70) : Color.black.opacity(0.40))
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(
                                 LinearGradient(
-                                    colors: isActive ? [
-                                        tab.color,
-                                        tab.color.opacity(0.3)
-                                    ] : [
+                                    colors: [
                                         Color(hex: "#3A2D6E"),
                                         Color(hex: "#16161E").opacity(0.2)
                                     ],
@@ -89,7 +86,7 @@ struct ControlCenterTabSelector: View {
                                 lineWidth: 1.5
                             )
                     )
-                    .shadow(color: isActive ? tab.color.opacity(0.2) : Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                    .shadow(color: Color.black.opacity(isActive ? 0.45 : 0.25), radius: 6, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
             }
