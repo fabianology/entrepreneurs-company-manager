@@ -13,6 +13,7 @@ struct DocumentListView: View {
 
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
+    @State private var documentToDelete: CompanyDocument? = nil
     @State private var openURL: IdentifiableURL? = nil
     @State private var selectedType: String = "All"
     @State private var isScanning = false
@@ -49,6 +50,13 @@ struct DocumentListView: View {
                                                     editingDoc = doc
                                                 } onOpen: {
                                                     openDocument(doc)
+                                                } onShare: {
+                                                    shareResourceId = doc.id
+                                                    shareResourceType = "document"
+                                                    shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+                                                    showShareSheet = true
+                                                } onDelete: {
+                                                    documentToDelete = doc
                                                 }
                                                 .padding(.horizontal, 20)
                                             }
@@ -76,6 +84,13 @@ struct DocumentListView: View {
                                                 editingDoc = doc
                                             } onOpen: {
                                                 openDocument(doc)
+                                            } onShare: {
+                                                shareResourceId = doc.id
+                                                shareResourceType = "document"
+                                                shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+                                                showShareSheet = true
+                                            } onDelete: {
+                                                documentToDelete = doc
                                             }
                                             .padding(.horizontal, 20)
                                         }
@@ -254,6 +269,27 @@ struct DocumentListView: View {
             }
         } message: {
             Text("Would you like to use Google Gemini AI to automatically extract text and categorize this document?\n\nClicking 'Yes' will securely process the document with AI. Clicking 'No' keeps the document entirely private on your device, and you can categorize it manually.")
+        }
+        .alert(
+            "Delete Document?",
+            isPresented: Binding(
+                get: { documentToDelete != nil },
+                set: { if !$0 { documentToDelete = nil } }
+            ),
+            presenting: documentToDelete
+        ) { doc in
+            Button("Delete Document", role: .destructive) {
+                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    vm.deleteDoc(doc, appState: appState)
+                }
+                documentToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                documentToDelete = nil
+            }
+        } message: { doc in
+            Text("“\(doc.name.isEmpty ? "This document" : doc.name)” and all associated files will be completely and permanently removed from the server. This action cannot be undone.")
         }
     }
     
@@ -439,138 +475,259 @@ struct DocumentRow: View {
     let doc: CompanyDocument
     let onEdit: () -> Void
     let onOpen: () -> Void
+    var onShare: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
 
-    @State private var offset: CGFloat = 0
-    @State private var isSwiped: Bool = false
+    enum RevealedState { case none, leftActions, rightAction }
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var revealedState: RevealedState = .none
+
+    private let leftRevealWidth: CGFloat = 70
+    private let rightRevealWidth: CGFloat = -70
 
     var body: some View {
-        ZStack(alignment: .trailing) {
-            // Delete Action Background Button
-            if let onDelete = onDelete {
+        ZStack {
+            // Share Action Button revealed on sliding right (left side)
+            if (dragOffset > 0 || revealedState == .leftActions) && onShare != nil {
+                HStack {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            dragOffset = 0
+                            revealedState = .none
+                        }
+                        onShare?()
+                    } label: {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.70))
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color(hex: "#918457").opacity(0.95),
+                                                        Color(hex: "#918457").opacity(0.35)
+                                                    ],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: Color(hex: "#918457").opacity(0.30), radius: 6, x: 0, y: 2)
+
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.9))
+                            }
+                            .frame(width: 44, height: 44)
+
+                            Text("Share")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.7))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 6)
+                    .opacity(min(1.0, Double(max(0, dragOffset) / 40.0)))
+
+                    Spacer()
+                }
+            }
+
+            // Delete Action Button revealed on sliding left (right side)
+            if (dragOffset < 0 || revealedState == .rightAction) && onDelete != nil {
                 HStack {
                     Spacer()
-                    Button(role: .destructive) {
+
+                    Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            offset = 0
-                            isSwiped = false
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            dragOffset = 0
+                            revealedState = .none
                         }
-                        onDelete()
+                        onDelete?()
                     } label: {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.red.opacity(0.85))
-                            
-                            VStack(spacing: 4) {
-                                Image(systemName: "trash.fill")
-                                    .font(.system(size: 18, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Text("Delete")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundStyle(.white)
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.70))
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color.red.opacity(0.95),
+                                                        Color.red.opacity(0.35)
+                                                    ],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: Color.red.opacity(0.30), radius: 6, x: 0, y: 2)
+
+                                Image(systemName: "trash")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(Color.red.opacity(0.9))
                             }
+                            .frame(width: 44, height: 44)
+
+                            Text("Delete")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.red.opacity(0.8))
                         }
-                        .frame(width: 72)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 6)
+                    .opacity(min(1.0, Double(abs(min(0, dragOffset)) / 40.0)))
+                }
+            }
+
+            // Document row content
+            HStack(spacing: 14) {
+                Image(systemName: doc.typeIcon)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(doc.name.isEmpty ? "Document" : doc.name)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                    if !(doc.uploadDate ?? "").isEmpty {
+                        Text("Added \(doc.uploadDate ?? "")")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    }
+                    if !(doc.notes ?? "").isEmpty {
+                        Text(doc.notes ?? "")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer()
+                
+                if !(doc.url ?? "").isEmpty {
+                    Button(action: onOpen) {
+                        Image(systemName: "paperclip")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#918457"))
+                            .padding(6)
                     }
                     .buttonStyle(.plain)
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-
-            // Main Document Card Content
-            Button {
-                if isSwiped {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        offset = 0
-                        isSwiped = false
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(hex: "#1C1C1E"))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: Color(hex: "#918457").opacity(0.2), radius: 6, x: 0, y: 3)
+            .contentShape(Rectangle())
+            .offset(x: dragOffset)
+            .onTapGesture {
+                if revealedState != .none {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                        dragOffset = 0
+                        revealedState = .none
                     }
                 } else {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     onEdit()
                 }
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: doc.typeIcon)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(doc.name.isEmpty ? "Document" : doc.name)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white)
-                        if !(doc.uploadDate ?? "").isEmpty {
-                            Text("Added \(doc.uploadDate ?? "")")
-                                .font(.system(size: 9, weight: .black))
-                                .foregroundStyle(Color.white.opacity(0.6))
-                        }
-                        if !(doc.notes ?? "").isEmpty {
-                            Text(doc.notes ?? "")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                                .lineLimit(1)
-                        }
-                    }
-                    Spacer()
-                    if !(doc.url ?? "").isEmpty {
-                        Button(action: onOpen) {
-                            Image(systemName: "paperclip")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#918457"))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(hex: "#1C1C1E"))
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#918457"),
-                                    Color(hex: "#918457").opacity(0.3)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 1.5
-                        )
-                )
-                .shadow(color: Color(hex: "#918457").opacity(0.2), radius: 6, x: 0, y: 3)
             }
-            .buttonStyle(.plain)
-            .offset(x: offset)
-            .gesture(
-                onDelete == nil ? nil :
-                DragGesture(minimumDistance: 15, coordinateSpace: .local)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 15)
                     .onChanged { value in
-                        if value.translation.width < 0 {
-                            let drag = value.translation.width + (isSwiped ? -72 : 0)
-                            offset = min(0, max(-120, drag))
-                        } else if isSwiped && value.translation.width > 0 {
-                            offset = min(0, -72 + value.translation.width)
+                        let translation = value.translation.width
+                        if revealedState == .none {
+                            if translation > 0 && onShare != nil {
+                                dragOffset = min(leftRevealWidth + 15, translation)
+                            } else if translation < 0 && onDelete != nil {
+                                if translation > rightRevealWidth {
+                                    dragOffset = translation
+                                } else {
+                                    dragOffset = rightRevealWidth + (translation - rightRevealWidth) * 0.75
+                                }
+                            }
+                        } else if revealedState == .leftActions {
+                            dragOffset = max(0, min(leftRevealWidth + 15, leftRevealWidth + translation))
+                        } else if revealedState == .rightAction {
+                            if translation > 0 {
+                                dragOffset = min(0, rightRevealWidth + translation)
+                            } else {
+                                dragOffset = rightRevealWidth + translation * 0.75
+                            }
                         }
                     }
                     .onEnded { value in
+                        let translation = value.translation.width
+                        let velocity = value.predictedEndTranslation.width - value.translation.width
+
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            if value.translation.width < -140 {
-                                offset = 0
-                                isSwiped = false
-                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                onDelete?()
-                            } else if value.translation.width < -40 || (isSwiped && value.translation.width < 20) {
-                                offset = -72
-                                isSwiped = true
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } else {
-                                offset = 0
-                                isSwiped = false
+                            if revealedState == .none {
+                                if translation < -140 || (translation < -80 && velocity < -150) {
+                                    // Deep swipe-through: trigger delete confirmation popup directly
+                                    dragOffset = 0
+                                    revealedState = .none
+                                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                    onDelete?()
+                                } else if translation < -30 && onDelete != nil {
+                                    dragOffset = rightRevealWidth
+                                    revealedState = .rightAction
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                } else if translation > 30 && onShare != nil {
+                                    dragOffset = leftRevealWidth
+                                    revealedState = .leftActions
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                } else {
+                                    dragOffset = 0
+                                    revealedState = .none
+                                }
+                            } else if revealedState == .leftActions {
+                                if translation < -20 {
+                                    dragOffset = 0
+                                    revealedState = .none
+                                } else {
+                                    dragOffset = leftRevealWidth
+                                    revealedState = .leftActions
+                                }
+                            } else if revealedState == .rightAction {
+                                if translation < -60 || velocity < -120 {
+                                    // Swiped further left from revealed state -> trigger delete popup
+                                    dragOffset = 0
+                                    revealedState = .none
+                                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                    onDelete?()
+                                } else if translation > 20 {
+                                    dragOffset = 0
+                                    revealedState = .none
+                                } else {
+                                    dragOffset = rightRevealWidth
+                                    revealedState = .rightAction
+                                }
                             }
                         }
                     }
@@ -631,190 +788,220 @@ struct EditDocumentSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    SharedItemOverrideBanner(resourceId: doc.id, defaultCompanyId: doc.companyId)
-                    
-                    Group {
-                    ZifrField(label: "Document Name", placeholder: "Articles of Incorporation", text: Binding(get: { doc.name }, set: { doc.name = $0 }))
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Document Type").zifrLabel()
-                        HStack {
-                            Picker("Type", selection: Binding(get: { doc.type }, set: { doc.type = $0 })) {
-                                ForEach(CompanyDocument.types(for: companyStructure), id: \.self) { Text($0).tag($0) }
-                            }
-                            .pickerStyle(.menu)
-                            .tint(.white)
-                            Spacer()
-                        }
-                        .cifrField()
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Document Source").zifrLabel()
-                        Picker("Source", selection: $inputMode) {
-                            Text("Local File").tag(0)
-                            Text("External Link").tag(1)
-                        }
-                        .pickerStyle(.segmented)
-                        .padding(.bottom, 8)
+            ZStack {
+                Color(hex: "#171717").ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        SharedItemOverrideBanner(resourceId: doc.id, defaultCompanyId: doc.companyId)
                         
-                        if inputMode == 0 {
-                            VStack(spacing: 12) {
-                                if let url = doc.url, !url.isEmpty, !url.hasPrefix("http") {
-                                    HStack {
-                                        Image(systemName: "doc.circle.fill")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(Color.zifrBlue)
-                                        
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text("Local File / Scan")
-                                                .font(.system(size: 13, weight: .bold))
-                                                .foregroundStyle(.white)
-                                            Text(url)
-                                                .font(.system(size: 10))
-                                                .foregroundStyle(Color.white.opacity(0.5))
-                                                .lineLimit(1)
+                        Group {
+                            // 1. Document Info Card
+                            ZifrSheetCard(title: "Document Info", icon: "doc.text.fill") {
+                                VStack(spacing: 14) {
+                                    ZifrField(label: "Document Name", placeholder: "Articles of Incorporation", text: Binding(get: { doc.name }, set: { doc.name = $0 }))
+                                    
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Document Type").zifrLabel()
+                                        HStack {
+                                            Picker("Type", selection: Binding(get: { doc.type }, set: { doc.type = $0 })) {
+                                                ForEach(CompanyDocument.types(for: companyStructure), id: \.self) { Text($0).tag($0) }
+                                            }
+                                            .pickerStyle(.menu)
+                                            .tint(.white)
+                                            Spacer()
                                         }
-                                        Spacer()
-                                        
-                                        Button(role: .destructive) {
-                                            doc.url = nil
-                                        } label: {
-                                            Image(systemName: "xmark.circle.fill")
-                                                .foregroundStyle(.red)
-                                                .font(.system(size: 16))
-                                        }
+                                        .cifrField()
                                     }
-                                    .padding(12)
+                                    
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text("Upload Date").zifrLabel()
+                                        HStack {
+                                            DatePicker("Upload Date", selection: uploadDateBinding, displayedComponents: .date)
+                                                .labelsHidden()
+                                                .colorScheme(.dark)
+                                                .tint(.zifrBlue)
+                                            Spacer()
+                                        }
+                                        .cifrField()
+                                    }
+                                }
+                            }
+                            
+                            // 2. File & Storage Card
+                            ZifrSheetCard(title: "File & Storage", icon: "folder.fill") {
+                                VStack(spacing: 14) {
+                                    Picker("Source", selection: $inputMode) {
+                                        Text("Local File").tag(0)
+                                        Text("External Link").tag(1)
+                                    }
+                                    .pickerStyle(.segmented)
+                                    
+                                    if inputMode == 0 {
+                                        VStack(spacing: 12) {
+                                            if let url = doc.url, !url.isEmpty, !url.hasPrefix("http") {
+                                                HStack {
+                                                    Image(systemName: "doc.circle.fill")
+                                                        .font(.system(size: 22))
+                                                        .foregroundStyle(Color(hex: "#C1AA78"))
+                                                    
+                                                    VStack(alignment: .leading, spacing: 2) {
+                                                        Text("Local File / Scan")
+                                                            .font(.system(size: 13, weight: .bold))
+                                                            .foregroundStyle(.white)
+                                                        Text(url)
+                                                            .font(.system(size: 10))
+                                                            .foregroundStyle(Color.white.opacity(0.5))
+                                                            .lineLimit(1)
+                                                    }
+                                                    Spacer()
+                                                    
+                                                    Button(role: .destructive) {
+                                                        doc.url = nil
+                                                    } label: {
+                                                        Image(systemName: "xmark.circle.fill")
+                                                            .foregroundStyle(.red)
+                                                            .font(.system(size: 16))
+                                                    }
+                                                }
+                                                .padding(12)
+                                                .background(Color.white.opacity(0.05))
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                            }
+                                            
+                                            HStack(spacing: 12) {
+                                                Button {
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    showFileImporter = true
+                                                } label: {
+                                                    HStack {
+                                                        Spacer()
+                                                        Image(systemName: "folder.badge.plus")
+                                                        Text("Choose File")
+                                                        Spacer()
+                                                    }
+                                                    .font(.system(size: 13, weight: .bold))
+                                                    .foregroundStyle(.white)
+                                                    .padding(.vertical, 12)
+                                                    .background(Color.white.opacity(0.08))
+                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                }
+                                                .buttonStyle(.plain)
+                                                
+                                                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                                                    HStack {
+                                                        Spacer()
+                                                        Image(systemName: "photo.badge.plus")
+                                                        Text("Choose Photo")
+                                                        Spacer()
+                                                    }
+                                                    .font(.system(size: 13, weight: .bold))
+                                                    .foregroundStyle(.white)
+                                                    .padding(.vertical, 12)
+                                                    .background(Color.white.opacity(0.08))
+                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                }
+                                            }
+                                            
+                                            if isUploading {
+                                                HStack(spacing: 8) {
+                                                    ProgressView()
+                                                        .tint(.zifrBlue)
+                                                    Text("Uploading document...")
+                                                        .font(.system(size: 12))
+                                                        .foregroundStyle(Color.white.opacity(0.6))
+                                                }
+                                                .padding(.top, 4)
+                                            }
+                                            
+                                            if let err = uploadError {
+                                                Text(err)
+                                                    .font(.system(size: 11, weight: .medium))
+                                                    .foregroundStyle(.red)
+                                                    .padding(.top, 4)
+                                            }
+                                        }
+                                    } else {
+                                        ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url ?? "" }, set: { doc.url = $0 }), keyboardType: .URL)
+                                    }
+                                }
+                            }
+                            
+                            // 3. Notes Card
+                            ZifrSheetCard(title: "Notes", icon: "note.text") {
+                                TextEditor(text: Binding(get: { doc.notes ?? "" }, set: { doc.notes = $0 }))
+                                    .font(.system(size: 13)).foregroundStyle(.white)
+                                    .scrollContentBackground(.hidden).frame(minHeight: 80)
+                                    .padding(12).background(Color.white.opacity(0.05))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            
+                            // MARK: – Actions
+                            if !isNew {
+                                ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                    VStack(spacing: 12) {
+                                        // Share Document
+                                        Button {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            showShareSheet = true
+                                        } label: {
+                                            VStack(spacing: 4) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "person.crop.circle.badge.plus")
+                                                    Text("Share Document")
+                                                }
+                                                .font(.system(size: 13, weight: .semibold))
+                                                Text("Generate a share link for collaborators")
+                                                    .font(.system(size: 10, weight: .regular))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                        }
+                                        .buttonStyle(MiloomSecondaryButtonStyle())
+                                    }
+                                }
+
+                                // ── Unencapsulated Bottom Delete Button ─────
+                                Button(role: .destructive) {
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                    showDelete = true
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "trash")
+                                        Text("Delete \(doc.name.isEmpty ? "Document" : doc.name)")
+                                        Spacer()
+                                    }
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.red)
+                                    .padding(.vertical, 14)
                                     .background(Color.white.opacity(0.05))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
-                                
-                                HStack(spacing: 12) {
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        showFileImporter = true
-                                    } label: {
-                                        HStack {
-                                            Spacer()
-                                            Image(systemName: "folder.badge.plus")
-                                            Text("Choose File")
-                                            Spacer()
-                                        }
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.vertical, 12)
-                                        .background(Color.white.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .buttonStyle(.plain)
+                                .confirmationDialog(
+                                    "Delete \"\(doc.name.isEmpty ? "this document" : doc.name)\"?",
+                                    isPresented: $showDelete,
+                                    titleVisibility: .visible
+                                ) {
+                                    Button("Delete Document", role: .destructive) {
+                                        vm.deleteDoc(doc, appState: appState)
+                                        dismiss()
                                     }
-                                    .buttonStyle(.plain)
-                                    
-                                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                                        HStack {
-                                            Spacer()
-                                            Image(systemName: "photo.badge.plus")
-                                            Text("Choose Photo")
-                                            Spacer()
-                                        }
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.vertical, 12)
-                                        .background(Color.white.opacity(0.1))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    }
-                                }
-                                
-                                if isUploading {
-                                    HStack(spacing: 8) {
-                                        ProgressView()
-                                            .tint(.zifrBlue)
-                                        Text("Uploading document...")
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(Color.white.opacity(0.6))
-                                    }
-                                    .padding(.top, 4)
-                                }
-                                
-                                if let err = uploadError {
-                                    Text(err)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(.red)
-                                        .padding(.top, 4)
+                                    Button("Cancel", role: .cancel) {}
+                                } message: {
+                                    Text("This will permanently delete this document and all associated files from the server. This action cannot be undone.")
                                 }
                             }
-                            .padding(12)
-                            .background(Color.white.opacity(0.03))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        } else {
-                            ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url ?? "" }, set: { doc.url = $0 }), keyboardType: .URL)
                         }
+                        .disabled(isViewer)
                     }
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Upload Date").zifrLabel()
-                        HStack {
-                            DatePicker("Upload Date", selection: uploadDateBinding, displayedComponents: .date)
-                                .labelsHidden()
-                                .colorScheme(.dark)
-                                .tint(.zifrBlue)
-                            Spacer()
-                        }
-                        .cifrField()
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Notes").zifrLabel()
-                        TextEditor(text: Binding(get: { doc.notes ?? "" }, set: { doc.notes = $0 }))
-                            .font(.system(size: 13)).foregroundStyle(.white)
-                            .scrollContentBackground(.hidden).frame(minHeight: 70)
-                            .padding(12).background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    if !isNew {
-                        // Share Document
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showShareSheet = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Share Document")
-                                Spacer()
-                            }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#4f46e5"))
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.bottom, 8)
-
-                        if showDelete {
-                            HStack(spacing: 20) {
-                                Text("Sure?").font(.system(size: 12, weight: .bold)).foregroundStyle(.red)
-                                Button("Yes") { vm.deleteDoc(doc, appState: appState); dismiss() }
-                                    .font(.system(size: 12, weight: .black)).foregroundStyle(.red)
-                                Button("No") { showDelete = false }
-                                    .font(.system(size: 12, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
-                            }
-                            .padding(14).glassCard(cornerRadius: 14)
-                        } else {
-                            Button { UIImpactFeedbackGenerator(style: .heavy).impactOccurred(); showDelete = true } label: {
-                                Label("Delete Document", systemImage: "trash")
-                                    .font(.system(size: 13, weight: .bold)).foregroundStyle(.red.opacity(0.7))
-                            }
-                        }
-                    }
-                    } // Close Group
-                    .disabled(isViewer)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 16)
+                    .padding(.bottom, 40)
                 }
-                .padding(20).padding(.bottom, 40)
             }
-            .background(Color(hex: "#171717"))
             .navigationTitle(isNew ? "New Document" : "Edit Document")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
