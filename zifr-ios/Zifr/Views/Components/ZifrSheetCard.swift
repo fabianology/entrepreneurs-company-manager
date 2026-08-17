@@ -50,7 +50,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
             // ── Header Band ────────────────────────────────
             if let title = title, !title.isEmpty {
                 HStack(alignment: .center, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(title)
                             .font(.system(size: 12, weight: .black))
                             .tracking(1.5)
