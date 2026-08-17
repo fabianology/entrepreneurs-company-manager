@@ -250,7 +250,9 @@ struct EditLoanSheet: View {
                         editingPaymentId = nil
                     }
                 )
-                .presentationDetents([.height(280)])
+                .presentationDetents([.fraction(0.70), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
             }
         }
     }

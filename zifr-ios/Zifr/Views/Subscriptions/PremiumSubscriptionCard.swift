@@ -578,7 +578,7 @@ struct PremiumSubscriptionCard: View {
                     showSubServiceHUD = false
                 }
             )
-            .presentationDetents([.height(420)])
+            .presentationDetents([.fraction(0.70), .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }
@@ -610,7 +610,7 @@ struct PremiumSubscriptionCard: View {
                     showEmailHUD = false
                 }
             )
-            .presentationDetents([.height(500)])
+            .presentationDetents([.fraction(0.70), .large])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(24)
         }

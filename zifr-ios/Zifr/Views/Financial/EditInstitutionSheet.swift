@@ -398,7 +398,7 @@ struct EditInstitutionSheet: View {
                         showAccountHUD = false
                     }
                 )
-                .presentationDetents([.height(420)])
+                .presentationDetents([.fraction(0.70), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }

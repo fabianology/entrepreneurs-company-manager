@@ -155,7 +155,7 @@ struct AddFinancialWizard: View {
                         showAccountHUD = false
                     }
                 )
-                .presentationDetents([.height(480)])
+                .presentationDetents([.fraction(0.70), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }
@@ -180,7 +180,7 @@ struct AddFinancialWizard: View {
                         showCardHUD = false
                     }
                 )
-                .presentationDetents([.height(720), .large])
+                .presentationDetents([.fraction(0.70), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }
@@ -205,7 +205,7 @@ struct AddFinancialWizard: View {
                         showLoanHUD = false
                     }
                 )
-                .presentationDetents([.height(550)])
+                .presentationDetents([.fraction(0.70), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(24)
             }
