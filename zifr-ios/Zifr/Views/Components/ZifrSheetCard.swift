@@ -50,25 +50,19 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
             // ── Header Band ────────────────────────────────
             if let title = title, !title.isEmpty {
                 HStack(alignment: .center, spacing: 8) {
-                    if let icon = icon, !icon.isEmpty {
-                        Image(systemName: icon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#C1AA78"))
-                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(alignment: .center, spacing: 8) {
+                            if let icon = icon, !icon.isEmpty {
+                                Image(systemName: icon)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#C1AA78"))
+                            }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 6) {
                             Text(title)
                                 .font(.system(size: 12, weight: .black))
                                 .tracking(1.5)
                                 .foregroundStyle(Color(hex: "#C1AA78"))
                                 .textCase(.uppercase)
-
-                            if let count = badgeCount {
-                                Text("[\(count)]")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color(hex: "#C1AA78"))
-                            }
                         }
 
                         if let sub = subtitle, !sub.isEmpty {
