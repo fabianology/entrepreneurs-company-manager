@@ -51,19 +51,11 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
             if let title = title, !title.isEmpty {
                 HStack(alignment: .center, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
-                        HStack(alignment: .center, spacing: 8) {
-                            if let icon = icon, !icon.isEmpty {
-                                Image(systemName: icon)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#C1AA78"))
-                            }
-
-                            Text(title)
-                                .font(.system(size: 12, weight: .black))
-                                .tracking(1.5)
-                                .foregroundStyle(Color(hex: "#C1AA78"))
-                                .textCase(.uppercase)
-                        }
+                        Text(title)
+                            .font(.system(size: 12, weight: .black))
+                            .tracking(1.5)
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                            .textCase(.uppercase)
 
                         if let sub = subtitle, !sub.isEmpty {
                             Text(sub)
