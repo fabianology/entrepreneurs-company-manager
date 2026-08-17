@@ -13,6 +13,8 @@ struct InstitutionCardView: View {
     let onEditLoan: (Loan) -> Void
     var isExpanded: Bool = true
     var onCollapse: (() -> Void)? = nil
+    var onDragChanged: ((DragGesture.Value) -> Void)? = nil
+    var onDragEnded: ((DragGesture.Value) -> Void)? = nil
     @State private var expanded = false
     @State private var copiedField: String? = nil
     @State private var passwordRevealed = false
@@ -122,6 +124,15 @@ struct InstitutionCardView: View {
                             UnevenRoundedRectangle(topLeadingRadius: 24, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 24)
                                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
                         )
+                )
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 10)
+                        .onChanged { value in
+                            onDragChanged?(value)
+                        }
+                        .onEnded { value in
+                            onDragEnded?(value)
+                        }
                 )
 
                     // ── Credentials (tap-to-copy) ────

@@ -43,7 +43,7 @@ struct EditCompanySheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     if isSharedWithMe {
                         HStack(spacing: 8) {
                             Image(systemName: "person.2.fill")
@@ -60,207 +60,198 @@ struct EditCompanySheet: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(Color(hex: "#4f46e5").opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        .padding(.bottom, -8)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#818cf8").opacity(0.3), lineWidth: 1))
                     }
 
                     Group {
-                    // Entity Name Row
-                    HStack(spacing: 16) {
-                        ZStack {
-                            if let data = logoData, let ui = UIImage(data: data) {
-                                Image(uiImage: ui)
-                                    .resizable()
-                                    .scaledToFill()
-                            } else {
-                                ZStack {
-                                    Color(hex: colorHex)
-                                    Text(name.isEmpty ? "?" : String(name.prefix(1)).uppercased())
-                                        .font(.system(size: 28, weight: .black, design: .rounded))
-                                        .foregroundStyle(.white)
+                        // MARK: - Business Identity Card
+                        ZifrSheetCard(title: "BUSINESS IDENTITY", icon: "building.2.fill") {
+                            VStack(spacing: 14) {
+                                // Entity Name Row
+                                HStack(spacing: 14) {
+                                    ZStack {
+                                        if let data = logoData, let ui = UIImage(data: data) {
+                                            Image(uiImage: ui)
+                                                .resizable()
+                                                .scaledToFill()
+                                        } else {
+                                            ZStack {
+                                                Color(hex: colorHex)
+                                                Text(name.isEmpty ? "?" : String(name.prefix(1)).uppercased())
+                                                    .font(.system(size: 28, weight: .black, design: .rounded))
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
+                                        
+                                        if logoData != nil {
+                                            Button { logoData = nil } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .foregroundStyle(.red, .white)
+                                                    .font(.system(size: 20))
+                                            }
+                                            .padding(4)
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                            .offset(x: 8, y: -8)
+                                        }
+                                    }
+                                    .frame(width: 70, height: 70)
+                                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                    .onTapGesture {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        let colors = Company.brandColors
+                                        if let currentIndex = colors.firstIndex(of: colorHex) {
+                                            let nextIndex = (currentIndex + 1) % colors.count
+                                            withAnimation(.spring(response: 0.3)) {
+                                                colorHex = colors[nextIndex]
+                                            }
+                                        } else {
+                                            colorHex = colors.first ?? "#000000"
+                                        }
+                                        logoData = nil // tapping color box clears logo to show color
+                                    }
+                                    
+                                    formSection {
+                                        PremiumInputField(label: "BUSINESS NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
+                                    }
                                 }
-                            }
-                            
-                            if logoData != nil {
-                                Button { logoData = nil } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.red, .white)
-                                        .font(.system(size: 20))
-                                }
-                                .padding(4)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                                .offset(x: 8, y: -8)
-                            }
-                        }
-                        .frame(width: 76, height: 76)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            let colors = Company.brandColors
-                            if let currentIndex = colors.firstIndex(of: colorHex) {
-                                let nextIndex = (currentIndex + 1) % colors.count
-                                withAnimation(.spring(response: 0.3)) {
-                                    colorHex = colors[nextIndex]
-                                }
-                            } else {
-                                colorHex = colors.first ?? "#000000"
-                            }
-                            logoData = nil // tapping color box clears logo to show color
-                        }
-                        
-                        formSection {
-                            PremiumInputField(label: "BUSINESS NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
-                        }
-                    }
-                    .padding(.top, 8)
 
-                    // Website Row
-                    HStack(spacing: 16) {
-                        formSection {
-                            PremiumInputField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL, textContentType: .URL)
-                        }
-                        
-                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                            VStack(spacing: 6) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 20, weight: .semibold))
-                                Text("UPLOAD")
-                                    .font(.system(size: 9, weight: .black))
-                                    .tracking(1)
-                            }
-                            .foregroundStyle(Color.white.opacity(0.8))
-                            .frame(width: 76)
-                            .frame(maxHeight: .infinity) // fills height of HStack defined by formSection
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        }
-                        .onChange(of: selectedPhoto) { _, item in
-                            Task {
-                                if let data = try? await item?.loadTransferable(type: Data.self) {
-                                    logoData = data
+                                // Website Row
+                                HStack(spacing: 12) {
+                                    formSection {
+                                        PremiumInputField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL, textContentType: .URL)
+                                    }
+                                    
+                                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                                        VStack(spacing: 4) {
+                                            Image(systemName: "square.and.arrow.up")
+                                                .font(.system(size: 18, weight: .semibold))
+                                            Text("UPLOAD")
+                                                .font(.system(size: 9, weight: .black))
+                                                .tracking(1)
+                                        }
+                                        .foregroundStyle(Color.white.opacity(0.8))
+                                        .frame(width: 72)
+                                        .frame(maxHeight: .infinity)
+                                        .background(Color(hex: "#2C2C2E"))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    }
+                                    .onChange(of: selectedPhoto) { _, item in
+                                        Task {
+                                            if let data = try? await item?.loadTransferable(type: Data.self) {
+                                                logoData = data
+                                            }
+                                        }
+                                    }
+                                }
+                                .fixedSize(horizontal: false, vertical: true)
+
+                                // Entity Category
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("BUSINESS CATEGORY")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                        .padding(.horizontal, 2)
+                                    
+                                    CustomSegmentedControl(options: ["Personal", "Business"], selection: $entityCategory)
+                                    .simultaneousGesture(TapGesture().onEnded {
+                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                    })
+                                    .onChange(of: entityCategory) { _, newValue in
+                                        if newValue == "Personal" {
+                                            structure = "Individual"
+                                        } else {
+                                            structure = "LLC"
+                                        }
+                                    }
+                                }
+
+                                // Structure Picker
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("BUSINESS STRUCTURE")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                        .padding(.horizontal, 2)
+                                    
+                                    Picker("Select Structure", selection: $structure) {
+                                        if entityCategory == "Personal" {
+                                            Text("Household").tag("Household")
+                                            Text("Individual").tag("Individual")
+                                        } else {
+                                            ForEach(Company.structures.filter { $0 != "Personal" && $0 != "Household" && $0 != "Individual" }, id: \.self) { s in
+                                                Text(s).tag(s)
+                                            }
+                                        }
+                                    }
+                                    .pickerStyle(.wheel)
+                                    .frame(height: 120)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    .simultaneousGesture(DragGesture().onChanged { _ in
+                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                    })
                                 }
                             }
                         }
-                    }
-                    .fixedSize(horizontal: false, vertical: true) // forces HStack to adhere to formSection's natural height
 
-                    // Entity Category
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("BUSINESS CATEGORY")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                            .padding(.horizontal, 4)
-                        
-                        CustomSegmentedControl(options: ["Personal", "Business"], selection: $entityCategory)
-                        .simultaneousGesture(TapGesture().onEnded {
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        })
-                        .onChange(of: entityCategory) { _, newValue in
-                            // Reset structure when category changes
-                            if newValue == "Personal" {
-                                structure = "Individual"
-                            } else {
-                                structure = "LLC"
-                            }
-                        }
-                    }
-
-                    // Structure Picker
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("BUSINESS STRUCTURE")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                            .padding(.horizontal, 4)
-                        
-                        Picker("Select Structure", selection: $structure) {
-                            if entityCategory == "Personal" {
-                                Text("Household").tag("Household")
-                                Text("Individual").tag("Individual")
-                            } else {
-                                ForEach(Company.structures.filter { $0 != "Personal" && $0 != "Household" && $0 != "Individual" }, id: \.self) { s in
-                                    Text(s).tag(s)
-                                }
-                            }
-                        }
-                        .pickerStyle(.wheel)
-                        .frame(height: 120)
-                        .frame(maxWidth: .infinity)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        .simultaneousGesture(DragGesture().onChanged { _ in
-                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                        })
-                    }
-                    } // End Group
-                    .disabled(isViewer)
-
-                    VStack(spacing: 30) {
-                        // App Navigators
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("APP NAVIGATORS")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                                .padding(.leading, 4)
-                            
+                        // MARK: - App Navigators Card
+                        ZifrSheetCard(title: "APP NAVIGATORS", icon: "arrow.triangle.turn.up.right.diamond.fill") {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 dismiss()
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    // Pop back to DashboardView, then start tutorial
                                     vm.path = NavigationPath()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                                         onboardingState.startTutorial(appState: appState, userId: authViewModel.currentUser?.id ?? UUID())
                                     }
                                 }
                             } label: {
-                                HStack(spacing: 6) {
+                                HStack(spacing: 8) {
                                     Image(systemName: "play.circle")
-                                        .font(.system(size: 14))
-                                    Text("Tutorial")
+                                        .font(.system(size: 16))
+                                    Text("Replay Tutorial")
                                         .font(.system(size: 14, weight: .semibold))
                                 }
                                 .foregroundStyle(.white)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color.black)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                .padding(.vertical, 12)
                             }
-                            .buttonStyle(.plain)
-                            .padding(.bottom, 4)
-                            
-
+                            .buttonStyle(MiloomSecondaryButtonStyle())
                         }
 
-
-
-                        // Share Entity
+                        // MARK: - Actions Card
                         if isEditing && !isViewer {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                showShareSheet = true
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "person.crop.circle.badge.plus")
-                                    Text("Share Business")
+                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                VStack(spacing: 12) {
+                                    // Share Entity
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        showShareSheet = true
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "person.crop.circle.badge.plus")
+                                                Text("Share Business")
+                                            }
+                                            .font(.system(size: 13, weight: .semibold))
+                                            Text("Invite collaborators to access this business")
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                    }
+                                    .buttonStyle(MiloomSecondaryButtonStyle())
                                 }
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color(hex: "#4f46e5"))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color(hex: "#4f46e5").opacity(0.1))
-                                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 22))
                             }
-                            .buttonStyle(.plain)
                         }
 
-                        // Delete
                         if isEditing {
+                            // ── Unencapsulated Bottom Delete / Leave Button ─────
                             Button(role: .destructive) {
                                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                                 showDeleteConfirm = true
@@ -275,7 +266,7 @@ struct EditCompanySheet: View {
                                 .foregroundStyle(.red)
                                 .padding(.vertical, 14)
                                 .background(Color.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                             .buttonStyle(.plain)
                             .confirmationDialog(
@@ -296,15 +287,16 @@ struct EditCompanySheet: View {
                                 }
                             }
                         }
-                    }
-                    .padding(.top, 10)
+                    } // End Group
+                    .disabled(isViewer)
                 }
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
                 .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(
-                Color(hex: "#171717")
+                Color(hex: "#1C1C1E")
                     .ignoresSafeArea()
                     .onTapGesture {
                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)

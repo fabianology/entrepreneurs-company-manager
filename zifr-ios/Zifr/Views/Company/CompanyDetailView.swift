@@ -542,58 +542,6 @@ struct CompanyDetailView: View {
                 Label("All Entities", systemImage: "square.grid.2x2")
             }
         } label: {
-            VStack(spacing: 0) {
-                Color.clear
-                    .frame(width: 44, height: 20)
-
-                ZStack {
-                    Circle()
-                        .fill(Color.black.opacity(0.70))
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: "#3A2D6E"),
-                                            Color(hex: "#16161E").opacity(0.2)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-                    Image(systemName: "circle.grid.3x3.fill")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.85))
-                }
-                .frame(width: 44, height: 44)
-            }
-            .frame(width: 44, height: 64)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var currentTabContext: AppViewModel.CompanyTab {
-        if vm.activeTab == .home {
-            switch activeInternalTab {
-            case .financial: return .financial
-            case .subscriptions: return .subscriptions
-            case .documents: return .documents
-            }
-        } else {
-            return vm.activeTab
-        }
-    }
-
-    private var plusButtonLabel: some View {
-        VStack(spacing: 0) {
-            Color.clear
-                .frame(width: 44, height: 20)
-
             ZStack {
                 Circle()
                     .fill(Color.black.opacity(0.70))
@@ -613,13 +561,53 @@ struct CompanyDetailView: View {
                     )
                     .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
 
-                Image(systemName: "plus")
+                Image(systemName: "circle.grid.3x3.fill")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Color.white.opacity(0.85))
             }
             .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
         }
-        .frame(width: 44, height: 64)
+        .buttonStyle(.plain)
+    }
+
+    private var currentTabContext: AppViewModel.CompanyTab {
+        if vm.activeTab == .home {
+            switch activeInternalTab {
+            case .financial: return .financial
+            case .subscriptions: return .subscriptions
+            case .documents: return .documents
+            }
+        } else {
+            return vm.activeTab
+        }
+    }
+
+    private var plusButtonLabel: some View {
+        ZStack {
+            Circle()
+                .fill(Color.black.opacity(0.70))
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#3A2D6E"),
+                                    Color(hex: "#16161E").opacity(0.2)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .frame(width: 44, height: 44)
         .contentShape(Rectangle())
     }
 

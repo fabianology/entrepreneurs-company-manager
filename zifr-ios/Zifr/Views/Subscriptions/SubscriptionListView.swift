@@ -45,19 +45,6 @@ struct SubscriptionListView: View {
                         )
                     }
                 }
-                .mask(
-                    Group {
-                        if hideActionBar {
-                            Rectangle().fill(Color.black)
-                        } else {
-                            VStack(spacing: 0) {
-                                Color.clear.frame(height: 25)
-                                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 35)
-                                Rectangle().fill(Color.black)
-                            }
-                        }
-                    }
-                )
                 .sheet(item: $editingSub) { sub in
                     EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false)
                 }

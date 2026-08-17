@@ -47,7 +47,7 @@ struct ControlCenterTabSelector: View {
                         HStack(alignment: .top) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(isActive ? .white : Color.white.opacity(0.4))
+                                .foregroundStyle(isActive ? tab.color : Color.white.opacity(0.4))
                             
                             Spacer()
                         }

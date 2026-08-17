@@ -43,110 +43,111 @@ struct EditProfileView: View {
                 }
                 
                 ScrollView {
-                    VStack(spacing: 32) {
-                        // Avatar Section
-                        VStack(spacing: 16) {
-                            if let selectedImage {
-                                selectedImage
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(Circle())
-                            } else if let user = authVM.currentUser,
-                                      case let .string(avatarUrlString) = user.userMetadata["avatar_url"],
-                                      let avatarUrl = URL(string: avatarUrlString) {
-                                AsyncImage(url: avatarUrl) { phase in
-                                    if let image = phase.image {
-                                        image
-                                            .resizable()
-                                            .scaledToFill()
-                                    } else {
-                                        ProgressView()
+                    VStack(spacing: 20) {
+                        // Avatar Card
+                        ZifrSheetCard(title: "PROFILE PHOTO", icon: "person.crop.circle.fill") {
+                            VStack(spacing: 16) {
+                                if let selectedImage {
+                                    selectedImage
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 90, height: 90)
+                                        .clipShape(Circle())
+                                } else if let user = authVM.currentUser,
+                                          case let .string(avatarUrlString) = user.userMetadata["avatar_url"],
+                                          let avatarUrl = URL(string: avatarUrlString) {
+                                    AsyncImage(url: avatarUrl) { phase in
+                                        if let image = phase.image {
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                        } else {
+                                            ProgressView()
+                                        }
                                     }
-                                }
-                                .frame(width: 100, height: 100)
-                                .clipShape(Circle())
-                            } else {
-                                Image(systemName: "person.crop.circle.fill")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 100, height: 100)
-                                    .foregroundStyle(Color.white.opacity(0.2))
-                                    .background(Color.white.opacity(0.05))
+                                    .frame(width: 90, height: 90)
                                     .clipShape(Circle())
-                            }
-                            
-                            PhotosPicker(selection: $selectedItem, matching: .images) {
-                                Text("Change Photo")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.blue)
+                                } else {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 90, height: 90)
+                                        .foregroundStyle(Color.white.opacity(0.2))
+                                        .background(Color.white.opacity(0.05))
+                                        .clipShape(Circle())
+                                }
+                                
+                                PhotosPicker(selection: $selectedItem, matching: .images) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "photo")
+                                        Text("Change Photo")
+                                    }
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(Color.zifrGold)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(Color.blue.opacity(0.1))
+                                    .background(Color.zifrGold.opacity(0.12))
                                     .clipShape(Capsule())
-                            }
-                            .onChange(of: selectedItem) { _, newItem in
-                                Task {
-                                    if let data = try? await newItem?.loadTransferable(type: Data.self),
-                                       let uiImage = UIImage(data: data) {
-                                        selectedImage = Image(uiImage: uiImage)
-                                        await uploadPhoto(data: data)
+                                    .overlay(Capsule().stroke(Color.zifrGold.opacity(0.25), lineWidth: 1))
+                                }
+                                .onChange(of: selectedItem) { _, newItem in
+                                    Task {
+                                        if let data = try? await newItem?.loadTransferable(type: Data.self),
+                                           let uiImage = UIImage(data: data) {
+                                            selectedImage = Image(uiImage: uiImage)
+                                            await uploadPhoto(data: data)
+                                        }
                                     }
                                 }
                             }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
                         }
-                        .padding(.top, 20)
-                        
-                        // Email Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("EMAIL ADDRESS")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                                .padding(.leading, 20)
-                            
-                            VStack(spacing: 0) {
-                                TextField("Email Address", text: $newEmail)
-                                    .keyboardType(.emailAddress)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 20)
-                                    .frame(height: 56)
-                            }
-                            .masonryGlass(cornerRadius: 16)
-                            
-                            Button {
-                                Task { await saveEmail() }
-                            } label: {
-                                HStack {
-                                    if isLoading {
-                                        ProgressView()
-                                            .tint(.white)
-                                    } else {
-                                        Text("Save Changes")
-                                            .font(.system(size: 16, weight: .bold))
+
+                        // Email Card
+                        ZifrSheetCard(title: "ACCOUNT EMAIL", icon: "envelope.fill") {
+                            VStack(spacing: 14) {
+                                ZifrField(
+                                    label: "EMAIL ADDRESS",
+                                    placeholder: "name@example.com",
+                                    text: $newEmail,
+                                    keyboardType: .emailAddress,
+                                    textContentType: .emailAddress
+                                )
+                                .textInputAutocapitalization(.never)
+                                
+                                Button {
+                                    Task { await saveEmail() }
+                                } label: {
+                                    HStack {
+                                        if isLoading {
+                                            ProgressView()
+                                                .tint(.white)
+                                        } else {
+                                            Text("Save Changes")
+                                                .font(.system(size: 14, weight: .bold))
+                                        }
                                     }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
                                 }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 56)
-                                .background(newEmail != userEmail && !newEmail.isEmpty ? Color(hex: "#3b82f6") : Color.white.opacity(0.1))
-                                .foregroundStyle(newEmail != userEmail && !newEmail.isEmpty ? .white : Color.white.opacity(0.4))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                            }
-                            .disabled(newEmail == userEmail || newEmail.isEmpty || isLoading)
-                            .padding(.top, 8)
-                            
-                            if let errorMessage {
-                                Text(errorMessage)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(.red)
-                                    .padding(.top, 4)
-                                    .padding(.horizontal, 10)
+                                .buttonStyle(MiloomPrimaryButtonStyle())
+                                .disabled(newEmail == userEmail || newEmail.isEmpty || isLoading)
+                                .opacity(newEmail == userEmail || newEmail.isEmpty ? 0.5 : 1.0)
+                                
+                                if let errorMessage {
+                                    Text(errorMessage)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(.red)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 8)
+                                }
                             }
                         }
                     }
                     .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 30)
                 }
             }
         }

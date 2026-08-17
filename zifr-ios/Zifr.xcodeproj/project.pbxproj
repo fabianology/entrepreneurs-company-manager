@@ -43,6 +43,7 @@
 		5921C64C073EA205947D4777 /* DataRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E5CF10B11366A7F77DE656 /* DataRepository.swift */; };
 		5970666C186E2CA75860907F /* CompanyDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */; };
 		5EBA22404FBAACD632D6D989 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0931BDA073A93591B071DF97 /* SupabaseService.swift */; };
+		5EC7E8942D39E5F51E63576D /* ZifrSheetCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC4FA694E089A3DBE0154364 /* ZifrSheetCard.swift */; };
 		656E6D3AAA4F61BC73C58401 /* CompanyCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73663491A43CB99703F9853B /* CompanyCardView.swift */; };
 		67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1CA7408BE63B84A63BABDB8 /* Date+Formatting.swift */; };
 		69D91C3C7B5CDA51965F9B7C /* GeminiLiveModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E25EDBCCD886BA5EE5BA4F7 /* GeminiLiveModels.swift */; };
@@ -199,6 +200,7 @@
 		C9AA15572DE4A8323574FF99 /* CompanyDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanyDocument.swift; sourceTree = "<group>"; };
 		C9E5CF10B11366A7F77DE656 /* DataRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataRepository.swift; sourceTree = "<group>"; };
 		CB6907BC498BB2697B95920A /* ResetPasswordSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ResetPasswordSheet.swift; sourceTree = "<group>"; };
+		CC4FA694E089A3DBE0154364 /* ZifrSheetCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ZifrSheetCard.swift; sourceTree = "<group>"; };
 		CC66ED993A18713ED859F4C2 /* ActivityLogsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogsView.swift; sourceTree = "<group>"; };
 		CFBEB3A6723B073A9EA5CEFD /* StackedInstitutionDeckView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StackedInstitutionDeckView.swift; sourceTree = "<group>"; };
 		D1A73D787862A2955DEB8BEA /* OnboardingStateManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingStateManager.swift; sourceTree = "<group>"; };
@@ -393,6 +395,7 @@
 				96AFA05E28920F297646C677 /* CompanyAvatar.swift */,
 				FB03F357FB890C8E4972D112 /* SharedComponents.swift */,
 				61A850DC5075A689B18E8282 /* ZifrSwipeActions.swift */,
+				CC4FA694E089A3DBE0154364 /* ZifrSheetCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -674,6 +677,7 @@
 				6C87244063268D8A258D7324 /* ControlCenterTabSelector.swift in Sources */,
 				B7F6DCD15BE938B9DD69F2DD /* SubscriptionCoverFlow.swift in Sources */,
 				156B44B06B11EAAF42291B37 /* DocumentCategoryCoverFlow.swift in Sources */,
+				5EC7E8942D39E5F51E63576D /* ZifrSheetCard.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -181,10 +181,10 @@ struct CompanyCardView: View {
             HStack {
                 Spacer()
                 
-                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: Color(hex: "#2070BD"))
+                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: Color(hex: "#1A7077"))
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        onTapSubscriptions?()
+                        onTapInstitutions?()
                     }
                 
                 Spacer()
@@ -195,10 +195,10 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: Color(hex: "#1A7077"))
+                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: Color(hex: "#2070BD"))
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        onTapInstitutions?()
+                        onTapSubscriptions?()
                     }
                 
                 Spacer()

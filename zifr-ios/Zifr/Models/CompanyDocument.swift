@@ -42,57 +42,54 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
     }
 
     static let businessTypes = [
-        "Formation",
+        "Legal",
         "Taxes",
-        "Legal & IP",
-        "Contracts",
-        "Compliance",
         "Identity",
-        "Property",
         "Estate",
-        "Other"
+        "Other",
+        "Receipts"
     ]
 
     static let personalTypes = [
-        "Medical",
-        "Identity",
         "Legal",
         "Taxes",
-        "Property",
-        "Other"
+        "Identity",
+        "Estate",
+        "Other",
+        "Receipts"
     ]
 
     static func normalizeType(_ type: String) -> String {
         switch type {
-        case "Formation & Governance": return "Formation"
-        case "Tax & IRS": return "Taxes"
-        case "Contracts & HR": return "Contracts"
-        case "Compliance & Insurance": return "Compliance"
-        case "Identity & Vital Records", "Identity & Vital Docs": return "Identity"
-        case "Property & Assets", "Property & Estate": return "Property"
-        case "Estate & Medical": return "Estate"
-        default: return type
+        case "Legal", "Legal & IP", "Contracts", "Contracts & HR", "Formation", "Formation & Governance", "Compliance", "Compliance & Insurance":
+            return "Legal"
+        case "Taxes", "Tax & IRS":
+            return "Taxes"
+        case "Identity", "Identity & Vital Records", "Identity & Vital Docs":
+            return "Identity"
+        case "Estate", "Estate & Medical", "Medical", "Property", "Property & Assets", "Property & Estate":
+            return "Estate"
+        case "Receipts", "Receipt":
+            return "Receipts"
+        case "Other":
+            return "Other"
+        default:
+            return type
         }
     }
 
     static func types(for structure: String) -> [String] {
-        if structure == "Personal" {
-            return personalTypes
-        } else {
-            return businessTypes
-        }
+        return businessTypes
     }
 
     static func icon(for type: String) -> String {
         switch type {
-        case "Formation", "Formation & Governance": return "building.2.fill"
+        case "Legal", "Legal & IP", "Contracts", "Formation", "Compliance": return "scale.3d"
         case "Taxes", "Tax & IRS": return "dollarsign.circle"
-        case "Legal & IP", "Legal": return "scale.3d"
-        case "Contracts", "Contracts & HR": return "signature"
-        case "Compliance", "Compliance & Insurance": return "checkmark.shield"
         case "Identity", "Identity & Vital Records", "Identity & Vital Docs": return "person.text.rectangle"
-        case "Property", "Property & Assets", "Property & Estate": return "house.fill"
-        case "Estate", "Estate & Medical", "Medical": return "cross.case.fill"
+        case "Estate", "Estate & Medical", "Medical", "Property": return "house.fill"
+        case "Receipts", "Receipt": return "receipt"
+        case "Other": return "doc"
         default: return "doc"
         }
     }

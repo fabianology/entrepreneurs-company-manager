@@ -284,209 +284,111 @@ struct EditSubscriptionSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                SharedItemOverrideBanner(resourceId: sub.id, defaultCompanyId: sub.companyId)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
+            ScrollView {
+                VStack(spacing: 20) {
+                    SharedItemOverrideBanner(resourceId: sub.id, defaultCompanyId: sub.companyId)
 
-                Group {
-                    // MARK: – Top Controls
-                VStack(spacing: 12) {
-                    CustomSegmentedControl(options: ["paid", "free"], selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 }))
-                }
-                .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
-                .listRowBackground(Color.clear)
-
-                // MARK: – Identity
-                Section {
-                     VStack(spacing: 16) {
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "SERVICE NAME",
-                                placeholder: "e.g. Shopify",
-                                text: Binding(get: { sub.name }, set: { sub.name = $0 })
-                            )
-                            ZifrField(
-                                label: "WEBSITE",
-                                placeholder: "shopify.com",
-                                text: Binding(get: { sub.website ?? "" }, set: { sub.website = $0 }),
-                                keyboardType: .URL,
-                                textContentType: .URL
-                            )
-                            .textInputAutocapitalization(.never)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) {
-                                ZifrAutocompleteField(
-                                    label: "LOGIN ID",
-                                    placeholder: "username or email",
-                                    text: Binding(get: { sub.loginId ?? "" }, set: { sub.loginId = $0 }),
-                                    keyboardType: .emailAddress,
-                                    textContentType: .username,
-                                    suggestions: allSubscriptions.compactMap { $0.loginId }.filter { !$0.isEmpty } + institutions.compactMap { $0.username }.filter { !$0.isEmpty } + institutions.compactMap { $0.email }.filter { !$0.isEmpty }
+                    Group {
+                        // MARK: – Identity & Service Details Card
+                        ZifrSheetCard(title: "SERVICE DETAILS", icon: "lock.shield") {
+                            VStack(spacing: 16) {
+                                CustomSegmentedControl(
+                                    options: ["paid", "free"],
+                                    selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 })
                                 )
-                                
-                                ZStack(alignment: .bottomTrailing) {
+                                .padding(.bottom, 2)
+
+                                HStack(spacing: 12) {
                                     ZifrField(
-                                        label: "PASSWORD",
-                                        placeholder: "••••••••",
-                                        text: Binding(get: { sub.password ?? "" }, set: { sub.password = $0 }),
-                                        isSecure: !showPassword,
-                                        textContentType: .password
+                                        label: "SERVICE NAME",
+                                        placeholder: "e.g. Shopify",
+                                        text: Binding(get: { sub.name }, set: { sub.name = $0 })
+                                    )
+                                    ZifrField(
+                                        label: "WEBSITE",
+                                        placeholder: "shopify.com",
+                                        text: Binding(get: { sub.website ?? "" }, set: { sub.website = $0 }),
+                                        keyboardType: .URL,
+                                        textContentType: .URL
                                     )
                                     .textInputAutocapitalization(.never)
-                                    
-                                    Button {
-                                        showPassword.toggle()
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    } label: {
-                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                            .padding()
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 12) {
+                                        ZifrAutocompleteField(
+                                            label: "LOGIN ID",
+                                            placeholder: "username or email",
+                                            text: Binding(get: { sub.loginId ?? "" }, set: { sub.loginId = $0 }),
+                                            keyboardType: .emailAddress,
+                                            textContentType: .username,
+                                            suggestions: allSubscriptions.compactMap { $0.loginId }.filter { !$0.isEmpty } + institutions.compactMap { $0.username }.filter { !$0.isEmpty } + institutions.compactMap { $0.email }.filter { !$0.isEmpty }
+                                        )
+                                        
+                                        ZStack(alignment: .bottomTrailing) {
+                                            ZifrField(
+                                                label: "PASSWORD",
+                                                placeholder: "••••••••",
+                                                text: Binding(get: { sub.password ?? "" }, set: { sub.password = $0 }),
+                                                isSecure: !showPassword,
+                                                textContentType: .password
+                                            )
+                                            .textInputAutocapitalization(.never)
+                                            
+                                            Button {
+                                                showPassword.toggle()
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            } label: {
+                                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                    .padding()
+                                            }
+                                            .padding(.bottom, 2)
+                                        }
                                     }
-                                    .padding(.bottom, 2)
+                                    
+                                    DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                                 }
                             }
-                            
-                            DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                         }
 
-                    }
-                    .padding(.vertical, 4)
-                } header: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.shield")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("SERVICE DETAILS")
-                            .font(.system(size: 12, weight: .black))
-                            .tracking(1.5)
-                    }
-                    .foregroundStyle(Color.white.opacity(0.6))
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                .listRowSeparator(.hidden)
-
-                // MARK: – Billing (Paid only)
-                if !sub.isFree {
-
-                    Section {
-                        VStack(spacing: 16) {
-                            HStack(spacing: 12) {
-                                costCard
-                                autoPayCard
-                            }
-                            billingCycleCard
-                            HStack(spacing: 12) {
-                                renewalCard
-                                statusCard
-                            }
-                            paidFromCard
-                        }
-                        .padding(.vertical, 4)
-                    } header: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "creditcard")
-                                .font(.system(size: 12, weight: .bold))
-                            Text("BILLING & RENEWAL")
-                                .font(.system(size: 12, weight: .black))
-                                .tracking(1.5)
-                        }
-                        .foregroundStyle(Color.white.opacity(0.6))
-                        .padding(.top, 16)
-                        .padding(.bottom, 8)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                    .listRowSeparator(.hidden)
-                }
-
-                    // MARK: – Notes (before Security)
-                    Section {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("PURPOSE & NOTES")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            TextField("e.g. Design tool used by marketing...",
-                                      text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }),
-                                      axis: .vertical)
-                                .lineLimit(3...6)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        }
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                    .listRowSeparator(.hidden)
-
-
-
-                    // MARK: – Security & Recovery (below Notes)
-                    // Reveal button — shown only when section is hidden
-                    if !showSecurity {
-                        Section {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) { showSecurity = true }
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "lock.shield")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    Text("ADD SECURITY INFO")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.35))
-                                    Spacer()
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.25))
-                                }
-                                .padding(.horizontal, 16)
-                                .frame(height: 36)
-                                .background(Color.white.opacity(0.04))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                            }
-                            .buttonStyle(.plain)
-                        } header: { EmptyView() }
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                        .listRowSeparator(.hidden)
-                    }
-
-                    if showSecurity {
-                        Section {
-                        VStack(spacing: 0) {
-                            // Tappable collapse row
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) { showSecurity = false }
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                HStack {
-                                    Rectangle()
-                                        .fill(Color.white.opacity(0.07))
-                                        .frame(height: 1)
-                                    Text("SECURITY")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.25))
-                                        .fixedSize()
-                                    Image(systemName: "chevron.up")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.2))
+                        // MARK: – Billing (Paid only)
+                        if !sub.isFree {
+                            ZifrSheetCard(title: "BILLING & RENEWAL", icon: "creditcard") {
+                                VStack(spacing: 16) {
+                                    HStack(spacing: 12) {
+                                        costCard
+                                        autoPayCard
+                                    }
+                                    billingCycleCard
+                                    HStack(spacing: 12) {
+                                        renewalCard
+                                        statusCard
+                                    }
+                                    paidFromCard
                                 }
                             }
-                            .buttonStyle(.plain)
-                            .padding(.bottom, 8)
+                        }
 
+                        // MARK: – Notes
+                        ZifrSheetCard(title: "PURPOSE & NOTES", icon: "note.text") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                TextField("e.g. Design tool used by marketing...",
+                                          text: Binding(get: { sub.notes ?? "" }, set: { sub.notes = $0 }),
+                                          axis: .vertical)
+                                    .lineLimit(3...6)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .padding(14)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
+                        }
+
+                        // MARK: – Security & Recovery
+                        ZifrSheetCard(title: "SECURITY & RECOVERY", icon: "shield.lefthalf.filled") {
                             HStack(spacing: 12) {
                                 // 2FA Picker card
                                 VStack(alignment: .leading, spacing: 4) {
@@ -503,8 +405,8 @@ struct EditSubscriptionSheet: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .frame(height: 44)
                                     .background(Color(hex: "#2C2C2E"))
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                                 }
 
                                 // Recovery TextField card
@@ -516,116 +418,106 @@ struct EditSubscriptionSheet: View {
                                 .autocorrectionDisabled()
                             }
                         }
-                        } header: { EmptyView() }
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                        .listRowSeparator(.hidden)
-                    }
 
-
-                    // MARK: – Supplemental Services
-                    // Thin divider above SubServices
-
-
-                    SubServicesSection(
-                        sub: sub,
-                        onAdd: {
-                            subDraft = SubService()
-                            subDraftIndex = nil
-                            showSubServiceHUD = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        },
-                        onEdit: { idx, service in
-                            subDraft = service
-                            subDraftIndex = idx
-                            showSubServiceHUD = true
-                        }
-                    )
-
-                    // MARK: – Linked Emails
-
-                    LinkedEmailsSection(
-                        sub: sub,
-                        onAdd: {
-                            emailDraft = LinkedEmail()
-                            emailDraftIndex = nil
-                            showEmailHUD = true
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        },
-                        onEdit: { idx, email in
-                            emailDraft = email
-                            emailDraftIndex = idx
-                            showEmailHUD = true
-                        }
-                    )
-
-                // MARK: – Danger Zone
-                if !isNew {
-                    Section {
-                        // Share Service (premium gradient)
-                         Button {
-                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                             showShareSheet = true
-                         } label: {
-                             VStack(spacing: 4) {
-                                 HStack(spacing: 6) {
-                                     Image(systemName: "person.crop.circle.badge.plus")
-                                     Text("Share Service")
-                                 }
-                                 .font(.system(size: 13, weight: .semibold))
-                                 Text("Generate a share link for collaborators")
-                                     .font(.system(size: 10, weight: .regular))
-                                     .foregroundStyle(Color.white.opacity(0.6))
-                             }
-                             .frame(maxWidth: .infinity)
-                             .padding(.vertical, 10)
-                         }
-                         .buttonStyle(MiloomSecondaryButtonStyle())
-                         .padding(.bottom, 8)
-
-                        // Delete Service
-                        Button(role: .destructive) {
-                            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                            showDeleteConfirm = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "trash")
-                                Text("Delete \(sub.name.isEmpty ? "Service" : sub.name)")
-                                Spacer()
+                        // MARK: – Supplemental Services
+                        SubServicesSection(
+                            sub: sub,
+                            onAdd: {
+                                subDraft = SubService()
+                                subDraftIndex = nil
+                                showSubServiceHUD = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            },
+                            onEdit: { idx, service in
+                                subDraft = service
+                                subDraftIndex = idx
+                                showSubServiceHUD = true
                             }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.red)
-                            .padding(.vertical, 14)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        .buttonStyle(.plain)
-                        .confirmationDialog(
-                            "Delete \"\(sub.name.isEmpty ? "this service" : sub.name)\"?",
-                            isPresented: $showDeleteConfirm,
-                            titleVisibility: .visible
-                        ) {
-                            Button("Delete Service", role: .destructive) {
-                                vm.deleteSub(sub, appState: appState)
-                                dismiss()
+                        )
+
+                        // MARK: – Linked Emails
+                        LinkedEmailsSection(
+                            sub: sub,
+                            onAdd: {
+                                emailDraft = LinkedEmail()
+                                emailDraftIndex = nil
+                                showEmailHUD = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            },
+                            onEdit: { idx, email in
+                                emailDraft = email
+                                emailDraftIndex = idx
+                                showEmailHUD = true
                             }
-                            Button("Cancel", role: .cancel) {}
-                        } message: {
-                            Text("This will permanently delete this service and all associated data. This action cannot be undone.")
+                        )
+
+                        // MARK: – Actions
+                        if !isNew {
+                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                VStack(spacing: 12) {
+                                    // Share Service
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        showShareSheet = true
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "person.crop.circle.badge.plus")
+                                                Text("Share Service")
+                                            }
+                                            .font(.system(size: 13, weight: .semibold))
+                                            Text("Generate a share link for collaborators")
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                    }
+                                    .buttonStyle(MiloomSecondaryButtonStyle())
+                                }
+                            }
+
+                            // ── Unencapsulated Bottom Delete Button ─────
+                            Button(role: .destructive) {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDeleteConfirm = true
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "trash")
+                                    Text("Delete \(sub.name.isEmpty ? "Service" : sub.name)")
+                                    Spacer()
+                                }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
+                            .confirmationDialog(
+                                "Delete \"\(sub.name.isEmpty ? "this service" : sub.name)\"?",
+                                isPresented: $showDeleteConfirm,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Delete Service", role: .destructive) {
+                                    vm.deleteSub(sub, appState: appState)
+                                    dismiss()
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            } message: {
+                                Text("This will permanently delete this service and all associated data. This action cannot be undone.")
+                            }
                         }
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
+                    } // End Group
+                    .disabled(isViewer)
                 }
-                } // End Group
-                .disabled(isViewer)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .onAppear {
                 if (sub.nextRenewal ?? "").isEmpty {
                     if sub.billingCycle == "Monthly" {
@@ -794,100 +686,92 @@ struct SubServicesSection: View {
     let onAdd: () -> Void
     let onEdit: (Int, SubService) -> Void
 
-
-
     var body: some View {
-        Section {
-                Button { onAdd() } label: {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                            Text("Add Sub-Service")
-                        }
-                        .font(.system(size: 13, weight: .bold))
-                        
-                        Text("addons · extra licenses · premium tiers")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.6))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(MiloomSecondaryButtonStyle())
-
-                ForEach(sub.subServices.indices, id: \.self) { i in
-                    let ss = sub.subServices[i]
-                    Button { onEdit(i, ss) } label: {
-                        HStack(spacing: 12) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                HStack(spacing: 6) {
-                                    if ss.cost > 0 {
-                                        Text("$\(ss.cost, specifier: "%.2f")")
+        ZifrSheetCard(
+            title: "SUB-SERVICES",
+            icon: "square.grid.3x3.fill",
+            subtitle: "addons · extra licenses · premium tiers",
+            badgeCount: sub.subServices.count
+        ) {
+            if !sub.subServices.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(sub.subServices.indices, id: \.self) { i in
+                        let ss = sub.subServices[i]
+                        Button { 
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onEdit(i, ss) 
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(ss.name.isEmpty ? "Unnamed Service" : ss.name)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                    HStack(spacing: 6) {
+                                        if ss.cost > 0 {
+                                            Text("$\(ss.cost, specifier: "%.2f")")
+                                                .font(.system(size: 11, weight: .medium))
+                                                .foregroundStyle(Color.white.opacity(0.45))
+                                            Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                        }
+                                        Text(ss.billingCycle.rawValue)
                                             .font(.system(size: 11, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.45))
                                         Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
+                                        Text(ss.autoPay == .auto ? "Auto" : "Manual")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(ss.autoPay == .auto ? 0.8 : 0.3))
                                     }
-                                    Text(ss.billingCycle.rawValue)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.45))
-                                    Text("·").font(.system(size: 11)).foregroundStyle(Color.white.opacity(0.2))
-                                    Text(ss.autoPay == .auto ? "Auto" : "Manual")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(ss.autoPay == .auto ? 0.8 : 0.3))
                                 }
+                                Spacer()
+                                // Status pill
+                                Text(ss.status.rawValue.uppercased())
+                                    .font(.system(size: 9, weight: .black))
+                                    .tracking(0.5)
+                                    .foregroundStyle(ss.status == .active ? Color.green : Color.orange)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background((ss.status == .active ? Color.green : Color.orange).opacity(0.12))
+                                    .clipShape(Capsule())
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.2))
                             }
-                            Spacer()
-                            // Status pill
-                            Text(ss.status.rawValue.uppercased())
-                                .font(.system(size: 9, weight: .black))
-                                .tracking(0.5)
-                                .foregroundStyle(ss.status == .active ? Color.green : Color.orange)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background((ss.status == .active ? Color.green : Color.orange).opacity(0.12))
-                                .clipShape(Capsule())
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.2))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(hex: "#2C2C2E"))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            withAnimation {
-                                var services = sub.subServices
-                                services.remove(at: i)
-                                sub.subServices = services
+                        .buttonStyle(PremiumButtonStyle())
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                withAnimation {
+                                    var services = sub.subServices
+                                    services.remove(at: i)
+                                    sub.subServices = services
+                                }
+                            } label: {
+                                Label("Delete Sub-Service", systemImage: "trash")
                             }
-                        } label: {
-                            Image(systemName: "trash")
                         }
-                        .tint(.red)
                     }
                 }
-        } header: {
-            HStack(spacing: 6) {
-                Image(systemName: "square.grid.3x3.fill")
-                    .font(.system(size: 12, weight: .bold))
-                Text("SUB-SERVICES")
-                    .font(.system(size: 12, weight: .black))
-                    .tracking(1.5)
             }
-            .foregroundStyle(Color.white.opacity(0.6))
-            .padding(.top, 16)
-            .padding(.bottom, 8)
+
+            Button { 
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onAdd() 
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Add Sub-Service")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(MiloomSecondaryButtonStyle())
         }
-        .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-        .listRowSeparator(.hidden)
     }
 }
 
@@ -922,166 +806,161 @@ struct SubServiceHUD: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 12) {
+            ScrollView {
+                VStack(spacing: 16) {
+                    ZifrSheetCard(title: "SERVICE DETAILS", icon: "square.grid.3x3.fill") {
+                        VStack(spacing: 14) {
+                            // Row 1: Name + Paid From
+                            HStack(spacing: 12) {
+                                ZifrField(
+                                    label: "NAME",
+                                    placeholder: "e.g. Premium Plan",
+                                    text: $draft.name
+                                )
+                                .autocorrectionDisabled()
 
-                        // Row 1: Name + Paid From
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "NAME",
-                                placeholder: "e.g. Premium Plan",
-                                text: $draft.name
-                            )
-                            .autocorrectionDisabled()
+                                // Paid From card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("PAID FROM")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    
+                                    Button {
+                                        showPaymentPicker = true
+                                    } label: {
+                                        HStack {
+                                            Text(draft.paymentMethod.isEmpty ? "N/A" : paymentMethodWithInstitution(for: draft.paymentMethod))
+                                                .font(.system(size: 14, weight: .bold))
+                                                .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
+                                                .lineLimit(1)
+                                            Spacer(minLength: 8)
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 12, weight: .bold))
+                                                .foregroundStyle(Color.white.opacity(0.3))
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .frame(height: 44)
+                                        .background(Color(hex: "#2C2C2E"))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
 
-                            // Paid From card
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("PAID FROM")
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.45))
-                                
-                                Button {
-                                    showPaymentPicker = true
-                                } label: {
-                                    HStack {
-                                        Text(draft.paymentMethod.isEmpty ? "N/A" : paymentMethodWithInstitution(for: draft.paymentMethod))
+                            // Row 2: Cost + Billing Cycle
+                            HStack(spacing: 12) {
+                                // Cost card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("COST")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    HStack(spacing: 4) {
+                                        Text("$")
                                             .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
-                                            .lineLimit(1)
-                                        Spacer(minLength: 8)
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.3))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        DoubleField(placeholder: "0.00", value: $draft.cost)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
                                     }
                                     .padding(.horizontal, 16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                     .frame(height: 44)
                                     .background(Color(hex: "#2C2C2E"))
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                                 }
-                                .buttonStyle(.plain)
-                            }
-                        }
 
-                        // Row 2: Cost + Billing Cycle
-                        HStack(spacing: 12) {
-                            // Cost card
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("COST")
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.45))
-                                HStack(spacing: 4) {
-                                    Text("$")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    DoubleField(placeholder: "0.00", value: $draft.cost)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                }
-                                .padding(.horizontal, 16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(height: 44)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                            }
-
-                            // Billing Cycle card
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("CYCLE")
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.45))
-                                CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
-                                    get: { draft.billingCycle == .monthly ? "Monthly" : "Yearly" },
-                                    set: { draft.billingCycle = $0 == "Monthly" ? .monthly : .yearly }
-                                ))
-                            }
-                        }
-
-                        // Row 3: Auto Pay + Status
-                        HStack(spacing: 12) {
-                            // Auto Pay card
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("AUTO PAY")
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.45))
-                                HStack {
-                                    Text(draft.autoPay == .auto ? "Enabled" : "Manual")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.white)
-                                    Spacer()
-                                    Toggle("", isOn: Binding(
-                                        get: { draft.autoPay == .auto },
-                                        set: { draft.autoPay = $0 ? .auto : .manual }
+                                // Billing Cycle card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("CYCLE")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
+                                        get: { draft.billingCycle == .monthly ? "Monthly" : "Yearly" },
+                                        set: { draft.billingCycle = $0 == "Monthly" ? .monthly : .yearly }
                                     ))
-                                    .labelsHidden()
-                                    .tint(.green)
-                                    .scaleEffect(0.8)
                                 }
-                                .padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
 
-                            // Status card
+                            // Row 3: Auto Pay + Status
+                            HStack(spacing: 12) {
+                                // Auto Pay card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("AUTO PAY")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    HStack {
+                                        Text(draft.autoPay == .auto ? "Enabled" : "Manual")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color.white)
+                                        Spacer()
+                                        Toggle("", isOn: Binding(
+                                            get: { draft.autoPay == .auto },
+                                            set: { draft.autoPay = $0 ? .auto : .manual }
+                                        ))
+                                        .labelsHidden()
+                                        .tint(.green)
+                                        .scaleEffect(0.8)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                }
+
+                                // Status card
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("STATUS")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    HStack {
+                                        StatusDot(isGreen: draft.status == .active)
+                                        Text(draft.status == .active ? "Active" : "Paused")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Spacer()
+                                        Toggle("", isOn: Binding(
+                                            get: { draft.status == .active },
+                                            set: { draft.status = $0 ? .active : .paused }
+                                        ))
+                                        .labelsHidden()
+                                        .tint(.green)
+                                        .scaleEffect(0.8)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                }
+                            }
+
+                            // Row 4: Purpose (full width)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("STATUS")
+                                Text("PURPOSE")
                                     .font(.system(size: 12, weight: .regular))
                                     .foregroundStyle(Color.white.opacity(0.45))
-                                HStack {
-                                    StatusDot(isGreen: draft.status == .active)
-                                    Text(draft.status == .active ? "Active" : "Paused")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                    Spacer()
-                                    Toggle("", isOn: Binding(
-                                        get: { draft.status == .active },
-                                        set: { draft.status = $0 ? .active : .paused }
-                                    ))
-                                    .labelsHidden()
-                                    .tint(.green)
-                                    .scaleEffect(0.8)
-                                }
-                                .padding(.horizontal, 12)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 44)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                TextField("What is this service for?",
+                                          text: $draft.purpose,
+                                          axis: .vertical)
+                                    .lineLimit(2...4)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .autocorrectionDisabled()
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
-                        }
-
-                        // Row 4: Purpose (full width)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("PURPOSE")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            TextField("What is this service for?",
-                                      text: $draft.purpose,
-                                      axis: .vertical)
-                                .lineLimit(2...4)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white)
-                                .autocorrectionDisabled()
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                     }
-                    .padding(.vertical, 4)
-                } header: { EmptyView() }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
 
-                if !isNew {
-                    Section {
+                    if !isNew {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onDelete?()
@@ -1096,19 +975,17 @@ struct SubServiceHUD: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .navigationTitle(draft.name.isEmpty ? "New Service" : draft.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1312,58 +1189,50 @@ struct LinkedEmailsSection: View {
     @Environment(AppState.self) private var appState
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
-
-
     var body: some View {
-        Section {
-                Button { onAdd() } label: {
-                    VStack(spacing: 4) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                            Text("Add Linked Email")
-                        }
-                        .font(.system(size: 13, weight: .bold))
-                        
-                        Text("aliases · forwards · external accounts")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.6))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(MiloomSecondaryButtonStyle())
-
-                ForEach(sub.linkedEmails.indices, id: \.self) { i in
-                    let em = sub.linkedEmails[i]
-                    LinkedEmailCardView(em: em, allSubscriptions: allSubscriptions, onEdit: { onEdit(i, em) })
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            withAnimation {
-                                var emails = sub.linkedEmails
-                                emails.remove(at: i)
-                                sub.linkedEmails = emails
+        ZifrSheetCard(
+            title: "LINKED EMAILS",
+            icon: "envelope.fill",
+            subtitle: "aliases · forwards · external accounts",
+            badgeCount: sub.linkedEmails.count
+        ) {
+            if !sub.linkedEmails.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(sub.linkedEmails.indices, id: \.self) { i in
+                        let em = sub.linkedEmails[i]
+                        LinkedEmailCardView(em: em, allSubscriptions: allSubscriptions, onEdit: { 
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onEdit(i, em) 
+                        })
+                        .contextMenu {
+                            Button(role: .destructive) {
+                                withAnimation {
+                                    var emails = sub.linkedEmails
+                                    emails.remove(at: i)
+                                    sub.linkedEmails = emails
+                                }
+                            } label: {
+                                Label("Delete Linked Email", systemImage: "trash")
                             }
-                        } label: {
-                            Image(systemName: "trash")
                         }
-                        .tint(.red)
                     }
                 }
-        } header: {
-            HStack(spacing: 6) {
-                Image(systemName: "envelope.fill")
-                    .font(.system(size: 12, weight: .bold))
-                Text("LINKED EMAILS")
-                    .font(.system(size: 12, weight: .black))
-                    .tracking(1.5)
             }
-            .foregroundStyle(Color.white.opacity(0.6))
-            .padding(.top, 16)
-            .padding(.bottom, 8)
+
+            Button { 
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                onAdd() 
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Add Linked Email")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(MiloomSecondaryButtonStyle())
         }
-        .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-        .listRowSeparator(.hidden)
     }
 }
 
@@ -1514,72 +1383,67 @@ struct LinkedEmailHUD: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(spacing: 12) {
-
-                        // Row 1: Address (full width)
-                        ZifrAutocompleteField(
-                            label: "EMAIL ADDRESS",
-                            placeholder: "name@example.com",
-                            text: $draft.email,
-                            keyboardType: .emailAddress,
-                            suggestions: allLogins
-                        )
-
-                        // Row 2: Provider + Access Method
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "PROVIDER",
-                                placeholder: "Gmail, iCloud…",
-                                text: $draft.provider
+            ScrollView {
+                VStack(spacing: 16) {
+                    ZifrSheetCard(title: "LINKED EMAIL DETAILS", icon: "envelope.fill") {
+                        VStack(spacing: 14) {
+                            // Row 1: Address (full width)
+                            ZifrAutocompleteField(
+                                label: "EMAIL ADDRESS",
+                                placeholder: "name@example.com",
+                                text: $draft.email,
+                                keyboardType: .emailAddress,
+                                suggestions: allLogins
                             )
-                            .autocorrectionDisabled()
 
-                            ZifrField(
-                                label: "ACCESS METHOD",
-                                placeholder: "Google SSO, Password…",
-                                text: $draft.accessMethod
-                            )
-                            .autocorrectionDisabled()
-                        }
-
-                        // Row 3: Used For (full width)
-                        ZifrField(
-                            label: "USED FOR",
-                            placeholder: "Billing, Admin…",
-                            text: $draft.usedFor
-                        )
-                        .autocorrectionDisabled()
-
-                        // Row 4: Used In (Auto-computed)
-                        usedInCard
-
-                        // Row 5: Notes (full width)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("NOTES")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            TextField("Add notes…", text: notesBinding, axis: .vertical)
-                                .lineLimit(2...4)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(.white)
+                            // Row 2: Provider + Access Method
+                            HStack(spacing: 12) {
+                                ZifrField(
+                                    label: "PROVIDER",
+                                    placeholder: "Gmail, iCloud…",
+                                    text: $draft.provider
+                                )
                                 .autocorrectionDisabled()
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.06), lineWidth: 1))
+
+                                ZifrField(
+                                    label: "ACCESS METHOD",
+                                    placeholder: "Google SSO, Password…",
+                                    text: $draft.accessMethod
+                                )
+                                .autocorrectionDisabled()
+                            }
+
+                            // Row 3: Used For (full width)
+                            ZifrField(
+                                label: "USED FOR",
+                                placeholder: "Billing, Admin…",
+                                text: $draft.usedFor
+                            )
+                            .autocorrectionDisabled()
+
+                            // Row 4: Used In (Auto-computed)
+                            usedInCard
+
+                            // Row 5: Notes (full width)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("NOTES")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                TextField("Add notes…", text: notesBinding, axis: .vertical)
+                                    .lineLimit(2...4)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .autocorrectionDisabled()
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
                         }
                     }
-                    .padding(.vertical, 4)
-                } header: { EmptyView() }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
 
-                if !isNew {
-                    Section {
+                    if !isNew {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onDelete?()
@@ -1594,19 +1458,17 @@ struct LinkedEmailHUD: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .navigationTitle(draft.email.isEmpty ? "New Email" : draft.email)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

@@ -64,48 +64,79 @@ struct AdminSettingsView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showingEditProfile = true
                     } label: {
-                        VStack(spacing: 16) {
+                        ZStack {
+                            // 1. Background Photo / Base
                             if let user = authVM.currentUser,
                                case let .string(avatarUrlString) = user.userMetadata["avatar_url"],
                                let avatarUrl = URL(string: avatarUrlString) {
                                 AsyncImage(url: avatarUrl) { phase in
-                                    if let image = phase.image {
+                                    switch phase {
+                                    case .success(let image):
                                         image
                                             .resizable()
-                                            .scaledToFill()
-                                    } else {
-                                        Image(systemName: "person.crop.circle.fill")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .foregroundStyle(Color.white.opacity(0.2))
+                                            .aspectRatio(contentMode: .fill)
+                                    default:
+                                        Color(hex: "#1C1C1E")
                                     }
                                 }
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                                .background(Circle().fill(Color.white.opacity(0.05)))
+                                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                                .clipped()
+                                .overlay(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.black.opacity(0.15),
+                                            Color.black.opacity(0.70)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                             } else {
+                                Color(hex: "#1C1C1E")
+                                
                                 Image(systemName: "person.crop.circle.fill")
                                     .resizable()
                                     .scaledToFit()
-                                    .frame(width: 80, height: 80)
+                                    .frame(width: 72, height: 72)
                                     .foregroundStyle(Color.white.opacity(0.2))
-                                    .background(Color.white.opacity(0.05))
-                                    .clipShape(Circle())
+                                    .offset(y: -20)
                             }
                             
-                            VStack(spacing: 6) {
+                            // 2. Email and Edit Profile overlaid directly over the picture
+                            VStack(spacing: 8) {
+                                Spacer()
+                                
                                 Text(userEmail)
                                     .font(.system(size: 20, weight: .bold))
                                     .foregroundStyle(.white)
+                                    .shadow(color: Color.black.opacity(0.9), radius: 6, x: 0, y: 2)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                                 
                                 Text("EDIT PROFILE")
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
+                                    .tracking(0.5)
+                                    .foregroundStyle(Color.white.opacity(0.85))
+                                    .shadow(color: Color.black.opacity(0.9), radius: 4, x: 0, y: 1)
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 32)
-                        .masonryGlass(cornerRadius: 24)
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [Color.white.opacity(0.18), Color.white.opacity(0.06)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                        .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
                     }
                     .padding(.horizontal, 20)
 

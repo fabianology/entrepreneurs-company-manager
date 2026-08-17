@@ -41,7 +41,7 @@ struct StackedInstitutionDeckView: View {
             let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == lastInst.name.lowercased() }
             let showPhysicalCards = isExpanded
             let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-            lastHeight = (institutionHeights[lastInst.id] ?? collapsedHeight) + cardPeekHeight + 16.0
+            lastHeight = (institutionHeights[lastInst.id] ?? 360) + cardPeekHeight + 16.0
         } else {
             lastHeight = collapsedHeight
         }
@@ -56,7 +56,7 @@ struct StackedInstitutionDeckView: View {
             }
         }
         .frame(height: totalStackHeight, alignment: .top)
-        .padding(.bottom, 120)
+        .padding(.bottom, 24)
         .onPreferenceChange(InstitutionHeightKey.self) { value in
             institutionHeights.merge(value, uniquingKeysWith: { $1 })
         }
@@ -101,7 +101,7 @@ struct StackedInstitutionDeckView: View {
             if expandedInstId == inst.id {
                 let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == inst.name.lowercased() }
                 let cardPeekHeight: CGFloat = instCards.isEmpty ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-                offset += (institutionHeights[inst.id] ?? collapsedHeight) + cardPeekHeight + 8.0
+                offset += (institutionHeights[inst.id] ?? 360) + cardPeekHeight + 8.0
             } else {
                 offset += collapsedHeight
             }
@@ -320,21 +320,18 @@ struct StackedInstitutionDeckView: View {
                     }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
+            },
+            onDragChanged: { value in
+                handleDragChange(value: value, inst: inst)
+            },
+            onDragEnded: { value in
+                handleDragEnd(value: value, index: index, inst: inst)
             }
         )
         .background(
             GeometryReader { geo in
                 Color.clear.preference(key: InstitutionHeightKey.self, value: [inst.id: geo.size.height])
             }
-        )
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 10)
-                .onChanged { value in
-                    handleDragChange(value: value, inst: inst)
-                }
-                .onEnded { value in
-                    handleDragEnd(value: value, index: index, inst: inst)
-                }
         )
         .zIndex(10)
     }

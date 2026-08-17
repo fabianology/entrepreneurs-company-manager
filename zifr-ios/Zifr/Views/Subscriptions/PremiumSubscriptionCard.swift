@@ -785,64 +785,137 @@ struct DynamicLoginLabelView: View {
     let loginId: String
     var ignoreSubscriptionId: String? = nil
     var ignoreInstitutionId: String? = nil
+    var vm: AppViewModel? = nil
     
     @Environment(AppState.self) private var appState
     private var allSubscriptions: [Subscription] { appState.subscriptions }
-    
     private var allInstitutions: [Institution] { appState.institutions }
+    
+    @State private var selectedSubscription: Subscription? = nil
+    @State private var selectedInstitution: Institution? = nil
+    @State private var localVM = AppViewModel()
+    
+    private var effectiveVM: AppViewModel {
+        vm ?? localVM
+    }
     
     var body: some View {
         let normalizedLogin = loginId.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         if !normalizedLogin.isEmpty {
-            let subServices: [String] = allSubscriptions.compactMap { s in
+            let matchingSubs: [Subscription] = allSubscriptions.compactMap { s in
                 if let ignoreId = ignoreSubscriptionId, s.id.uuidString == ignoreId { return nil }
                 
                 if (s.loginId ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
-                    return s.name.isEmpty ? "Unnamed Service" : s.name
+                    return s
                 } else if s.linkedEmails.contains(where: { e in e.email.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin }) {
-                    return s.name.isEmpty ? "Unnamed Service" : s.name
+                    return s
                 }
                 return nil
             }
             
-            let instServices: [String] = allInstitutions.compactMap { i in
+            let matchingInsts: [Institution] = allInstitutions.compactMap { i in
                 if let ignoreId = ignoreInstitutionId, i.id.uuidString == ignoreId { return nil }
                 
                 let instLogin = (i.username ?? "").isEmpty ? (i.email ?? "") : (i.username ?? "")
                 if instLogin.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin {
-                    return i.name.isEmpty ? "Unnamed Institution" : i.name
+                    return i
                 } else if (i.email ?? "").lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedLogin && !(i.email ?? "").isEmpty {
-                    return i.name.isEmpty ? "Unnamed Institution" : i.name
+                    return i
                 }
                 return nil
             }
             
-            let allTextTags = (subServices + instServices).reduce(into: [String]()) { result, name in
+            let allNames: [String] = (matchingInsts.map { $0.name.isEmpty ? "Unnamed Institution" : $0.name } + matchingSubs.map { $0.name.isEmpty ? "Unnamed Service" : $0.name }).reduce(into: [String]()) { result, name in
                 if !result.contains(name) { result.append(name) }
             }
             
-            if !allTextTags.isEmpty {
-                HStack(alignment: .center, spacing: 6) {
-                    Text("LOGIN ALSO USED IN:")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#C1AA78"))
-                        .textCase(.uppercase)
-                        .layoutPriority(1)
+            if !matchingInsts.isEmpty || !matchingSubs.isEmpty {
+                Menu {
+                    if !matchingInsts.isEmpty {
+                        Section("Institutions (\(matchingInsts.count))") {
+                            ForEach(matchingInsts, id: \.id) { inst in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    selectedInstitution = inst
+                                } label: {
+                                    Label(inst.name.isEmpty ? "Unnamed Institution" : inst.name, systemImage: "building.columns")
+                                }
+                            }
+                        }
+                    }
                     
-                    HStack(spacing: 4) {
-                        Image(systemName: "link")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.zifrGreen)
+                    if !matchingSubs.isEmpty {
+                        Section("Services (\(matchingSubs.count))") {
+                            ForEach(matchingSubs, id: \.id) { sub in
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    selectedSubscription = sub
+                                } label: {
+                                    Label(sub.name.isEmpty ? "Unnamed Service" : sub.name, systemImage: "sparkles")
+                                }
+                            }
+                        }
+                    }
+                    
+                    Section {
+                        Button {
+                            UIPasteboard.general.string = normalizedLogin
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        } label: {
+                            Label("Copy Login (\(normalizedLogin))", systemImage: "doc.on.doc")
+                        }
+                    }
+                } label: {
+                    HStack(alignment: .center, spacing: 6) {
+                        Text("LOGIN ALSO USED IN:")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                            .textCase(.uppercase)
+                            .layoutPriority(1)
                         
-                        Text(allTextTags.joined(separator: " | "))
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color(hex: "#7D7D7D"))
-                            .lineLimit(1)
+                        HStack(spacing: 5) {
+                            Image(systemName: "link")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.zifrGreen)
+                            
+                            Text(allNames.joined(separator: " · "))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color(hex: "#7D7D7D"))
+                                .lineLimit(1)
+                            
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.35))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
                     }
                 }
+                .buttonStyle(.plain)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 12)
-                .padding(.bottom, -10)
+                .padding(.top, 6)
+                .sheet(item: $selectedSubscription) { sub in
+                    EditSubscriptionSheet(
+                        sub: sub,
+                        institutions: appState.institutions,
+                        cards: appState.cards,
+                        vm: effectiveVM,
+                        isNew: false
+                    )
+                }
+                .sheet(item: $selectedInstitution) { inst in
+                    EditInstitutionSheet(
+                        institution: inst,
+                        institutions: appState.institutions,
+                        cards: appState.cards,
+                        loans: appState.loans,
+                        vm: effectiveVM,
+                        isNew: false
+                    )
+                }
             }
         }
     }

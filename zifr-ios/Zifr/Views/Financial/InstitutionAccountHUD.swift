@@ -24,118 +24,111 @@ struct InstitutionAccountHUD: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("TYPE")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                        Picker("", selection: $draft.type) {
-                            ForEach(InstitutionAccount.allTypes, id: \.self) { t in
-                                Text(t).tag(t)
-                            }
-                        }
-                        .labelsHidden()
-                        .padding(.leading, 6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: 44)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 4)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("LINKED DEBIT CARD")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                        Picker("", selection: Binding(
-                            get: { draft.linkedCardId ?? "" },
-                            set: { draft.linkedCardId = $0.isEmpty ? nil : $0 }
-                        )) {
-                            Text("None").tag("")
-                            ForEach(availableCards.filter { $0.type.lowercased().contains("debit") }) { card in
-                                Text("\(card.name.isEmpty ? "Card" : card.name) (•••• \(card.last4 ?? "0000"))").tag(card.id.uuidString)
-                            }
-                        }
-                        .labelsHidden()
-                        .padding(.leading, 6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: 44)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 4)
-
-                    ZifrField(
-                        label: "ACCOUNT NAME",
-                        placeholder: "e.g. Primary Checking",
-                        text: $draft.name
-                    )
-                    .padding(.vertical, 4)
-
-                    ZifrField(
-                        label: "ACCOUNT NUMBER",
-                        placeholder: "e.g. 1234567890",
-                        text: Binding(
-                            get: { draft.accountNumber ?? "" },
-                            set: { newValue in
-                                draft.accountNumber = newValue
-                                let filtered = newValue.filter { $0.isNumber }
-                                if filtered.count >= 4 {
-                                    draft.last4 = String(filtered.suffix(4))
-                                } else {
-                                    draft.last4 = filtered
+            ScrollView {
+                VStack(spacing: 16) {
+                    ZifrSheetCard(title: "ACCOUNT DETAILS", icon: "building.columns.fill") {
+                        VStack(spacing: 14) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("TYPE")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                Picker("", selection: $draft.type) {
+                                    ForEach(InstitutionAccount.allTypes, id: \.self) { t in
+                                        Text(t).tag(t)
+                                    }
                                 }
+                                .labelsHidden()
+                                .padding(.leading, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                .contentShape(RoundedRectangle(cornerRadius: 12))
                             }
-                        ),
-                        keyboardType: .numberPad
-                    )
-                    .padding(.vertical, 4)
+                            .buttonStyle(.plain)
 
-                    ZifrField(
-                        label: "ROUTING NUMBER",
-                        placeholder: "e.g. 021000021",
-                        text: Binding(
-                            get: { draft.routingNumber ?? "" },
-                            set: { draft.routingNumber = $0 }
-                        ),
-                        keyboardType: .numberPad
-                    )
-                    .padding(.vertical, 4)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("LINKED DEBIT CARD")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                Picker("", selection: Binding(
+                                    get: { draft.linkedCardId ?? "" },
+                                    set: { draft.linkedCardId = $0.isEmpty ? nil : $0 }
+                                )) {
+                                    Text("None").tag("")
+                                    ForEach(availableCards.filter { $0.type.lowercased().contains("debit") }) { card in
+                                        Text("\(card.name.isEmpty ? "Card" : card.name) (•••• \(card.last4 ?? "0000"))").tag(card.id.uuidString)
+                                    }
+                                }
+                                .labelsHidden()
+                                .padding(.leading, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                .contentShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("BALANCE")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                        HStack(spacing: 4) {
-                            Text("$")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            DoubleField(placeholder: "0.00", value: $draft.balance)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(.white)
+                            ZifrField(
+                                label: "ACCOUNT NAME",
+                                placeholder: "e.g. Primary Checking",
+                                text: $draft.name
+                            )
+
+                            ZifrField(
+                                label: "ACCOUNT NUMBER",
+                                placeholder: "e.g. 1234567890",
+                                text: Binding(
+                                    get: { draft.accountNumber ?? "" },
+                                    set: { newValue in
+                                        draft.accountNumber = newValue
+                                        let filtered = newValue.filter { $0.isNumber }
+                                        if filtered.count >= 4 {
+                                            draft.last4 = String(filtered.suffix(4))
+                                        } else {
+                                            draft.last4 = filtered
+                                        }
+                                    }
+                                ),
+                                keyboardType: .numberPad
+                            )
+
+                            ZifrField(
+                                label: "ROUTING NUMBER",
+                                placeholder: "e.g. 021000021",
+                                text: Binding(
+                                    get: { draft.routingNumber ?? "" },
+                                    set: { draft.routingNumber = $0 }
+                                ),
+                                keyboardType: .numberPad
+                            )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("BALANCE")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                HStack(spacing: 4) {
+                                    Text("$")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                    DoubleField(placeholder: "0.00", value: $draft.balance)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
                         }
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: 44)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
-                    .padding(.vertical, 4)
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
 
-                if !isNew {
-                    Section {
+                    if !isNew {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onDelete?()
@@ -150,19 +143,17 @@ struct InstitutionAccountHUD: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .onAppear {
                 initialDraft = draft
             }

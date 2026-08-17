@@ -294,35 +294,15 @@ struct FinancialView: View {
                                 }
                             }
                         }
+                        
+                        // Extra bottom clearance to ensure full scrollability above the bottom tab bar and home indicator
+                        Spacer().frame(height: hideActionBar ? 160 : 120)
                     }
                 }
                 .padding(.horizontal, 20)
             }
         }
         .scrollIndicators(.hidden)
-        .mask(
-            Group {
-                if hideActionBar {
-                    Rectangle().fill(Color.black)
-                } else {
-                    VStack(spacing: 0) {
-                        // Completely transparent above top of action bar area (25pt)
-                        Color.clear.frame(height: 25)
-                        
-                        // Fast dissolve gradient across action bar height (from 60pt down to 25pt)
-                        LinearGradient(
-                            colors: [.clear, .black],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                        .frame(height: 35)
-                        
-                        // Fully visible list area below action bar
-                        Rectangle().fill(Color.black)
-                    }
-                }
-            }
-        )
         .onChange(of: onboardingState.currentStep) { _, step in
             // Scroll wallet into view for tutorial steps 11-13
             switch step {

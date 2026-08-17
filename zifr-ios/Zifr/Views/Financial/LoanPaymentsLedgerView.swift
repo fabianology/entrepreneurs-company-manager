@@ -8,26 +8,38 @@ struct LoanPaymentsLedgerView: View {
     @Binding var showPaymentHUD: Bool
 
     var body: some View {
-        let isPaymentsEmpty = (loan.payments ?? []).isEmpty
-        return VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("PAYMENT LEDGER")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.5))
-                    .tracking(1)
-            }
-            
+        ZifrSheetCard(
+            title: "PAYMENT LEDGER",
+            icon: "list.bullet.rectangle",
+            subtitle: "recorded payments · running balance",
+            badgeCount: (loan.payments ?? []).count
+        ) {
             VStack(spacing: 0) {
                 ledgerHeaderRow
                 ledgerListItems
             }
-            .padding(.top, isPaymentsEmpty ? 0 : 4)
             .background(Color(hex: "#1A1A1A"))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
             )
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                editingPaymentId = nil
+                paymentDraft = LoanPayment(id: UUID(), userId: loan.userId, loanId: loan.id, date: Date(), amount: 0, source: "")
+                showPaymentHUD = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Add Payment")
+                }
+                .font(.system(size: 13, weight: .bold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(MiloomSecondaryButtonStyle())
         }
     }
 
@@ -35,14 +47,16 @@ struct LoanPaymentsLedgerView: View {
         HStack(spacing: 4) {
             Text("#").frame(width: 16, alignment: .leading)
             Text("DATE").frame(maxWidth: .infinity, alignment: .leading)
-            Text("AMOUNT").frame(width: 80, alignment: .trailing)
+            Text("AMOUNT").frame(width: 70, alignment: .leading)
+            Text("SOURCE").frame(maxWidth: .infinity, alignment: .leading)
+            Text("TOTAL").frame(width: 70, alignment: .trailing)
         }
         .font(.system(size: 9, weight: .bold))
         .foregroundStyle(Color.white.opacity(0.4))
         .textCase(.uppercase)
         .tracking(1)
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(Color(hex: "#1C1C1E"))
     }
 
@@ -72,49 +86,55 @@ struct LoanPaymentsLedgerView: View {
     }
     
     private func paymentRow(index: Int, payment: LoanPayment, cumulativeTotal: Double) -> some View {
-        HStack(spacing: 4) {
-            Text("\(index)")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.3))
-                .frame(width: 16, alignment: .leading)
-            
-            Text(payment.date.formatted(date: .abbreviated, time: .omitted))
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Text(payment.amount.currencyString)
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
-            Text((payment.source ?? "").isEmpty ? "None" : (payment.source ?? ""))
-                .font(.system(size: 11, weight: .bold))
-                .foregroundStyle((payment.source ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            editingPaymentId = payment.id.uuidString
+            paymentDraft = LoanPayment(id: payment.id, userId: loan.userId, loanId: loan.id, date: payment.date, amount: payment.amount, source: payment.source)
+            showPaymentHUD = true
+        } label: {
+            HStack(spacing: 4) {
+                Text("\(index)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.3))
+                    .frame(width: 16, alignment: .leading)
                 
-            Text(cumulativeTotal.currencyString)
-                .font(.system(size: 11, weight: .black, design: .monospaced))
-                .foregroundStyle(Color.zifrGold)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                Text(payment.date.formatted(date: .abbreviated, time: .omitted))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                
+                Text(payment.amount.currencyString)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .frame(width: 70, alignment: .leading)
+                
+                Text((payment.source ?? "").isEmpty ? "None" : (payment.source ?? ""))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle((payment.source ?? "").isEmpty ? Color.white.opacity(0.4) : .white)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                Text(cumulativeTotal.currencyString)
+                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                    .foregroundStyle(Color.zifrGold)
+                    .frame(width: 70, alignment: .trailing)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(Color(hex: "#2C2C2E").opacity(0.4))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .modifier(ZifrSwipeActionsModifier(
-            onEdit: {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                editingPaymentId = payment.id.uuidString
-                paymentDraft = LoanPayment(id: payment.id, userId: loan.userId, loanId: loan.id, date: payment.date, amount: payment.amount, source: payment.source)
-                showPaymentHUD = true
-            },
-            onDelete: {
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation {
                     if let pId = payment.id as UUID? {
                         loan.payments?.removeAll(where: { $0.id == pId })
                     }
                 }
+            } label: {
+                Label("Delete Payment", systemImage: "trash")
             }
-        ))
+        }
     }
 }

@@ -34,7 +34,7 @@ struct DocumentListView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // Offset for top action bar + anchored category tabs header
-                    Spacer().frame(height: hideActionBar ? 316 : 340)
+                    Spacer().frame(height: hideActionBar ? 312 : 276)
 
                     Group {
                         if documents.isEmpty {
@@ -88,23 +88,6 @@ struct DocumentListView: View {
                 }
             }
             .scrollIndicators(.hidden)
-            .mask(
-                VStack(spacing: 0) {
-                    // Completely transparent above halfway point of bottom tab row
-                    Color.clear.frame(height: hideActionBar ? 264 : 288)
-                    
-                    // Fast 30pt dissolve gradient from grid bottom (318pt) up to halfway mark (288pt)
-                    LinearGradient(
-                        colors: [.clear, .black],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 30)
-                    
-                    // Fully visible list area below category tabs
-                    Rectangle().fill(Color.black)
-                }
-            )
 
             // Fixed Header with Tabs (anchored, does not move when scrolling)
             VStack(spacing: 0) {
@@ -456,67 +439,143 @@ struct DocumentRow: View {
     let doc: CompanyDocument
     let onEdit: () -> Void
     let onOpen: () -> Void
+    var onDelete: (() -> Void)? = nil
+
+    @State private var offset: CGFloat = 0
+    @State private var isSwiped: Bool = false
 
     var body: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            onEdit()
-        } label: {
-            HStack(spacing: 14) {
-                Image(systemName: doc.typeIcon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(doc.name.isEmpty ? "Document" : doc.name)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                    if !(doc.uploadDate ?? "").isEmpty {
-                        Text("Added \(doc.uploadDate ?? "")")
-                            .font(.system(size: 9, weight: .black))
-                            .foregroundStyle(Color.white.opacity(0.6))
-                    }
-                    if !(doc.notes ?? "").isEmpty {
-                        Text(doc.notes ?? "")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.white.opacity(0.5))
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
-                if !(doc.url ?? "").isEmpty {
-                    Button(action: onOpen) {
-                        Image(systemName: "paperclip")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#918457"))
+        ZStack(alignment: .trailing) {
+            // Delete Action Background Button
+            if let onDelete = onDelete {
+                HStack {
+                    Spacer()
+                    Button(role: .destructive) {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            offset = 0
+                            isSwiped = false
+                        }
+                        onDelete()
+                    } label: {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.red.opacity(0.85))
+                            
+                            VStack(spacing: 4) {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Delete")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                        .frame(width: 72)
                     }
                     .buttonStyle(.plain)
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 16))
             }
-            .padding(14)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.black.opacity(0.40))
+
+            // Main Document Card Content
+            Button {
+                if isSwiped {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        offset = 0
+                        isSwiped = false
+                    }
+                } else {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onEdit()
+                }
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: doc.typeIcon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(doc.name.isEmpty ? "Document" : doc.name)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                        if !(doc.uploadDate ?? "").isEmpty {
+                            Text("Added \(doc.uploadDate ?? "")")
+                                .font(.system(size: 9, weight: .black))
+                                .foregroundStyle(Color.white.opacity(0.6))
+                        }
+                        if !(doc.notes ?? "").isEmpty {
+                            Text(doc.notes ?? "")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    if !(doc.url ?? "").isEmpty {
+                        Button(action: onOpen) {
+                            Image(systemName: "paperclip")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color(hex: "#918457"))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(hex: "#1C1C1E"))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color(hex: "#918457").opacity(0.2), radius: 6, x: 0, y: 3)
+            }
+            .buttonStyle(.plain)
+            .offset(x: offset)
+            .gesture(
+                onDelete == nil ? nil :
+                DragGesture(minimumDistance: 15, coordinateSpace: .local)
+                    .onChanged { value in
+                        if value.translation.width < 0 {
+                            let drag = value.translation.width + (isSwiped ? -72 : 0)
+                            offset = min(0, max(-120, drag))
+                        } else if isSwiped && value.translation.width > 0 {
+                            offset = min(0, -72 + value.translation.width)
+                        }
+                    }
+                    .onEnded { value in
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            if value.translation.width < -140 {
+                                offset = 0
+                                isSwiped = false
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                onDelete?()
+                            } else if value.translation.width < -40 || (isSwiped && value.translation.width < 20) {
+                                offset = -72
+                                isSwiped = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } else {
+                                offset = 0
+                                isSwiped = false
+                            }
+                        }
+                    }
             )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#918457"),
-                                Color(hex: "#918457").opacity(0.3)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1.5
-                    )
-            )
-            .shadow(color: Color(hex: "#918457").opacity(0.2), radius: 6, x: 0, y: 3)
         }
-        .buttonStyle(.plain)
     }
 }
 

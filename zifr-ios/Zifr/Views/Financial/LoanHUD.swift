@@ -23,125 +23,120 @@ struct LoanHUD: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    ZifrField(
-                        label: "LOAN NAME",
-                        placeholder: "e.g. Mortgage",
-                        text: $draft.name
-                    )
-                    .padding(.vertical, 4)
+            ScrollView {
+                VStack(spacing: 16) {
+                    ZifrSheetCard(title: "LOAN DETAILS", icon: "doc.text.fill") {
+                        VStack(spacing: 14) {
+                            ZifrField(
+                                label: "LOAN NAME",
+                                placeholder: "e.g. Mortgage",
+                                text: $draft.name
+                            )
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("ROLE")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                        Picker("", selection: $draft.role) {
-                            ForEach(Loan.roles, id: \.self) { t in
-                                Text(t).tag(t)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("ROLE")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                Picker("", selection: $draft.role) {
+                                    ForEach(Loan.roles, id: \.self) { t in
+                                        Text(t).tag(t)
+                                    }
+                                }
+                                .labelsHidden()
+                                .padding(.leading, 6)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                .contentShape(RoundedRectangle(cornerRadius: 12))
                             }
-                        }
-                        .labelsHidden()
-                        .padding(.leading, 6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: 44)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        .contentShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                    .padding(.vertical, 4)
 
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("PRINCIPAL")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            HStack(spacing: 4) {
-                                Text("$")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                DoubleField(placeholder: "0.00", value: $draft.principalAmount)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("INTEREST RATE")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            HStack(spacing: 4) {
-                                DoubleField(placeholder: "0.00", value: $draft.interestRate)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                Text("%")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                            }
-                            .padding(.horizontal, 16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                        }
-                    }
-                    .padding(.vertical, 4)
-
-                    HStack(spacing: 12) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("TERM YEARS")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            Picker("", selection: $draft.termYears) {
-                                ForEach(0...40, id: \.self) { y in
-                                    Text("\(y) Years").tag(y)
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("PRINCIPAL")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    HStack(spacing: 4) {
+                                        Text("$")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                        DoubleField(placeholder: "0.00", value: $draft.principalAmount)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("INTEREST RATE")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    HStack(spacing: 4) {
+                                        DoubleField(placeholder: "0.00", value: $draft.interestRate)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(.white)
+                                        Text("%")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                                 }
                             }
-                            .labelsHidden()
-                            .padding(.leading, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                            .contentShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("TERM MONTHS")
-                                .font(.system(size: 12, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.45))
-                            Picker("", selection: $draft.termMonths) {
-                                ForEach(0...11, id: \.self) { m in
-                                    Text("\(m) Months").tag(m)
+
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("TERM YEARS")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    Picker("", selection: $draft.termYears) {
+                                        ForEach(0...40, id: \.self) { y in
+                                            Text("\(y) Years").tag(y)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .padding(.leading, 6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("TERM MONTHS")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    Picker("", selection: $draft.termMonths) {
+                                        ForEach(0...11, id: \.self) { m in
+                                            Text("\(m) Months").tag(m)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .padding(.leading, 6)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                    .contentShape(RoundedRectangle(cornerRadius: 12))
                                 }
                             }
-                            .labelsHidden()
-                            .padding(.leading, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                            .contentShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
-                    .padding(.vertical, 4)
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
 
-                if !isNew {
-                    Section {
+                    if !isNew {
                         Button(role: .destructive) {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onDelete?()
@@ -156,19 +151,17 @@ struct LoanHUD: View {
                             .foregroundStyle(.red)
                             .padding(.vertical, 14)
                             .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                     }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .onAppear {
                 initialDraft = draft
             }

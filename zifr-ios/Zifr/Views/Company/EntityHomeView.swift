@@ -97,21 +97,6 @@ struct EntityHomeView: View {
                     .id("documentSection")
                 }
             }
-            .mask(
-                VStack(spacing: 0) {
-                    // Dissolve zone: cards fade out behind tabs
-                    // Tab selector is ~88pt (8 top + 70 height + 10 bottom)
-                    Color.clear.frame(height: 58)
-                    LinearGradient(
-                        colors: [.clear, .black],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: 30)
-                    // Fully visible below
-                    Rectangle().fill(Color.black)
-                }
-            )
             
             // TAB SELECTOR (floating on top)
             ControlCenterTabSelector(

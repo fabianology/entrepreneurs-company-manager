@@ -64,83 +64,82 @@ struct EditLoanSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     SharedItemOverrideBanner(resourceId: loan.id, defaultCompanyId: loan.companyId)
                     
                     Group {
-                    loanSummarySection()
-                    
-                    loanRoleSection()
-                    
-                    VStack(spacing: 12) {
+                        loanSummarySection()
+                        
                         loanPrincipalSection()
-                        LoanPaymentsLedgerView(loan: $loan, editingPaymentId: $editingPaymentId, paymentDraft: $paymentDraft, showPaymentHUD: $showPaymentHUD)
-                    }
-                    .padding(.horizontal, 20)
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
+                        
+                        LoanPaymentsLedgerView(
+                            loan: $loan,
+                            editingPaymentId: $editingPaymentId,
+                            paymentDraft: $paymentDraft,
+                            showPaymentHUD: $showPaymentHUD
+                        )
 
-                    if !isNew {
-                        // Share Loan
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showShareSheet = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Share Loan")
-                                Spacer()
+                        // MARK: - Actions Card
+                        if !isNew {
+                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                VStack(spacing: 12) {
+                                    // Share Loan
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        showShareSheet = true
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "person.crop.circle.badge.plus")
+                                                Text("Share Loan")
+                                            }
+                                            .font(.system(size: 13, weight: .semibold))
+                                            Text("Generate a share link for collaborators")
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                    }
+                                    .buttonStyle(MiloomSecondaryButtonStyle())
+                                }
                             }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#4f46e5"))
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .buttonStyle(.plain)
 
-                        // Delete Loan
-                        Button(role: .destructive) {
-                            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                            showDeleteConfirm = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "trash")
-                                Text("Delete \((loan.name ?? "").isEmpty ? "Loan" : loan.name)")
-                                Spacer()
+                            // ── Unencapsulated Bottom Delete Button ─────
+                            Button(role: .destructive) {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDeleteConfirm = true
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "trash")
+                                    Text("Delete \((loan.name ?? "").isEmpty ? "Loan" : loan.name)")
+                                    Spacer()
+                                }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.red)
-                            .padding(.vertical, 14)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 8)
-                        .padding(.bottom, 32)
-                        .buttonStyle(.plain)
-                        .confirmationDialog("Delete Loan?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                            Button("Delete Loan", role: .destructive) {
-                                vm.deleteLoan(loan, appState: appState)
-                                dismiss()
+                            .buttonStyle(.plain)
+                            .confirmationDialog("Delete Loan?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                                Button("Delete Loan", role: .destructive) {
+                                    vm.deleteLoan(loan, appState: appState)
+                                    dismiss()
+                                }
+                                Button("Cancel", role: .cancel) {}
                             }
-                            Button("Cancel", role: .cancel) {}
                         }
-                    }
                     } // Close Group
                     .disabled(isViewer)
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .onAppear {
                 snapshot = currentSnapshot
             }
@@ -351,156 +350,152 @@ struct EditLoanSheet: View {
     @ViewBuilder
     private func loanSummarySection() -> some View {
         let amort = loan.amortization
-        VStack(spacing: 20) {
-            // Header Stats
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(.white)
-                    Text((loan.lender ?? "").isEmpty ? "Lender Unknown" : (loan.lender ?? ""))
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.6))
+        ZifrSheetCard(title: "LOAN SUMMARY", icon: "chart.pie.fill") {
+            VStack(spacing: 16) {
+                // Header Stats
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text((loan.lender ?? "").isEmpty ? "Lender Unknown" : (loan.lender ?? ""))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(loan.principalAmount.currencyString)
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundStyle(.white)
+                        Text("PRINCIPAL")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(1)
+                            .foregroundStyle(Color.white.opacity(0.4))
+                    }
                 }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(loan.principalAmount.currencyString)
-                        .font(.system(size: 20, weight: .black))
-                        .foregroundStyle(.white)
-                    Text("PRINCIPAL")
-                        .font(.system(size: 10, weight: .heavy))
-                        .tracking(1)
-                        .foregroundStyle(Color.white.opacity(0.4))
+                
+                // Progress Bar
+                VStack(spacing: 8) {
+                    GeometryReader { geo in
+                        HStack(spacing: 0) {
+                            Rectangle()
+                                .fill(Color(hex: "#545454"))
+                                .frame(width: geo.size.width * (amort.principalPct / 100))
+                            Rectangle()
+                                .fill(Color(hex: "#742C2D"))
+                        }
+                    }
+                    .frame(height: 8)
+                    .clipShape(Capsule())
+                    .background(Color.white.opacity(0.05))
                 }
-            }
-            
-            // Progress Bar
-            VStack(spacing: 8) {
+                
+                // Stats Grid
                 GeometryReader { geo in
                     HStack(spacing: 0) {
-                        Rectangle()
-                            .fill(Color(hex: "#545454"))
-                            .frame(width: geo.size.width * (amort.principalPct / 100))
-                        Rectangle()
-                            .fill(Color(hex: "#742C2D"))
+                        summaryStatColumn(label: "INTEREST", value: amort.totalInterest.currencyString, width: geo.size.width / 3)
+                        summaryStatColumn(label: "TOTAL COST", value: amort.totalCost.currencyString, width: geo.size.width / 3)
+                        summaryStatColumn(label: "MO. PAYMENT", value: amort.monthlyPayment.currencyString, width: geo.size.width / 3)
                     }
                 }
-                .frame(height: 8)
-                .clipShape(Capsule())
-                .background(Color.white.opacity(0.05))
-            }
-            
-            // Stats Grid
-            GeometryReader { geo in
-                HStack(spacing: 0) {
-                    summaryStatColumn(label: "INTEREST", value: amort.totalInterest.currencyString, width: geo.size.width / 3)
-                    summaryStatColumn(label: "TOTAL COST", value: amort.totalCost.currencyString, width: geo.size.width / 3)
-                    summaryStatColumn(label: "MO. PAYMENT", value: amort.monthlyPayment.currencyString, width: geo.size.width / 3)
-                }
-            }
-            .frame(height: 40)
-            
-            if !amort.schedule.isEmpty {
-                VStack(spacing: 12) {
-                    Divider().background(Color.white.opacity(0.05))
-                        .padding(.vertical, 4)
-                        
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showAmortizationTable.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            Text(showAmortizationTable ? "Hide Schedule" : "Amortization Schedule")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.6))
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.6))
-                                .rotationEffect(.degrees(showAmortizationTable ? 180 : 0))
-                            Spacer()
-                        }
-                        .frame(height: 36)
-                        .background(Color.white.opacity(0.03))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    if showAmortizationTable {
-                        VStack(spacing: 0) {
-                            HStack {
-                                Text(loan.scheduleFrequency == "Weekly" ? "WK" : (loan.scheduleFrequency == "Yearly" ? "YR" : "MO"))
-                                    .frame(width: 30, alignment: .leading)
-                                Text("PMT")
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                Text("PRIN")
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                Text("INT")
-                                    .foregroundStyle(Color(hex: "#742C2D"))
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
-                                Text("BAL")
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                .frame(height: 40)
+                
+                if !amort.schedule.isEmpty {
+                    VStack(spacing: 12) {
+                        Divider().background(Color.white.opacity(0.05))
+                            .padding(.vertical, 2)
+                            
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showAmortizationTable.toggle()
                             }
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                            .textCase(.uppercase)
-                            .tracking(1)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(Color(hex: "#1C1C1E"))
-                            
-                            Divider().background(Color.white.opacity(0.05))
-                            
-                            ScrollView {
-                                VStack(spacing: 0) {
-                                    ForEach(amort.schedule) { row in
-                                        HStack {
-                                            Text("\(row.month)")
-                                                .foregroundStyle(Color.white.opacity(0.5))
-                                                .frame(width: 30, alignment: .leading)
-                                            Text("$\(Int(round(row.payment)))")
-                                                .foregroundStyle(Color.white.opacity(0.9))
-                                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                            Text("$\(Int(round(row.principal)))")
-                                                .foregroundStyle(Color.white.opacity(0.7))
-                                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                            Text("$\(Int(round(row.interest)))")
-                                                .foregroundStyle(Color(hex: "#742C2D"))
-                                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                            Text("$\(Int(round(row.balance)))")
-                                                .foregroundStyle(Color.white)
-                                                .fontWeight(.bold)
-                                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                        }
-                                        .font(.system(size: 11, weight: .regular, design: .monospaced))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        
-                                        if row.month != amort.schedule.last?.month {
-                                            Divider().background(Color.white.opacity(0.03))
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text(showAmortizationTable ? "Hide Schedule" : "Amortization Schedule")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .rotationEffect(.degrees(showAmortizationTable ? 180 : 0))
+                                Spacer()
+                            }
+                            .frame(height: 36)
+                            .background(Color.white.opacity(0.03))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if showAmortizationTable {
+                            VStack(spacing: 0) {
+                                HStack {
+                                    Text(loan.scheduleFrequency == "Weekly" ? "WK" : (loan.scheduleFrequency == "Yearly" ? "YR" : "MO"))
+                                        .frame(width: 30, alignment: .leading)
+                                    Text("PMT")
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                    Text("PRIN")
+                                        .foregroundStyle(Color.white.opacity(0.5))
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                    Text("INT")
+                                        .foregroundStyle(Color(hex: "#742C2D"))
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                    Text("BAL")
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                }
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .textCase(.uppercase)
+                                .tracking(1)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "#1C1C1E"))
+                                
+                                Divider().background(Color.white.opacity(0.05))
+                                
+                                ScrollView {
+                                    VStack(spacing: 0) {
+                                        ForEach(amort.schedule) { row in
+                                            HStack {
+                                                Text("\(row.month)")
+                                                    .foregroundStyle(Color.white.opacity(0.5))
+                                                    .frame(width: 30, alignment: .leading)
+                                                Text("$\(Int(round(row.payment)))")
+                                                    .foregroundStyle(Color.white.opacity(0.9))
+                                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                                Text("$\(Int(round(row.principal)))")
+                                                    .foregroundStyle(Color.white.opacity(0.7))
+                                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                                Text("$\(Int(round(row.interest)))")
+                                                    .foregroundStyle(Color(hex: "#742C2D"))
+                                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                                Text("$\(Int(round(row.balance)))")
+                                                    .foregroundStyle(Color.white)
+                                                    .fontWeight(.bold)
+                                                    .frame(maxWidth: .infinity, alignment: .trailing)
+                                            }
+                                            .font(.system(size: 11, weight: .regular, design: .monospaced))
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            
+                                            if row.month != amort.schedule.last?.month {
+                                                Divider().background(Color.white.opacity(0.03))
+                                            }
                                         }
                                     }
                                 }
+                                .frame(maxHeight: 250)
+                                .background(Color.black.opacity(0.2))
                             }
-                            .frame(maxHeight: 250)
-                            .background(Color.black.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.03), lineWidth: 1))
                         }
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.03), lineWidth: 1))
                     }
                 }
             }
         }
-        .padding(24)
-        .background(Color(hex: "#2C2C2E"))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.05), lineWidth: 1))
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
     }
 
     private func summaryStatColumn(label: String, value: String, width: CGFloat) -> some View {
@@ -521,31 +516,35 @@ struct EditLoanSheet: View {
         if !isInstitutionContext {
             CustomSegmentedControl(options: Loan.roles, selection: $loan.role)
             .frame(height: 44)
-            .padding(.horizontal, 20)
             .disabled(!isNew)
         }
     }
 
     @ViewBuilder
     private func loanPrincipalSection() -> some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                ZifrField(
-                    label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LENT TO" : "LENDER", 
-                    placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Acme Corp" : "e.g. Chase", 
-                    text: Binding(get: { loan.lender ?? "" }, set: { loan.lender = $0 })
-                )
-                ZifrField(
-                    label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LOAN NAME" : "LOAN ID", 
-                    placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Bridge Loan" : "e.g. Series A", 
-                    text: Binding(get: { loan.name ?? "" }, set: { loan.name = $0 })
-                )
-            }
-            
-            GeometryReader { geo in
+        ZifrSheetCard(title: "LOAN DETAILS", icon: "doc.text") {
+            VStack(spacing: 14) {
+                if !isInstitutionContext {
+                    loanRoleSection()
+                        .padding(.bottom, 2)
+                }
+
+                HStack(spacing: 12) {
+                    ZifrField(
+                        label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LENT TO" : "LENDER", 
+                        placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Acme Corp" : "e.g. Chase", 
+                        text: Binding(get: { loan.lender ?? "" }, set: { loan.lender = $0 })
+                    )
+                    ZifrField(
+                        label: (!isInstitutionContext && loan.role == "I'm Lending") ? "LOAN NAME" : "LOAN ID", 
+                        placeholder: (!isInstitutionContext && loan.role == "I'm Lending") ? "e.g. Bridge Loan" : "e.g. Series A", 
+                        text: Binding(get: { loan.name ?? "" }, set: { loan.name = $0 })
+                    )
+                }
+                
                 HStack(spacing: 12) {
                     moneyField(label: "PRINCIPAL", value: $loan.principalAmount)
-                        .frame(width: geo.size.width * 0.5 - 6)
+                        .frame(maxWidth: .infinity)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("LOAN TERM")
@@ -565,81 +564,77 @@ struct EditLoanSheet: View {
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(Color.white.opacity(0.5))
                             }
-                            .padding(.horizontal, 10)
+                            .padding(.horizontal, 12)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .frame(height: 44)
                             .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                
+                if loan.role == "I'm Lending" {
+                    HStack(spacing: 12) {
+                        loanPicker(label: "INTEREST TYPE", sel: $loan.interestType, opts: Loan.interestTypes)
+                    }
+                }
+                
+                HStack(spacing: 12) {
+                    aprField(label: loan.interestType == "Fixed" ? "FIXED FEE" : "YR APR", value: $loan.interestRate)
+                    loanPicker(label: "PAYMENT FREQUENCY", sel: $loan.scheduleFrequency, opts: Loan.frequencies)
+                }
+                
+                HStack(spacing: 12) {
+                    datePicker(label: "START DATE", selection: $loan.startDate)
+                        .onChange(of: loan.startDate) { _, _ in updateMaturityDate() }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("MATURITY")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                        
+                        if let selection = Binding($loan.maturityDate) {
+                            DatePicker("", selection: selection, displayedComponents: .date)
+                                .labelsHidden()
+                                .datePickerStyle(.compact)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(height: 44)
+                                .onChange(of: loan.maturityDate) { _, _ in updateTerm() }
+                        } else {
+                            Button {
+                                loan.maturityDate = Date()
+                            } label: {
+                                Text("Set Date")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.zifrGold)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .frame(height: 44)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .frame(width: geo.size.width * 0.5 - 6)
                 }
-            }
-            .frame(height: 64)
-            
-            if loan.role == "I'm Lending" {
-                HStack(spacing: 12) {
-                    loanPicker(label: "INTEREST TYPE", sel: $loan.interestType, opts: Loan.interestTypes)
-                }
-            }
-            
-            HStack(spacing: 12) {
-                aprField(label: loan.interestType == "Fixed" ? "FIXED FEE" : "YR APR", value: $loan.interestRate)
-                loanPicker(label: "PAYMENT FREQUENCY", sel: $loan.scheduleFrequency, opts: Loan.frequencies)
-            }
-            
-            HStack(spacing: 12) {
-                datePicker(label: "START DATE", selection: $loan.startDate)
-                    .onChange(of: loan.startDate) { _, _ in updateMaturityDate() }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("MATURITY")
+                    Text("LOAN NOTES")
                         .font(.system(size: 12, weight: .regular))
                         .foregroundStyle(Color.white.opacity(0.45))
                     
-                    if let selection = Binding($loan.maturityDate) {
-                        DatePicker("", selection: selection, displayedComponents: .date)
-                            .labelsHidden()
-                            .datePickerStyle(.compact)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .onChange(of: loan.maturityDate) { _, _ in updateTerm() }
-                    } else {
-                        Button {
-                            loan.maturityDate = Date()
-                        } label: {
-                            Text("Set Date")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color.zifrGold)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .frame(height: 44)
-                        }
-                    }
+                    TextField("Add notes...", text: Binding(get: { loan.notes ?? "" }, set: { loan.notes = $0 }), axis: .vertical)
+                        .lineLimit(3...6)
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white)
+                        .padding(14)
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                 }
+                .padding(.top, 2)
             }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("LOAN SUMMARY")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.45))
-                    .padding(.leading, 6)
-                
-                TextField("Add notes...", text: Binding(get: { loan.notes ?? "" }, set: { loan.notes = $0 }), axis: .vertical)
-                    .lineLimit(3...6)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white)
-                    .padding(12)
-                    .background(Color(hex: "#2C2C2E"))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-            }
-            .padding(.top, 4)
         }
-        .padding(16)
-        .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.05), lineWidth: 1))
     }
 
         

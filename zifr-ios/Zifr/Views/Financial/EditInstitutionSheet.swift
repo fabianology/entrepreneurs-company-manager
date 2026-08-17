@@ -59,298 +59,273 @@ struct EditInstitutionSheet: View {
     @State private var showLoanHUD = false
     @State private var loanDraft: Loan? = nil
 
-
-
     var body: some View {
         NavigationStack {
-            Form {
-                SharedItemOverrideBanner(resourceId: institution.id, defaultCompanyId: institution.companyId)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
-                Group {
-                // MARK: - Bank Identity
-                Section {
-                    VStack(spacing: 16) {
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "INSTITUTION",
-                                placeholder: "e.g. Chase",
-                                text: Binding(get: { institution.name }, set: { institution.name = $0 })
-                            )
-                            ZifrField(
-                                label: "WEBSITE",
-                                placeholder: "chase.com",
-                                text: Binding(get: { institution.loginUrl ?? "" }, set: { institution.loginUrl = $0 }),
-                                keyboardType: .URL,
-                                textContentType: .URL
-                            )
-                            .textInputAutocapitalization(.never)
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(spacing: 12) {
-                                ZifrAutocompleteField(
-                                    label: "LOGIN ID",
-                                    placeholder: "username",
-                                    text: Binding(
-                                        get: { (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "") },
-                                        set: { newValue in
-                                            let old = institution.username
-                                            institution.username = newValue
-                                            if newValue.contains("@") && ((institution.email ?? "").isEmpty || institution.email == old) {
-                                                institution.email = newValue
-                                            }
-                                        }
-                                    ),
-                                    keyboardType: .emailAddress
-                                )
-
-                                ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(spacing: 20) {
+                    SharedItemOverrideBanner(resourceId: institution.id, defaultCompanyId: institution.companyId)
+                    
+                    Group {
+                        // ── Card 1: Bank Identity & Login ──────────────
+                        ZifrSheetCard(title: "LOGIN & IDENTITY", icon: "lock.shield") {
+                            VStack(spacing: 16) {
+                                HStack(spacing: 12) {
                                     ZifrField(
-                                        label: "PASSWORD",
-                                        placeholder: "••••••••",
-                                        text: Binding(get: { institution.password ?? "" }, set: { institution.password = $0 }),
-                                        isSecure: !showPassword,
-                                        textContentType: .password
+                                        label: "INSTITUTION",
+                                        placeholder: "e.g. Chase",
+                                        text: Binding(get: { institution.name }, set: { institution.name = $0 })
+                                    )
+                                    ZifrField(
+                                        label: "WEBSITE",
+                                        placeholder: "chase.com",
+                                        text: Binding(get: { institution.loginUrl ?? "" }, set: { institution.loginUrl = $0 }),
+                                        keyboardType: .URL,
+                                        textContentType: .URL
+                                    )
+                                    .textInputAutocapitalization(.never)
+                                }
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 12) {
+                                        ZifrAutocompleteField(
+                                            label: "LOGIN ID",
+                                            placeholder: "username",
+                                            text: Binding(
+                                                get: { (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "") },
+                                                set: { newValue in
+                                                    let old = institution.username
+                                                    institution.username = newValue
+                                                    if newValue.contains("@") && ((institution.email ?? "").isEmpty || institution.email == old) {
+                                                        institution.email = newValue
+                                                    }
+                                                }
+                                            ),
+                                            keyboardType: .emailAddress
+                                        )
+
+                                        ZStack(alignment: .bottomTrailing) {
+                                            ZifrField(
+                                                label: "PASSWORD",
+                                                placeholder: "••••••••",
+                                                text: Binding(get: { institution.password ?? "" }, set: { institution.password = $0 }),
+                                                isSecure: !showPassword,
+                                                textContentType: .password
+                                            )
+                                            .textInputAutocapitalization(.never)
+
+                                            Button {
+                                                showPassword.toggle()
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            } label: {
+                                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(Color.white.opacity(0.4))
+                                                    .padding()
+                                            }
+                                            .padding(.bottom, 2)
+                                        }
+                                    }
+                                    
+                                    let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
+                                    DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
+                                }
+                                
+                                HStack(spacing: 12) {
+                                    ZifrField(
+                                        label: "EMAIL",
+                                        placeholder: "name@company.com",
+                                        text: Binding(get: { institution.email ?? "" }, set: { institution.email = $0 }),
+                                        keyboardType: .emailAddress,
+                                        textContentType: .emailAddress
                                     )
                                     .textInputAutocapitalization(.never)
 
-                                    Button {
-                                        showPassword.toggle()
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    } label: {
-                                        Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                            .padding()
-                                    }
-                                    .padding(.bottom, 2)
+                                    ZifrField(
+                                        label: "2FA",
+                                        placeholder: "Phone or App",
+                                        text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
+                                    )
                                 }
                             }
-                            
-                            let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
-                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
                         }
-                        
-                        HStack(spacing: 12) {
-                            ZifrField(
-                                label: "EMAIL",
-                                placeholder: "name@company.com",
-                                text: Binding(get: { institution.email ?? "" }, set: { institution.email = $0 }),
-                                keyboardType: .emailAddress,
-                                textContentType: .emailAddress
-                            )
-                            .textInputAutocapitalization(.never)
 
-                            ZifrField(
-                                label: "2FA",
-                                placeholder: "Phone or App",
-                                text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
-                            )
-                        }
-                        
-                        // Sync Latest Data
+                        // ── Card 2: Accounts ───────────────────────────
+                        InstitutionAccountsSection(
+                            institution: institution,
+                            vm: vm,
+                            onAdd: {
+                                accountDraft = InstitutionAccount()
+                                accountDraftIndex = nil
+                                showAccountHUD = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            },
+                            onEdit: { idx, acc in
+                                accountDraft = acc
+                                accountDraftIndex = idx
+                                showAccountHUD = true
+                            }
+                        )
+
+                        // ── Card 3: Cards ──────────────────────────────
+                        InstitutionCardsSection(
+                            cards: instCards,
+                            onAdd: {
+                                cardDraft = vm.addCard(appState: appState, userId: institution.userId, companyId: institution.companyId)
+                                cardDraft?.institutionName = institution.name 
+                                showCardHUD = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            },
+                            onEdit: { card in
+                                cardDraft = card
+                                showCardHUD = true
+                            },
+                            onDelete: { card in
+                                vm.deleteCard(card, appState: appState)
+                            }
+                        )
+
+                        // ── Card 4: Loans ──────────────────────────────
+                        InstitutionLoansSection(
+                            loans: instLoans,
+                            onAdd: {
+                                loanDraft = vm.addLoan(appState: appState, userId: institution.userId, companyId: institution.companyId)
+                                loanDraft?.lender = institution.name 
+                                showLoanHUD = true
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            },
+                            onEdit: { loan in
+                                loanDraft = loan
+                                showLoanHUD = true
+                            },
+                            onDelete: { loan in
+                                vm.deleteLoan(loan, appState: appState)
+                            }
+                        )
+
+                        // ── Card 5: Actions ────────────────────────────
                         if !isNew {
-                            Button {
-                                guard !isSyncing else { return }
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                isSyncing = true
-                                syncSuccess = false
-                                Task {
-                                    do {
-                                        try await PlaidService.shared.syncSubscriptions(institutionId: institution.id)
-                                        await DataRepository.shared.fetchAllData(appState: appState)
-                                        if let updatedInst = appState.institutions.first(where: { $0.id == institution.id }) {
-                                            self.institution = updatedInst
+                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                VStack(spacing: 12) {
+                                    // Share Institution
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        showShareSheet = true
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "person.crop.circle.badge.plus")
+                                                Text("Share Institution")
+                                            }
+                                            .font(.system(size: 13, weight: .semibold))
+                                            Text("Generate a share link for collaborators")
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(Color.white.opacity(0.6))
                                         }
-                                        isSyncing = false
-                                        syncSuccess = true
-                                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                                        try? await Task.sleep(nanoseconds: 2_000_000_000)
-                                        syncSuccess = false
-                                    } catch {
-                                        isSyncing = false
-                                        syncErrorMsg = error.localizedDescription
-                                        print("Failed to sync bank data: \(error)")
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                    }
+                                    .buttonStyle(MiloomSecondaryButtonStyle())
+
+                                    // Sync Latest Data
+                                    VStack(spacing: 6) {
+                                        Button {
+                                            guard !isSyncing else { return }
+                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                            isSyncing = true
+                                            syncSuccess = false
+                                            Task {
+                                                do {
+                                                    try await PlaidService.shared.syncSubscriptions(institutionId: institution.id)
+                                                    await DataRepository.shared.fetchAllData(appState: appState)
+                                                    if let updatedInst = appState.institutions.first(where: { $0.id == institution.id }) {
+                                                        self.institution = updatedInst
+                                                    }
+                                                    isSyncing = false
+                                                    syncSuccess = true
+                                                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                                                    syncSuccess = false
+                                                } catch {
+                                                    isSyncing = false
+                                                    syncErrorMsg = error.localizedDescription
+                                                    print("Failed to sync bank data: \(error)")
+                                                }
+                                            }
+                                        } label: {
+                                            VStack(spacing: 4) {
+                                                HStack(spacing: 6) {
+                                                    if isSyncing {
+                                                        ProgressView()
+                                                            .tint(.white)
+                                                            .scaleEffect(0.8)
+                                                        Text("Syncing...")
+                                                    } else if syncSuccess {
+                                                        Image(systemName: "checkmark.circle.fill")
+                                                            .foregroundStyle(Color.zifrGreen)
+                                                        Text("Sync Complete")
+                                                            .foregroundStyle(Color.zifrGreen)
+                                                    } else {
+                                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                                        Text("Sync Latest Data")
+                                                    }
+                                                }
+                                                .font(.system(size: 13, weight: .semibold))
+                                                Text(isSyncing || syncSuccess ? "Updates may take a few moments to appear" : "Pull newest balances and subscriptions from Plaid")
+                                                    .font(.system(size: 10, weight: .regular))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                            }
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
+                                        }
+                                        .buttonStyle(MiloomSecondaryButtonStyle())
+                                        
+                                        Text("Last synced on: \(institution.lastSyncedAt?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                            .frame(maxWidth: .infinity, alignment: .center)
                                     }
                                 }
+                            }
+
+                            // ── Unencapsulated Bottom Delete Button ─────
+                            Button(role: .destructive) {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDeleteConfirm = true
                             } label: {
-                                VStack(spacing: 4) {
-                                    HStack(spacing: 6) {
-                                    if isSyncing {
-                                        ProgressView()
-                                            .tint(.white)
-                                            .scaleEffect(0.8)
-                                        Text("Syncing...")
-                                    } else if syncSuccess {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(Color.zifrGreen)
-                                        Text("Sync Complete")
-                                            .foregroundStyle(Color.zifrGreen)
-                                    } else {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                        Text("Sync Latest Data")
-                                    }
-                                    }
-                                    .font(.system(size: 13, weight: .semibold))
-                                    Text(isSyncing || syncSuccess ? "Updates may take a few moments to appear" : "Pull newest balances and subscriptions from Plaid")
-                                        .font(.system(size: 10, weight: .regular))
-                                        .foregroundStyle(Color.white.opacity(0.6))
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "trash")
+                                    Text("Delete \(institution.name.isEmpty ? "Institution" : institution.name)")
+                                    Spacer()
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
-                            .buttonStyle(MiloomSecondaryButtonStyle())
-                            .padding(.top, 8)
-                            
-                            Text("Last synced on: \(institution.lastSyncedAt?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.4))
-                                .frame(maxWidth: .infinity, alignment: .center)
-                                .padding(.top, 4)
+                            .buttonStyle(.plain)
+                            .confirmationDialog(
+                                "Delete Bank?",
+                                isPresented: $showDeleteConfirm,
+                                titleVisibility: .visible
+                            ) {
+                                Button("Delete Bank", role: .destructive) {
+                                    vm.deleteInstitution(institution, appState: appState)
+                                    dismiss()
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            }
                         }
                     }
-                    .padding(.vertical, 4)
-                } header: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.shield")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("LOGIN & IDENTITY")
-                            .font(.system(size: 12, weight: .black))
-                            .tracking(1.5)
-                    }
-                    .foregroundStyle(Color(hex: "#C1AA78"))
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
+                    .disabled(isViewer)
                 }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
-                .listRowSeparator(.hidden)
-
-
-
-                // MARK: - Accounts Section
-                InstitutionAccountsSection(
-                    institution: institution,
-                    vm: vm,
-                    onAdd: {
-                        accountDraft = InstitutionAccount()
-                        accountDraftIndex = nil
-                        showAccountHUD = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    },
-                    onEdit: { idx, acc in
-                        accountDraft = acc
-                        accountDraftIndex = idx
-                        showAccountHUD = true
-                    }
-                )
-
-
-
-                // MARK: - Cards Section
-                InstitutionCardsSection(
-                    cards: instCards,
-                    onAdd: {
-                        cardDraft = vm.addCard(appState: appState, userId: institution.userId, companyId: institution.companyId)
-                        cardDraft?.institutionName = institution.name 
-                        showCardHUD = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    },
-                    onEdit: { card in
-                        cardDraft = card
-                        showCardHUD = true
-                    },
-                    onDelete: { card in
-                        vm.deleteCard(card, appState: appState)
-                    }
-                )
-
-
-
-                // MARK: - Loans Section
-                InstitutionLoansSection(
-                    loans: instLoans,
-                    onAdd: {
-                        loanDraft = vm.addLoan(appState: appState, userId: institution.userId, companyId: institution.companyId)
-                        loanDraft?.lender = institution.name 
-                        showLoanHUD = true
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    },
-                    onEdit: { loan in
-                        loanDraft = loan
-                        showLoanHUD = true
-                    },
-                    onDelete: { loan in
-                        vm.deleteLoan(loan, appState: appState)
-                    }
-                )
-
-                if !isNew {
-                    Section {
-                        // Share Institution
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showShareSheet = true
-                        } label: {
-                        VStack(spacing: 4) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Share Institution")
-                            }
-                            .font(.system(size: 13, weight: .semibold))
-                            Text("Generate a share link for collaborators")
-                                .font(.system(size: 10, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.6))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        }
-                        .buttonStyle(MiloomSecondaryButtonStyle())
-                        .padding(.bottom, 8)
-
-                        // Delete Institution
-                        Button(role: .destructive) {
-                            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                            showDeleteConfirm = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "trash")
-                                Text("Delete \(institution.name.isEmpty ? "Institution" : institution.name)")
-                                Spacer()
-                            }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.red)
-                            .padding(.vertical, 14)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .confirmationDialog(
-                            "Delete Bank?",
-                            isPresented: $showDeleteConfirm,
-                            titleVisibility: .visible
-                        ) {
-                            Button("Delete Bank", role: .destructive) {
-                                vm.deleteInstitution(institution, appState: appState)
-                                dismiss()
-                            }
-                            Button("Cancel", role: .cancel) {}
-                        }
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 32, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
-                }
-                } // End Group
-                .disabled(isViewer)
-
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .onAppear {
                 snapshot = currentSnapshot
             }
@@ -364,7 +339,6 @@ struct EditInstitutionSheet: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        
                         if isNew { 
                             vm.deleteInstitution(institution, appState: appState) 
                         } else if let snap = snapshot {

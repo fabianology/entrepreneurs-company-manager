@@ -479,75 +479,54 @@ struct EditCardSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                SharedItemOverrideBanner(resourceId: card.id, defaultCompanyId: card.companyId)
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets())
+            ScrollView {
+                VStack(spacing: 20) {
+                    SharedItemOverrideBanner(resourceId: card.id, defaultCompanyId: card.companyId)
 
-                Group {
-                if !isInstitutionContext {
-                    Section {
-                        institutionSelectorRow
-                            .padding(.vertical, 4)
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 0, trailing: 20))
-                    .listRowSeparator(.hidden)
-                }
-
-                Section {
                     Group {
-                        row1
-                        row2
-                        if card.type.lowercased() != "debit" {
-                            row3
-                            row4
-                        }
-                        row5
-                        paysForRow
-                        
-                        Button(action: {
-                            showTransactions = true
-                        }) {
-                            HStack {
-                                Text("TRANSACTIONS")
-                                    .font(.system(size: 15, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                Spacer()
-                                Image(systemName: "receipt")
-                                    .foregroundStyle(Color.white.opacity(0.3))
+                        if !isInstitutionContext {
+                            ZifrSheetCard(title: "FINANCIAL INSTITUTION", icon: "building.columns") {
+                                institutionSelectorRow
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
-                        .padding(.top, 4)
-                    }
-                }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
 
-
-                // MARK: - Financial Details
-                Section {
-                    VStack(spacing: 0) {
-                        HStack {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.07))
-                                .frame(height: 1)
-                            Text("FINANCIALS")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.25))
-                                .fixedSize()
-                            Rectangle()
-                                .fill(Color.white.opacity(0.07))
-                                .frame(height: 1)
+                        // MARK: - Card Details Card
+                        ZifrSheetCard(title: "CARD DETAILS", icon: "creditcard") {
+                            VStack(spacing: 16) {
+                                row1
+                                row2
+                                if card.type.lowercased() != "debit" {
+                                    row3
+                                    row4
+                                }
+                                row5
+                                paysForRow
+                                
+                                Button(action: {
+                                    showTransactions = true
+                                }) {
+                                    HStack {
+                                        Text("TRANSACTIONS")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .tracking(0.5)
+                                            .foregroundStyle(.white)
+                                        Spacer()
+                                        Image(systemName: "receipt")
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                }
+                                .buttonStyle(PremiumButtonStyle())
+                                .padding(.top, 4)
+                            }
                         }
-                        .padding(.bottom, 8)
 
+                        // MARK: - Financial Details Card
+                        ZifrSheetCard(title: "FINANCIALS", icon: "chart.line.uptrend.xyaxis") {
                             VStack(spacing: 12) {
                                 HStack(spacing: 12) {
                                     moneyField(label: "BALANCE", value: Binding(get: { card.balance }, set: { card.balance = $0 }))
@@ -567,132 +546,120 @@ struct EditCardSheet: View {
                                     HStack(spacing: 12) {
                                         aprField(label: "APR%", value: $card.apr)
                                             .frame(maxWidth: .infinity)
-                                            .frame(width: (UIScreen.main.bounds.width - 64) * 0.28)
                                         
                                         aprField(label: "PROMO APR%", value: $card.promoApr)
                                             .frame(maxWidth: .infinity)
-                                            .frame(width: (UIScreen.main.bounds.width - 64) * 0.28)
                                         
                                         datePicker(label: "ENDS", selection: Binding(get: { card.promoEnds ?? Date() }, set: { card.promoEnds = $0 }))
                                     }
                                 }
                             }
                         }
-                    } header: { EmptyView() }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                    .listRowSeparator(.hidden)
-                // MARK: - Notes
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("NOTES")
-                            .font(.system(size: 12, weight: .regular))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                            .padding(.leading, 6)
-                        
-                        TextField("Add notes...", text: Binding(get: { card.notes ?? "" }, set: { card.notes = $0 }), axis: .vertical)
-                            .lineLimit(3...6)
-                            .font(.system(size: 14))
-                            .foregroundStyle(.white)
-                            .padding(12)
-                            .background(Color(hex: "#2C2C2E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                    }
-                } header: { EmptyView() }
-                .listRowBackground(Color.clear)
-                .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
-                .listRowSeparator(.hidden)
 
-                if !isNew {
-                    Section {
-                        // Share Card
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showShareSheet = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                Text("Share Card")
-                                Spacer()
+                        // MARK: - Notes Card
+                        ZifrSheetCard(title: "NOTES", icon: "note.text") {
+                            VStack(alignment: .leading, spacing: 6) {
+                                TextField("Add notes...", text: Binding(get: { card.notes ?? "" }, set: { card.notes = $0 }), axis: .vertical)
+                                    .lineLimit(3...6)
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.white)
+                                    .padding(14)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#4f46e5"))
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "#4f46e5").opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#4f46e5").opacity(0.3), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
-                        .padding(.bottom, 8)
 
-                        // Delete Card
-                        Button(role: .destructive) {
-                            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                            showDeleteConfirm = true
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Image(systemName: "trash")
-                                Text("Delete \(card.name.isEmpty ? "Card" : card.name)")
-                                Spacer()
+                        // MARK: - Actions Card
+                        if !isNew {
+                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                VStack(spacing: 12) {
+                                    // Share Card
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        showShareSheet = true
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "person.crop.circle.badge.plus")
+                                                Text("Share Card")
+                                            }
+                                            .font(.system(size: 13, weight: .semibold))
+                                            Text("Generate a share link for collaborators")
+                                                .font(.system(size: 10, weight: .regular))
+                                                .foregroundStyle(Color.white.opacity(0.6))
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 10)
+                                    }
+                                    .buttonStyle(MiloomSecondaryButtonStyle())
+                                }
                             }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.red)
-                            .padding(.vertical, 14)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .confirmationDialog("Delete Card?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
-                            Button("Delete Card", role: .destructive) {
-                                let instNameStr = card.institutionName ?? ""
-                                vm.deleteCard(card, appState: appState)
-                                
-                                let remainingCards = cards.filter { ($0.institutionName ?? "").lowercased() == instNameStr.lowercased() && $0.id != card.id }
-                                if let orphanedInst = institutions.first(where: { $0.name.lowercased() == instNameStr.lowercased() }) {
-                                    if remainingCards.isEmpty && orphanedInst.accounts.isEmpty {
-                                        institutionToDelete = orphanedInst
-                                        
-                                        // Slight delay so the first sheet closes cleanly before showing second
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                            showDeleteInstitutionConfirm = true
+
+                            // ── Unencapsulated Bottom Delete Button ─────
+                            Button(role: .destructive) {
+                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                showDeleteConfirm = true
+                            } label: {
+                                HStack {
+                                    Spacer()
+                                    Image(systemName: "trash")
+                                    Text("Delete \(card.name.isEmpty ? "Card" : card.name)")
+                                    Spacer()
+                                }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.red)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.05))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
+                            .confirmationDialog("Delete Card?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+                                Button("Delete Card", role: .destructive) {
+                                    let instNameStr = card.institutionName ?? ""
+                                    vm.deleteCard(card, appState: appState)
+                                    
+                                    let remainingCards = cards.filter { ($0.institutionName ?? "").lowercased() == instNameStr.lowercased() && $0.id != card.id }
+                                    if let orphanedInst = institutions.first(where: { $0.name.lowercased() == instNameStr.lowercased() }) {
+                                        if remainingCards.isEmpty && orphanedInst.accounts.isEmpty {
+                                            institutionToDelete = orphanedInst
+                                            
+                                            // Slight delay so the first sheet closes cleanly before showing second
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                                showDeleteInstitutionConfirm = true
+                                            }
+                                        } else {
+                                            dismiss()
                                         }
                                     } else {
                                         dismiss()
                                     }
-                                } else {
+                                }
+                                Button("Cancel", role: .cancel) {}
+                            }
+                            .alert("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm) {
+                                Button("Yes, Delete", role: .destructive) {
+                                    if let inst = institutionToDelete {
+                                        vm.deleteInstitution(inst, appState: appState)
+                                    }
                                     dismiss()
                                 }
-                            }
-                            Button("Cancel", role: .cancel) {}
-                        }
-                        .alert("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm) {
-                            Button("Yes, Delete", role: .destructive) {
-                                if let inst = institutionToDelete {
-                                    vm.deleteInstitution(inst, appState: appState)
+                                Button("No, Keep Institution", role: .cancel) {
+                                    dismiss()
                                 }
-                                dismiss()
+                            } message: {
+                                Text("This was the last item for \(institutionToDelete?.name ?? "this institution"). Do you want to delete the institution profile too?")
                             }
-                            Button("No, Keep Institution", role: .cancel) {
-                                dismiss()
-                            }
-                        } message: {
-                            Text("This was the last item for \(institutionToDelete?.name ?? "this institution"). Do you want to delete the institution profile too?")
                         }
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowInsets(EdgeInsets(top: 16, leading: 20, bottom: 20, trailing: 20))
-                    .listRowSeparator(.hidden)
+                    } // End Group
+                    .disabled(isViewer)
                 }
-                } // End Group
-                .disabled(isViewer)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
             }
             .scrollDismissesKeyboard(.interactively)
-            .scrollContentBackground(.hidden)
             .background(Color(hex: "#1C1C1E"))
-            .listSectionSpacing(0)
             .sheet(isPresented: $showCardScanner) {
                 CardScannerView { result in
                     if let number = result.cardNumber {
