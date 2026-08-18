@@ -220,7 +220,7 @@ struct CompanyCardView: View {
                 
                 Text("\(count)")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.zifrGold)
+                    .foregroundStyle(.white)
             }
             
             Text(title.uppercased())

@@ -43,20 +43,20 @@ struct ControlCenterTabSelector: View {
                         HStack(alignment: .top) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(isActive ? tab.color : Color(hex: "#0a261c"))
+                                .foregroundStyle(isActive ? tab.color : Color.zifrTabBarFill)
                             
                             Spacer()
                         }
                         
                         Text(tab.rawValue.uppercased())
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(isActive ? .white : Color(hex: "#0a261c"))
+                            .foregroundStyle(isActive ? .white : Color.zifrTabBarFill)
                             .lineLimit(1)
                         
                         // Micro Summary
                         Text(summaryText(for: tab))
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(isActive ? Color.white.opacity(0.7) : Color(hex: "#0a261c").opacity(0.75))
+                            .foregroundStyle(isActive ? Color.white.opacity(0.7) : Color.zifrTabBarFill.opacity(0.85))
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
