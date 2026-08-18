@@ -738,16 +738,16 @@ struct DashboardView: View {
                     Text("\"\(parts.first ?? vm.quote)\"")
                         .font(.system(size: 14, weight: .semibold))
                         .italic()
-                        .foregroundStyle(Color(hex: "#092e21"))
-                        .shadow(color: Color.black.opacity(0.80), radius: 0.5, x: 0, y: -0.75)
-                        .shadow(color: Color(hex: "#42c092").opacity(0.35), radius: 0.5, x: 0, y: 1.0)
+                        .foregroundStyle(Color(hex: "#10503a"))
+                        .shadow(color: Color.black.opacity(0.55), radius: 0.5, x: 0, y: -0.75)
+                        .shadow(color: Color.white.opacity(0.20), radius: 0.5, x: 0, y: 0.75)
                         .multilineTextAlignment(.center)
                     if parts.count > 1 {
                         Text("— \(parts[1])")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color(hex: "#092e21"))
-                            .shadow(color: Color.black.opacity(0.75), radius: 0.5, x: 0, y: -0.75)
-                            .shadow(color: Color(hex: "#42c092").opacity(0.35), radius: 0.5, x: 0, y: 1.0)
+                            .foregroundStyle(Color(hex: "#10503a"))
+                            .shadow(color: Color.black.opacity(0.50), radius: 0.5, x: 0, y: -0.75)
+                            .shadow(color: Color.white.opacity(0.20), radius: 0.5, x: 0, y: 0.75)
                     }
                 }
                 .padding(.horizontal, 32)
