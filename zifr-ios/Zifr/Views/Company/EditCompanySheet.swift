@@ -101,19 +101,66 @@ struct EditCompanySheet: View {
                                     .onTapGesture {
                                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                         let colors = Company.brandColors
-                                        if let currentIndex = colors.firstIndex(of: colorHex) {
+                                        if let currentIndex = colors.firstIndex(where: { $0.caseInsensitiveCompare(colorHex) == .orderedSame }) {
                                             let nextIndex = (currentIndex + 1) % colors.count
                                             withAnimation(.spring(response: 0.3)) {
                                                 colorHex = colors[nextIndex]
                                             }
                                         } else {
-                                            colorHex = colors.first ?? "#000000"
+                                            colorHex = colors.first ?? "#4f46e5"
                                         }
                                         logoData = nil // tapping color box clears logo to show color
                                     }
                                     
                                     formSection {
                                         PremiumInputField(label: "BUSINESS NAME", placeholder: "Acme Holdings LLC", text: $name, textContentType: .organizationName)
+                                    }
+                                }
+
+                                // Brand Color Swatches Row
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("BRAND COLOR")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                        .padding(.horizontal, 2)
+
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 10) {
+                                            ForEach(Company.brandColors, id: \.self) { hex in
+                                                let isSelected = colorHex.caseInsensitiveCompare(hex) == .orderedSame && logoData == nil
+                                                Button {
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    withAnimation(.spring(response: 0.3)) {
+                                                        colorHex = hex.lowercased()
+                                                        logoData = nil
+                                                    }
+                                                } label: {
+                                                    ZStack {
+                                                        Circle()
+                                                            .fill(Color(hex: hex))
+                                                            .frame(width: 32, height: 32)
+                                                            .overlay(
+                                                                Circle()
+                                                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                                                            )
+                                                        
+                                                        if isSelected {
+                                                            Circle()
+                                                                .stroke(Color.white, lineWidth: 2.5)
+                                                                .frame(width: 38, height: 38)
+                                                            
+                                                            Image(systemName: "checkmark")
+                                                                .font(.system(size: 12, weight: .bold))
+                                                                .foregroundStyle(hex == "#000000" ? .white : (hex == "#f59e0b" ? .black : .white))
+                                                        }
+                                                    }
+                                                    .frame(width: 40, height: 40)
+                                                }
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                        .padding(.vertical, 4)
+                                        .padding(.horizontal, 2)
                                     }
                                 }
 
@@ -339,10 +386,11 @@ struct EditCompanySheet: View {
 
     private var hasChanges: Bool {
         if let c = company {
+            let colorChanged = colorHex.caseInsensitiveCompare(c.colorHex) != .orderedSame
             return name != c.name ||
                    structure != c.structure ||
                    entityCategory != ( (c.structure == "Individual" || c.structure == "Household") ? "Personal" : "Business" ) ||
-                   colorHex != c.colorHex ||
+                   colorChanged ||
                    website != c.website ||
                    logoData != c.logoData
         } else {
@@ -355,26 +403,27 @@ struct EditCompanySheet: View {
         name = c.name
         structure = c.structure
         entityCategory = (c.structure == "Individual" || c.structure == "Household") ? "Personal" : "Business"
-        colorHex = c.colorHex
+        colorHex = c.colorHex.lowercased()
         website = c.website ?? ""
         logoData = c.logoData
     }
 
     private func save() {
+        let normalizedHex = colorHex.lowercased()
         if let c = company {
             var updated = c
-            updated.name = name; updated.structure = structure; updated.colorHex = colorHex
+            updated.name = name; updated.structure = structure; updated.colorHex = normalizedHex
             updated.website = website; updated.logoData = logoData
             vm.updateCompany(updated, appState: appState)
         } else {
             // Get user ID synchronously from the AuthViewModel
             if let userId = authViewModel.currentUser?.id {
-                vm.addCompany(appState: appState, userId: userId, name: name, structure: structure, colorHex: colorHex, logoData: logoData, website: website)
+                vm.addCompany(appState: appState, userId: userId, name: name, structure: structure, colorHex: normalizedHex, logoData: logoData, website: website)
             } else {
                 print("⚠️ [Save] No authenticated user found in AuthViewModel. Falling back to temporary UUID.")
                 // Fallback to avoid breaking local app state if the user is in transition
                 let fallbackId = UUID()
-                vm.addCompany(appState: appState, userId: fallbackId, name: name, structure: structure, colorHex: colorHex, logoData: logoData, website: website)
+                vm.addCompany(appState: appState, userId: fallbackId, name: name, structure: structure, colorHex: normalizedHex, logoData: logoData, website: website)
             }
         }
     }

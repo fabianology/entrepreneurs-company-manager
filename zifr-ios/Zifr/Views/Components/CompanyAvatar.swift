@@ -10,16 +10,6 @@ struct CompanyAvatar: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
-            } else if let website = company.website, !website.isEmpty {
-                AsyncImage(url: faviconURL(for: website)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFit().padding(8)
-                    default:
-                        initialsView
-                    }
-                }
-                .background(Color.clear)
             } else {
                 initialsView
             }
@@ -30,7 +20,7 @@ struct CompanyAvatar: View {
 
     private var initialsView: some View {
         ZStack {
-            Color(hex: company.colorHex)
+            company.brandColor
             Text(company.initial)
                 .font(.system(size: size * 0.40, weight: .black, design: .rounded))
                 .foregroundStyle(.white)

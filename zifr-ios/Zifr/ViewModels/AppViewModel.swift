@@ -52,9 +52,12 @@ final class AppViewModel {
         var mutableCompany = company
         mutableCompany.lastModified = Date()
         appState.companies[idx] = mutableCompany
+        if selectedCompany?.id == company.id {
+            selectedCompany = mutableCompany
+        }
         Task {
             do { try await DataRepository.shared.updateCompany(mutableCompany) }
-            catch { await MainActor.run { if let currentIdx = appState.companies.firstIndex(where: { $0.id == company.id }) { appState.companies[currentIdx] = original }; appState.error = "Failed to update company." } }
+            catch { await MainActor.run { if let currentIdx = appState.companies.firstIndex(where: { $0.id == company.id }) { appState.companies[currentIdx] = original }; if self.selectedCompany?.id == company.id { self.selectedCompany = original }; appState.error = "Failed to update company." } }
         }
     }
 

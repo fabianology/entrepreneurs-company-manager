@@ -182,6 +182,11 @@ struct CompanyDetailView: View {
             if let f = frames["tabBar"]              { tutFrameTabBar = f }
             if let f = frames["financialActionBar"]  { tutFrameFinancialActionBar = f }
         }
+        .onChange(of: appState.companies) { _, newCompanies in
+            if let updated = newCompanies.first(where: { $0.id == company.id }) {
+                company = updated
+            }
+        }
         .onChange(of: appState.institutions.count) { _, _ in
             onboardingState.evaluateState(appState: appState)
         }
