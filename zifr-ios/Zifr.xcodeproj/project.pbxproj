@@ -49,6 +49,7 @@
 		69D91C3C7B5CDA51965F9B7C /* GeminiLiveModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E25EDBCCD886BA5EE5BA4F7 /* GeminiLiveModels.swift */; };
 		6C46EFBD69964364C9C5EDB4 /* PremiumUpgradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16D6BBDF83C69BAE06B41FC /* PremiumUpgradeView.swift */; };
 		6C87244063268D8A258D7324 /* ControlCenterTabSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4861EC0D60AFBE606028390E /* ControlCenterTabSelector.swift */; };
+		6C87244063268D8A258D7399 /* ControlCenterMessageBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4861EC0D60AFBE6060283999 /* ControlCenterMessageBoard.swift */; };
 		70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */; };
 		72BC06A839A641B99C1899EF /* TutorialSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59350929451728D7E6E54F26 /* TutorialSheetView.swift */; };
 		73D5A6C76807E119730217CA /* EntityHomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49911BBD98F14E05FC2A96B7 /* EntityHomeViewModel.swift */; };
@@ -145,6 +146,7 @@
 		4101F9620312FEC6BD9A1DD3 /* ActivityLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
 		413C5A710215BBAF96C2E51F /* ZifrApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ZifrApp.swift; sourceTree = "<group>"; };
 		4861EC0D60AFBE606028390E /* ControlCenterTabSelector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControlCenterTabSelector.swift; sourceTree = "<group>"; };
+		4861EC0D60AFBE6060283999 /* ControlCenterMessageBoard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ControlCenterMessageBoard.swift; sourceTree = "<group>"; };
 		48FACB377EF3DEDCA10F5A3E /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		49911BBD98F14E05FC2A96B7 /* EntityHomeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntityHomeViewModel.swift; sourceTree = "<group>"; };
 		4C3A8B1889223B777ECDA81B /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
@@ -328,6 +330,7 @@
 				9527B3A94D5AF9697F46A147 /* EntitySubscriptionSection.swift */,
 				F564E5574B9B03EDA84362FA /* FinancialReceiptView.swift */,
 				4861EC0D60AFBE606028390E /* ControlCenterTabSelector.swift */,
+				4861EC0D60AFBE6060283999 /* ControlCenterMessageBoard.swift */,
 				3592587797EA9749DAE7591A /* SubscriptionCoverFlow.swift */,
 				DED9E3791E6144EF3D1E230C /* DocumentCategoryCoverFlow.swift */,
 			);
@@ -675,6 +678,7 @@
 				2C3A0A6F5F8542F4BC590FC1 /* SandboxSeeder.swift in Sources */,
 				E86994340C958D7C23B0A92A /* StackedInstitutionDeckView.swift in Sources */,
 				6C87244063268D8A258D7324 /* ControlCenterTabSelector.swift in Sources */,
+				6C87244063268D8A258D7399 /* ControlCenterMessageBoard.swift in Sources */,
 				B7F6DCD15BE938B9DD69F2DD /* SubscriptionCoverFlow.swift in Sources */,
 				156B44B06B11EAAF42291B37 /* DocumentCategoryCoverFlow.swift in Sources */,
 				5EC7E8942D39E5F51E63576D /* ZifrSheetCard.swift in Sources */,
