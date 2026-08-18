@@ -8,6 +8,7 @@ extension Color {
     static let zifrBG     = Color(hex: "#166A4E")
     static let zifrCard   = Color(hex: "#171717")
     static let zifrBorder = Color.white.opacity(0.08)
+    static let zifrTabBarFill = Color(hex: "#0a261c")
 
     // MARK: - Hex Init
     init(hex: String) {

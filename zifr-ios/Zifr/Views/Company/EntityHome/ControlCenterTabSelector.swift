@@ -69,7 +69,7 @@ struct ControlCenterTabSelector: View {
                     .frame(maxWidth: .infinity)
                     .background(
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(isActive ? Color.black.opacity(0.70) : Color.black.opacity(0.40))
+                            .fill(isActive ? Color.zifrTabBarFill.opacity(0.70) : Color.zifrTabBarFill.opacity(0.40))
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .overlay(

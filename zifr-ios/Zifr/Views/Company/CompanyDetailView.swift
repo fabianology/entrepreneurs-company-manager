@@ -272,7 +272,7 @@ struct CompanyDetailView: View {
                     .frame(height: 44)
                     .background(
                         Capsule()
-                            .fill(Color.black.opacity(0.70))
+                            .fill(Color.zifrTabBarFill.opacity(0.70))
                     )
                     .overlay(
                         Capsule()
@@ -491,7 +491,7 @@ struct CompanyDetailView: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(Color.black.opacity(0.70))
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
                     .overlay(
                         Circle()
                             .stroke(
@@ -549,7 +549,7 @@ struct CompanyDetailView: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(Color.black.opacity(0.70))
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
                     .overlay(
                         Circle()
                             .stroke(
@@ -591,7 +591,7 @@ struct CompanyDetailView: View {
     private var plusButtonLabel: some View {
         ZStack {
             Circle()
-                .fill(Color.black.opacity(0.70))
+                .fill(Color.zifrTabBarFill.opacity(0.70))
                 .overlay(
                     Circle()
                         .stroke(

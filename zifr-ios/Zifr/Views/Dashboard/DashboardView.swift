@@ -379,7 +379,7 @@ struct DashboardView: View {
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(Color.black.opacity(0.70))
+                                .fill(Color.zifrTabBarFill.opacity(0.70))
                                 .overlay(
                                     Circle()
                                         .stroke(
@@ -421,7 +421,7 @@ struct DashboardView: View {
                         .frame(height: 44)
                         .background(
                             Capsule()
-                                .fill(Color.black.opacity(0.70))
+                                .fill(Color.zifrTabBarFill.opacity(0.70))
                         )
                         .overlay(
                             Capsule()
@@ -460,7 +460,7 @@ struct DashboardView: View {
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(Color.black.opacity(0.70))
+                                .fill(Color.zifrTabBarFill.opacity(0.70))
                                 .overlay(
                                     Circle()
                                         .stroke(
@@ -630,7 +630,7 @@ struct DashboardView: View {
         } label: {
             ZStack {
                 Circle()
-                    .fill(Color.black.opacity(0.70))
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
                     .overlay(
                         Circle()
                             .stroke(
@@ -736,14 +736,14 @@ struct DashboardView: View {
                 let parts = vm.quote.components(separatedBy: " - ")
                 VStack(spacing: 2) {
                     Text("\"\(parts.first ?? vm.quote)\"")
-                        .font(.system(size: 14, weight: .light))
+                        .font(.system(size: 14, weight: .medium))
                         .italic()
-                        .foregroundStyle(Color.white.opacity(0.45))
+                        .foregroundStyle(Color.black.opacity(0.85))
                         .multilineTextAlignment(.center)
                     if parts.count > 1 {
                         Text("— \(parts[1])")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.3))
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Color.black.opacity(0.65))
                     }
                 }
                 .padding(.horizontal, 32)
@@ -751,7 +751,7 @@ struct DashboardView: View {
                 .animation(.easeInOut(duration: 0.6), value: vm.quote)
             } else {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.08))
+                    .fill(Color.black.opacity(0.12))
                     .frame(width: 220, height: 14)
                     .shimmer()
             }

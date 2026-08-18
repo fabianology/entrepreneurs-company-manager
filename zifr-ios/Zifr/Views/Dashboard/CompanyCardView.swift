@@ -191,11 +191,14 @@ struct CompanyCardView: View {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.06)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
                     ),
-                    lineWidth: 1
+                    lineWidth: 1.5
                 )
         )
         .shadow(color: brandColor.opacity(0.08), radius: 20, x: 0, y: 10)
