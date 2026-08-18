@@ -47,7 +47,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack(path: $vm.path) {
             ZStack(alignment: .top) {
-                Color.black.ignoresSafeArea()
+                Color.zifrGreen.ignoresSafeArea()
                 
                 AnimatedHeaderBackground()
                     .ignoresSafeArea(edges: .top)
@@ -388,8 +388,8 @@ struct DashboardView: View {
                                         .stroke(
                                             LinearGradient(
                                                 colors: [
-                                                    Color(hex: "#3A2D6E"),
-                                                    Color(hex: "#16161E").opacity(0.2)
+                                                    Color(hex: "#918457"),
+                                                    Color(hex: "#918457").opacity(0.3)
                                                 ],
                                                 startPoint: .top,
                                                 endPoint: .bottom
@@ -431,8 +431,8 @@ struct DashboardView: View {
                                 .stroke(
                                     LinearGradient(
                                         colors: [
-                                            Color(hex: "#3A2D6E"),
-                                            Color(hex: "#252528")
+                                            Color(hex: "#918457"),
+                                            Color(hex: "#918457").opacity(0.3)
                                         ],
                                         startPoint: .top,
                                         endPoint: .bottom
@@ -469,8 +469,8 @@ struct DashboardView: View {
                                         .stroke(
                                             LinearGradient(
                                                 colors: [
-                                                    Color(hex: "#3A2D6E"),
-                                                    Color(hex: "#16161E").opacity(0.2)
+                                                    Color(hex: "#918457"),
+                                                    Color(hex: "#918457").opacity(0.3)
                                                 ],
                                                 startPoint: .top,
                                                 endPoint: .bottom
@@ -639,8 +639,8 @@ struct DashboardView: View {
                             .stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color(hex: "#3A2D6E"),
-                                        Color(hex: "#16161E").opacity(0.2)
+                                        Color(hex: "#918457"),
+                                        Color(hex: "#918457").opacity(0.3)
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom

@@ -1055,35 +1055,35 @@ struct AnimatedHeaderBackground: View {
             
             ZStack {
                 // Base background color
-                Color.black.ignoresSafeArea()
+                Color.zifrGreen.ignoresSafeArea()
 
-                // Deep Indigo
+                // Deep Teal/Green
                 Circle()
-                    .fill(Color(hex: "#221C4A").opacity(0.9))
+                    .fill(Color(hex: "#15566a").opacity(0.85))
                     .frame(width: w * 1.6, height: w * 1.6)
                     .blur(radius: 100)
                     .offset(x: animate ? -w * 0.2 : w * 0.1, y: animate ? -h * 0.35 : -h * 0.45)
                 
-                // Vibrant Purple
+                // Vibrant Zifr Green
                 Circle()
-                    .fill(Color(hex: "#46246B").opacity(0.7))
+                    .fill(Color(hex: "#1f7055").opacity(0.70))
                     .frame(width: w * 1.3, height: w * 1.3)
                     .blur(radius: 90)
                     .offset(x: animate ? w * 0.25 : -w * 0.2, y: animate ? -h * 0.45 : -h * 0.3)
                 
-                // Teal Splash (Reduced)
+                // Emerald Splash
                 Circle()
-                    .fill(Color(hex: "#1E8C8C").opacity(0.35))
+                    .fill(Color(hex: "#258a69").opacity(0.40))
                     .frame(width: w * 0.7, height: w * 0.7)
                     .blur(radius: 80)
                     .offset(x: animate ? -w * 0.15 : w * 0.3, y: animate ? -h * 0.3 : -h * 0.4)
                 
-                // Black bleed from sides
+                // Green bleed from sides
                 HStack(spacing: 0) {
-                    LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                    LinearGradient(colors: [Color.zifrGreen, .clear], startPoint: .leading, endPoint: .trailing)
                         .frame(width: 60)
                     Spacer()
-                    LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                    LinearGradient(colors: [.clear, Color.zifrGreen], startPoint: .leading, endPoint: .trailing)
                         .frame(width: 60)
                 }
             }

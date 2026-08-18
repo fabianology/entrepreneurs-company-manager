@@ -143,12 +143,9 @@ struct DocumentListView: View {
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(
                                     LinearGradient(
-                                        colors: isAllSelected ? [
+                                        colors: [
                                             Color(hex: "#918457"),
                                             Color(hex: "#918457").opacity(0.3)
-                                        ] : [
-                                            Color(hex: "#3A2D6E"),
-                                            Color(hex: "#16161E").opacity(0.2)
                                         ],
                                         startPoint: .top,
                                         endPoint: .bottom
@@ -156,7 +153,7 @@ struct DocumentListView: View {
                                     lineWidth: 1.5
                                 )
                         )
-                        .shadow(color: isAllSelected ? Color(hex: "#918457").opacity(0.2) : Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
                     }
 
                     // Category Dashboard Grid
@@ -644,7 +641,7 @@ struct DocumentRow: View {
                         lineWidth: 1.5
                     )
             )
-            .shadow(color: Color(hex: "#918457").opacity(0.2), radius: 6, x: 0, y: 3)
+            .shadow(color: Color.black.opacity(0.35), radius: 6, x: 0, y: 3)
             .contentShape(Rectangle())
             .offset(x: dragOffset)
             .onTapGesture {
@@ -1288,12 +1285,9 @@ struct CategoryGridCard: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(
                         LinearGradient(
-                            colors: isSelected ? [
+                            colors: [
                                 Color(hex: "#918457"),
                                 Color(hex: "#918457").opacity(0.3)
-                            ] : [
-                                Color(hex: "#3A2D6E"),
-                                Color(hex: "#16161E").opacity(0.2)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -1301,7 +1295,7 @@ struct CategoryGridCard: View {
                         lineWidth: 1.5
                     )
             )
-            .shadow(color: isSelected ? Color(hex: "#918457").opacity(0.2) : Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+            .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
         }
     }
 }

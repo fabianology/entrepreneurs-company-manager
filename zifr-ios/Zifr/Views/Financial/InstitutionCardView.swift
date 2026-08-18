@@ -296,8 +296,8 @@ struct InstitutionCardView: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            Color(hex: "#3A2D6E"),
-                            Color(hex: "#16161E").opacity(0.2)
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
                         ],
                         startPoint: .top,
                         endPoint: .bottom

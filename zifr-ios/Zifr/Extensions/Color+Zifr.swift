@@ -5,7 +5,7 @@ extension Color {
     static let zifrGreen  = Color(hex: "#1f7055")
     static let zifrGold   = Color(hex: "#EBC351")
     static let zifrBlue   = Color(hex: "#0091FF")
-    static let zifrBG     = Color(hex: "#000000")
+    static let zifrBG     = Color(hex: "#1f7055")
     static let zifrCard   = Color(hex: "#171717")
     static let zifrBorder = Color.white.opacity(0.08)
 
@@ -73,6 +73,17 @@ extension ShapeStyle where Self == LinearGradient {
             colors: [Color(hex: "#15566a"), Color(hex: "#00544e")],
             startPoint: .leading,
             endPoint: .trailing
+        )
+    }
+
+    static var vaultOutline: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(hex: "#918457"),
+                Color(hex: "#918457").opacity(0.3)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
         )
     }
 }

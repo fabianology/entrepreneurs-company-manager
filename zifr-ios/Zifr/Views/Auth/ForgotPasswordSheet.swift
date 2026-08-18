@@ -20,9 +20,9 @@ struct ForgotPasswordSheet: View {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                 }
             
-            // Shifting purple/teal blur blob in corner
+            // Shifting green blur blob in corner
             Circle()
-                .fill(Color(hex: "#46246B").opacity(0.3))
+                .fill(Color.zifrGreen.opacity(0.35))
                 .frame(width: 300, height: 300)
                 .blur(radius: 50)
                 .offset(x: 100, y: -200)

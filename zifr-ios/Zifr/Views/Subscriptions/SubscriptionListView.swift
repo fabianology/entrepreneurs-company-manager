@@ -327,8 +327,8 @@ struct StackedSubscriptionDeckView: View {
                                 .stroke(
                                     LinearGradient(
                                         colors: [
-                                            Color(hex: "#3A2D6E"),
-                                            currentLevel == .full ? Color(hex: "#16161E").opacity(0.2) : Color.clear
+                                            Color(hex: "#918457"),
+                                            currentLevel == .full ? Color(hex: "#918457").opacity(0.3) : Color.clear
                                         ],
                                         startPoint: .top,
                                         endPoint: .bottom
