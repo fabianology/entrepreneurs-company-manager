@@ -147,7 +147,7 @@ struct CompanyCardView: View {
             HStack {
                 Spacer()
                 
-                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: .black)
+                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapInstitutions?()
@@ -161,7 +161,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: .black)
+                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapSubscriptions?()
@@ -175,7 +175,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "doc.text", title: "Documents", count: docsCount, color: .black)
+                statusItem(icon: "doc.text", title: "Documents", count: docsCount)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapDocuments?()
@@ -211,16 +211,16 @@ struct CompanyCardView: View {
         )
     }
 
-    private func statusItem(icon: String, title: String, count: Int, color: Color) -> some View {
+    private func statusItem(icon: String, title: String, count: Int) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(color)
+                    .foregroundStyle(Color.white)
                 
                 Text("\(count)")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.zifrGold)
             }
             
             Text(title.uppercased())
