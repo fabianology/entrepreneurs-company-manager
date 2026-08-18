@@ -147,7 +147,7 @@ struct CompanyCardView: View {
             HStack {
                 Spacer()
                 
-                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount)
+                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: Color(hex: "#1A7077"))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapInstitutions?()
@@ -161,7 +161,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount)
+                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: Color(hex: "#1A7077"))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapSubscriptions?()
@@ -175,7 +175,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "doc.text", title: "Documents", count: docsCount)
+                statusItem(icon: "doc.text", title: "Documents", count: docsCount, color: Color(hex: "#1A7077"))
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapDocuments?()
@@ -211,12 +211,12 @@ struct CompanyCardView: View {
         )
     }
 
-    private func statusItem(icon: String, title: String, count: Int) -> some View {
+    private func statusItem(icon: String, title: String, count: Int, color: Color) -> some View {
         VStack(spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(color)
                 
                 Text("\(count)")
                     .font(.system(size: 16, weight: .semibold))

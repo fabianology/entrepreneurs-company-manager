@@ -14,11 +14,7 @@ enum EntityHomeTab: String, CaseIterable {
     }
     
     var color: Color {
-        switch self {
-        case .financial: return Color(hex: "#1A7077")
-        case .subscriptions: return Color(hex: "#2070BD")
-        case .documents: return Color(hex: "#918457")
-        }
+        Color(hex: "#1A7077")
     }
 }
 
@@ -47,20 +43,20 @@ struct ControlCenterTabSelector: View {
                         HStack(alignment: .top) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(Color.black)
+                                .foregroundStyle(isActive ? tab.color : Color(hex: "#0a261c"))
                             
                             Spacer()
                         }
                         
                         Text(tab.rawValue.uppercased())
                             .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(isActive ? .white : Color.white.opacity(0.4))
+                            .foregroundStyle(isActive ? .white : Color(hex: "#0a261c"))
                             .lineLimit(1)
                         
                         // Micro Summary
                         Text(summaryText(for: tab))
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(isActive ? Color.white.opacity(0.7) : Color.white.opacity(0.25))
+                            .foregroundStyle(isActive ? Color.white.opacity(0.7) : Color(hex: "#0a261c").opacity(0.75))
                             .lineLimit(1)
                     }
                     .padding(.horizontal, 10)
