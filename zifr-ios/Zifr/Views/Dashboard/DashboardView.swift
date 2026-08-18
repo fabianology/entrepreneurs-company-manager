@@ -48,9 +48,6 @@ struct DashboardView: View {
         NavigationStack(path: $vm.path) {
             ZStack(alignment: .top) {
                 Color.zifrBG.ignoresSafeArea()
-                
-                AnimatedHeaderBackground()
-                    .ignoresSafeArea(edges: .top)
 
                 VStack(spacing: 0) {
                     // Sticky Header (Miloom Logo & Quote)
@@ -733,12 +730,6 @@ struct DashboardView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(height: 50)
-                    .background(
-                        Ellipse()
-                            .fill(Color.black.opacity(0.5))
-                            .frame(width: 180, height: 80)
-                            .blur(radius: 24)
-                    )
             }
 
             if !vm.quote.isEmpty {

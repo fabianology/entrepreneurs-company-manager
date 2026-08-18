@@ -139,40 +139,6 @@ struct CompanyCardView: View {
                 Color.black.opacity(0.70)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             )
-            .overlay(
-                TimelineView(.animation) { timeline in
-                    let now = timeline.date.timeIntervalSince1970
-                    let hash = abs(company.id.uuidString.hashValue)
-                    let duration = 6.5 + Double(hash % 15) / 10.0
-                    let initialAngle = Double(hash % 360)
-                    let currentAngle = initialAngle + (now.truncatingRemainder(dividingBy: duration) / duration) * 360.0
-
-                    ZStack {
-                        // Solid base stroke in a deeper/darker shade of the brand color
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(brandColor.opacity(0.28), lineWidth: 1)
-                        
-                        // Premium specular angular light sweep in lighter brand color tones
-                        AngularGradient(
-                            colors: [
-                                brandColor.opacity(0.95),
-                                brandColor.opacity(0.55),
-                                brandColor.opacity(0.20),
-                                brandColor.opacity(0.55),
-                                brandColor.opacity(0.95)
-                            ],
-                            center: .center,
-                            angle: .degrees(currentAngle)
-                        )
-                        .mask(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.white, lineWidth: 1.25)
-                        )
-                        .shadow(color: brandColor.opacity(0.30), radius: 5, x: 0, y: 0)
-                    }
-                    .allowsHitTesting(false)
-                }
-            )
             .padding(.horizontal, 16)
             .padding(.top, 16)
             .padding(.bottom, 18)
