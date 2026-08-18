@@ -20,7 +20,9 @@ enum EntityHomeTab: String, CaseIterable {
 
 struct ControlCenterTabSelector: View {
     @Binding var activeTab: EntityHomeTab
+    @Namespace private var pillAnimation
     
+    // Legacy props (kept for call-site compatibility)
     var institutions: [Institution] = []
     var loans: [Loan] = []
     var subscriptions: [Subscription] = []
@@ -29,15 +31,61 @@ struct ControlCenterTabSelector: View {
     var totalDebt: Double = 0
     
     var body: some View {
-        Picker("Control Center Section", selection: $activeTab) {
+        HStack(spacing: 0) {
             ForEach(EntityHomeTab.allCases, id: \.self) { tab in
-                Text(tab.rawValue).tag(tab)
+                let isActive = activeTab == tab
+                
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        activeTab = tab
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(isActive ? tab.color : Color.zifrTabBarFill)
+                        
+                        Text(tab.rawValue.uppercased())
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(isActive ? .white : Color.zifrTabBarFill)
+                            .lineLimit(1)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        Group {
+                            if isActive {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(Color.zifrTabBarFill.opacity(0.70))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        Color(hex: "#918457"),
+                                                        Color(hex: "#918457").opacity(0.3)
+                                                    ],
+                                                    startPoint: .top,
+                                                    endPoint: .bottom
+                                                ),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
+                                    .matchedGeometryEffect(id: "activePill", in: pillAnimation)
+                            }
+                        }
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
-        .pickerStyle(.segmented)
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.zifrTabBarFill.opacity(0.40))
+        )
         .padding(.horizontal, 20)
-        .onChange(of: activeTab) { _, _ in
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        }
     }
 }

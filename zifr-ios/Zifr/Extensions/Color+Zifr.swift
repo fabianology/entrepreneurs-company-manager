@@ -5,7 +5,7 @@ extension Color {
     static let zifrGreen  = Color(hex: "#1f7055")
     static let zifrGold   = Color(hex: "#EBC351")
     static let zifrBlue   = Color(hex: "#0091FF")
-    static let zifrBG     = Color(hex: "#0a261c")
+    static let zifrBG     = Color(hex: "#166A4E")
     static let zifrCard   = Color(hex: "#171717")
     static let zifrBorder = Color.white.opacity(0.08)
     static let zifrTabBarFill = Color(hex: "#0a261c")
