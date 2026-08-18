@@ -82,10 +82,17 @@ struct ControlCenterTabSelector: View {
             }
         }
         .padding(4)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.zifrTabBarFill.opacity(0.40))
-        )
         .padding(.horizontal, 20)
+        .background(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: 16,
+                bottomTrailingRadius: 16,
+                topTrailingRadius: 0
+            )
+            .fill(Color.zifrTabBarFill.opacity(0.40))
+            .padding(.top, -30)
+            .padding(.horizontal, 20)
+        )
     }
 }
