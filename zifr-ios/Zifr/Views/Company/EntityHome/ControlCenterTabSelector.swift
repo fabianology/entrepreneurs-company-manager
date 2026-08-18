@@ -75,24 +75,43 @@ struct ControlCenterTabSelector: View {
             }()
             
             ZStack(alignment: .leading) {
-                // 1. Sliding Pill (Active Indicator)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.zifrTabBarFill.opacity(0.70))
+                // 1. Clear Liquid Glass Sliding Pill
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.zifrTabBarFill.opacity(0.35))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(
+                        // Specular glass shine
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color(hex: "#918457"),
-                                        Color(hex: "#918457").opacity(0.3)
+                                        Color.white.opacity(0.22),
+                                        Color.white.opacity(0.04),
+                                        Color.clear
                                     ],
                                     startPoint: .top,
                                     endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
+                                )
                             )
                     )
-                    .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
+                    .overlay(
+                        // Dynamic glass rim stroke
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.65),
+                                        Color(hex: "#918457").opacity(0.70),
+                                        Color(hex: "#918457").opacity(0.20),
+                                        Color.white.opacity(0.10)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.2
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.35), radius: 8, x: 0, y: 4)
                     .frame(width: tabWidth, height: tabHeight)
                     .offset(x: currentPillX)
                     .animation(isDragging ? nil : .spring(response: 0.28, dampingFraction: 0.84), value: currentPillX)
