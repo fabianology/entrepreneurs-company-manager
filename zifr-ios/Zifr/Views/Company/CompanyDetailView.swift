@@ -399,50 +399,37 @@ struct CompanyDetailView: View {
 
     // MARK: - Entity Command Plate
     private var companyHeader: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .center, spacing: 10) {
-                ZStack {
-                    CompanyAvatar(company: company, size: 44)
-                }
-                .frame(width: 48, height: 48)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showEditCompany = true
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    // Top row: Company name & Receipt Icon
-                    HStack(alignment: .center) {
-                        Text(company.name.isEmpty ? "Company" : company.name)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-
-                        Spacer(minLength: 8)
-
-                        headerActionMenu
-                    }
-
-                    // Dynamic metrics sub-line per tab (full width below)
-                    metricSubLine
-                }
+        HStack(alignment: .center, spacing: 10) {
+            ZStack {
+                CompanyAvatar(company: company, size: 48)
+            }
+            .frame(width: 52, height: 52)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showEditCompany = true
             }
 
-            // Message Board: Rotating Top 3 Tab-Specific Insights
-            ControlCenterMessageBoard(
-                activeTab: activeInternalTab,
-                company: company,
-                cards: cards,
-                institutions: institutions,
-                loans: loans,
-                subscriptions: subscriptions,
-                documents: documents
-            )
+            VStack(alignment: .leading, spacing: 4) {
+                // Top row: Company name & Receipt Icon
+                HStack(alignment: .center) {
+                    Text(company.name.isEmpty ? "Company" : company.name)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 8)
+
+                    headerActionMenu
+                }
+
+                // Dynamic metrics sub-line per tab (full width below)
+                metricSubLine
+            }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .padding(.leading, 12)
-        .padding(.trailing, 14)
+        .padding(.trailing, 16)
         .background(
             ZStack {
                 RoundedRectangle(cornerRadius: 16)

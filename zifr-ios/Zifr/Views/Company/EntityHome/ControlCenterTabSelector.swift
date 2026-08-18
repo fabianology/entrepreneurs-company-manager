@@ -21,8 +21,10 @@ enum EntityHomeTab: String, CaseIterable {
 struct ControlCenterTabSelector: View {
     @Binding var activeTab: EntityHomeTab
     
-    // Interactive drag state
-    @State private var dragPositionX: CGFloat? = nil
+    // Interactive drag & fling state
+    @State private var dragTranslationX: CGFloat = 0
+    @State private var isDragging: Bool = false
+    @State private var startPillX: CGFloat = 0
     @State private var hoveredIndex: Int = 0
     @State private var lastHapticIndex: Int = 0
     
@@ -48,22 +50,24 @@ struct ControlCenterTabSelector: View {
             let innerPadding: CGFloat = 4
             let availableWidth = max(0, totalWidth - (innerPadding * 2))
             let tabWidth = availableWidth / CGFloat(tabs.count)
-            let tabHeight: CGFloat = 46
+            let tabHeight: CGFloat = 48
             
-            // Calculate pill X offset based on active state or active drag
+            // Resting pill X coordinate
             let restingPillX = innerPadding + (CGFloat(currentIndex) * tabWidth)
+            
+            // Dynamic pill position during drag or rest
             let currentPillX: CGFloat = {
-                if let dragX = dragPositionX {
+                if isDragging {
+                    let rawX = startPillX + dragTranslationX
                     let minX = innerPadding
                     let maxX = innerPadding + (CGFloat(tabs.count - 1) * tabWidth)
-                    let centerOffset = dragX - (tabWidth / 2)
                     
-                    if centerOffset < minX {
-                        return minX - ((minX - centerOffset) * 0.2) // Rubberband left
-                    } else if centerOffset > maxX {
-                        return maxX + ((centerOffset - maxX) * 0.2) // Rubberband right
+                    if rawX < minX {
+                        return minX + ((rawX - minX) * 0.25) // Rubberband left
+                    } else if rawX > maxX {
+                        return maxX + ((rawX - maxX) * 0.25) // Rubberband right
                     } else {
-                        return centerOffset
+                        return rawX
                     }
                 } else {
                     return restingPillX
@@ -91,22 +95,23 @@ struct ControlCenterTabSelector: View {
                     .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
                     .frame(width: tabWidth, height: tabHeight)
                     .offset(x: currentPillX)
-                    .animation(dragPositionX == nil ? .spring(response: 0.32, dampingFraction: 0.82) : nil, value: currentPillX)
+                    .animation(isDragging ? nil : .spring(response: 0.28, dampingFraction: 0.84), value: currentPillX)
                 
                 // 2. Tab Labels (Interactive Grid)
                 HStack(spacing: 0) {
                     ForEach(Array(tabs.enumerated()), id: \.element) { index, tab in
-                        let isHighlighted = (dragPositionX != nil ? hoveredIndex == index : activeTab == tab)
+                        let isHighlighted = (isDragging ? hoveredIndex == index : activeTab == tab)
                         
-                        HStack(spacing: 5) {
+                        HStack(spacing: 6) {
                             Image(systemName: tab.icon)
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(isHighlighted ? tab.color : Color.zifrTabBarFill)
                             
                             Text(tab.rawValue.uppercased())
-                                .font(.system(size: 11, weight: .bold))
+                                .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(isHighlighted ? .white : Color.zifrTabBarFill)
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                         }
                         .frame(width: tabWidth, height: tabHeight)
                         .contentShape(Rectangle())
@@ -124,42 +129,69 @@ struct ControlCenterTabSelector: View {
                     topTrailingRadius: 0
                 )
             )
-            // Gesture recognizer for fluid direct sliding + instant tapping
+            // Gesture recognizer for fluid relative sliding, fling velocity, and instant taps
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { value in
-                        let touchX = value.location.x
-                        dragPositionX = touchX
+                        if !isDragging {
+                            isDragging = true
+                            startPillX = restingPillX
+                            selectionFeedback.prepare()
+                        }
+                        dragTranslationX = value.translation.width
                         
-                        let relativeX = max(0, min(availableWidth, touchX - innerPadding))
-                        let newIndex = min(tabs.count - 1, max(0, Int(relativeX / tabWidth)))
+                        let rawX = startPillX + dragTranslationX
+                        let currentCenter = rawX + (tabWidth / 2)
+                        let fractionalIndex = (currentCenter - innerPadding) / tabWidth
+                        let activeHover = min(tabs.count - 1, max(0, Int(floor(fractionalIndex))))
                         
-                        if newIndex != hoveredIndex {
-                            hoveredIndex = newIndex
-                            if newIndex != lastHapticIndex {
-                                lastHapticIndex = newIndex
+                        if activeHover != hoveredIndex {
+                            hoveredIndex = activeHover
+                            if activeHover != lastHapticIndex {
+                                lastHapticIndex = activeHover
                                 selectionFeedback.selectionChanged()
                                 selectionFeedback.prepare()
                             }
                         }
                     }
                     .onEnded { value in
-                        let predictedX = value.location.x + (value.velocity.width * 0.08)
-                        let relativeX = max(0, min(availableWidth, predictedX - innerPadding))
-                        let finalIndex = min(tabs.count - 1, max(0, Int(round(relativeX / tabWidth))))
+                        let velocityX = value.velocity.width
+                        let translationX = value.translation.width
                         
-                        dragPositionX = nil
-                        hoveredIndex = finalIndex
-                        lastHapticIndex = finalIndex
+                        var targetIndex = currentIndex
+                        
+                        // Fling gesture detection
+                        if velocityX > 250 {
+                            // Flinging Right -> next tab
+                            targetIndex = min(tabs.count - 1, currentIndex + 1)
+                        } else if velocityX < -250 {
+                            // Flinging Left -> previous tab
+                            targetIndex = max(0, currentIndex - 1)
+                        } else if abs(translationX) > 10 {
+                            // Drag release without high velocity: choose nearest tab
+                            let currentCenter = (startPillX + translationX) + (tabWidth / 2)
+                            let fractionalIndex = (currentCenter - innerPadding) / tabWidth
+                            targetIndex = min(tabs.count - 1, max(0, Int(round(fractionalIndex))))
+                        } else {
+                            // Simple tap: calculate tab from tap location
+                            let tapX = value.startLocation.x - innerPadding
+                            let tappedIndex = min(tabs.count - 1, max(0, Int(tapX / tabWidth)))
+                            targetIndex = tappedIndex
+                        }
+                        
+                        isDragging = false
+                        dragTranslationX = 0
+                        hoveredIndex = targetIndex
+                        lastHapticIndex = targetIndex
                         
                         impactFeedback.impactOccurred()
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                            activeTab = tabs[finalIndex]
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                            activeTab = tabs[targetIndex]
                         }
                     }
             )
         }
-        .frame(height: 54)
+        .frame(height: 56)
         .padding(.horizontal, 20)
         .background(
             UnevenRoundedRectangle(
