@@ -74,19 +74,35 @@ struct ControlCenterTabSelector: View {
                 }
             }()
             
+            let pillCenterX = currentPillX + (tabWidth / 2)
+            
             ZStack(alignment: .leading) {
-                // 1. Clear Liquid Glass Sliding Pill
+                // 1. Clear Liquid Glass Magnifying Lens Pill
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(Color.zifrTabBarFill.opacity(0.35))
                     .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        // Convex glass optical dome highlight
+                        RadialGradient(
+                            colors: [
+                                Color.white.opacity(0.30),
+                                Color.white.opacity(0.08),
+                                Color.clear
+                            ],
+                            center: .top,
+                            startRadius: 0,
+                            endRadius: tabWidth * 0.75
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    )
                     .overlay(
                         // Specular glass shine
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.22),
-                                        Color.white.opacity(0.04),
+                                        Color.white.opacity(0.24),
+                                        Color.white.opacity(0.03),
                                         Color.clear
                                     ],
                                     startPoint: .top,
@@ -100,10 +116,10 @@ struct ControlCenterTabSelector: View {
                             .stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.65),
-                                        Color(hex: "#918457").opacity(0.70),
-                                        Color(hex: "#918457").opacity(0.20),
-                                        Color.white.opacity(0.10)
+                                        Color.white.opacity(0.75),
+                                        Color(hex: "#918457").opacity(0.80),
+                                        Color(hex: "#918457").opacity(0.25),
+                                        Color.white.opacity(0.15)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -111,14 +127,19 @@ struct ControlCenterTabSelector: View {
                                 lineWidth: 1.2
                             )
                     )
-                    .shadow(color: Color.black.opacity(0.35), radius: 8, x: 0, y: 4)
+                    .shadow(color: Color.black.opacity(0.40), radius: isDragging ? 10 : 7, x: 0, y: isDragging ? 5 : 3)
+                    .scaleEffect(isDragging ? 1.04 : 1.0)
                     .frame(width: tabWidth, height: tabHeight)
                     .offset(x: currentPillX)
                     .animation(isDragging ? nil : .spring(response: 0.28, dampingFraction: 0.84), value: currentPillX)
                 
-                // 2. Tab Labels (Interactive Grid)
+                // 2. Tab Labels (Continuous Magnifying Lens Effect)
                 HStack(spacing: 0) {
                     ForEach(Array(tabs.enumerated()), id: \.element) { index, tab in
+                        let tabCenterX = innerPadding + (CGFloat(index) * tabWidth) + (tabWidth / 2)
+                        let dist = abs(pillCenterX - tabCenterX)
+                        let proximity = max(0, min(1.0, 1.0 - (dist / tabWidth)))
+                        let magnification = 1.0 + (proximity * 0.16) // 1.00x -> 1.16x optical lens magnification
                         let isHighlighted = (isDragging ? hoveredIndex == index : activeTab == tab)
                         
                         HStack(spacing: 6) {
@@ -130,10 +151,13 @@ struct ControlCenterTabSelector: View {
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(isHighlighted ? .white : Color.zifrTabBarFill)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.85)
+                                .minimumScaleFactor(0.80)
                         }
+                        .shadow(color: Color.black.opacity(Double(proximity) * 0.35), radius: 3, x: 0, y: 1.5)
+                        .scaleEffect(magnification, anchor: .center)
                         .frame(width: tabWidth, height: tabHeight)
                         .contentShape(Rectangle())
+                        .animation(isDragging ? nil : .spring(response: 0.28, dampingFraction: 0.84), value: magnification)
                         .animation(.easeInOut(duration: 0.15), value: isHighlighted)
                     }
                 }
@@ -162,7 +186,7 @@ struct ControlCenterTabSelector: View {
                         let rawX = startPillX + dragTranslationX
                         let currentCenter = rawX + (tabWidth / 2)
                         let fractionalIndex = (currentCenter - innerPadding) / tabWidth
-                        let activeHover = min(tabs.count - 1, max(0, Int(floor(fractionalIndex))))
+                        let activeHover = min(tabs.count - 1, max(0, Int(round(fractionalIndex))))
                         
                         if activeHover != hoveredIndex {
                             hoveredIndex = activeHover
