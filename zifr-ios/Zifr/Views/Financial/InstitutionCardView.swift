@@ -294,7 +294,14 @@ struct InstitutionCardView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 24)
                 .stroke(
-                    LinearGradient.silverOutline,
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
                     lineWidth: 1.5
                 )
         )

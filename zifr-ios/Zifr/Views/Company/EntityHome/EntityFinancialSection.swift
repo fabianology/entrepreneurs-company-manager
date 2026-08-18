@@ -298,7 +298,7 @@ struct EntityFinancialSection: View {
         .frame(maxWidth: .infinity)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(LinearGradient.silverOutline, lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .spotlightTarget(isActive: onboardingState.isSpotlightingCommandCenterFinancials)
         .padding(.horizontal, 20)
         .sheet(isPresented: $showFinancialReceiptReport) {
