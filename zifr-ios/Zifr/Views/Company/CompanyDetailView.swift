@@ -90,6 +90,7 @@ struct CompanyDetailView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
+                    .zIndex(10)
                     .background(
                         GeometryReader { geo in
                             Color.clear.preference(
@@ -430,8 +431,12 @@ struct CompanyDetailView: View {
         .padding(.leading, 12)
         .padding(.trailing, 16)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.zifrTabBarFill.opacity(0.70))
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.zifrBG)
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
+            }
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
