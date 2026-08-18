@@ -24,8 +24,9 @@ struct ControlCenterTabSelector: View {
     // Interactive drag & fling state
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging: Bool = false
-    @State private var visualHoverIndex: Int = 0
+    @State private var hoverIndex: Int = 0
     @State private var lastHapticIndex: Int = 0
+    @State private var trackWidth: CGFloat = 0
     
     // Legacy props (kept for call-site compatibility)
     var institutions: [Institution] = []
@@ -43,149 +44,39 @@ struct ControlCenterTabSelector: View {
         tabs.firstIndex(of: activeTab) ?? 0
     }
     
-    var body: some View {
-        GeometryReader { geometry in
-            let totalWidth = geometry.size.width
-            let innerPadding: CGFloat = 4
-            let availableWidth = max(0, totalWidth - (innerPadding * 2))
-            let tabWidth = availableWidth / CGFloat(tabs.count)
-            let tabHeight: CGFloat = 48
-            
-            // Base offset for current active tab
-            let baseOffset = innerPadding + (CGFloat(currentIndex) * tabWidth)
-            
-            // Continuous position with rubber-banding
-            let pillOffset: CGFloat = {
-                let target = baseOffset + dragOffset
-                let minOffset = innerPadding
-                let maxOffset = innerPadding + (CGFloat(tabs.count - 1) * tabWidth)
-                
-                if target < minOffset {
-                    return minOffset - ((minOffset - target) * 0.22)
-                } else if target > maxOffset {
-                    return maxOffset + ((target - maxOffset) * 0.22)
-                } else {
-                    return target
-                }
-            }()
-            
-            ZStack(alignment: .leading) {
-                // 1. Sliding Pill (Active Indicator)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(Color.zifrTabBarFill.opacity(0.70))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#918457"),
-                                        Color(hex: "#918457").opacity(0.3)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
-                    .frame(width: tabWidth, height: tabHeight)
-                    .offset(x: pillOffset)
-                    .animation(isDragging ? .interactiveSpring(response: 0.15, dampingFraction: 0.86) : .spring(response: 0.28, dampingFraction: 0.82), value: pillOffset)
-                
-                // 2. Tab Labels (Interactive Grid)
-                HStack(spacing: 0) {
-                    ForEach(Array(tabs.enumerated()), id: \.element) { index, tab in
-                        let isHighlighted = (isDragging ? visualHoverIndex == index : activeTab == tab)
-                        
-                        Button {
-                            selectTab(index: index)
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 13.5, weight: .bold))
-                                    .foregroundStyle(isHighlighted ? tab.color : Color.zifrTabBarFill)
-                                
-                                Text(tab.rawValue.uppercased())
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(isHighlighted ? .white : Color.zifrTabBarFill)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.85)
-                            }
-                            .frame(width: tabWidth, height: tabHeight)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .animation(.easeInOut(duration: 0.15), value: isHighlighted)
-                    }
-                }
-                .padding(.horizontal, innerPadding)
+    private let innerPadding: CGFloat = 4
+    private let tabHeight: CGFloat = 48
+    
+    private var calculatedTabWidth: CGFloat {
+        let baseWidth = (trackWidth > 0 ? trackWidth : (UIScreen.main.bounds.width - 40))
+        let available = max(0, baseWidth - (innerPadding * 2))
+        return available / CGFloat(tabs.count)
+    }
+    
+    private var pillOffset: CGFloat {
+        let tabW = calculatedTabWidth
+        let base = innerPadding + (CGFloat(currentIndex) * tabW)
+        if isDragging {
+            let target = base + dragOffset
+            let minOffset = innerPadding
+            let maxOffset = innerPadding + (CGFloat(tabs.count - 1) * tabW)
+            if target < minOffset {
+                return minOffset - ((minOffset - target) * 0.22)
+            } else if target > maxOffset {
+                return maxOffset + ((target - maxOffset) * 0.22)
+            } else {
+                return target
             }
-            .frame(width: totalWidth, height: tabHeight + (innerPadding * 2), alignment: .leading)
-            .contentShape(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
-                    bottomLeadingRadius: 16,
-                    bottomTrailingRadius: 16,
-                    topTrailingRadius: 0
-                )
-            )
-            // Gesture recognizer for direct sliding and fling
-            .gesture(
-                DragGesture(minimumDistance: 4, coordinateSpace: .local)
-                    .onChanged { value in
-                        if !isDragging {
-                            isDragging = true
-                            selectionFeedback.prepare()
-                        }
-                        dragOffset = value.translation.width
-                        
-                        // Calculate which tab the pill center is hovering over
-                        let centerPosition = pillOffset + (tabWidth / 2) - innerPadding
-                        let currentHover = min(tabs.count - 1, max(0, Int(centerPosition / tabWidth)))
-                        
-                        if currentHover != visualHoverIndex {
-                            visualHoverIndex = currentHover
-                            if currentHover != lastHapticIndex {
-                                lastHapticIndex = currentHover
-                                selectionFeedback.selectionChanged()
-                                selectionFeedback.prepare()
-                            }
-                        }
-                    }
-                    .onEnded { value in
-                        let flingX = value.predictedEndTranslation.width
-                        let transX = value.translation.width
-                        
-                        var destinationIndex = currentIndex
-                        
-                        // Fling or Drag determination
-                        if flingX > 35 || transX > tabWidth * 0.4 {
-                            // Fling right -> advance to next tab
-                            destinationIndex = min(tabs.count - 1, currentIndex + 1)
-                        } else if flingX < -35 || transX < -tabWidth * 0.4 {
-                            // Fling left -> retreat to previous tab
-                            destinationIndex = max(0, currentIndex - 1)
-                        } else {
-                            // Settle on the closest tab to current position
-                            let centerPosition = pillOffset + (tabWidth / 2) - innerPadding
-                            destinationIndex = min(tabs.count - 1, max(0, Int(round(centerPosition / tabWidth))))
-                        }
-                        
-                        isDragging = false
-                        dragOffset = 0
-                        visualHoverIndex = destinationIndex
-                        lastHapticIndex = destinationIndex
-                        
-                        impactFeedback.impactOccurred()
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-                            activeTab = tabs[destinationIndex]
-                        }
-                    }
-            )
+        } else {
+            return base
         }
-        .frame(height: 56)
-        .padding(.horizontal, 20)
-        .background(
+    }
+    
+    var body: some View {
+        let tabW = calculatedTabWidth
+        
+        ZStack(alignment: .leading) {
+            // 1. Track Background (attached seamlessly under header)
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
                 bottomLeadingRadius: 16,
@@ -194,33 +85,140 @@ struct ControlCenterTabSelector: View {
             )
             .fill(Color.zifrTabBarFill.opacity(0.40))
             .padding(.top, -30)
-            .padding(.horizontal, 20)
+            
+            // 2. Sliding Pill (Active Indicator)
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.zifrTabBarFill.opacity(0.70))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
+                .frame(width: tabW, height: tabHeight)
+                .offset(x: pillOffset)
+            
+            // 3. Tab Labels
+            HStack(spacing: 0) {
+                ForEach(Array(tabs.enumerated()), id: \.element) { index, tab in
+                    let isHighlighted = (isDragging ? hoverIndex == index : activeTab == tab)
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 13.5, weight: .bold))
+                            .foregroundStyle(isHighlighted ? tab.color : Color.zifrTabBarFill)
+                        
+                        Text(tab.rawValue.uppercased())
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(isHighlighted ? .white : Color.zifrTabBarFill)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                    }
+                    .frame(width: tabW, height: tabHeight)
+                    .contentShape(Rectangle())
+                    .animation(.easeInOut(duration: 0.15), value: isHighlighted)
+                }
+            }
+            .padding(.horizontal, innerPadding)
+        }
+        .frame(height: 56)
+        .padding(.horizontal, 20)
+        .background(
+            GeometryReader { geo in
+                Color.clear.preference(key: TrackWidthKey.self, value: geo.size.width)
+            }
         )
+        .onPreferenceChange(TrackWidthKey.self) { width in
+            if width > 0 {
+                trackWidth = width
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                .onChanged { value in
+                    if !isDragging {
+                        isDragging = true
+                        selectionFeedback.prepare()
+                        impactFeedback.prepare()
+                    }
+                    dragOffset = value.translation.width
+                    
+                    let center = pillOffset + (tabW / 2) - innerPadding
+                    let hover = min(tabs.count - 1, max(0, Int(round(center / tabW))))
+                    
+                    if hover != hoverIndex {
+                        hoverIndex = hover
+                        if hover != lastHapticIndex {
+                            lastHapticIndex = hover
+                            selectionFeedback.selectionChanged()
+                            selectionFeedback.prepare()
+                        }
+                    }
+                }
+                .onEnded { value in
+                    let transX = value.translation.width
+                    let predictedTransX = value.predictedEndTranslation.width
+                    let velocityX = value.velocity.width
+                    
+                    var targetIndex = currentIndex
+                    
+                    // Tap detection (minimal movement)
+                    if abs(transX) < 6 {
+                        let tapX = value.startLocation.x - 20 - innerPadding
+                        let tappedIdx = min(tabs.count - 1, max(0, Int(tapX / tabW)))
+                        targetIndex = tappedIdx
+                    }
+                    // Fling detection (high velocity or high predicted travel)
+                    else if velocityX > 200 || predictedTransX > tabW * 0.35 {
+                        targetIndex = min(tabs.count - 1, currentIndex + 1)
+                    } else if velocityX < -200 || predictedTransX < -tabW * 0.35 {
+                        targetIndex = max(0, currentIndex - 1)
+                    }
+                    // Drag release based on position
+                    else {
+                        let finalCenter = pillOffset + (tabW / 2) - innerPadding
+                        targetIndex = min(tabs.count - 1, max(0, Int(round(finalCenter / tabW))))
+                    }
+                    
+                    isDragging = false
+                    dragOffset = 0
+                    hoverIndex = targetIndex
+                    lastHapticIndex = targetIndex
+                    
+                    impactFeedback.impactOccurred()
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.78)) {
+                        activeTab = tabs[targetIndex]
+                    }
+                }
+        )
+        .animation(isDragging ? nil : .spring(response: 0.28, dampingFraction: 0.78), value: activeTab)
         .onAppear {
-            visualHoverIndex = currentIndex
+            hoverIndex = currentIndex
             lastHapticIndex = currentIndex
             selectionFeedback.prepare()
             impactFeedback.prepare()
         }
         .onChange(of: activeTab) { _, newTab in
             let newIdx = tabs.firstIndex(of: newTab) ?? 0
-            visualHoverIndex = newIdx
+            hoverIndex = newIdx
             lastHapticIndex = newIdx
         }
     }
-    
-    private func selectTab(index: Int) {
-        let safeIndex = min(tabs.count - 1, max(0, index))
-        guard safeIndex != currentIndex else { return }
-        
-        impactFeedback.impactOccurred()
-        visualHoverIndex = safeIndex
-        lastHapticIndex = safeIndex
-        
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
-            dragOffset = 0
-            isDragging = false
-            activeTab = tabs[safeIndex]
-        }
+}
+
+private struct TrackWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
