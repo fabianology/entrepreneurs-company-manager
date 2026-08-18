@@ -79,7 +79,7 @@ struct EntityFinancialSection: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
-                .background(Color.black.opacity(0.70))
+                .background(Color.zifrTabBarFill.opacity(0.70))
                 .overlay(
                     Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)),
                     alignment: .bottom
