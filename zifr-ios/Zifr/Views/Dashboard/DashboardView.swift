@@ -734,16 +734,20 @@ struct DashboardView: View {
 
             if !vm.quote.isEmpty {
                 let parts = vm.quote.components(separatedBy: " - ")
-                VStack(spacing: 2) {
+                VStack(spacing: 3) {
                     Text("\"\(parts.first ?? vm.quote)\"")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.system(size: 14, weight: .semibold))
                         .italic()
-                        .foregroundStyle(Color.black.opacity(0.85))
+                        .foregroundStyle(Color(hex: "#092e21"))
+                        .shadow(color: Color.black.opacity(0.80), radius: 0.5, x: 0, y: -0.75)
+                        .shadow(color: Color(hex: "#42c092").opacity(0.35), radius: 0.5, x: 0, y: 1.0)
                         .multilineTextAlignment(.center)
                     if parts.count > 1 {
                         Text("— \(parts[1])")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.black.opacity(0.65))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color(hex: "#092e21"))
+                            .shadow(color: Color.black.opacity(0.75), radius: 0.5, x: 0, y: -0.75)
+                            .shadow(color: Color(hex: "#42c092").opacity(0.35), radius: 0.5, x: 0, y: 1.0)
                     }
                 }
                 .padding(.horizontal, 32)
