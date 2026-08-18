@@ -47,7 +47,7 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack(path: $vm.path) {
             ZStack(alignment: .top) {
-                Color.zifrGreen.ignoresSafeArea()
+                Color.zifrBG.ignoresSafeArea()
                 
                 AnimatedHeaderBackground()
                     .ignoresSafeArea(edges: .top)
@@ -931,7 +931,7 @@ struct SharedWithMeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.zifrGreen.ignoresSafeArea()
+                Color.zifrBG.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {

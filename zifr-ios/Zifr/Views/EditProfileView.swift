@@ -16,7 +16,7 @@ struct EditProfileView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            Color.zifrGreen.ignoresSafeArea()
+            Color.zifrBG.ignoresSafeArea()
             
             AnimatedHeaderBackground()
                 .ignoresSafeArea(edges: .top)

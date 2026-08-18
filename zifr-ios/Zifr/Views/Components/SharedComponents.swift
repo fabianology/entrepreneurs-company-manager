@@ -1047,7 +1047,7 @@ struct MiloomListView<Content: View>: View {
 // MARK: - Premium Header Background
 struct AnimatedHeaderBackground: View {
     var body: some View {
-        Color.zifrGreen
+        Color.zifrBG
             .ignoresSafeArea()
             .allowsHitTesting(false)
     }

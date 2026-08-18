@@ -14,7 +14,7 @@ struct ForgotPasswordSheet: View {
     
     var body: some View {
         ZStack {
-            Color.zifrGreen.ignoresSafeArea()
+            Color.zifrBG.ignoresSafeArea()
                 .onTapGesture {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                 }

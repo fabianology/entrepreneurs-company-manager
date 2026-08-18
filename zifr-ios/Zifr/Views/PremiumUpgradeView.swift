@@ -9,7 +9,7 @@ struct PremiumUpgradeView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            Color.zifrGreen.ignoresSafeArea()
+            Color.zifrBG.ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Header Image/Graphic
