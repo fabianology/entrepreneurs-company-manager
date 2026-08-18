@@ -356,7 +356,7 @@ struct CompanyDetailView: View {
                     let screenWidth = UIScreen.main.bounds.width
                     let startX = value.startLocation.x
                     
-                    let isEdgeSwipe = startX < 120 || startX > screenWidth - 120
+                    let isEdgeSwipe = startX < 30 || startX > screenWidth - 30
                     if !isEdgeSwipe { return }
                     
                     let transX = value.translation.width
@@ -431,9 +431,23 @@ struct CompanyDetailView: View {
         .padding(.trailing, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.zifrTabBarFill)
+                .fill(Color.zifrTabBarFill.opacity(0.70))
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
         .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
         .contentShape(Rectangle())
         .onTapGesture {
