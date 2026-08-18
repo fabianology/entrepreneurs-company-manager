@@ -931,7 +931,7 @@ struct SharedWithMeView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.zifrGreen.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {

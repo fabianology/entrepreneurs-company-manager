@@ -9,15 +9,7 @@ struct PremiumUpgradeView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
-            
-            // Dynamic premium background
-            LinearGradient(
-                colors: [Color(hex: "#1e3a8a").opacity(0.8), Color.black],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            Color.zifrGreen.ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Header Image/Graphic

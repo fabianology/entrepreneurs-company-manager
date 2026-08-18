@@ -1044,58 +1044,12 @@ struct MiloomListView<Content: View>: View {
     }
 }
 
-// MARK: - Premium Animated Header Background
+// MARK: - Premium Header Background
 struct AnimatedHeaderBackground: View {
-    @State private var animate = false
-
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            
-            ZStack {
-                // Base background color
-                Color.zifrGreen.ignoresSafeArea()
-
-                // Deep Teal/Green
-                Circle()
-                    .fill(Color(hex: "#15566a").opacity(0.85))
-                    .frame(width: w * 1.6, height: w * 1.6)
-                    .blur(radius: 100)
-                    .offset(x: animate ? -w * 0.2 : w * 0.1, y: animate ? -h * 0.35 : -h * 0.45)
-                
-                // Vibrant Zifr Green
-                Circle()
-                    .fill(Color(hex: "#1f7055").opacity(0.70))
-                    .frame(width: w * 1.3, height: w * 1.3)
-                    .blur(radius: 90)
-                    .offset(x: animate ? w * 0.25 : -w * 0.2, y: animate ? -h * 0.45 : -h * 0.3)
-                
-                // Emerald Splash
-                Circle()
-                    .fill(Color(hex: "#258a69").opacity(0.40))
-                    .frame(width: w * 0.7, height: w * 0.7)
-                    .blur(radius: 80)
-                    .offset(x: animate ? -w * 0.15 : w * 0.3, y: animate ? -h * 0.3 : -h * 0.4)
-                
-                // Green bleed from sides
-                HStack(spacing: 0) {
-                    LinearGradient(colors: [Color.zifrGreen, .clear], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: 60)
-                    Spacer()
-                    LinearGradient(colors: [.clear, Color.zifrGreen], startPoint: .leading, endPoint: .trailing)
-                        .frame(width: 60)
-                }
-            }
-            .frame(width: w, height: h)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 10).repeatForever(autoreverses: true)) {
-                animate = true
-            }
-        }
+        Color.zifrGreen
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
     }
 }
 

@@ -14,18 +14,10 @@ struct ForgotPasswordSheet: View {
     
     var body: some View {
         ZStack {
-            // Dark premium background with native blur appearance
-            Color.black.ignoresSafeArea()
+            Color.zifrGreen.ignoresSafeArea()
                 .onTapGesture {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                 }
-            
-            // Shifting green blur blob in corner
-            Circle()
-                .fill(Color.zifrGreen.opacity(0.35))
-                .frame(width: 300, height: 300)
-                .blur(radius: 50)
-                .offset(x: 100, y: -200)
             
             VStack(spacing: 24) {
                 // Drag Indicator
