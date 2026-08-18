@@ -147,7 +147,7 @@ struct CompanyCardView: View {
             HStack {
                 Spacer()
                 
-                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: Color(hex: "#1A7077"))
+                statusItem(icon: "dollarsign.bank.building", title: "Financial", count: institutionsCount, color: .black)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapInstitutions?()
@@ -161,7 +161,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: Color(hex: "#2070BD"))
+                statusItem(icon: "square.3.layers.3d", title: "Services", count: subscriptionsCount, color: .black)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapSubscriptions?()
@@ -175,7 +175,7 @@ struct CompanyCardView: View {
                 
                 Spacer()
                 
-                statusItem(icon: "doc.text", title: "Documents", count: docsCount, color: Color(hex: "#918457"))
+                statusItem(icon: "doc.text", title: "Documents", count: docsCount, color: .black)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         onTapDocuments?()
