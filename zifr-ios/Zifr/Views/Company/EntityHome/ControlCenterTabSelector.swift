@@ -77,58 +77,14 @@ struct ControlCenterTabSelector: View {
             let pillCenterX = currentPillX + (tabWidth / 2)
             
             ZStack(alignment: .leading) {
-                // 1. Clear Liquid Glass Magnifying Lens Pill
+                // 1. Pure Native iOS Clear Liquid Glass Pill
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.zifrTabBarFill.opacity(0.35))
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .fill(.ultraThinMaterial)
                     .overlay(
-                        // Convex glass optical dome highlight
-                        RadialGradient(
-                            colors: [
-                                Color.white.opacity(0.30),
-                                Color.white.opacity(0.08),
-                                Color.clear
-                            ],
-                            center: .top,
-                            startRadius: 0,
-                            endRadius: tabWidth * 0.75
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    )
-                    .overlay(
-                        // Specular glass shine
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.24),
-                                        Color.white.opacity(0.03),
-                                        Color.clear
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .stroke(Color.white.opacity(0.20), lineWidth: 0.5)
                     )
-                    .overlay(
-                        // Dynamic glass rim stroke
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.75),
-                                        Color(hex: "#918457").opacity(0.80),
-                                        Color(hex: "#918457").opacity(0.25),
-                                        Color.white.opacity(0.15)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.2
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(0.40), radius: isDragging ? 10 : 7, x: 0, y: isDragging ? 5 : 3)
-                    .scaleEffect(isDragging ? 1.04 : 1.0)
+                    .shadow(color: Color.black.opacity(0.20), radius: 8, x: 0, y: 3)
                     .frame(width: tabWidth, height: tabHeight)
                     .offset(x: currentPillX)
                     .animation(isDragging ? nil : .spring(response: 0.28, dampingFraction: 0.84), value: currentPillX)
