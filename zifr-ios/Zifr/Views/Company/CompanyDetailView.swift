@@ -431,7 +431,7 @@ struct CompanyDetailView: View {
         .padding(.trailing, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.zifrTabBarFill.opacity(0.70))
+                .fill(Color.zifrTabBarFill)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
