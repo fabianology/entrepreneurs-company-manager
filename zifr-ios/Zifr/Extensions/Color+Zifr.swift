@@ -90,8 +90,8 @@ extension ShapeStyle where Self == LinearGradient {
     static var silverOutline: LinearGradient {
         LinearGradient(
             colors: [
-                Color(hex: "#D4D8DD"),
-                Color(hex: "#121417").opacity(0.2)
+                Color(hex: "#4E555E"),
+                Color(hex: "#101214").opacity(0.2)
             ],
             startPoint: .top,
             endPoint: .bottom
