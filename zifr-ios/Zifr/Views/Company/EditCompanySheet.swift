@@ -117,53 +117,6 @@ struct EditCompanySheet: View {
                                     }
                                 }
 
-                                // Brand Color Swatches Row
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("BRAND COLOR")
-                                        .font(.system(size: 12, weight: .regular))
-                                        .foregroundStyle(Color.white.opacity(0.45))
-                                        .padding(.horizontal, 2)
-
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 10) {
-                                            ForEach(Company.brandColors, id: \.self) { hex in
-                                                let isSelected = colorHex.caseInsensitiveCompare(hex) == .orderedSame && logoData == nil
-                                                Button {
-                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                    withAnimation(.spring(response: 0.3)) {
-                                                        colorHex = hex.lowercased()
-                                                        logoData = nil
-                                                    }
-                                                } label: {
-                                                    ZStack {
-                                                        Circle()
-                                                            .fill(Color(hex: hex))
-                                                            .frame(width: 32, height: 32)
-                                                            .overlay(
-                                                                Circle()
-                                                                    .stroke(Color.white.opacity(0.15), lineWidth: 1)
-                                                            )
-                                                        
-                                                        if isSelected {
-                                                            Circle()
-                                                                .stroke(Color.white, lineWidth: 2.5)
-                                                                .frame(width: 38, height: 38)
-                                                            
-                                                            Image(systemName: "checkmark")
-                                                                .font(.system(size: 12, weight: .bold))
-                                                                .foregroundStyle(hex == "#000000" ? .white : (hex == "#f59e0b" ? .black : .white))
-                                                        }
-                                                    }
-                                                    .frame(width: 40, height: 40)
-                                                }
-                                                .buttonStyle(.plain)
-                                            }
-                                        }
-                                        .padding(.vertical, 4)
-                                        .padding(.horizontal, 2)
-                                    }
-                                }
-
                                 // Website Row
                                 HStack(spacing: 12) {
                                     formSection {
