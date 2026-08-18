@@ -75,14 +75,7 @@ struct ControlCenterTabSelector: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
                             .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#918457"),
-                                        Color(hex: "#918457").opacity(0.3)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
+                                tab == .financial ? LinearGradient.silverOutline : LinearGradient.vaultOutline,
                                 lineWidth: 1.5
                             )
                     )

@@ -256,14 +256,7 @@ struct StackedInstitutionDeckView: View {
         .overlay(
             cardShape
                 .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
+                    LinearGradient.silverOutline,
                     lineWidth: 1.5
                 )
         )

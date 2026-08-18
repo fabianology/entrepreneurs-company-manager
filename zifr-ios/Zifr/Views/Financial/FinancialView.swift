@@ -217,7 +217,7 @@ struct FinancialView: View {
                                 .padding(.vertical, 16)
                                 .background(Color.white.opacity(0.05))
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(LinearGradient.silverOutline, lineWidth: 1.5))
                             }
                             .buttonStyle(PremiumButtonStyle())
                             .spotlightTarget(isActive: onboardingState.isSpotlightingBank)

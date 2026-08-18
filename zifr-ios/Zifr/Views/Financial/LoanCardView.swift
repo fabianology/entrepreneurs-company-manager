@@ -80,7 +80,10 @@ struct LoanCardView: View {
             .padding(16)
             .background(Color(hex: "#1C1C1E"))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(LinearGradient.silverOutline, lineWidth: 1.5)
+            )
         }
         .buttonStyle(.plain)
     }
