@@ -434,20 +434,6 @@ struct CompanyDetailView: View {
                 .fill(Color.zifrTabBarFill)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
         .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
         .contentShape(Rectangle())
         .onTapGesture {
