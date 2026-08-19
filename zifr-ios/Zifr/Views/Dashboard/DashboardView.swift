@@ -724,47 +724,15 @@ struct DashboardView: View {
     }
 
     private var headerSection: some View {
-        VStack(spacing: 14) {
-            if let uiImage = UIImage(named: "logo.png") {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 50)
-            }
-
-            if !vm.quote.isEmpty {
-                let parts = vm.quote.components(separatedBy: " - ")
-                VStack(spacing: 3) {
-                    Text("\"\(parts.first ?? vm.quote)\"")
-                        .font(.system(size: 14, weight: .semibold))
-                        .italic()
-                        .foregroundStyle(Color(hex: "#10503a"))
-                        .shadow(color: Color.black.opacity(0.55), radius: 0.5, x: 0, y: -0.75)
-                        .shadow(color: Color.white.opacity(0.20), radius: 0.5, x: 0, y: 0.75)
-                        .multilineTextAlignment(.center)
-                    if parts.count > 1 {
-                        Text("— \(parts[1])")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color(hex: "#10503a"))
-                            .shadow(color: Color.black.opacity(0.50), radius: 0.5, x: 0, y: -0.75)
-                            .shadow(color: Color.white.opacity(0.20), radius: 0.5, x: 0, y: 0.75)
-                    }
-                }
-                .padding(.horizontal, 32)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                .animation(.easeInOut(duration: 0.6), value: vm.quote)
-            } else {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.black.opacity(0.12))
-                    .frame(width: 220, height: 14)
-                    .shimmer()
-            }
+        VStack(spacing: 0) {
+            Image("miloom_logo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 120)
+                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 20)
-        .task {
-            if vm.quote.isEmpty { await vm.loadQuote() }
-        }
     }
     
     @ViewBuilder

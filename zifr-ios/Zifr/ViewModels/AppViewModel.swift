@@ -9,7 +9,6 @@ final class AppViewModel {
     var activeTab: CompanyTab = .home
     var searchQuery: String = ""
     var showSearch: Bool = false
-    var quote: String = ""
     var deepLinkModelId: UUID? = nil
     var path = NavigationPath()
 
@@ -299,33 +298,6 @@ final class AppViewModel {
         cards.filter { $0.companyId == company.id && $0.type == "Credit" }.reduce(0) { $0 + $1.limit }
     }
 
-    private let localQuotes = [
-        "The best way to predict the future is to create it. - Peter Drucker",
-        "The way to get started is to quit talking and begin doing. - Walt Disney",
-        "Your time is limited, so don't waste it living someone else's life. - Steve Jobs",
-        "If you are not embarrassed by the first version of your product, you've launched too late. - Reid Hoffman",
-        "Risk more than others think is safe. Dream more than others think is practical. - Howard Schultz",
-        "Ideas are cheap. Execution is everything. - Chris Sacca",
-        "Done is better than perfect. - Sheryl Sandberg",
-        "Chase the vision, not the money. - Tony Hsieh",
-        "Don't find customers for your products, find products for your customers. - Seth Godin",
-        "Quality is the best business plan. - John Lasseter",
-        "It’s not about ideas. It’s about making ideas happen. - Scott Belsky",
-        "If you can't feed a team with two pizzas, it's too large. - Jeff Bezos",
-        "Do not be embarrassed by your failures, learn from them and start again. - Richard Branson",
-        "Growth and comfort do not coexist. - Ginni Rometty",
-        "A brand for a company is like a reputation for a person. - Jeff Bezos",
-        "We suffer more often in imagination than in reality. - Seneca",
-        "You have power over your mind - not outside events. Realize this, and you will find strength. - Marcus Aurelius",
-        "First say to yourself what you would be; and then do what you have to do. - Epictetus",
-        "The impediment to action advances action. What stands in the way becomes the way. - Marcus Aurelius",
-        "Waste no more time arguing what a good man should be. Be one. - Marcus Aurelius"
-    ]
-
-    func loadQuote() async {
-        let q = localQuotes.randomElement() ?? ""
-        await MainActor.run { self.quote = q }
-    }
 
     struct SearchResult: Identifiable {
         let id = UUID()
