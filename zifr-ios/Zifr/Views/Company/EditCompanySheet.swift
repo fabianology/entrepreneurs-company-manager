@@ -138,21 +138,21 @@ struct EditCompanySheet: View {
                                             guard let url = URL(string: host), let domain = url.host else { return }
                                             
                                             let cleanDomain = domain.replacingOccurrences(of: "www.", with: "")
-                                            let clearbitURL = URL(string: "https://logo.clearbit.com/\(cleanDomain)?size=256")!
+                                            let logokitURL = URL(string: "https://img.logokit.com/\(cleanDomain)?token=pk_fr19dc92f4c45a5ff8583c&size=256")!
                                             let googleURL = URL(string: "https://www.google.com/s2/favicons?domain=\(cleanDomain)&sz=256")!
                                             
                                             do {
                                                 var fetchedData: Data? = nil
                                                 var success = false
                                                 
-                                                // Try Clearbit first with a strict 1.5 second timeout
+                                                // Try LogoKit first with a strict 1.5 second timeout
                                                 do {
                                                     let config = URLSessionConfiguration.default
                                                     config.timeoutIntervalForRequest = 1.5
                                                     config.timeoutIntervalForResource = 1.5
                                                     let fastSession = URLSession(configuration: config)
                                                     
-                                                    let (data, response) = try await fastSession.data(from: clearbitURL)
+                                                    let (data, response) = try await fastSession.data(from: logokitURL)
                                                     if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
                                                         fetchedData = data
                                                         success = true

@@ -186,7 +186,7 @@ struct FaviconImage: View {
 
     private var primaryLogoURL: URL? {
         guard !cleanDomain.isEmpty else { return nil }
-        return URL(string: "https://logo.clearbit.com/\(cleanDomain)")
+        return URL(string: "https://img.logokit.com/\(cleanDomain)?token=pk_fr19dc92f4c45a5ff8583c&size=256")
     }
 
     private var fallbackFaviconURL: URL? {
