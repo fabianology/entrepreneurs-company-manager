@@ -126,7 +126,7 @@ struct EditCompanySheet: View {
                                     .onChange(of: website) { _, newValue in
                                         websiteFetchTask?.cancel()
                                         websiteFetchTask = Task {
-                                            try? await Task.sleep(nanoseconds: 1_200_000_000) // 1.2s debounce
+                                            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s debounce
                                             guard !Task.isCancelled else { return }
                                             
                                             // Only auto-fetch if there is no custom logo
@@ -145,18 +145,23 @@ struct EditCompanySheet: View {
                                                 var fetchedData: Data? = nil
                                                 var success = false
                                                 
-                                                // Try Clearbit first
+                                                // Try Clearbit first with a strict 1.5 second timeout
                                                 do {
-                                                    let (data, response) = try await URLSession.shared.data(from: clearbitURL)
+                                                    let config = URLSessionConfiguration.default
+                                                    config.timeoutIntervalForRequest = 1.5
+                                                    config.timeoutIntervalForResource = 1.5
+                                                    let fastSession = URLSession(configuration: config)
+                                                    
+                                                    let (data, response) = try await fastSession.data(from: clearbitURL)
                                                     if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
                                                         fetchedData = data
                                                         success = true
                                                     }
                                                 } catch {
-                                                    print("Clearbit fetch failed, falling back to Google: \(error)")
+                                                    // Clearbit failed or timed out
                                                 }
                                                 
-                                                // Fallback to Google if Clearbit failed (404, DNS error, etc)
+                                                // Fallback to Google if Clearbit failed (404, DNS error, timeout, etc)
                                                 if !success {
                                                     let (data, response) = try await URLSession.shared.data(from: googleURL)
                                                     if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
