@@ -83,18 +83,6 @@ struct EditCompanySheet: View {
                                                     .font(.system(size: 28, weight: .black, design: .rounded))
                                                     .foregroundStyle(.white)
                                             }
-                                        }
-                                        
-                                        if logoData != nil {
-                                            Button { logoData = nil } label: {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .foregroundStyle(.red, .white)
-                                                    .font(.system(size: 20))
-                                            }
-                                            .padding(4)
-                                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                                            .offset(x: 8, y: -8)
-                                        }
                                     }
                                     .frame(width: 70, height: 70)
                                     .clipShape(RoundedRectangle(cornerRadius: 18))
