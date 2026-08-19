@@ -78,8 +78,6 @@ struct Company: Identifiable, Codable, Hashable {
         if let str = try? container.decodeIfPresent(String.self, forKey: .logoData) {
             if str.hasPrefix("\\x") {
                 logoData = Data(hexString: String(str.dropFirst(2)))
-            } else if str.hasPrefix("\x") {
-                logoData = Data(hexString: String(str.dropFirst(1)))
             } else {
                 logoData = Data(base64Encoded: str)
             }
