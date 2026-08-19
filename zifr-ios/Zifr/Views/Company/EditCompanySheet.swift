@@ -142,21 +142,38 @@ struct EditCompanySheet: View {
                                             let googleURL = URL(string: "https://www.google.com/s2/favicons?domain=\(cleanDomain)&sz=256")!
                                             
                                             do {
-                                                var (data, response) = try await URLSession.shared.data(from: clearbitURL)
-                                                if let httpRes = response as? HTTPURLResponse, httpRes.statusCode != 200 {
-                                                    (data, response) = try await URLSession.shared.data(from: googleURL)
+                                                var fetchedData: Data? = nil
+                                                var success = false
+                                                
+                                                // Try Clearbit first
+                                                do {
+                                                    let (data, response) = try await URLSession.shared.data(from: clearbitURL)
+                                                    if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
+                                                        fetchedData = data
+                                                        success = true
+                                                    }
+                                                } catch {
+                                                    print("Clearbit fetch failed, falling back to Google: \(error)")
                                                 }
                                                 
-                                                if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
+                                                // Fallback to Google if Clearbit failed (404, DNS error, etc)
+                                                if !success {
+                                                    let (data, response) = try await URLSession.shared.data(from: googleURL)
+                                                    if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
+                                                        fetchedData = data
+                                                    }
+                                                }
+                                                
+                                                if let finalData = fetchedData {
                                                     await MainActor.run {
                                                         // Ensure user hasn't uploaded manually while we were fetching
                                                         if self.logoData == nil {
-                                                            self.logoData = data
+                                                            self.logoData = finalData
                                                         }
                                                     }
                                                 }
                                             } catch {
-                                                print("Logo auto-fetch failed: \(error)")
+                                                print("Logo auto-fetch completely failed: \(error)")
                                             }
                                         }
                                     }
