@@ -49,27 +49,10 @@ struct DashboardView: View {
             ZStack(alignment: .top) {
                 Color.zifrBG.ignoresSafeArea()
 
-                // Background Logo Grid Bleed
-                Image("miloom_logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: .infinity)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0.0),
-                                .init(color: .black, location: 0.85),
-                                .init(color: .clear, location: 1.0)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .ignoresSafeArea(edges: .top)
-
                 VStack(spacing: 0) {
-                    // Sticky Header (Miloom Logo & Quote Spacer)
+                    // Sticky Header (Miloom Logo & Quote)
                     headerSection
+                        .padding(.top, 12)
                         .padding(.bottom, 28)
 
                     List {
@@ -741,8 +724,15 @@ struct DashboardView: View {
     }
 
     private var headerSection: some View {
-        Spacer()
-            .frame(height: 110)
+        VStack(spacing: 0) {
+            Image("miloom_logo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: 32)
+                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
