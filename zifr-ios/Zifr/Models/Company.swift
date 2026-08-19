@@ -74,9 +74,15 @@ struct Company: Identifiable, Codable, Hashable {
         lastModified = try container.decode(Date.self, forKey: .lastModified)
         lastViewed = try container.decode(Date.self, forKey: .lastViewed)
         
-        // SAFE DECODE: gracefully fail if logo_data is not valid Base64
-        if let base64String = try? container.decodeIfPresent(String.self, forKey: .logoData) {
-            logoData = Data(base64Encoded: base64String)
+        // SAFE DECODE: handle Base64, Postgres BYTEA hex strings (\x...), or raw Data
+        if let str = try? container.decodeIfPresent(String.self, forKey: .logoData) {
+            if str.hasPrefix("\\x") {
+                logoData = Data(hexString: String(str.dropFirst(2)))
+            } else if str.hasPrefix("\x") {
+                logoData = Data(hexString: String(str.dropFirst(1)))
+            } else {
+                logoData = Data(base64Encoded: str)
+            }
         } else {
             logoData = try? container.decodeIfPresent(Data.self, forKey: .logoData)
         }
@@ -175,6 +181,7 @@ struct ResourceShare: Identifiable, Codable, Hashable {
     var role: String
     var senderEmail: String?
     var senderDisplayName: String?
+    var recipientEmail: String?
     var createdAt: Date
     
     enum CodingKeys: String, CodingKey {
@@ -185,6 +192,7 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         case role
         case senderEmail = "sender_email"
         case senderDisplayName = "sender_display_name"
+        case recipientEmail = "recipient_email"
         case createdAt = "created_at"
     }
     
@@ -206,5 +214,26 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         self.senderEmail = senderEmail
         self.senderDisplayName = senderDisplayName
         self.createdAt = createdAt
+    }
+}
+
+// MARK: - Hex Data Decoder
+extension Data {
+    init?(hexString: String) {
+        let cleanHex = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleanHex.count % 2 == 0 else { return nil }
+        var data = Data(capacity: cleanHex.count / 2)
+        var index = cleanHex.startIndex
+        for _ in 0..<(cleanHex.count / 2) {
+            let nextIndex = cleanHex.index(index, offsetBy: 2)
+            let bytes = cleanHex[index..<nextIndex]
+            if let byte = UInt8(bytes, radix: 16) {
+                data.append(byte)
+            } else {
+                return nil
+            }
+            index = nextIndex
+        }
+        self = data
     }
 }

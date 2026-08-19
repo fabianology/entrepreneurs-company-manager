@@ -10,6 +10,8 @@ struct CompanyAvatar: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
+            } else if let website = company.website, !website.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                FaviconImage(website: website, size: size)
             } else {
                 initialsView
             }

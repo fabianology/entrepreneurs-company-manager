@@ -76,6 +76,8 @@ struct EditCompanySheet: View {
                                             Image(uiImage: ui)
                                                 .resizable()
                                                 .scaledToFill()
+                                        } else if !website.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                            FaviconImage(website: website, size: 70)
                                         } else {
                                             ZStack {
                                                 Color(hex: colorHex)
@@ -83,6 +85,7 @@ struct EditCompanySheet: View {
                                                     .font(.system(size: 28, weight: .black, design: .rounded))
                                                     .foregroundStyle(.white)
                                             }
+                                        }
                                     }
                                     .frame(width: 70, height: 70)
                                     .clipShape(RoundedRectangle(cornerRadius: 18))
