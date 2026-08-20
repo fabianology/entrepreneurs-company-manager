@@ -29,13 +29,89 @@ struct DocumentListView: View {
         Dictionary(grouping: documents, by: { CompanyDocument.normalizeType($0.type) })
     }
 
+    @ViewBuilder
+    private var complianceChecklistSection: some View {
+        let required = CompanyDocument.requiredDocuments(for: company.structure)
+        let missing = required.filter { req in
+            !documents.contains { doc in
+                doc.name.lowercased().contains(req.title.lowercased()) || req.title.lowercased().contains(doc.name.lowercased()) || doc.type == req.category && doc.name.lowercased().contains("formation")
+            }
+        }
+        
+        if !missing.isEmpty && selectedType == "All" {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "checklist")
+                        .foregroundStyle(Color(hex: "#0A84FF"))
+                    Text("Compliance Checklist")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Text("\(required.count - missing.count)/\(required.count)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(missing, id: \.title) { req in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Image(systemName: CompanyDocument.icon(for: req.category))
+                                        .font(.system(size: 12))
+                                    Text(req.category.uppercased())
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                .foregroundStyle(Color.white.opacity(0.5))
+                                
+                                Text(req.title)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(2)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                
+                                Spacer()
+                                
+                                Button {
+                                    var newDocInstance = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                                    newDocInstance.name = req.title
+                                    newDocInstance.type = req.category
+                                    newDoc = newDocInstance
+                                } label: {
+                                    Text("Upload")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(Color.white.opacity(0.1))
+                                        .clipShape(Capsule())
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .padding(16)
+                            .frame(width: 160, height: 140)
+                            .background(Color.white.opacity(0.05))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                }
+                .padding(.horizontal, -20)
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             // Scrollable Document Rows List (Background layer scrolling behind header)
             ScrollView {
                 VStack(spacing: 0) {
                     // Offset for top action bar + anchored category tabs header
-                    Spacer().frame(height: hideActionBar ? 312 : 276)
+                    Spacer().frame(height: hideActionBar ? 288 : 276)
+
+                    complianceChecklistSection
 
                     Group {
                         if documents.isEmpty {
@@ -106,7 +182,7 @@ struct DocumentListView: View {
 
             // Fixed Header with Tabs (anchored, does not move when scrolling)
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 98 : 62)
+                Spacer().frame(height: hideActionBar ? 74 : 62)
 
                 VStack(spacing: 12) {
                     // All Documents Box (Full Width)
@@ -404,13 +480,25 @@ struct DocumentListView: View {
 
     private func openDocument(_ doc: CompanyDocument) {
         guard let docUrl = doc.url, !docUrl.isEmpty else { return }
+        
         if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
             let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
             if let u = URL(string: cleanPath) {
                 openURL = IdentifiableURL(url: u)
             }
-        } else if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
-            openURL = IdentifiableURL(url: u)
+        } else {
+            Task {
+                do {
+                    let signedUrl = try await DataRepository.shared.getSignedUrl(for: docUrl)
+                    await MainActor.run { openURL = IdentifiableURL(url: signedUrl) }
+                } catch {
+                    print("Failed to get signed URL: \(error)")
+                    // Fallback to try opening as regular URL if signed URL fails
+                    if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
+                        await MainActor.run { openURL = IdentifiableURL(url: u) }
+                    }
+                }
+            }
         }
     }
 
@@ -1029,7 +1117,7 @@ struct EditDocumentSheet: View {
                             let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: "image/jpeg")
                             
                             await MainActor.run {
-                                doc.url = uploadUrl.absoluteString
+                                doc.url = uploadUrl
                                 if doc.name.isEmpty || doc.name == "New Document" {
                                     doc.name = "Photo - \(doc.type)"
                                 }
@@ -1091,7 +1179,7 @@ struct EditDocumentSheet: View {
                             let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: contentType)
                             
                             await MainActor.run {
-                                doc.url = uploadUrl.absoluteString
+                                doc.url = uploadUrl
                                 if doc.name.isEmpty || doc.name == "New Document" {
                                     doc.name = url.deletingPathExtension().lastPathComponent
                                 }

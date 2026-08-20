@@ -34,7 +34,7 @@ struct FinancialView: View {
                     VStack(spacing: 0) {
                         // ── Main Wallet Stack ──
                         VStack(spacing: 0) {
-                            Spacer().frame(height: hideActionBar ? 110 : 70) // Offset for tabs or action bar
+                            Spacer().frame(height: hideActionBar ? 82 : 70) // Offset for tabs (82) or action bar (70) to maintain consistent 20pt card gap
                             if institutions.isEmpty && cards.isEmpty && loans.isEmpty {
                         // Empty State — dummy wallet
                         let dummyAmexId = UUID()

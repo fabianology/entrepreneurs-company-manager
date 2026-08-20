@@ -278,7 +278,7 @@ struct StackedSubscriptionDeckView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 98 : 70)
+                Spacer().frame(height: hideActionBar ? 82 : 70) // 20pt gap below action bar (50->70) or slider tabs (62->82)
 
                 ZStack(alignment: .top) {
                     ForEach(Array(subscriptions.enumerated()), id: \.element.id) { index, sub in

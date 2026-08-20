@@ -108,7 +108,7 @@ struct EntityHomeView: View {
                 documents: documents,
                 totalDebt: model.totalDebt
             )
-            .padding(.top, 8)
+            .padding(.top, 6)
             .padding(.bottom, 10)
         }
         .frame(width: UIScreen.main.bounds.width)
