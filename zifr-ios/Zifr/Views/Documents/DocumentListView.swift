@@ -109,7 +109,7 @@ struct DocumentListView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // Offset for top action bar + anchored category tabs header
-                    Spacer().frame(height: hideActionBar ? 288 : 276)
+                    Spacer().frame(height: hideActionBar ? 296 : 284)
 
                     complianceChecklistSection
 
@@ -182,7 +182,7 @@ struct DocumentListView: View {
 
             // Fixed Header with Tabs (anchored, does not move when scrolling)
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 74 : 62)
+                Spacer().frame(height: hideActionBar ? 82 : 70)
 
                 VStack(spacing: 12) {
                     // All Documents Box (Full Width)
