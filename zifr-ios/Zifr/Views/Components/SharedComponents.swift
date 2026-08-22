@@ -184,20 +184,15 @@ struct FaviconImage: View {
         return raw
     }
 
-    private var primaryLogoURL: URL? {
-        guard !cleanDomain.isEmpty else { return nil }
-        return URL(string: "https://img.logokit.com/\(cleanDomain)?token=pk_fr19dc92f4c45a5ff8583c&size=256")
-    }
-
-    private var fallbackFaviconURL: URL? {
+    private var faviconURL: URL? {
         guard !cleanDomain.isEmpty else { return nil }
         return URL(string: "https://www.google.com/s2/favicons?domain=\(cleanDomain)&sz=256")
     }
 
     var body: some View {
         ZStack {
-            if let primary = primaryLogoURL {
-                AsyncImage(url: primary) { phase in
+            if let url = faviconURL {
+                AsyncImage(url: url) { phase in
                     switch phase {
                     case .success(let image):
                         image.resizable()
@@ -205,21 +200,7 @@ struct FaviconImage: View {
                             .frame(width: size, height: size)
                             .clipShape(RoundedRectangle(cornerRadius: max(4, size * 0.2)))
                     default:
-                        if let fallback = fallbackFaviconURL {
-                            AsyncImage(url: fallback) { fallbackPhase in
-                                switch fallbackPhase {
-                                case .success(let fallbackImg):
-                                    fallbackImg.resizable()
-                                        .scaledToFit()
-                                        .frame(width: size, height: size)
-                                        .clipShape(RoundedRectangle(cornerRadius: max(4, size * 0.2)))
-                                default:
-                                    globeFallback
-                                }
-                            }
-                        } else {
-                            globeFallback
-                        }
+                        globeFallback
                     }
                 }
             } else {
