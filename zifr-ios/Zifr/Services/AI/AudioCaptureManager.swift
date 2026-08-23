@@ -15,6 +15,7 @@ class AudioCaptureManager: ObservableObject {
     // Half-duplex: mute mic while assistant speaks to prevent echo feedback
     private var isMuted = false
     private var unmuteTimer: Timer?
+    @Published var isAssistantSpeaking = false
     
     func start() async {
         guard !isRecording else { return }
@@ -142,13 +143,12 @@ class AudioCaptureManager: ObservableObject {
     /// Each call resets the unmute timer so the mic stays muted while audio chunks keep arriving.
     private func muteInput() {
         isMuted = true
-        
-        // Reset the unmute timer — unmute 600ms after the last audio chunk arrives.
-        // This gives a natural pause after the assistant finishes speaking.
         DispatchQueue.main.async {
+            self.isAssistantSpeaking = true
             self.unmuteTimer?.invalidate()
-            self.unmuteTimer = Timer.scheduledTimer(withTimeInterval: 0.6, repeats: false) { [weak self] _ in
+            self.unmuteTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: false) { [weak self] _ in
                 self?.isMuted = false
+                self?.isAssistantSpeaking = false
             }
         }
     }

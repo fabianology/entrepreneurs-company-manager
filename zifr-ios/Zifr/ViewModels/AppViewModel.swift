@@ -34,9 +34,7 @@ final class AppViewModel {
 
     // CRUD: Companies
     func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
-        // Purge sandbox if they added a real business
-        SandboxSeeder.purge(appState: appState)
-
+        DummyDataSeeder.purge(appState: appState)
         let company = Company(userId: userId, name: name, structure: structure, companyDescription: nil, colorHex: colorHex, logoData: logoData, website: website)
         appState.companies.append(company)
         Task {
@@ -482,6 +480,15 @@ final class AppViewModel {
                 minifiedData += "- Loans: \(loansString)\n"
             }
         }
+        
+
+        let detectedSubs = SubscriptionDetector.detect(transactions: appState.transactions, existingSubscriptions: appState.subscriptions)
+        if !detectedSubs.isEmpty {
+            minifiedData += "\nDetected Anomalies (Unracked Subscriptions in Transactions):\n"
+            minifiedData += detectedSubs.map { "- \($0.name): $\($0.amount)/\($0.frequency) (charged \($0.occurrences)x)" }.joined(separator: "\n")
+            minifiedData += "\nWhen you first greet the user, PROACTIVELY alert them if they have any un-tracked subscriptions or obvious duplicate charges (e.g., same service on multiple cards) and ask if they'd like you to draft them."
+        }
+        
         return minifiedData
     }
 }

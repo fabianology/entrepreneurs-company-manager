@@ -17,7 +17,6 @@ struct FinancialView: View {
     @State private var newCard: FinancialCard? = nil
     @State private var newInst: Institution? = nil
     @State private var newLoan: Loan? = nil
-    @State private var showWizard = false
     @State private var wizardInstitution: Institution? = nil
     @State private var shareResourceId: UUID = UUID()
     @State private var shareResourceType: String = "all_financials"
@@ -183,82 +182,55 @@ struct FinancialView: View {
                             .padding(.top, 40)
                             .id("tutorialWallet")
                         } else {
-                        VStack(spacing: 24) {
-                            // ── Primary Action: Add Bank ──
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                                showWizard = true
-                            } label: {
-                                HStack(spacing: 16) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color(hex: "#C1AA78").opacity(0.15))
-                                            .frame(width: 48, height: 48)
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 18, weight: .bold))
-                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                            VStack(spacing: 0) {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                                } label: {
+                                    DynamicGlassCard(cornerRadius: 24, height: 215) {
+                                        VStack(spacing: 16) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color.white.opacity(0.08))
+                                                    .frame(width: 44, height: 44)
+                                                    .overlay(
+                                                        Circle()
+                                                            .stroke(
+                                                                LinearGradient(
+                                                                    colors: [Color.white.opacity(0.50), Color.white.opacity(0.10)],
+                                                                    startPoint: .topLeading,
+                                                                    endPoint: .bottomTrailing
+                                                                ),
+                                                                lineWidth: 1
+                                                            )
+                                                    )
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 18, weight: .bold))
+                                                    .foregroundStyle(.white)
+                                            }
+                                            
+                                            VStack(spacing: 6) {
+                                                Text("CONNECT FINANCIAL INSTITUTION")
+                                                    .font(.system(size: 13, weight: .bold))
+                                                    .textCase(.uppercase)
+                                                    .tracking(2)
+                                                    .foregroundStyle(.white)
+                                                
+                                                Text("Link accounts, credit cards and loans")
+                                                    .font(.system(size: 13, weight: .medium))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                                    .tracking(0.5)
+                                            }
+                                        }
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 24)
                                     }
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("Connect Financial Institution")
-                                            .font(.system(size: 16, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                        Text("Link your accounts via Plaid")
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.5))
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.3))
+                                    .padding(.horizontal, 20)
                                 }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 16)
-                                .background(Color.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 16))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                .buttonStyle(.plain)
+                                .padding(.top, 24)
+                                .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
                             }
-                            .buttonStyle(PremiumButtonStyle())
-                            .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
-                            
-                            // ── Demo Bank Connections ──
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Demo Bank Connections")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .tracking(0.5)
-                                Text("Sample institutions showing credentials and accounts. Tap to expand details.")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                    .lineSpacing(4)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 8)
-                            
-                            InstitutionCardView(
-                                institution: dummyAmex,
-                                totalMonthlyPayment: 0,
-                                cardCount: 1,
-                                loanCount: 0,
-                                loans: [],
-                                vm: vm,
-                                onEdit: {},
-                                onEditLoan: { _ in }
-                            )
-                            
-                            InstitutionCardView(
-                                institution: dummyChase,
-                                totalMonthlyPayment: dummyLoan.monthlyPayment,
-                                cardCount: 1,
-                                loanCount: 1,
-                                loans: [dummyLoan],
-                                vm: vm,
-                                onEdit: {},
-                                onEditLoan: { _ in }
-                            )
-                        }
-                        .padding(.top, 20)
                         }
                     } else {
                         // Institutions Block
@@ -329,10 +301,8 @@ struct FinancialView: View {
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
         }
-        .sheet(isPresented: $showWizard) {
-            if let inst = wizardInstitution {
-                AddFinancialWizard(institution: inst, vm: vm)
-            }
+        .sheet(item: $wizardInstitution) { inst in
+            AddFinancialWizard(institution: inst, vm: vm, allInstitutions: institutions)
         }
         .sheet(item: $newInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: true) }
         .sheet(item: $editingInst) { i in EditInstitutionSheet(institution: i, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false) }
@@ -714,7 +684,6 @@ struct FinancialView: View {
                 }
                 Button {
                     wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                    showWizard = true
                 } label: {
                     Label("Add Account", systemImage: "building.columns")
                 }

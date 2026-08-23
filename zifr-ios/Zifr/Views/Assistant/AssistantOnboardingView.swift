@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import AVFoundation
 
 struct AssistantOnboardingView: View {
     @Environment(\.dismiss) private var dismiss
@@ -22,6 +23,9 @@ struct AssistantOnboardingView: View {
     @State private var pendingLoan: Loan? = nil
     @State private var pendingCard: FinancialCard? = nil
     @State private var pendingDelete: PendingDelete? = nil
+    
+    @State private var synthesizer = AVSpeechSynthesizer()
+    @State private var pendingTTS: String? = nil
     
     // Chat Mode states
     @State private var isChatMode = false
@@ -133,6 +137,29 @@ struct AssistantOnboardingView: View {
                         "name": SchemaProperty(type: "STRING", description: "The name of the entity to delete (case insensitive match).")
                     ],
                     required: ["entityType", "name"]
+                )
+            ),
+            FunctionDeclaration(
+                name: "scanForSubscriptions",
+                description: "Runs a deep scan across connected financial accounts to detect untracked subscriptions or anomalies. You can optionally pass a cardName or institutionName to filter the scan.",
+                parameters: Schema(
+                    type: "OBJECT",
+                    properties: [
+                        "filterName": SchemaProperty(type: "STRING", description: "Optional. The name of the card or institution to scan specifically (e.g. 'Amex', 'Chase'). Leave empty to scan everything.")
+                    ],
+                    required: []
+                )
+            ),
+            FunctionDeclaration(
+                name: "readLocalSecureField",
+                description: "Reads a secure field (like a password or login ID) out loud locally using the device's offline speech synthesizer. Call this when the user asks you to read a password or username for an account or subscription. ONLY call this after you tell the user: 'I cannot read your credentials for security reasons, but I will hand you over to your device's secure local system to read them to you.'",
+                parameters: Schema(
+                    type: "OBJECT",
+                    properties: [
+                        "accountName": SchemaProperty(type: "STRING", description: "The name of the account or subscription whose field should be read (e.g. 'Chase', 'Figma', 'Netflix')."),
+                        "fieldType": SchemaProperty(type: "STRING", description: "The type of field to read: 'password' or 'username'.")
+                    ],
+                    required: ["accountName", "fieldType"]
                 )
             )
         ])
@@ -464,8 +491,6 @@ struct AssistantOnboardingView: View {
                         Button("Confirm & Save") {
                             saveCompany(company)
                             sendToolResponse(for: call, success: true)
-                            // Purge sandbox if they added a real business
-                            SandboxSeeder.purge(appState: appState)
                             disconnectAndDismiss()
                         }
                         .frame(maxWidth: .infinity)
@@ -542,8 +567,6 @@ struct AssistantOnboardingView: View {
                                 logoData: nil,
                                 website: ""
                             )
-                            // Purge sandbox if they added a real business
-                            SandboxSeeder.purge(appState: appState)
                             disconnectAndDismiss()
                         }
                         .frame(maxWidth: .infinity)
@@ -575,6 +598,19 @@ struct AssistantOnboardingView: View {
         }
         .onAppear {
             setupConnection()
+        }
+        .onChange(of: captureManager.isAssistantSpeaking) { isSpeaking in
+            if !isSpeaking, let val = pendingTTS {
+                pendingTTS = nil
+                let utterance = AVSpeechUtterance(string: val)
+                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                utterance.volume = 1.0
+                
+                // Slight micro-delay to let the mic un-mute cleanly before Apple speaks
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    synthesizer.speak(utterance)
+                }
+            }
         }
         .onDisappear {
             captureManager.stop()
@@ -863,6 +899,68 @@ struct AssistantOnboardingView: View {
             
             sendToolResponse(for: firstCall, success: false, errorMessage: "Could not find \(entityType) named '\(entityName)'.")
             
+        case "scanForSubscriptions":
+            let filterName = (args["filterName"]?.value as? String) ?? ""
+            var targetAccountId: String? = nil
+            
+            if !filterName.isEmpty {
+                let term = filterName.lowercased()
+                if let card = appState.cards.first(where: { ($0.name.lowercased().contains(term)) || ($0.institutionName?.lowercased().contains(term) ?? false) }) {
+                    targetAccountId = card.plaidAccountId
+                }
+            }
+            
+            let detectedSubs = SubscriptionDetector.detect(transactions: appState.transactions, existingSubscriptions: appState.subscriptions, filterAccountId: targetAccountId)
+            
+            let resultStr = detectedSubs.isEmpty ? "No new un-tracked subscriptions found." : "Found the following un-tracked subscriptions: " + detectedSubs.map { "\($0.name) ($\($0.amount)/\($0.frequency))" }.joined(separator: ", ")
+            
+            sendToolResponse(for: firstCall, success: true, customPayload: ["results": AnyCodable(resultStr)])
+            
+        case "readLocalSecureField":
+            let accountName = (args["accountName"]?.value as? String) ?? ""
+            let fieldType = (args["fieldType"]?.value as? String)?.lowercased() ?? "password"
+            var valueToRead: String? = nil
+            let term = accountName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Better matching logic
+            for inst in appState.institutions {
+                let iName = inst.name.lowercased()
+                if iName.contains(term) || term.contains(iName) {
+                    valueToRead = fieldType == "username" ? (inst.username ?? inst.email) : inst.password
+                    if valueToRead != nil && !valueToRead!.isEmpty { break }
+                }
+                for acc in inst.accounts {
+                    let aName = acc.name.lowercased()
+                    let aType = acc.type.lowercased()
+                    if aName.contains(term) || term.contains(aName) || aType.contains(term) || term.contains(aType) {
+                        valueToRead = fieldType == "username" ? (inst.username ?? inst.email) : inst.password
+                        if valueToRead != nil && !valueToRead!.isEmpty { break }
+                    }
+                }
+                if valueToRead != nil && !valueToRead!.isEmpty { break }
+            }
+            
+            if valueToRead == nil || valueToRead!.isEmpty {
+                for sub in appState.subscriptions {
+                    let sName = sub.name.lowercased()
+                    if sName.contains(term) || term.contains(sName) {
+                        valueToRead = fieldType == "username" ? sub.loginId : sub.password
+                        if valueToRead != nil && !valueToRead!.isEmpty { break }
+                    }
+                }
+            }
+            
+            if let val = valueToRead, !val.isEmpty {
+                sendToolResponse(for: firstCall, success: true, customPayload: ["status": AnyCodable("handed_off_to_local_system_and_waiting_for_assistant_to_finish")])
+                
+                // Store it. The onChange(of: captureManager.isAssistantSpeaking) will trigger it.
+                DispatchQueue.main.async {
+                    self.pendingTTS = val
+                }
+            } else {
+                sendToolResponse(for: firstCall, success: false, errorMessage: "Could not find a \(fieldType) locally for '\(accountName)'.")
+            }
+            
         default:
             sendToolResponse(for: firstCall, success: false, errorMessage: "Unknown tool call: \(firstCall.name)")
         }
@@ -917,21 +1015,32 @@ struct AssistantOnboardingView: View {
         }
     }
     
-    private func sendToolResponse(for call: FunctionCall, success: Bool, errorMessage: String? = nil) {
+    private func sendToolResponse(for call: FunctionCall, success: Bool, errorMessage: String? = nil, customPayload: [String: AnyCodable]? = nil) {
         var payload: [String: AnyCodable] = ["success": AnyCodable(success)]
         if let err = errorMessage {
             payload["error"] = AnyCodable(err)
         }
+        if let custom = customPayload {
+            for (k, v) in custom {
+                payload[k] = v
+            }
+        }
         
         if isChatMode {
+            var outputDict: [String: Any] = [
+                "success": success,
+                "error": errorMessage ?? ""
+            ]
+            if let custom = customPayload {
+                for (k, v) in custom {
+                    outputDict[k] = v.value
+                }
+            }
             let responsePart: [String: Any] = [
                 "functionResponse": [
                     "name": call.name,
                     "response": [
-                        "output": [
-                            "success": success,
-                            "error": errorMessage ?? ""
-                        ]
+                        "output": outputDict
                     ]
                 ]
             ]

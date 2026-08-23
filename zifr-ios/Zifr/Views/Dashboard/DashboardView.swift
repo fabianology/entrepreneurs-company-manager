@@ -35,8 +35,11 @@ struct DashboardView: View {
 
     @State private var dummyCompany = Company(
         userId: UUID(),
-        name: "Acme Holdings LLC",
-        structure: "LLC"
+        name: "ARK (dummy)",
+        structure: "LLC",
+        companyDescription: "ARK Investment & Innovation LLC.",
+        colorHex: "#f59e0b",
+        website: "ark.com"
     )
 
     // Tutorial target frames (captured in 'dashboard' coordinate space)
@@ -56,166 +59,80 @@ struct DashboardView: View {
                         .padding(.bottom, 28)
 
                     List {
-                        if let firstCompany = appState.companies.first, SandboxSeeder.isSandbox(companyId: firstCompany.id) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "lightbulb.fill")
-                                    .font(.system(size: 16))
-                                    .foregroundStyle(Color(hex: "#5AC8FA"))
-                                
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Demo Mode Active")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.white)
-                                    Text("Explore features or set up your real business.")
-                                        .font(.system(size: 11))
-                                        .foregroundStyle(.white.opacity(0.6))
-                                }
-                                
-                                Spacer()
-                                
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    showAddCompany = true
-                                } label: {
-                                    Text("Set Up")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 6)
-                                        .background(
-                                            LinearGradient(
-                                                colors: [Color(hex: "#5AC8FA"), Color(hex: "#0A84FF")],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
-                                        )
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(Color(hex: "#1C1C1E"))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#5AC8FA").opacity(0.3), lineWidth: 1))
-                            .padding(.bottom, 16)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
+                        ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
+                            let row = companyCardRow(for: company)
+                            let isLast = index == filteredCompanies.count - 1
+                            let hasPlaceholder = companies.isEmpty || companies.contains(where: { DummyDataSeeder.isDummy(companyId: $0.id) })
+                            row
+                                .background(tutorialFrameCapture(index: index))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? 120 : 16, trailing: 20))
                         }
 
-                ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
-                    let row = companyCardRow(for: company)
-                    let withFrame = row.background(tutorialFrameCapture(index: index))
-                    SwipeableCompanyCardView(
-                        company: company,
-                        onEdit: { editingCompany = company },
-                        onShare: { companyToShare = company },
-                        onDelete: { companyToDelete = company }
-                    ) {
-                        withFrame
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 16, trailing: 20))
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) { companyToDelete = company } label: {
-                            Image(systemName: "trash")
-                        }
-                        .tint(.red)
-                    }
-                }
-
-                // Add company button / tutorial demo card
-                Group {
-                    if companies.isEmpty {
-                        // Un-blurred only while the tutorial is actively running.
-                        // tutorialHasBeenRun is a stored @Observable Bool — reliably triggers re-render.
-                        if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
-                            // Tutorial in progress: show demo card fully visible
-                            CompanyCardView(
-                                company: dummyCompany,
-                                institutionsCount: 1,
-                                subscriptionsCount: 3,
-                                docsCount: 2,
-                                onEdit: {}
-                            )
-                            .allowsHitTesting(false)
-                            .padding(.top, 4)
-                            .background(
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        tutorialEntityFrame = geo.frame(in: .named("dashboard"))
-                                    }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
-                                        tutorialEntityFrame = f
-                                    }
-                                }
-                            )
-                        } else {
-                            // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                showAddCompany = true
-                            } label: {
-                                ZStack {
+                        // Add company button / empty state placeholder under the dummy company
+                        Group {
+                            if companies.isEmpty || companies.contains(where: { DummyDataSeeder.isDummy(companyId: $0.id) }) {
+                                // Un-blurred only while the tutorial is actively running.
+                                if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
+                                    // Tutorial in progress: show demo card fully visible
                                     CompanyCardView(
                                         company: dummyCompany,
-                                        institutionsCount: 0,
-                                        subscriptionsCount: 0,
-                                        docsCount: 0,
+                                        institutionsCount: 2,
+                                        subscriptionsCount: 4,
+                                        docsCount: 3,
                                         onEdit: {}
                                     )
                                     .allowsHitTesting(false)
-                                    .blur(radius: 3)
-                                    .opacity(0.8)
+                                    .padding(.top, 4)
+                                    .background(
+                                        GeometryReader { geo in
+                                            Color.clear.onAppear {
+                                                tutorialEntityFrame = geo.frame(in: .named("dashboard"))
+                                            }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                                tutorialEntityFrame = f
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        showAddCompany = true
+                                    } label: {
+                                        ZStack {
+                                            CompanyCardView(
+                                                company: dummyCompany,
+                                                institutionsCount: 0,
+                                                subscriptionsCount: 0,
+                                                docsCount: 0,
+                                                onEdit: {}
+                                            )
+                                            .allowsHitTesting(false)
+                                            .blur(radius: 3)
+                                            .opacity(0.8)
 
-                                    VStack(spacing: 16) {
-                                        Image(systemName: "plus.app.fill")
-                                            .font(.system(size: 28))
-                                            .foregroundStyle(.white)
-                                        Text("+ CREATE YOUR FIRST BUSINESS")
-                                            .font(.system(size: 11, weight: .black))
-                                            .textCase(.uppercase)
-                                            .tracking(2)
-                                            .foregroundStyle(.white)
+                                            VStack(spacing: 16) {
+                                                Image(systemName: "plus.app.fill")
+                                                    .font(.system(size: 28))
+                                                    .foregroundStyle(.white)
+                                                Text("ADD YOUR COMPANY OR ENTITY")
+                                                    .font(.system(size: 11, weight: .black))
+                                                    .textCase(.uppercase)
+                                                    .tracking(2)
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
                                     }
+                                    .padding(.top, 4)
+                                    .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
                                 }
                             }
-                            .padding(.top, 4)
-                            .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
                         }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
                     }
-                }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: orphanedSharedItems.isEmpty ? 120 : 16, trailing: 20))
-
-                if !orphanedSharedItems.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "tray.fill")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
-                            Text("Shared With Me")
-                                .font(.system(size: 13, weight: .black))
-                                .tracking(1.5)
-                                .textCase(.uppercase)
-                                .foregroundStyle(Color.white.opacity(0.4))
-                        }
-                        
-                        VStack(spacing: 12) {
-                            ForEach(orphanedSharedItems, id: \.id) { share in
-                                SharedItemCardView(title: share.title, type: share.type.capitalized, role: share.role, senderEmail: share.senderEmail, createdAt: share.createdAt)
-                                    .onTapGesture {
-                                        openSharedItem(share)
-                                    }
-                            }
-                        }
-                    }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
-                }
-            }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .background(Color.clear)
@@ -728,7 +645,7 @@ struct DashboardView: View {
             Image("miloom_logo")
                 .resizable()
                 .scaledToFit()
-                .frame(height: 32)
+                .frame(height: 120)
                 .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
         }
         .frame(maxWidth: .infinity)
@@ -1043,241 +960,3 @@ struct MiloomFolderView: View {
     }
 }
 
-// MARK: - Swipeable Company Card Component
-
-struct SwipeableCompanyCardView<Content: View>: View {
-    let company: Company
-    let onEdit: () -> Void
-    let onShare: () -> Void
-    let onDelete: () -> Void
-    let content: Content
-
-    @State private var dragOffset: CGFloat = 0
-    @State private var revealedState: RevealState = .none
-
-    enum RevealState {
-        case none
-        case leftActions
-        case rightAction
-    }
-
-    private let leftRevealWidth: CGFloat = 72
-    private let rightRevealWidth: CGFloat = -72
-
-    init(
-        company: Company,
-        onEdit: @escaping () -> Void,
-        onShare: @escaping () -> Void,
-        onDelete: @escaping () -> Void,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.company = company
-        self.onEdit = onEdit
-        self.onShare = onShare
-        self.onDelete = onDelete
-        self.content = content()
-    }
-
-    var body: some View {
-        ZStack {
-            // Edit & Share Action Buttons revealed on sliding right (left side)
-            if dragOffset > 0 || revealedState == .leftActions {
-                HStack {
-                    VStack(spacing: 12) {
-                        // Edit button (top)
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                dragOffset = 0
-                                revealedState = .none
-                            }
-                            onEdit()
-                        } label: {
-                            VStack(spacing: 4) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.black.opacity(0.70))
-                                        .overlay(
-                                            Circle()
-                                                .stroke(
-                                                    LinearGradient(
-                                                        colors: [
-                                                            company.brandColor.opacity(0.95),
-                                                            company.brandColor.opacity(0.35)
-                                                        ],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ),
-                                                    lineWidth: 1.5
-                                                )
-                                        )
-                                        .shadow(color: company.brandColor.opacity(0.30), radius: 6, x: 0, y: 2)
-
-                                    Image(systemName: "pencil")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.9))
-                                }
-                                .frame(width: 44, height: 44)
-
-                                Text("Edit")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.7))
-                            }
-                        }
-                        .buttonStyle(.plain)
-
-                        // Share button (below edit icon)
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                dragOffset = 0
-                                revealedState = .none
-                            }
-                            onShare()
-                        } label: {
-                            VStack(spacing: 4) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.black.opacity(0.70))
-                                        .overlay(
-                                            Circle()
-                                                .stroke(
-                                                    LinearGradient(
-                                                        colors: [
-                                                            company.brandColor.opacity(0.95),
-                                                            company.brandColor.opacity(0.35)
-                                                        ],
-                                                        startPoint: .topLeading,
-                                                        endPoint: .bottomTrailing
-                                                    ),
-                                                    lineWidth: 1.5
-                                                )
-                                        )
-                                        .shadow(color: company.brandColor.opacity(0.30), radius: 6, x: 0, y: 2)
-
-                                    Image(systemName: "square.and.arrow.up")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundStyle(Color.white.opacity(0.9))
-                                }
-                                .frame(width: 44, height: 44)
-
-                                Text("Share")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.7))
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.leading, 6)
-                    .opacity(min(1.0, Double(max(0, dragOffset) / 40.0)))
-
-                    Spacer()
-                }
-            }
-
-            // Delete Action Button revealed on sliding left (right side)
-            if dragOffset < 0 || revealedState == .rightAction {
-                HStack {
-                    Spacer()
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            dragOffset = 0
-                            revealedState = .none
-                        }
-                        onDelete()
-                    } label: {
-                        VStack(spacing: 4) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.black.opacity(0.70))
-                                    .overlay(
-                                        Circle()
-                                            .stroke(
-                                                LinearGradient(
-                                                    colors: [
-                                                        Color.red.opacity(0.95),
-                                                        Color.red.opacity(0.35)
-                                                    ],
-                                                    startPoint: .topLeading,
-                                                    endPoint: .bottomTrailing
-                                                ),
-                                                lineWidth: 1.5
-                                            )
-                                    )
-                                    .shadow(color: Color.red.opacity(0.30), radius: 6, x: 0, y: 2)
-
-                                Image(systemName: "trash")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(Color.red.opacity(0.9))
-                            }
-                            .frame(width: 44, height: 44)
-
-                            Text("Delete")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Color.red.opacity(0.8))
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 6)
-                    .opacity(min(1.0, Double(abs(min(0, dragOffset)) / 40.0)))
-                }
-            }
-
-            // Company card content
-            content
-                .offset(x: dragOffset)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 15)
-                        .onChanged { value in
-                            let translation = value.translation.width
-                            if revealedState == .none {
-                                if translation > 0 {
-                                    dragOffset = min(leftRevealWidth + 15, translation)
-                                } else {
-                                    dragOffset = max(rightRevealWidth - 15, translation)
-                                }
-                            } else if revealedState == .leftActions {
-                                dragOffset = max(0, min(leftRevealWidth + 15, leftRevealWidth + translation))
-                            } else if revealedState == .rightAction {
-                                dragOffset = min(0, max(rightRevealWidth - 15, rightRevealWidth + translation))
-                            }
-                        }
-                        .onEnded { value in
-                            let translation = value.translation.width
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                if revealedState == .none {
-                                    if translation > 30 {
-                                        dragOffset = leftRevealWidth
-                                        revealedState = .leftActions
-                                    } else if translation < -30 {
-                                        dragOffset = rightRevealWidth
-                                        revealedState = .rightAction
-                                    } else {
-                                        dragOffset = 0
-                                        revealedState = .none
-                                    }
-                                } else if revealedState == .leftActions {
-                                    if translation < -20 {
-                                        dragOffset = 0
-                                        revealedState = .none
-                                    } else {
-                                        dragOffset = leftRevealWidth
-                                        revealedState = .leftActions
-                                    }
-                                } else if revealedState == .rightAction {
-                                    if translation > 20 {
-                                        dragOffset = 0
-                                        revealedState = .none
-                                    } else {
-                                        dragOffset = rightRevealWidth
-                                        revealedState = .rightAction
-                                    }
-                                }
-                            }
-                        }
-                )
-        }
-    }
-}

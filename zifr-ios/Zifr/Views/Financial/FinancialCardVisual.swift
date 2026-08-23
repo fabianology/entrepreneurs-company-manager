@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import LocalAuthentication
+import AVFoundation
 
 // ── Wallet Sleeve Component ──
 struct AggressiveSleeveShape: Shape {
@@ -650,6 +651,8 @@ struct BackFieldView: View {
     
     @State private var isCopied = false
     @State private var isPasswordRevealed = false
+    @State private var synthesizer = AVSpeechSynthesizer()
+    @State private var isSpeaking = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -675,6 +678,35 @@ struct BackFieldView: View {
                         Image(systemName: isPasswordRevealed ? "eye.slash" : "eye")
                             .font(.system(size: 10))
                             .foregroundStyle(primaryColor.opacity(0.5))
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button {
+                        if isSpeaking {
+                            synthesizer.stopSpeaking(at: .immediate)
+                            isSpeaking = false
+                        } else {
+                            isSpeaking = true
+                            
+                            let introUtterance = AVSpeechUtterance(string: "I cannot read your password for security reasons, but I will hand you over to your device's secure local system to read it to you.")
+                            introUtterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                            
+                            let passUtterance = AVSpeechUtterance(string: value)
+                            passUtterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+                            
+                            synthesizer.speak(introUtterance)
+                            synthesizer.speak(passUtterance)
+                            
+                            // Simple reset
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+                                isSpeaking = false
+                            }
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Image(systemName: isSpeaking ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(isSpeaking ? Color.blue : primaryColor.opacity(0.5))
                     }
                     .buttonStyle(.plain)
                 }

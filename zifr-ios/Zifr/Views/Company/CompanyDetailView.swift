@@ -54,7 +54,6 @@ struct CompanyDetailView: View {
     @State private var newCard: FinancialCard? = nil
     @State private var newDoc: CompanyDocument? = nil
     @State private var newLoan: Loan? = nil
-    @State private var showFinancialWizard = false
     @State private var wizardInstitution: Institution? = nil
     @State private var showAssistant = false
     @State private var assistantStrokeRotation: Double = 0.0
@@ -142,10 +141,8 @@ struct CompanyDetailView: View {
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
-        .sheet(isPresented: $showFinancialWizard) {
-            if let inst = wizardInstitution {
-                AddFinancialWizard(institution: inst, vm: vm, isCommandCenterContext: true, allInstitutions: institutions)
-            }
+        .sheet(item: $wizardInstitution) { inst in
+            AddFinancialWizard(institution: inst, vm: vm, isCommandCenterContext: true, allInstitutions: institutions)
         }
         .sheet(item: $newLoan) { l in
             EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards)
@@ -191,8 +188,8 @@ struct CompanyDetailView: View {
         .onChange(of: appState.institutions.count) { _, _ in
             onboardingState.evaluateState(appState: appState)
         }
-        .onChange(of: showFinancialWizard) { _, isPresented in
-            if !isPresented {
+        .onChange(of: wizardInstitution) { _, inst in
+            if inst == nil {
                 onboardingState.evaluateState(appState: appState)
             }
         }
@@ -222,10 +219,13 @@ struct CompanyDetailView: View {
                 // Real onboarding tab switches
                 case .needsBank:
                     vm.activeTab = .financial
+                    activeInternalTab = .financial
                 case .needsReview:
                     vm.activeTab = .subscriptions
+                    activeInternalTab = .subscriptions
                 case .needsNotes:
                     vm.activeTab = .documents
+                    activeInternalTab = .documents
                 case .needsCommandCenterQuickAdd, .needsCommandCenterFinancialsHeader,
                      .needsCommandCenterFinancialsAccounts, .needsCommandCenterFinancialsReport,
                      .needsCommandCenterSubscriptions, .needsCommandCenterDocuments:
@@ -240,12 +240,20 @@ struct CompanyDetailView: View {
                      .tutorialFinancialPage, .tutorialFinancialWallet,
                      .tutorialFinancialCardTap:
                     vm.activeTab = .financial
+                    activeInternalTab = .financial
                 default:
                     break
                 }
             }
         }
         .onAppear {
+            if vm.activeTab == .subscriptions {
+                activeInternalTab = .subscriptions
+            } else if vm.activeTab == .documents {
+                activeInternalTab = .documents
+            } else if vm.activeTab == .financial {
+                activeInternalTab = .financial
+            }
             onboardingState.evaluateState(appState: appState)
         }
         // Popover moved to the button
@@ -357,33 +365,56 @@ struct CompanyDetailView: View {
                     let screenWidth = UIScreen.main.bounds.width
                     let startX = value.startLocation.x
                     
-                    let isEdgeSwipe = startX < 30 || startX > screenWidth - 30
+                    let isEdgeSwipe = startX < 44 || startX > screenWidth - 44
                     if !isEdgeSwipe { return }
                     
                     let transX = value.translation.width
                     let transY = value.translation.height
                     
-                    if abs(transX) > 50 && abs(transY) < 60 {
+                    if abs(transX) > 40 && abs(transY) < 60 {
                         swipeHandled = true
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         
-                        if transX > 0 {
-                            // Swipe Left to Right (Go Back)
-                            if vm.activeTab == .home {
-                                dismiss()
+                        if vm.activeTab == .home {
+                            let tabs = EntityHomeTab.allCases
+                            let currentIndex = tabs.firstIndex(of: activeInternalTab) ?? 0
+                            
+                            if transX < 0 {
+                                // Swipe Left (from right edge towards left -> Next tab: Financial -> Services -> Vault)
+                                if currentIndex < tabs.count - 1 {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                        activeInternalTab = tabs[currentIndex + 1]
+                                    }
+                                }
                             } else {
-                                // From financial, subscription, and docs page, swiping right goes directly to command center
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .home }
+                                // Swipe Right (from left edge towards right -> Previous tab: Vault -> Services -> Financial)
+                                if currentIndex > 0 {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                        activeInternalTab = tabs[currentIndex - 1]
+                                    }
+                                }
                             }
                         } else {
-                            // Swipe Right to Left (Go Forward)
-                            if vm.activeTab == .home {
-                                // Swiping left from the command center goes to the dashboard
-                                dismiss()
-                            } else if vm.activeTab == .subscriptions {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .financial }
-                            } else if vm.activeTab == .financial {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { vm.activeTab = .documents }
+                            if transX > 0 {
+                                // Swipe Left to Right (Go Back to Command Center)
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    vm.activeTab = .home
+                                }
+                            } else {
+                                // Swipe Right to Left (Go Forward)
+                                if vm.activeTab == .subscriptions {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        vm.activeTab = .financial
+                                    }
+                                } else if vm.activeTab == .financial {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                        vm.activeTab = .documents
+                                    }
+                                }
                             }
                         }
                     }
@@ -640,7 +671,6 @@ struct CompanyDetailView: View {
                 }
                 Button {
                     wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                    showFinancialWizard = true
                 } label: {
                     Label("Add Account", systemImage: "building.columns")
                 }
@@ -784,7 +814,6 @@ struct CompanyDetailView: View {
                     onTapTarget: {
                         onboardingState.currentStep = .notStarted // Temporary hide so tap goes through
                         wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                        showFinancialWizard = true
                     }
                 )
             case .needsReview:
@@ -978,7 +1007,6 @@ struct CompanyDetailView: View {
                         newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
                     } else if tab == .financial {
                         wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                        showFinancialWizard = true
                     }
                 }
             )

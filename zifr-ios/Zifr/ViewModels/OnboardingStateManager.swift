@@ -172,7 +172,7 @@ final class OnboardingStateManager {
            let saved = OnboardingStep(rawValue: savedStr) {
             self.currentStep = saved
         } else {
-            self.currentStep = .skipped // Default to skipped to allow free sandbox exploration
+            self.currentStep = .skipped
         }
         self.tutorialHasBeenRun = UserDefaults.standard.bool(forKey: "tutorialHasBeenRun")
     }
@@ -203,12 +203,6 @@ final class OnboardingStateManager {
     }
     
     func startTutorial(appState: AppState, userId: UUID) {
-        UserDefaults.standard.set(false, forKey: "sandboxPurged")
-        SandboxSeeder.purge(appState: appState)
-        SandboxSeeder.seed(appState: appState, userId: userId, force: true)
-        if let idx = appState.companies.firstIndex(where: { $0.id == SandboxSeeder.sandboxCompanyId }) {
-            appState.companies[idx].lastViewed = Date().addingTimeInterval(1000)
-        }
         tutorialHasBeenRun = true
         currentStep = .tutorialEntityCard
     }
@@ -253,10 +247,6 @@ final class OnboardingStateManager {
 
     func exitTutorial(appState: AppState) {
         currentStep = .skipped
-        let hasRealCompanies = appState.companies.contains { $0.id != SandboxSeeder.sandboxCompanyId }
-        if hasRealCompanies {
-            SandboxSeeder.purge(appState: appState)
-        }
     }
 }
 

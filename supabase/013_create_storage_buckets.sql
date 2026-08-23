@@ -1,7 +1,7 @@
 -- Create buckets for Company Documents and Avatars
 INSERT INTO storage.buckets (id, name, public) 
 VALUES 
-  ('CompanyDocuments', 'CompanyDocuments', true),
+  ('CompanyDocuments', 'CompanyDocuments', false),
   ('Avatars', 'Avatars', true)
 ON CONFLICT (id) DO UPDATE SET public = excluded.public;
 

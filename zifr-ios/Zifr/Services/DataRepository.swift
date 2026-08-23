@@ -23,64 +23,75 @@ class DataRepository {
         }
     }
 
+    private func safeFetchShares() async -> [ResourceShare] {
+        do { return try await client.from("resource_shares").select().execute().value }
+        catch {
+            print("Failed to fetch resource shares! (Table may not exist yet): \(error)")
+            return []
+        }
+    }
+
+    @MainActor
     func fetchAllData(appState: AppState) async {
-        await MainActor.run { appState.isLoading = true }
-        do {
-            async let fetchCompanies: [Company] = client.from("companies").select().execute().value
-            async let fetchSubscriptions: [Subscription] = client.from("subscriptions").select().execute().value
-            async let fetchInstitutions: [Institution] = client.from("institutions").select().execute().value
-            async let fetchCards: [FinancialCard] = client.from("financial_cards").select().execute().value
-            async let fetchLoans: [Loan] = client.from("loans").select().execute().value
-            async let fetchDocuments: [CompanyDocument] = client.from("company_documents").select().execute().value
-            async let fetchShares: [ResourceShare] = client.from("resource_shares").select().execute().value
-            async let fetchActivityLogs: [ActivityLog] = client.from("activity_logs").select().order("created_at", ascending: false).execute().value
-            async let fetchNotifications: [AppNotification] = client.from("app_notifications").select().order("created_at", ascending: false).execute().value
-            async let fetchPreferences: [UserPreferences] = client.from("user_preferences").select().execute().value
-            
-            // Safe fetch for transactions in case table doesn't exist yet
-            async let fetchTransactions: [Transaction] = safeFetchTransactions()
-            
-            let (companies, subscriptions, institutions, cards, loans, documents, shares, activityLogs, notifications, preferences, transactions) = try await (
-                fetchCompanies, fetchSubscriptions, fetchInstitutions, fetchCards, fetchLoans, fetchDocuments, fetchShares, fetchActivityLogs, fetchNotifications, fetchPreferences, fetchTransactions
-            )
-            
-            let secureSubs = subscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
-            let secureInst = institutions.map { i -> Institution in var m = i; m.password = SecurityService.shared.decrypt(i.password); return m }
-            let secureCards = cards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
-            
-            let session = try? await client.auth.session
-            let currentUserId = session?.user.id
-            
-            // Write count to a file we can read from the host
-            if let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let fileURL = docsDir.appendingPathComponent("tx_count.txt")
-                try? "\(transactions.count)".write(to: fileURL, atomically: true, encoding: .utf8)
-            }
-            
-            await MainActor.run {
-                appState.companies = companies
-                appState.subscriptions = secureSubs
-                appState.institutions = secureInst
-                appState.cards = secureCards
-                appState.loans = loans
-                appState.documents = documents
-                appState.transactions = transactions
-                appState.resourceShares = shares
-                appState.activityLogs = activityLogs
-                appState.notifications = notifications
-                appState.userPreferences = preferences.first
-                appState.isLoading = false
-                
-                if companies.isEmpty, let userId = currentUserId {
-                    SandboxSeeder.seed(appState: appState, userId: userId)
-                }
-            }
-        } catch {
-            print("Failed to fetch data: \(error)")
-            await MainActor.run {
-                appState.error = error.localizedDescription
-                appState.isLoading = false
-            }
+        if appState.isLoading { return }
+        appState.isLoading = true
+        
+        // PRE-WARM: Fire a single, ultra-lightweight query to force any pending token refreshes or connection handshakes.
+        // If we blast 11 concurrent queries while the SDK is still refreshing the auth token on launch, it locks the queue for 11 seconds!
+        _ = try? await client.from("user_preferences").select("id").limit(1).execute()
+        
+        async let fCompanies: [Company] = measure("companies") { (try? await client.from("companies").select("id, user_id, name, structure, company_description, color_hex, website, last_modified, last_viewed").execute().value) ?? [] }
+        async let fSubscriptions: [Subscription] = measure("subscriptions") { (try? await client.from("subscriptions").select().execute().value) ?? [] }
+        async let fInstitutions: [Institution] = measure("institutions") { (try? await client.from("institutions").select().execute().value) ?? [] }
+        async let fCards: [FinancialCard] = measure("cards") { (try? await client.from("financial_cards").select().execute().value) ?? [] }
+        async let fLoans: [Loan] = measure("loans") { (try? await client.from("loans").select().execute().value) ?? [] }
+        async let fDocuments: [CompanyDocument] = measure("documents") { (try? await client.from("company_documents").select().execute().value) ?? [] }
+        async let fShares = measure("shares") { await safeFetchShares() }
+        async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
+        async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
+        async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
+        async let fTransactions = measure("transactions") { await safeFetchTransactions() }
+        
+        let fetchedCompanies = await fCompanies
+        let fetchedSubscriptions = await fSubscriptions
+        let fetchedInstitutions = await fInstitutions
+        let fetchedCards = await fCards
+        let fetchedLoans = await fLoans
+        let fetchedDocuments = await fDocuments
+        let shares = await fShares
+        let fetchedActivityLogs = await fActivity
+        let fetchedNotifications = await fNotifications
+        let fetchedPreferences = await fPrefs
+        let transactions = await fTransactions
+        
+        let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
+        let secureInst = fetchedInstitutions.map { i -> Institution in var m = i; m.password = SecurityService.shared.decrypt(i.password); return m }
+        let secureCards = fetchedCards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
+        
+        let session = try? await client.auth.session
+        let currentUserId = session?.user.id
+        
+        appState.companies = fetchedCompanies
+        appState.subscriptions = secureSubs
+        appState.institutions = secureInst
+        appState.cards = secureCards
+        appState.loans = fetchedLoans
+        appState.documents = fetchedDocuments
+        appState.resourceShares = shares
+        appState.activityLogs = fetchedActivityLogs
+        appState.notifications = fetchedNotifications
+        appState.userPreferences = fetchedPreferences.first
+        appState.transactions = transactions
+        appState.isLoading = false
+        
+        // Write count to a file we can read from the host
+        if let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let fileURL = docsDir.appendingPathComponent("tx_count.txt")
+            try? "\(transactions.count)".write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+
+        if fetchedCompanies.isEmpty, let userId = currentUserId {
+            DummyDataSeeder.seed(appState: appState, userId: userId)
         }
     }
     
@@ -345,7 +356,7 @@ class DataRepository {
     }
     
     // MARK: - File Storage Upload
-    func uploadDocumentFile(fileData: Data, fileName: String, contentType: String) async throws -> URL {
+    func uploadDocumentFile(fileData: Data, fileName: String, contentType: String) async throws -> String {
         guard let session = try? await client.auth.session else {
             throw URLError(.userAuthenticationRequired)
         }
@@ -363,11 +374,7 @@ class DataRepository {
                     options: FileOptions(cacheControl: "3600", contentType: contentType, upsert: true)
                 )
             
-            let publicUrl = try client.storage
-                .from("CompanyDocuments")
-                .getPublicURL(path: filePath)
-            
-            return publicUrl
+            return filePath
         } catch {
             print("Supabase upload to 'CompanyDocuments' failed, trying local fallback: \(error)")
             // Fallback: save to app's local documents directory (just like how the scanner does it!)
@@ -378,8 +385,25 @@ class DataRepository {
             let localURL = documentDirectory.appendingPathComponent(uniqueName)
             try fileData.write(to: localURL)
             try fileManager.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: localURL.path)
-            return localURL
+            return localURL.absoluteString
         }
+    }
+
+    func getSignedUrl(for docUrl: String) async throws -> URL {
+        let storagePath: String
+        if docUrl.contains("/CompanyDocuments/") {
+            if let range = docUrl.range(of: "/CompanyDocuments/") {
+                storagePath = String(docUrl[range.upperBound...])
+            } else {
+                throw URLError(.badURL)
+            }
+        } else {
+            storagePath = docUrl
+        }
+        
+        return try await client.storage
+            .from("CompanyDocuments")
+            .createSignedURL(path: storagePath, expiresIn: 60)
     }
     
     // MARK: - Revoke Shared Access
@@ -510,5 +534,23 @@ final class SecurityService {
             print("Decryption error: \(error)")
             return nil
         }
+    }
+}
+
+extension DataRepository {
+    func measure<T>(_ name: String, _ operation: () async throws -> T) async rethrows -> T {
+        let start = Date()
+        let result = try await operation()
+        let end = Date()
+        let time = end.timeIntervalSince(start)
+        print("⏱️ [DataRepository] \(name) took \(time) seconds")
+        
+        if time > 5.0 {
+            Task { @MainActor in
+                NotificationCenter.default.post(name: Notification.Name("SlowQueryDetected"), object: "\(name) took \(String(format: "%.1f", time))s")
+            }
+        }
+        
+        return result
     }
 }

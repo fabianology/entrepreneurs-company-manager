@@ -18,7 +18,6 @@ struct EditCompanySheet: View {
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
-    @State private var websiteFetchTask: Task<Void, Never>? = nil
 
     var isEditing: Bool { company != nil }
 
@@ -76,8 +75,6 @@ struct EditCompanySheet: View {
                                             Image(uiImage: ui)
                                                 .resizable()
                                                 .scaledToFill()
-                                        } else if !website.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                            FaviconImage(website: website, size: 70)
                                         } else {
                                             ZStack {
                                                 Color(hex: colorHex)
@@ -85,6 +82,17 @@ struct EditCompanySheet: View {
                                                     .font(.system(size: 28, weight: .black, design: .rounded))
                                                     .foregroundStyle(.white)
                                             }
+                                        }
+                                        
+                                        if logoData != nil {
+                                            Button { logoData = nil } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .foregroundStyle(.red, .white)
+                                                    .font(.system(size: 20))
+                                            }
+                                            .padding(4)
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                                            .offset(x: 8, y: -8)
                                         }
                                     }
                                     .frame(width: 70, height: 70)
@@ -113,65 +121,6 @@ struct EditCompanySheet: View {
                                 HStack(spacing: 12) {
                                     formSection {
                                         PremiumInputField(label: "WEBSITE", placeholder: "acme.com", text: $website, keyboardType: .URL, textContentType: .URL)
-                                    }
-                                    .onChange(of: website) { _, newValue in
-                                        websiteFetchTask?.cancel()
-                                        websiteFetchTask = Task {
-                                            try? await Task.sleep(nanoseconds: 400_000_000) // 0.4s debounce
-                                            guard !Task.isCancelled else { return }
-                                            
-                                            // Only auto-fetch if there is no custom logo
-                                            guard logoData == nil else { return }
-                                            
-                                            var host = newValue.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-                                            if host.isEmpty { return }
-                                            if !host.hasPrefix("http") { host = "https://\(host)" }
-                                            guard let url = URL(string: host), let domain = url.host else { return }
-                                            
-                                            let cleanDomain = domain.replacingOccurrences(of: "www.", with: "")
-                                            let logokitURL = URL(string: "https://img.logokit.com/\(cleanDomain)?token=pk_fr19dc92f4c45a5ff8583c&size=256")!
-                                            let googleURL = URL(string: "https://www.google.com/s2/favicons?domain=\(cleanDomain)&sz=256")!
-                                            
-                                            do {
-                                                var fetchedData: Data? = nil
-                                                var success = false
-                                                
-                                                // Try LogoKit first with a strict 1.5 second timeout
-                                                do {
-                                                    let config = URLSessionConfiguration.default
-                                                    config.timeoutIntervalForRequest = 1.5
-                                                    config.timeoutIntervalForResource = 1.5
-                                                    let fastSession = URLSession(configuration: config)
-                                                    
-                                                    let (data, response) = try await fastSession.data(from: logokitURL)
-                                                    if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
-                                                        fetchedData = data
-                                                        success = true
-                                                    }
-                                                } catch {
-                                                    // Clearbit failed or timed out
-                                                }
-                                                
-                                                // Fallback to Google if Clearbit failed (404, DNS error, timeout, etc)
-                                                if !success {
-                                                    let (data, response) = try await URLSession.shared.data(from: googleURL)
-                                                    if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 {
-                                                        fetchedData = data
-                                                    }
-                                                }
-                                                
-                                                if let finalData = fetchedData {
-                                                    await MainActor.run {
-                                                        // Ensure user hasn't uploaded manually while we were fetching
-                                                        if self.logoData == nil {
-                                                            self.logoData = finalData
-                                                        }
-                                                    }
-                                                }
-                                            } catch {
-                                                print("Logo auto-fetch completely failed: \(error)")
-                                            }
-                                        }
                                     }
                                     
                                     PhotosPicker(selection: $selectedPhoto, matching: .images) {
@@ -257,7 +206,7 @@ struct EditCompanySheet: View {
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                                     vm.path = NavigationPath()
                                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                        onboardingState.startTutorial(appState: appState, userId: authViewModel.currentUser?.id ?? UUID())
+                                        onboardingState.startTutorial()
                                     }
                                 }
                             } label: {
@@ -445,7 +394,6 @@ private func formSection<Content: View>(@ViewBuilder content: () -> Content) -> 
 
 struct ShareEntitySheet: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(AppState.self) private var appState
     let resourceId: UUID
     let resourceType: String
     let resourceTitle: String
@@ -456,13 +404,6 @@ struct ShareEntitySheet: View {
     @State private var isSending = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
-    
-    @State private var auditResult: String?
-    @State private var isAuditing = false
-    
-    private var activeShares: [ResourceShare] {
-        appState.resourceShares.filter { $0.resourceId == resourceId }
-    }
     
     let roles = ["Viewer", "Editor", "Admin"]
     
@@ -501,86 +442,6 @@ struct ShareEntitySheet: View {
                             }
                         }
                         .padding(.top, 24)
-                        
-                        if !activeShares.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("Current Collaborators")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(Color.white.opacity(0.6))
-                                        .textCase(.uppercase)
-                                    Spacer()
-                                    Button {
-                                        runAudit()
-                                    } label: {
-                                        if isAuditing {
-                                            ProgressView().scaleEffect(0.8)
-                                        } else {
-                                            HStack(spacing: 4) {
-                                                Image(systemName: "sparkles")
-                                                Text("AI Audit")
-                                            }
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(Color(hex: "#0A84FF"))
-                                        }
-                                    }
-                                }
-                                
-                                if let audit = auditResult {
-                                    HStack(alignment: .top) {
-                                        Image(systemName: "exclamationmark.shield.fill")
-                                            .foregroundStyle(Color(hex: "#0A84FF"))
-                                            .padding(.top, 2)
-                                        Text(audit)
-                                            .font(.system(size: 13, weight: .medium))
-                                            .foregroundStyle(.white)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                    }
-                                    .padding(12)
-                                    .background(Color(hex: "#0A84FF").opacity(0.15))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#0A84FF").opacity(0.3), lineWidth: 1))
-                                }
-                                
-                                VStack(spacing: 8) {
-                                    ForEach(activeShares) { share in
-                                        HStack {
-                                            ZStack {
-                                                Circle().fill(Color.white.opacity(0.1)).frame(width: 36, height: 36)
-                                                Image(systemName: "person.fill").font(.system(size: 16)).foregroundStyle(.white)
-                                            }
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(share.recipientEmail ?? "User \(share.userId.uuidString.prefix(6))")
-                                                    .font(.system(size: 14, weight: .medium))
-                                                    .foregroundStyle(.white)
-                                                    .lineLimit(1)
-                                                Text("\(share.role) • Added \(share.createdAt, format: .dateTime.month().day().year())")
-                                                    .font(.system(size: 11))
-                                                    .foregroundStyle(Color.white.opacity(0.5))
-                                            }
-                                            Spacer()
-                                            Button("Revoke") {
-                                                Task {
-                                                    // Revoke functionality here (optional for now, or just an alert)
-                                                }
-                                            }
-                                            .font(.system(size: 12, weight: .bold))
-                                            .foregroundStyle(.red)
-                                        }
-                                        .padding(12)
-                                        .background(Color(hex: "#1A1A1C"))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 20)
-                            
-                            Divider()
-                                .overlay(Color.white.opacity(0.1))
-                                .padding(.vertical, 8)
-                        }
                         
                         VStack(spacing: 20) {
                             // Email Field
@@ -730,21 +591,6 @@ struct ShareEntitySheet: View {
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.error)
                 }
-            }
-        }
-    }
-    
-    private func runAudit() {
-        guard !activeShares.isEmpty else { return }
-        isAuditing = true
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        
-        Task {
-            let result = await GeminiService.shared.auditShares(shares: activeShares)
-            await MainActor.run {
-                self.auditResult = result
-                self.isAuditing = false
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
             }
         }
     }

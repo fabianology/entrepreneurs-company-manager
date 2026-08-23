@@ -29,93 +29,17 @@ struct DocumentListView: View {
         Dictionary(grouping: documents, by: { CompanyDocument.normalizeType($0.type) })
     }
 
-    @ViewBuilder
-    private var complianceChecklistSection: some View {
-        let required = CompanyDocument.requiredDocuments(for: company.structure)
-        let missing = required.filter { req in
-            !documents.contains { doc in
-                doc.name.lowercased().contains(req.title.lowercased()) || req.title.lowercased().contains(doc.name.lowercased()) || doc.type == req.category && doc.name.lowercased().contains("formation")
-            }
-        }
-        
-        if !missing.isEmpty && selectedType == "All" {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "checklist")
-                        .foregroundStyle(Color(hex: "#0A84FF"))
-                    Text("Compliance Checklist")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(.white)
-                    Spacer()
-                    Text("\(required.count - missing.count)/\(required.count)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.5))
-                }
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(missing, id: \.title) { req in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: CompanyDocument.icon(for: req.category))
-                                        .font(.system(size: 12))
-                                    Text(req.category.uppercased())
-                                        .font(.system(size: 10, weight: .bold))
-                                }
-                                .foregroundStyle(Color.white.opacity(0.5))
-                                
-                                Text(req.title)
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(2)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                
-                                Spacer()
-                                
-                                Button {
-                                    var newDocInstance = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-                                    newDocInstance.name = req.title
-                                    newDocInstance.type = req.category
-                                    newDoc = newDocInstance
-                                } label: {
-                                    Text("Upload")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(Color.white.opacity(0.1))
-                                        .clipShape(Capsule())
-                                        .foregroundStyle(.white)
-                                }
-                            }
-                            .padding(16)
-                            .frame(width: 160, height: 140)
-                            .background(Color.white.opacity(0.05))
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .padding(.horizontal, -20)
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
-        }
-    }
-
     var body: some View {
         ZStack(alignment: .top) {
             // Scrollable Document Rows List (Background layer scrolling behind header)
             ScrollView {
                 VStack(spacing: 0) {
                     // Offset for top action bar + anchored category tabs header
-                    Spacer().frame(height: hideActionBar ? 296 : 284)
-
-                    complianceChecklistSection
+                    Spacer().frame(height: hideActionBar ? 312 : 276)
 
                     Group {
                         if documents.isEmpty {
-                            emptyState.padding(.horizontal, 20)
+                            emptyState
                         } else {
                             if selectedType == "All" {
                                 VStack(spacing: 10) {
@@ -182,7 +106,7 @@ struct DocumentListView: View {
 
             // Fixed Header with Tabs (anchored, does not move when scrolling)
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 82 : 70)
+                Spacer().frame(height: hideActionBar ? 98 : 62)
 
                 VStack(spacing: 12) {
                     // All Documents Box (Full Width)
@@ -451,30 +375,48 @@ struct DocumentListView: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
         }) {
-            ZStack {
-                // Dummy document row
-                VStack(spacing: 0) {
-                    DocumentRow(doc: dummyDoc, onEdit: {}, onOpen: {})
+            DynamicGlassCard(cornerRadius: 20, height: 165) {
+                VStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.08))
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color.white.opacity(0.50), Color.white.opacity(0.10)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            )
+                        Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    
+                    VStack(spacing: 4) {
+                        Text("ADD A DOCUMENT")
+                            .font(.system(size: 13, weight: .bold))
+                            .textCase(.uppercase)
+                            .tracking(2)
+                            .foregroundStyle(.white)
+                        
+                        Text("Link, scan or upload a document")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                            .tracking(0.5)
+                    }
                 }
-                .allowsHitTesting(false)
-                .blur(radius: 3)
-                
-                // Glass overlay
-                VStack(spacing: 16) {
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.white)
-                    Text("ADD YOUR FIRST DOCUMENT")
-                        .font(.system(size: 11, weight: .black))
-                        .textCase(.uppercase)
-                        .tracking(2)
-                        .foregroundStyle(.white)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
             }
+            .padding(.horizontal, 20)
         }
-        .padding(.top, 40)
+        .buttonStyle(.plain)
+        .padding(.top, 24)
         .spotlightTarget(isActive: onboardingState.isSpotlightingNotes)
     }
 

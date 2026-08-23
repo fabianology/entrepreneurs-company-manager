@@ -114,6 +114,11 @@ struct ZifrApp: App {
             } message: {
                 Text(appState.error ?? "An unknown error occurred.")
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SlowQueryDetected"))) { notification in
+                if let msg = notification.object as? String {
+                    appState.error = "Slow DB Query: \(msg)"
+                }
+            }
         }
     }
 }

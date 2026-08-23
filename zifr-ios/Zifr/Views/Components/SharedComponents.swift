@@ -1095,3 +1095,48 @@ struct MiloomAccordion<Content: View>: View {
     }
 }
 
+// MARK: - Dynamic Glass Placeholder Card
+struct DynamicGlassCard<Content: View>: View {
+    var cornerRadius: CGFloat = 24
+    var height: CGFloat = 215
+    @ViewBuilder let content: () -> Content
+    
+    @State private var rotation: Double = 0
+    
+    var body: some View {
+        ZStack {
+            // Glass background (4% white tint)
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.white.opacity(0.04))
+            
+            // Dynamic Glass Specular Highlight Bevel Stroke
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .stroke(
+                    AngularGradient(
+                        stops: [
+                            .init(color: Color.white.opacity(0.55), location: 0.0),
+                            .init(color: Color.white.opacity(0.15), location: 0.22),
+                            .init(color: Color.white.opacity(0.05), location: 0.45),
+                            .init(color: Color.white.opacity(0.40), location: 0.68),
+                            .init(color: Color.white.opacity(0.12), location: 0.88),
+                            .init(color: Color.white.opacity(0.55), location: 1.0)
+                        ],
+                        center: .center,
+                        angle: .degrees(rotation)
+                    ),
+                    lineWidth: 1.2
+                )
+            
+            content()
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .onAppear {
+            withAnimation(.linear(duration: 8.0).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
+        }
+    }
+}
+

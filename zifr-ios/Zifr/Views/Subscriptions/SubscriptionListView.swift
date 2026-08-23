@@ -24,8 +24,11 @@ struct SubscriptionListView: View {
             ScrollViewReader { proxy in
                 Group {
                     if subscriptions.isEmpty {
-                        MiloomListView {
-                            emptyState
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                Spacer().frame(height: hideActionBar ? 82 : 70)
+                                emptyState
+                            }
                         }
                     } else {
                         StackedSubscriptionDeckView(
@@ -202,42 +205,54 @@ struct SubscriptionListView: View {
                 )
                 .allowsHitTesting(false)
                 .padding(.horizontal, 20)
-                .padding(.top, 40)
+                .padding(.top, 24)
             } else {
                 Button(action: {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     newSub = Subscription(userId: company.userId, companyId: company.id)
                 }) {
-                    ZStack {
-                        PremiumSubscriptionCard(
-                            sub: dummyNetflix,
-                            allSubscriptions: [],
-                            institutions: [],
-                            cards: [],
-                            onEdit: {},
-                            onSave: { modifiedSub in
-                                dummyNetflix = modifiedSub
-                            }
-                        )
-                        .allowsHitTesting(false)
-                        .blur(radius: 3)
-                        
+                    DynamicGlassCard(cornerRadius: 24, height: 215) {
                         VStack(spacing: 16) {
-                            Image(systemName: "square.3.layers.3d")
-                                .font(.system(size: 28))
-                                .foregroundStyle(.white)
-                            Text("ADD YOUR FIRST SUBSCRIPTION")
-                                .font(.system(size: 11, weight: .black))
-                                .textCase(.uppercase)
-                                .tracking(2)
-                                .foregroundStyle(.white)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white.opacity(0.08))
+                                    .frame(width: 44, height: 44)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [Color.white.opacity(0.50), Color.white.opacity(0.10)],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 1
+                                            )
+                                    )
+                                Image(systemName: "plus")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundStyle(.white)
+                            }
+                            
+                            VStack(spacing: 6) {
+                                Text("ADD A SERVICE")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .textCase(.uppercase)
+                                    .tracking(2)
+                                    .foregroundStyle(.white)
+                                
+                                Text("Link a subscription, service or login")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .tracking(0.5)
+                            }
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(Color.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 24))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                     }
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 40)
+                .buttonStyle(.plain)
+                .padding(.top, 24)
                 .spotlightTarget(isActive: onboardingState.isSpotlightingReview)
             }
         }
