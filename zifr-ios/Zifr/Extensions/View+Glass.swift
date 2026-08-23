@@ -34,24 +34,35 @@ struct LiquidGlassModifier: ViewModifier {
     }
 }
 
-// MARK: - Masonry Glass Modifier (Tinted Material Blur)
-struct MasonryGlassModifier: ViewModifier {
-    var cornerRadius: CGFloat = 12
+// MARK: - Zifr Card Box Modifier (Signature zifrTabBarFill + Gold Linear Gradient Stroke)
+struct ZifrCardBoxModifier: ViewModifier {
+    var cornerRadius: CGFloat = 24
 
     func body(content: Content) -> some View {
         content
             .background(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color(hex: "#1C1C1E").opacity(0.40))
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
             )
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
             )
+            .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
     }
 }
+
 
 // MARK: - Premium Dark Bar Modifier (70% Opacity Black)
 struct PremiumDarkBarModifier: ViewModifier {
@@ -128,9 +139,10 @@ extension View {
         modifier(LiquidGlassModifier(cornerRadius: cornerRadius))
     }
 
-    func masonryGlass(cornerRadius: CGFloat = 12) -> some View {
-        modifier(MasonryGlassModifier(cornerRadius: cornerRadius))
+    func zifrCardBox(cornerRadius: CGFloat = 24) -> some View {
+        modifier(ZifrCardBoxModifier(cornerRadius: cornerRadius))
     }
+
 
     func premiumDarkBar(cornerRadius: CGFloat = 12) -> some View {
         modifier(PremiumDarkBarModifier(cornerRadius: cornerRadius))
@@ -187,5 +199,38 @@ struct ShimmerModifier: ViewModifier {
 extension View {
     func shimmer(active: Bool = true) -> some View {
         active ? AnyView(modifier(ShimmerModifier())) : AnyView(self)
+    }
+}
+
+// MARK: - Zifr Plus Circle Component (Tab Bar style & color)
+struct ZifrPlusCircle: View {
+    var size: CGFloat = 44
+    var iconSize: CGFloat = 18
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.zifrTabBarFill.opacity(0.70))
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "plus")
+                .font(.system(size: iconSize, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .frame(width: size, height: size)
     }
 }

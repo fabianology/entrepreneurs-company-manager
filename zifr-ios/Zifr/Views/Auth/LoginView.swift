@@ -24,22 +24,11 @@ struct LoginView: View {
                 Spacer()
                 
                 // MARK: - Logo & Brand
-                VStack(spacing: 24) {
-                    ZStack {
-                        Circle()
-                            .fill(Color(hex: "#171717"))
-                            .frame(width: 100, height: 100)
-                            .shadow(color: Color.white.opacity(0.03), radius: 20, x: 0, y: 0)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
-                            )
-                        
-                        Image("Logo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 60, height: 60)
-                    }
+                VStack(spacing: 20) {
+                    Image("login_logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 72)
                     
                     VStack(spacing: 8) {
                         Text("MILOOM")
@@ -192,7 +181,7 @@ struct LoginView: View {
                         } label: {
                             Text(isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(Color(hex: "#A2A2A2"))
+                                .foregroundStyle(.white)
                         }
                         .padding(.top, 4)
                         
@@ -201,7 +190,7 @@ struct LoginView: View {
                             Rectangle().fill(Color(hex: "#333333")).frame(height: 1)
                             Text("OR")
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color(hex: "#666666"))
+                                .foregroundStyle(Color(hex: "#A2A2A2"))
                             Rectangle().fill(Color(hex: "#333333")).frame(height: 1)
                         }
                         .padding(.horizontal, 40)
@@ -258,14 +247,14 @@ struct LoginView: View {
                     VStack(spacing: 4) {
                         Text("By continuing, your data is securely synced to your personal account.")
                             .font(.system(size: 11, weight: .regular))
-                            .foregroundStyle(Color(hex: "#666666"))
+                            .foregroundStyle(Color(hex: "#A2A2A2"))
                             .multilineTextAlignment(.center)
                         
                         HStack(spacing: 8) {
                             Link(destination: URL(string: "https://miloom.co/terms")!) {
                                 Text("Terms of Service")
                                     .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                                    .foregroundStyle(.white)
                             }
                             
                             Text("•")
@@ -275,7 +264,7 @@ struct LoginView: View {
                             Link(destination: URL(string: "https://miloom.co/privacy")!) {
                                 Text("Privacy Policy")
                                     .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(Color(hex: "#A2A2A2"))
+                                    .foregroundStyle(.white)
                             }
                         }
                     }

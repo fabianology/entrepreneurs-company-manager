@@ -838,13 +838,14 @@ struct AssistantOnboardingView: View {
                 }
                 
                 let tabMap: [String: AppViewModel.CompanyTab] = [
-                    "home": .home,
+                    "home": .financial,
                     "services": .subscriptions,
                     "subscriptions": .subscriptions,
                     "financial": .financial,
                     "financials": .financial,
                     "docs": .documents,
-                    "documents": .documents
+                    "documents": .documents,
+                    "vault": .documents
                 ]
                 
                 if let tab = tabMap[tabStr.lowercased()] {

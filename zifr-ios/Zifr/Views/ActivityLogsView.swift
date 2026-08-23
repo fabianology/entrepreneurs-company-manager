@@ -231,9 +231,10 @@ struct MessageRowView: View {
             }
         }
         .padding(16)
-        .masonryGlass(cornerRadius: 20)
+        .background(Color.zifrTabBarFill.opacity(0.70))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(log.isRead ? Color.clear : (isSecurityConcern ? Color.red.opacity(0.5) : Color(hex: "#4f46e5").opacity(0.5)), lineWidth: 1)
         )
     }

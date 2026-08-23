@@ -624,12 +624,12 @@ struct CustomSegmentedControl: View {
                 } label: {
                     Text(option)
                         .font(.system(size: 14, weight: selection == option ? .semibold : .medium))
-                        .foregroundStyle(selection == option ? Color.white : Color.white.opacity(0.65))
+                        .foregroundStyle(selection == option ? Color(hex: "#121212") : Color.white.opacity(0.65))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .background {
                             if selection == option {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(.miloomPrimary)
+                                    .fill(Color(hex: "#C1AA78"))
                                     .matchedGeometryEffect(id: "SEGMENT", in: animation)
                             }
                         }
@@ -746,10 +746,10 @@ struct MiloomPrimaryButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isEnabled ? .white : Color.white.opacity(0.3))
+            .foregroundStyle(isEnabled ? Color(hex: "#121212") : Color.white.opacity(0.3))
             .background {
                 if isEnabled {
-                    LinearGradient.miloomPrimary
+                    Color(hex: "#C1AA78")
                 } else {
                     Color.white.opacity(0.05)
                 }
@@ -768,7 +768,7 @@ struct MiloomSecondaryButtonStyle: ButtonStyle {
             .foregroundStyle(isEnabled ? .white : Color.white.opacity(0.3))
             .background {
                 if isEnabled {
-                    LinearGradient.miloomSecondary
+                    Color(hex: "#166A4E")
                 } else {
                     Color.white.opacity(0.05)
                 }
@@ -1041,7 +1041,7 @@ struct MiloomListCard<Content: View>: View {
         VStack(spacing: 0) {
             content
         }
-        .masonryGlass(cornerRadius: 24)
+        .zifrCardBox(cornerRadius: 24)
     }
 }
 

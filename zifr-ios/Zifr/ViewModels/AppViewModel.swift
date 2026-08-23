@@ -6,7 +6,7 @@ import Observation
 final class AppViewModel {
     // MARK: - Navigation State
     var selectedCompany: Company?
-    var activeTab: CompanyTab = .home
+    var activeTab: EntityHomeTab = .financial
     var searchQuery: String = ""
     var showSearch: Bool = false
     var deepLinkModelId: UUID? = nil
@@ -16,21 +16,7 @@ final class AppViewModel {
         case adminSettings
     }
 
-    enum CompanyTab: String, CaseIterable {
-        case home = "Home"
-        case subscriptions = "Services"
-        case financial = "Financial"
-        case documents = "Docs"
-
-        var icon: String {
-            switch self {
-            case .home:          return "circle.grid.3x3.fill"
-            case .subscriptions: return "square.3.layers.3d"
-            case .financial:     return "dollarsign.bank.building"
-            case .documents:     return "doc.text"
-            }
-        }
-    }
+    typealias CompanyTab = EntityHomeTab
 
     // CRUD: Companies
     func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
@@ -359,7 +345,7 @@ final class AppViewModel {
         for c in companies {
             let payload = [c.name, c.structure, c.companyDescription ?? "", c.website ?? ""].joined(separator: " ")
             if matches(payload) {
-                results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, modelId: c.id, tab: .subscriptions, logoData: c.logoData))
+                results.append(.init(type: .company, title: c.name, subtitle: c.structure, companyId: c.id, modelId: c.id, tab: .financial, logoData: c.logoData))
             }
         }
         

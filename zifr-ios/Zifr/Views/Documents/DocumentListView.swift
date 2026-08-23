@@ -377,25 +377,7 @@ struct DocumentListView: View {
         }) {
             DynamicGlassCard(cornerRadius: 20, height: 165) {
                 VStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.08))
-                            .frame(width: 40, height: 40)
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [Color.white.opacity(0.50), Color.white.opacity(0.10)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            )
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+                    ZifrPlusCircle(size: 44, iconSize: 18)
                     
                     VStack(spacing: 4) {
                         Text("ADD A DOCUMENT")

@@ -341,7 +341,7 @@ struct GlobalSearchView: View {
     private func navigate(to result: AppViewModel.SearchResult) {
         if let company = companies.first(where: { $0.id == result.companyId }) {
             vm.selectedCompany = company
-            vm.activeTab = (result.type == .company) ? .home : result.tab
+            vm.activeTab = result.tab
             vm.deepLinkModelId = result.modelId
             vm.path.append(company)
         }

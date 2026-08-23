@@ -198,29 +198,68 @@ struct EditCompanySheet: View {
                             }
                         }
 
-                        // MARK: - App Navigators Card
-                        ZifrSheetCard(title: "APP NAVIGATORS", icon: "arrow.triangle.turn.up.right.diamond.fill") {
-                            Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    vm.path = NavigationPath()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                                        onboardingState.startTutorial()
+                        // MARK: - App Navigation Card
+                        ZifrSheetCard(title: "APP NAVIGATION", icon: "arrow.triangle.turn.up.right.diamond.fill") {
+                            VStack(spacing: 12) {
+                                // Demo Account Toggle
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text("Demo Account")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                        Text("Show dummy demo account data across the app")
+                                            .font(.system(size: 11, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.5))
                                     }
+                                    Spacer()
+                                    Toggle("", isOn: Binding(
+                                        get: {
+                                            appState.companies.contains(where: { $0.id == DummyDataSeeder.dummyCompanyId })
+                                        },
+                                        set: { enable in
+                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                            if enable {
+                                                let userId = authViewModel.currentUser?.id ?? UUID()
+                                                DummyDataSeeder.seed(appState: appState, userId: userId, force: true)
+                                            } else {
+                                                DummyDataSeeder.purge(appState: appState)
+                                                if company?.id == DummyDataSeeder.dummyCompanyId {
+                                                    dismiss()
+                                                }
+                                            }
+                                        }
+                                    ))
+                                    .labelsHidden()
+                                    .tint(Color.zifrGreen)
                                 }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "play.circle")
-                                        .font(.system(size: 16))
-                                    Text("Replay Tutorial")
-                                        .font(.system(size: 14, weight: .semibold))
+                                .padding(.horizontal, 14)
+                                .frame(height: 52)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    dismiss()
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        vm.path = NavigationPath()
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                                            onboardingState.startTutorial()
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "play.circle")
+                                            .font(.system(size: 16))
+                                        Text("Replay Tutorial")
+                                            .font(.system(size: 14, weight: .semibold))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
                                 }
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .buttonStyle(MiloomSecondaryButtonStyle())
                             }
-                            .buttonStyle(MiloomSecondaryButtonStyle())
                         }
 
                         // MARK: - Actions Card

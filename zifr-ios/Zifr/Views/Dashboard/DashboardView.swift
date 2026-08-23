@@ -62,7 +62,7 @@ struct DashboardView: View {
                         ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
                             let row = companyCardRow(for: company)
                             let isLast = index == filteredCompanies.count - 1
-                            let hasPlaceholder = companies.isEmpty || companies.contains(where: { DummyDataSeeder.isDummy(companyId: $0.id) })
+                            let hasPlaceholder = companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
                             row
                                 .background(tutorialFrameCapture(index: index))
                                 .listRowBackground(Color.clear)
@@ -72,7 +72,7 @@ struct DashboardView: View {
 
                         // Add company button / empty state placeholder under the dummy company
                         Group {
-                            if companies.isEmpty || companies.contains(where: { DummyDataSeeder.isDummy(companyId: $0.id) }) {
+                            if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
                                 // Un-blurred only while the tutorial is actively running.
                                 if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
                                     // Tutorial in progress: show demo card fully visible
@@ -251,7 +251,7 @@ struct DashboardView: View {
                         if vm.path.isEmpty {
                             vm.path.append(entity)
                         }
-                        // CompanyDetailView's own onChange will set vm.activeTab = .home
+                        // CompanyDetailView will render the Control Center
                     }
 
                 // ── Financial steps (incl. tabBar step): push into entity, financial tab ──
@@ -272,14 +272,14 @@ struct DashboardView: View {
                      .tutorialSearch, .tutorialAssistant, .tutorialSwipeHint:
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         vm.path = NavigationPath()
-                        vm.activeTab = .home
+                        vm.activeTab = .financial
                     }
 
                 // ── Done ──
                 case .tutorialDone:
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                         vm.path = NavigationPath()
-                        vm.activeTab = .home
+                        vm.activeTab = .financial
                     }
 
                 default:
@@ -683,7 +683,7 @@ struct DashboardView: View {
             onTapSubscriptions: { navigateAction(.subscriptions) },
             onTapInstitutions: { navigateAction(.financial) },
             onTapDocuments: { navigateAction(.documents) },
-            onTapMain: { navigateAction(.home) }
+            onTapMain: { navigateAction(.financial) }
         )
     }
 
@@ -695,7 +695,7 @@ struct DashboardView: View {
             vm.activeTab = .subscriptions
         case .needsAssistant, .completed:
             vm.path = NavigationPath()
-            vm.activeTab = .home
+            vm.activeTab = .financial
         default:
             break
         }

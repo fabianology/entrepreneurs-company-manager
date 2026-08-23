@@ -76,7 +76,7 @@ struct AdminSettingsView: View {
                                             .resizable()
                                             .aspectRatio(contentMode: .fill)
                                     default:
-                                        Color(hex: "#1C1C1E")
+                                        Color.zifrTabBarFill.opacity(0.70)
                                     }
                                 }
                                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
@@ -92,7 +92,7 @@ struct AdminSettingsView: View {
                                     )
                                 )
                             } else {
-                                Color(hex: "#1C1C1E")
+                                Color.zifrTabBarFill.opacity(0.70)
                                 
                                 Image(systemName: "person.crop.circle.fill")
                                     .resizable()
@@ -124,16 +124,20 @@ struct AdminSettingsView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
+                        .background(Color.zifrTabBarFill.opacity(0.70))
+                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 24)
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
                                 .stroke(
                                     LinearGradient(
-                                        colors: [Color.white.opacity(0.18), Color.white.opacity(0.06)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                                        colors: [
+                                            Color(hex: "#918457"),
+                                            Color(hex: "#918457").opacity(0.3)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
                                     ),
-                                    lineWidth: 1
+                                    lineWidth: 1.5
                                 )
                         )
                         .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
@@ -216,7 +220,7 @@ struct AdminSettingsView: View {
                                 .padding(.leading, 8)
                         }
                         .padding(16)
-                        .masonryGlass(cornerRadius: 24)
+                        .zifrCardBox(cornerRadius: 24)
                     }
                     .padding(.horizontal, 20)
                     
@@ -266,7 +270,7 @@ struct AdminSettingsView: View {
                                 )
                             )
                         }
-                        .masonryGlass(cornerRadius: 24)
+                        .zifrCardBox(cornerRadius: 24)
                         .padding(.horizontal, 20)
                     }
 
@@ -285,7 +289,7 @@ struct AdminSettingsView: View {
                                 Text("LINKED ACCOUNTS")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(.white)
-                                Text("Manage Plaid bank connections")
+                                 Text("Manage Plaid bank connections")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.6))
                             }
@@ -308,7 +312,7 @@ struct AdminSettingsView: View {
                                 .padding(.leading, 8)
                         }
                         .padding(16)
-                        .masonryGlass(cornerRadius: 24)
+                        .zifrCardBox(cornerRadius: 24)
                     }
                     .padding(.horizontal, 20)
                     
@@ -340,7 +344,7 @@ struct AdminSettingsView: View {
                                 .padding(.leading, 8)
                         }
                         .padding(16)
-                        .masonryGlass(cornerRadius: 24)
+                        .zifrCardBox(cornerRadius: 24)
                     }
                     .padding(.horizontal, 20)
                     
@@ -381,7 +385,7 @@ struct AdminSettingsView: View {
                                 }
                             }
                         }
-                        .masonryGlass(cornerRadius: 24)
+                        .zifrCardBox(cornerRadius: 24)
                         .padding(.horizontal, 20)
                     }
                     
@@ -427,7 +431,7 @@ struct AdminSettingsView: View {
                             .frame(height: 56)
                         }
                     }
-                    .masonryGlass(cornerRadius: 24)
+                    .zifrCardBox(cornerRadius: 24)
                     .padding(.horizontal, 20)
                     
                 }
@@ -789,7 +793,7 @@ struct LinkedAccountRow: View {
             }
         }
         .padding(16)
-        .masonryGlass(cornerRadius: 20)
+        .zifrCardBox(cornerRadius: 20)
         .alert("Unlink Connection?", isPresented: $showingUnlinkAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Unlink", role: .destructive) {
@@ -1300,8 +1304,7 @@ struct EntityCollaboratorsCard: View {
                 .padding(.bottom, 16)
             }
         }
-        .background(Color(hex: "#1C1C1E").opacity(0.40))
-        .masonryGlass(cornerRadius: 20)
+        .zifrCardBox(cornerRadius: 20)
     }
 }
 
@@ -1493,7 +1496,6 @@ struct UncategorizedCollaboratorsCard: View {
                 .padding(.bottom, 16)
             }
         }
-        .background(Color(hex: "#1C1C1E").opacity(0.40))
-        .masonryGlass(cornerRadius: 20)
+        .zifrCardBox(cornerRadius: 20)
     }
 }

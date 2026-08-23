@@ -63,7 +63,7 @@ extension String {
 extension ShapeStyle where Self == LinearGradient {
     static var miloomPrimary: LinearGradient {
         LinearGradient(
-            colors: [Color(hex: "#4f609a"), Color(hex: "#f2ac5b")],
+            colors: [Color(hex: "#C1AA78"), Color(hex: "#C1AA78")],
             startPoint: .leading,
             endPoint: .trailing
         )
@@ -71,7 +71,7 @@ extension ShapeStyle where Self == LinearGradient {
 
     static var miloomSecondary: LinearGradient {
         LinearGradient(
-            colors: [Color(hex: "#15566a"), Color(hex: "#00544e")],
+            colors: [Color(hex: "#166A4E"), Color(hex: "#166A4E")],
             startPoint: .leading,
             endPoint: .trailing
         )

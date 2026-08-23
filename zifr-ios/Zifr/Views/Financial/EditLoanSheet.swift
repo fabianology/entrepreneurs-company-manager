@@ -384,7 +384,7 @@ struct EditLoanSheet: View {
                                 .fill(Color(hex: "#545454"))
                                 .frame(width: geo.size.width * (amort.principalPct / 100))
                             Rectangle()
-                                .fill(Color(hex: "#742C2D"))
+                                .fill(Color.zifrBG)
                         }
                     }
                     .frame(height: 8)
@@ -442,7 +442,7 @@ struct EditLoanSheet: View {
                                         .foregroundStyle(Color.white.opacity(0.5))
                                         .frame(maxWidth: .infinity, alignment: .trailing)
                                     Text("INT")
-                                        .foregroundStyle(Color(hex: "#742C2D"))
+                                        .foregroundStyle(Color.zifrBG)
                                         .frame(maxWidth: .infinity, alignment: .trailing)
                                     Text("BAL")
                                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -471,7 +471,7 @@ struct EditLoanSheet: View {
                                                     .foregroundStyle(Color.white.opacity(0.7))
                                                     .frame(maxWidth: .infinity, alignment: .trailing)
                                                 Text("$\(Int(round(row.interest)))")
-                                                    .foregroundStyle(Color(hex: "#742C2D"))
+                                                    .foregroundStyle(Color.zifrBG)
                                                     .frame(maxWidth: .infinity, alignment: .trailing)
                                                 Text("$\(Int(round(row.balance)))")
                                                     .foregroundStyle(Color.white)

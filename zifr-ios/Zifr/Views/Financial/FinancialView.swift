@@ -189,25 +189,7 @@ struct FinancialView: View {
                                 } label: {
                                     DynamicGlassCard(cornerRadius: 24, height: 215) {
                                         VStack(spacing: 16) {
-                                            ZStack {
-                                                Circle()
-                                                    .fill(Color.white.opacity(0.08))
-                                                    .frame(width: 44, height: 44)
-                                                    .overlay(
-                                                        Circle()
-                                                            .stroke(
-                                                                LinearGradient(
-                                                                    colors: [Color.white.opacity(0.50), Color.white.opacity(0.10)],
-                                                                    startPoint: .topLeading,
-                                                                    endPoint: .bottomTrailing
-                                                                ),
-                                                                lineWidth: 1
-                                                            )
-                                                    )
-                                                Image(systemName: "plus")
-                                                    .font(.system(size: 18, weight: .bold))
-                                                    .foregroundStyle(.white)
-                                            }
+                                            ZifrPlusCircle(size: 44, iconSize: 18)
                                             
                                             VStack(spacing: 6) {
                                                 Text("CONNECT FINANCIAL INSTITUTION")
