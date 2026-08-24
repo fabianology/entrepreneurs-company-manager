@@ -25,6 +25,19 @@ struct DocumentListView: View {
     @AppStorage("aiConsentStatus") private var aiConsentStatus: String = "unset"
     @State private var showAIConsentAlert = false
 
+    private var contentTopInset: CGFloat {
+        hideActionBar ? 82 : 70
+    }
+
+    private var documentRowsTopInset: CGFloat {
+        contentTopInset + 214
+    }
+
+    private var scanButtonBottomInset: CGFloat {
+        // Clears the 44-point command bar, its 12-point bottom inset, and a 10-point gap.
+        hideActionBar ? 66 : 20
+    }
+
     var grouped: [String: [CompanyDocument]] {
         Dictionary(grouping: documents, by: { CompanyDocument.normalizeType($0.type) })
     }
@@ -35,7 +48,7 @@ struct DocumentListView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     // Offset for top action bar + anchored category tabs header
-                    Spacer().frame(height: hideActionBar ? 312 : 276)
+                    Spacer().frame(height: documentRowsTopInset)
 
                     Group {
                         if documents.isEmpty {
@@ -106,7 +119,7 @@ struct DocumentListView: View {
 
             // Fixed Header with Tabs (anchored, does not move when scrolling)
             VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 98 : 62)
+                Spacer().frame(height: contentTopInset)
 
                 VStack(spacing: 12) {
                     // All Documents Box (Full Width)
@@ -208,7 +221,7 @@ struct DocumentListView: View {
                 .clipShape(Capsule())
                 .shadow(color: Color.zifrBlue.opacity(0.5), radius: 12, x: 0, y: 0)
             }
-            .padding(.bottom, 20)
+            .padding(.bottom, scanButtonBottomInset)
         }
         .overlay {
             if isProcessingScan {
