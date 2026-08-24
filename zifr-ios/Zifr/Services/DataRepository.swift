@@ -45,6 +45,7 @@ class DataRepository {
         async let fInstitutions: [Institution] = measure("institutions") { (try? await client.from("institutions").select().execute().value) ?? [] }
         async let fCards: [FinancialCard] = measure("cards") { (try? await client.from("financial_cards").select().execute().value) ?? [] }
         async let fLoans: [Loan] = measure("loans") { (try? await client.from("loans").select().execute().value) ?? [] }
+        async let fLoanPayments: [LoanPayment] = measure("loan_payments") { (try? await client.from("loan_payments").select().execute().value) ?? [] }
         async let fDocuments: [CompanyDocument] = measure("documents") { (try? await client.from("company_documents").select().execute().value) ?? [] }
         async let fShares = measure("shares") { await safeFetchShares() }
         async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
@@ -57,6 +58,7 @@ class DataRepository {
         let fetchedInstitutions = await fInstitutions
         let fetchedCards = await fCards
         let fetchedLoans = await fLoans
+        let fetchedLoanPayments = await fLoanPayments
         let fetchedDocuments = await fDocuments
         let shares = await fShares
         let fetchedActivityLogs = await fActivity
@@ -68,6 +70,13 @@ class DataRepository {
         let secureInst = fetchedInstitutions.map { i -> Institution in var m = i; m.password = SecurityService.shared.decrypt(i.password); return m }
         let secureCards = fetchedCards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
         
+        let paymentsByLoan = Dictionary(grouping: fetchedLoanPayments, by: { $0.loanId })
+        let combinedLoans = fetchedLoans.map { loan -> Loan in
+            var l = loan
+            l.payments = paymentsByLoan[loan.id] ?? []
+            return l
+        }
+        
         let session = try? await client.auth.session
         let currentUserId = session?.user.id
         
@@ -75,7 +84,7 @@ class DataRepository {
         appState.subscriptions = secureSubs
         appState.institutions = secureInst
         appState.cards = secureCards
-        appState.loans = fetchedLoans
+        appState.loans = combinedLoans
         appState.documents = fetchedDocuments
         appState.resourceShares = shares
         appState.activityLogs = fetchedActivityLogs
@@ -188,6 +197,9 @@ class DataRepository {
     // MARK: - Loans
     func insertLoan(_ loan: Loan) async throws {
         try await client.from("loans").insert(loan).execute()
+        if let payments = loan.payments, !payments.isEmpty {
+            try? await client.from("loan_payments").insert(payments).execute()
+        }
     }
     func updateLoan(_ loan: Loan) async throws {
         if let session = try? await client.auth.session, loan.userId != session.user.id {
@@ -195,8 +207,15 @@ class DataRepository {
             try? await insertActivityLog(log)
         }
         try await client.from("loans").update(loan).eq("id", value: loan.id).execute()
+        
+        // Sync loan payments
+        try? await client.from("loan_payments").delete().eq("loan_id", value: loan.id).execute()
+        if let payments = loan.payments, !payments.isEmpty {
+            try? await client.from("loan_payments").insert(payments).execute()
+        }
     }
     func deleteLoan(_ id: UUID) async throws {
+        try? await client.from("loan_payments").delete().eq("loan_id", value: id).execute()
         try await client.from("loans").delete().eq("id", value: id).execute()
     }
     

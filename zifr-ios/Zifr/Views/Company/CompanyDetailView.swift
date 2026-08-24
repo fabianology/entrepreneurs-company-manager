@@ -194,12 +194,13 @@ struct CompanyDetailView: View {
         .onAppear {
             handleOnAppear()
         }
-        .safeAreaInset(edge: .bottom) {
+        .overlay(alignment: .bottom) {
             bottomBarInset
         }
         .overlay {
             tutorialOverlaySection
         }
+        .ignoresSafeArea(edges: .bottom)
         .gesture(edgeSwipeGesture)
         .navigationBarBackButtonHidden(true)
         }
@@ -683,7 +684,7 @@ struct CompanyDetailView: View {
 
         case .financial:
             let creditCards = cards.filter { $0.type == "Credit" }
-            let totalDebt = loans.filter { $0.role == "Bank Loan" }.reduce(0.0) { $0 + $1.remainingBalance } + creditCards.reduce(0.0) { $0 + $1.balance }
+            let totalDebt = loans.filter { $0.isLender }.reduce(0.0) { $0 + $1.remainingBalance } + creditCards.reduce(0.0) { $0 + $1.balance }
             let totalCredit = creditCards.reduce(0.0) { $0 + $1.limit }
 
             HStack(spacing: 8) {

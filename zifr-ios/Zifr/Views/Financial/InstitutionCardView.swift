@@ -291,7 +291,7 @@ struct InstitutionCardView: View {
         )
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
+         .overlay(
             RoundedRectangle(cornerRadius: 24)
                 .stroke(
                     LinearGradient(

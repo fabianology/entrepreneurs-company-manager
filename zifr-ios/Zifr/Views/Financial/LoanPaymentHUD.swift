@@ -3,7 +3,7 @@ import SwiftData
 
 // MARK: - Loan Payment HUD
 struct LoanPaymentHUD: View {
-    @State var draft: LoanPayment
+    @Binding var draft: LoanPayment
     let isNew: Bool
     let institutions: [Institution]
     let cards: [FinancialCard]
@@ -79,6 +79,7 @@ struct LoanPaymentHUD: View {
                                             }
                                         }
                                         Section("Other") {
+                                            Button("Cash") { draft.source = "Cash" }
                                             Button("None") { draft.source = "" }
                                         }
                                     } label: {

@@ -116,7 +116,7 @@ struct LoanPaymentsLedgerView: View {
                     
                 Text(cumulativeTotal.currencyString)
                     .font(.system(size: 11, weight: .black, design: .monospaced))
-                    .foregroundStyle(Color.zifrGold)
+                    .foregroundStyle(Color(hex: "#C1AA78"))
                     .frame(width: 70, alignment: .trailing)
             }
             .padding(.horizontal, 12)
@@ -130,6 +130,7 @@ struct LoanPaymentsLedgerView: View {
                 withAnimation {
                     if let pId = payment.id as UUID? {
                         loan.payments?.removeAll(where: { $0.id == pId })
+                        loan.recalculateBalance()
                     }
                 }
             } label: {

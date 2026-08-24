@@ -31,7 +31,7 @@ struct EntityHomeViewModel {
     var creditCards: [FinancialCard] { cards.filter { $0.type == "Credit" } }
     
     var totalDebt: Double {
-        loans.filter { $0.role == "Bank Loan" }.reduce(0) { $0 + $1.remainingBalance }
+        loans.filter { $0.isLender }.reduce(0) { $0 + $1.remainingBalance }
         + creditCards.reduce(0) { $0 + $1.balance }
     }
     

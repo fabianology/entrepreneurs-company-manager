@@ -12,7 +12,7 @@ struct FinancialReceiptView: View {
     private var creditCards: [FinancialCard] { cards.filter { $0.type == "Credit" } }
     
     private var totalDebt: Double {
-        loans.filter { $0.role == "Bank Loan" }.reduce(0) { $0 + $1.remainingBalance }
+        loans.filter { $0.isLender }.reduce(0) { $0 + $1.remainingBalance }
         + creditCards.reduce(0) { $0 + $1.balance }
     }
     
@@ -56,7 +56,7 @@ struct FinancialReceiptView: View {
                         }
                         
                         let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == (card.institutionName ?? "").lowercased() } }
-                        let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
+                        let orphanedLoans = loans.filter { loan in loan.isLender && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
                         
                         if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
                             otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
@@ -115,7 +115,7 @@ struct FinancialReceiptView: View {
     
     private func institutionItem(inst: Institution) -> some View {
         let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == (inst.name).lowercased() }
-        let instLoans = loans.filter { $0.role == "Bank Loan" && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
+        let instLoans = loans.filter { $0.isLender && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
         
         let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
         let instCredit = instCards.reduce(0) { $0 + $1.limit }

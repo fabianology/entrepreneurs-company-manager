@@ -97,6 +97,26 @@ struct EntityHomeView: View {
                     .id("documentSection")
                 }
             }
+            .mask(
+                VStack(spacing: 0) {
+                    // Fully disappeared (clear) at and above the top 1/3 of the tab bar
+                    Color.clear
+                        .frame(height: 25)
+                    
+                    // Smooth gradient fade across the lower 2/3 of the tab bar
+                    LinearGradient(
+                        colors: [.clear, .black],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 37)
+                    
+                    // Fully visible below the tab bar to the bottom of the display
+                    Color.black
+                        .frame(maxHeight: .infinity)
+                }
+                .ignoresSafeArea(edges: .bottom)
+            )
             
             // TAB SELECTOR (floating on top)
             ControlCenterTabSelector(
@@ -111,8 +131,9 @@ struct EntityHomeView: View {
             .padding(.top, 6)
             .padding(.bottom, 10)
         }
-        .frame(width: UIScreen.main.bounds.width)
+        .frame(maxWidth: .infinity)
         .background(Color.clear)
+        .ignoresSafeArea(edges: .bottom)
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
                 .presentationDetents([.fraction(0.9), .large])

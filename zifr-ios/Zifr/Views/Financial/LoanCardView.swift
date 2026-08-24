@@ -4,93 +4,129 @@ import SwiftData
 struct LoanCardView: View {
     let loan: Loan
     let onEdit: () -> Void
+    var onAddPayment: (() -> Void)? = nil
+    var onMarkPaid: (() -> Void)? = nil
 
     var body: some View {
-        Button(action: onEdit) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onEdit()
+        }) {
             let amort = loan.amortization
-            VStack(spacing: 12) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 12) {
+                // ── HEADER: Hero Identity & Key Balance ───────────────
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Loan Name
                         Text((loan.name ?? "").isEmpty ? "Loan" : loan.name)
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 16, weight: .bold))
                             .foregroundStyle(.white)
-                        Text((loan.lender ?? "").isEmpty ? "—" : (loan.lender ?? ""))
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.4))
-                    }
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 2) {
-                        let rateStr = String(format: loan.interestRate.truncatingRemainder(dividingBy: 1) == 0 ? "%.0f%%" : "%.2f%%", loan.interestRate)
-                        Text(rateStr)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                        Text("rate")
-                            .zifrLabel()
-                    }
-                    .padding(.trailing, 12)
-                    
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(amort.totalPrincipal.currencyString)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                        Text("principal")
-                            .zifrLabel()
-                    }
-                }
-
-                // Progress Bar
-                VStack(spacing: 8) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            // Track
-                            Capsule()
-                                .fill(Color.white.opacity(0.1))
+                            .lineLimit(1)
+                        
+                        // Counterparty (Borrower)
+                        let borrowerName = (loan.borrower ?? "").isEmpty ? (loan.lender ?? "") : (loan.borrower ?? "")
+                        let counterparty = borrowerName.isEmpty ? "—" : borrowerName
+                        HStack(spacing: 4) {
+                            Text("BORROWER")
+                                .zifrLabel()
+                                .foregroundStyle(Color(hex: "#C1AA78"))
                             
-                            // Fill (Vibrant Gradient)
-                            Capsule()
-                                .fill(LinearGradient(colors: [Color(hex: "#4f46e5"), Color(hex: "#818cf8")], startPoint: .leading, endPoint: .trailing))
-                                .frame(width: max(0, geo.size.width * (amort.principalPct / 100)))
+                            Text(counterparty)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.75))
+                                .lineLimit(1)
                         }
                     }
-                    .frame(height: 8)
+                    
+                    Spacer(minLength: 12)
+                    
+                    // Right: Prominent Balance Display with LOAN AMOUNT & numerical value
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(loan.remainingBalance.currencyString)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                            .monospacedDigit()
+                        
+                        HStack(spacing: 4) {
+                            Text("LOAN AMOUNT")
+                                .zifrLabel()
+                            Text(amort.totalPrincipal.currencyString)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.75))
+                        }
+                    }
                 }
 
-                HStack {
-                    let freqLabel = loan.scheduleFrequency == "Weekly" ? "Wk Pmt" : (loan.scheduleFrequency == "Yearly" ? "Yr Pmt" : "Mo Pmt")
-                    statBadge(label: freqLabel, value: amort.monthlyPayment.currencyString)
-                    Spacer()
-                    statBadge(label: "Interest", value: amort.totalInterest.currencyString)
-                    Spacer()
-                    statBadge(label: "Total Cost", value: amort.totalCost.currencyString)
-                }
+                // ── PROGRESS TELEMETRY: Status Bar & Payoff % ──────────
+                VStack(spacing: 6) {
+                    // Payoff Track: App Background Green (#166A4E) & Luminous Solid Gold (#C1AA78)
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            // Track (App background green #166A4E)
+                            Capsule()
+                                .fill(Color(hex: "#166A4E"))
+                            
+                            // Fill (Solid Gold)
+                            Capsule()
+                                .fill(Color(hex: "#C1AA78"))
+                                .frame(width: max(0, min(geo.size.width, geo.size.width * loan.progressPercent)))
+                        }
+                    }
+                    .frame(height: 7)
 
-                HStack {
-                    statBadge(label: "Remaining", value: loan.remainingBalance.currencyString)
-                    Spacer()
-                    statBadge(label: "Start", value: loan.startDate.numericDisplay)
-                    Spacer()
-                    if let maturity = loan.maturityDate {
-                        statBadge(label: "Maturity", value: maturity.numericDisplay)
-                    } else {
-                        statBadge(label: "Maturity", value: "—")
+                    // Micro-Telemetry Labels
+                    HStack {
+                        Spacer()
+                        let pctText = String(format: "%.0f%% PAID OFF", loan.progressPercent * 100)
+                        Text(pctText)
+                            .font(.system(size: 9, weight: .heavy))
+                            .tracking(1)
+                            .foregroundStyle(Color(hex: "#C1AA78"))
                     }
                 }
             }
-            .padding(16)
-            .background(Color(hex: "#1C1C1E"))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
+            )
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
         }
-        .buttonStyle(.plain)
-    }
-
-    private func statBadge(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label).zifrLabel()
-            Text(value)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
+        .buttonStyle(PremiumButtonStyle())
+        .contextMenu {
+            if let onAddPayment = onAddPayment {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onAddPayment()
+                } label: {
+                    Label("Add Payment", systemImage: "plus.circle")
+                }
+            }
+            
+            if let onMarkPaid = onMarkPaid {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onMarkPaid()
+                } label: {
+                    Label(loan.status == "Paid Off" ? "Mark as Active" : "Mark as Paid", systemImage: loan.status == "Paid Off" ? "arrow.counterclockwise" : "checkmark.circle.fill")
+                }
+            }
         }
     }
 }

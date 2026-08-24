@@ -68,9 +68,11 @@ struct ControlCenterTabSelector: View {
         }()
         
         ZStack(alignment: .leading) {
-            // 1. Sliding Pill (Active Indicator)
+            // 1. Sliding Pill (Active Indicator) - Liquid Glass Pill
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.zifrTabBarFill.opacity(0.70))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
@@ -107,11 +109,11 @@ struct ControlCenterTabSelector: View {
                         HStack(spacing: 6) {
                             Image(systemName: tab.icon)
                                 .font(.system(size: 13.5, weight: .bold))
-                                .foregroundStyle(isHighlighted ? tab.color : Color.zifrTabBarFill)
+                                .foregroundStyle(isHighlighted ? tab.color : Color.white.opacity(0.40))
                             
                             Text(tab.rawValue.uppercased())
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(isHighlighted ? .white : Color.zifrTabBarFill)
+                                .foregroundStyle(isHighlighted ? .white : Color.white.opacity(0.45))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.85)
                         }
@@ -193,7 +195,24 @@ struct ControlCenterTabSelector: View {
                 bottomTrailingRadius: 16,
                 topTrailingRadius: 0
             )
-            .fill(Color.zifrTabBarFill.opacity(0.40))
+            .fill(Color.zifrTabBarFill.opacity(0.30))
+            .background(
+                .ultraThinMaterial,
+                in: UnevenRoundedRectangle(
+                    topLeadingRadius: 0,
+                    bottomLeadingRadius: 16,
+                    bottomTrailingRadius: 16,
+                    topTrailingRadius: 0
+                )
+            )
+            .clipShape(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 0,
+                    bottomLeadingRadius: 16,
+                    bottomTrailingRadius: 16,
+                    topTrailingRadius: 0
+                )
+            )
             .padding(.top, -30)
             .padding(.horizontal, 20)
         )

@@ -25,6 +25,9 @@ struct FinancialView: View {
     @State private var poppedCardId: String? = nil
     @State private var pullingUpCardId: String? = nil
     @State private var zIndexCardId: String? = nil
+    @State private var paymentLoan: Loan? = nil
+    @State private var paymentDraft = LoanPayment(id: UUID(), userId: UUID(), loanId: UUID(), date: Date(), amount: 0.0)
+    @State private var showLoanPaymentHUD = false
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -243,14 +246,35 @@ struct FinancialView: View {
                                 
                                 standaloneWalletStack(cards: standaloneCards)
                                 ForEach(standaloneLoans) { loan in
-                                    LoanCardView(loan: loan, onEdit: { editingLoan = loan })
-                                        .id(loan.id)
+                                    LoanCardView(
+                                        loan: loan, 
+                                        onEdit: { editingLoan = loan },
+                                        onAddPayment: {
+                                            paymentLoan = loan
+                                            paymentDraft = LoanPayment(id: UUID(), userId: loan.userId, loanId: loan.id, date: Date(), amount: 0.0, source: "")
+                                            showLoanPaymentHUD = true
+                                        },
+                                        onMarkPaid: {
+                                            var updatedLoan = loan
+                                            if updatedLoan.status == "Paid Off" {
+                                                updatedLoan.status = "Active"
+                                                updatedLoan.remainingBalance = updatedLoan.principalAmount
+                                                updatedLoan.paidOffDate = nil
+                                            } else {
+                                                updatedLoan.status = "Paid Off"
+                                                updatedLoan.remainingBalance = 0
+                                                updatedLoan.paidOffDate = Date()
+                                            }
+                                            vm.saveLoan(updatedLoan, appState: appState)
+                                        }
+                                    )
+                                    .id(loan.id)
                                 }
                             }
                         }
                         
-                        // Extra bottom clearance to ensure full scrollability above the bottom tab bar and home indicator
-                        Spacer().frame(height: hideActionBar ? 160 : 120)
+                        // Bottom clearance so final item settles comfortably above floating action bar
+                        Spacer().frame(height: 80)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -292,6 +316,36 @@ struct FinancialView: View {
         .sheet(item: $editingCard) { c in EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: false) }
         .sheet(item: $newLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: true, institutions: institutions, cards: cards) }
         .sheet(item: $editingLoan) { l in EditLoanSheet(loan: l, vm: vm, isNew: false, institutions: institutions, cards: cards) }
+        .sheet(isPresented: $showLoanPaymentHUD) {
+            if let pLoan = paymentLoan {
+                LoanPaymentHUD(
+                    draft: $paymentDraft,
+                    isNew: true,
+                    institutions: institutions,
+                    cards: cards,
+                    onSave: {
+                        var updatedLoan = pLoan
+                        if updatedLoan.payments == nil { updatedLoan.payments = [] }
+                        updatedLoan.payments?.append(paymentDraft)
+                        updatedLoan.recalculateBalance()
+                        if updatedLoan.remainingBalance <= 0 {
+                            updatedLoan.status = "Paid Off"
+                            updatedLoan.paidOffDate = Date()
+                        }
+                        vm.saveLoan(updatedLoan, appState: appState)
+                        showLoanPaymentHUD = false
+                        paymentLoan = nil
+                    },
+                    onCancel: {
+                        showLoanPaymentHUD = false
+                        paymentLoan = nil
+                    }
+                )
+                .presentationDetents([.fraction(0.70), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+            }
+        }
         .onChange(of: vm.deepLinkModelId) { _, newValue in
             handleDeepLink(id: newValue, proxy: proxy)
         }

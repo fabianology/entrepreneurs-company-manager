@@ -48,7 +48,28 @@ struct Loan: Identifiable, Codable, Hashable {
     var paidOffDate: Date?
     var status: String
     var notes: String?
-    var payments: [LoanPayment]?
+    var payments: [LoanPayment]? = nil
+
+    var borrower: String? {
+        get {
+            guard let notes = notes else { return nil }
+            if let range = notes.range(of: "\\[Borrower: ([^\\]]+)\\]", options: .regularExpression) {
+                let match = String(notes[range])
+                return match.replacingOccurrences(of: "[Borrower: ", with: "").replacingOccurrences(of: "]", with: "")
+            }
+            return nil
+        }
+        set {
+            var currentNotes = notes ?? ""
+            if let range = currentNotes.range(of: "\\[Borrower: [^\\]]+\\]\\n?", options: .regularExpression) {
+                currentNotes.removeSubrange(range)
+            }
+            if let newBorrower = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !newBorrower.isEmpty {
+                currentNotes = "[Borrower: \(newBorrower)]\n" + currentNotes
+            }
+            notes = currentNotes.isEmpty ? nil : currentNotes
+        }
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -71,15 +92,15 @@ struct Loan: Identifiable, Codable, Hashable {
         case paidOffDate = "paid_off_date"
         case status
         case notes
-        case payments
     }
     
     init(
         id: UUID = UUID(),
         userId: UUID,
         companyId: UUID,
-        role: String = "Bank Loan",
+        role: String = "Borrower",
         lender: String? = nil,
+        borrower: String? = nil,
         name: String = "",
         principalAmount: Double = 0,
         remainingBalance: Double = 0,
@@ -118,6 +139,23 @@ struct Loan: Identifiable, Codable, Hashable {
         self.status = status
         self.notes = notes
         self.payments = payments
+        if let b = borrower, !b.isEmpty {
+            self.borrower = b
+        }
+    }
+
+    var totalPayments: Double {
+        (payments ?? []).reduce(0.0) { $0 + $1.amount }
+    }
+
+    mutating func recalculateBalance() {
+        let totalPaid = totalPayments
+        if interestType == "Fixed" {
+            let totalOwed = principalAmount + interestRate
+            remainingBalance = max(0, totalOwed - totalPaid)
+        } else {
+            remainingBalance = max(0, principalAmount - totalPaid)
+        }
     }
 
     var progressPercent: Double {
@@ -158,7 +196,22 @@ struct Loan: Identifiable, Codable, Hashable {
             let totalCost = principal + rate
             let pPct = totalCost > 0 ? (principal / totalCost) * 100 : 0
             let iPct = totalCost > 0 ? (rate / totalCost) * 100 : 0
-            return AmortizationResult(monthlyPayment: 0, totalPrincipal: principal, totalInterest: rate, totalCost: totalCost, principalPct: pPct, interestPct: iPct, schedule: [])
+            var schedule: [AmortizationRow] = []
+            var pmt: Double = 0
+            if totalMonths > 0 {
+                let periodsPerYear: Double = scheduleFrequency == "Weekly" ? 52 : (scheduleFrequency == "Yearly" ? 1 : 12)
+                let totalPeriods = scheduleFrequency == "Weekly" ? (totalMonths / 12) * 52 : (scheduleFrequency == "Yearly" ? (totalMonths / 12) : totalMonths)
+                let n = max(1, Int(totalPeriods))
+                pmt = totalCost / Double(n)
+                let principalPerPeriod = principal / Double(n)
+                let interestPerPeriod = rate / Double(n)
+                var balance = principal
+                for i in 1...n {
+                    balance -= principalPerPeriod
+                    schedule.append(AmortizationRow(month: i, payment: pmt, principal: principalPerPeriod, interest: interestPerPeriod, balance: max(0, balance)))
+                }
+            }
+            return AmortizationResult(monthlyPayment: pmt, totalPrincipal: principal, totalInterest: rate, totalCost: totalCost, principalPct: pPct, interestPct: iPct, schedule: schedule)
         }
 
         if totalMonths <= 0 {
@@ -200,8 +253,16 @@ struct Loan: Identifiable, Codable, Hashable {
         }
     }
 
-    static let roles = ["Bank Loan", "I'm Lending"]
+    var isBorrower: Bool {
+        role == "Borrower" || role == "I'm Lending"
+    }
+    
+    var isLender: Bool {
+        role == "Lender" || role == "Bank Loan"
+    }
+
+    static let roles = ["Lender", "Borrower"]
     static let statuses = ["Active", "Paid Off", "Default"]
-    static let frequencies = ["Weekly", "Monthly", "Yearly"]
+    static let frequencies = ["Weekly", "Monthly", "Yearly", "N/A"]
     static let interestTypes = ["Percentage", "Fixed"]
 }

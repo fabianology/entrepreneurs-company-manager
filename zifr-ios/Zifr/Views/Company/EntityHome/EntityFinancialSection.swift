@@ -96,7 +96,7 @@ struct EntityFinancialSection: View {
                 }
                 // Orphaned cards
                 let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == (card.institutionName ?? "").lowercased() } }
-                let orphanedLoans = loans.filter { loan in loan.role == "Bank Loan" && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
+                let orphanedLoans = loans.filter { loan in loan.isLender && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
                 
                 if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
                     let isOrphanedExpanded = expandedInstitutions.contains("orphaned")
@@ -315,7 +315,7 @@ struct EntityFinancialSection: View {
     private func institutionRow(_ inst: Institution) -> some View {
         let isExpanded = expandedInstitutions.contains(inst.id.uuidString)
         let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == (inst.name).lowercased() }
-        let instLoans = loans.filter { $0.role == "Bank Loan" && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
+        let instLoans = loans.filter { $0.isLender && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
         
         let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
         let instCredit = instCards.reduce(0) { $0 + $1.limit }
