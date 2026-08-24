@@ -207,7 +207,7 @@ struct PremiumSubscriptionCard: View {
                             }
                         }
 
-                        if isExplicitlyFull {
+                        if revealLevel == .full {
                             Button {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 onEdit()

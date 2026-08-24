@@ -95,47 +95,110 @@ struct ZifrSwipeActionsModifier: ViewModifier {
 
 // MARK: - Message Swipe Actions (Unread / Delete)
 struct ZifrMessageSwipeModifier: ViewModifier {
-    let onUnread: () -> Void
+    let onReadToggle: () -> Void
     let onDelete: () -> Void
     let isRead: Bool
     @State private var offset: CGFloat = 0
+    @GestureState private var dragOffset: CGFloat = 0
+
+    private let actionWidth: CGFloat = 104
+    private let revealThreshold: CGFloat = 52
+    private let fullSwipeThreshold: CGFloat = 220
+    private let fullSwipeExitOffset: CGFloat = 420
     
     func body(content: Content) -> some View {
-        ZStack {
-            // Unread Background (Leading)
-            Color.blue
-                .overlay(alignment: .leading) {
-                    Image(systemName: isRead ? "envelope.badge" : "envelope.open")
-                        .foregroundColor(.white)
-                        .padding(.leading, 20)
+        let rawOffset = offset + dragOffset
+        let visibleOffset = rawOffset < -actionWidth
+            ? max(-fullSwipeExitOffset, rawOffset)
+            : min(actionWidth, max(-actionWidth, rawOffset))
+
+        return ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(hex: "#315B50"))
+                .opacity(visibleOffset > 0 ? 1 : 0)
+
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color(hex: "#7A2E2E"))
+                .opacity(visibleOffset < 0 ? 1 : 0)
+
+            HStack(spacing: 0) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        offset = 0
+                    }
+                    onReadToggle()
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: isRead ? "envelope.badge" : "envelope.open")
+                            .font(.system(size: 17, weight: .bold))
+                        Text(isRead ? "UNREAD" : "READ")
+                            .font(.system(size: 9, weight: .black))
+                            .tracking(0.8)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: actionWidth)
+                    .frame(maxHeight: .infinity)
                 }
-                .opacity(offset > 0 ? 1 : 0)
-            
-            // Delete Background (Trailing)
-            Color.red
-                .overlay(alignment: .trailing) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.white)
-                        .padding(.trailing, 20)
+                .buttonStyle(.plain)
+
+                Spacer(minLength: 0)
+
+                Button {
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                        offset = 0
+                    }
+                    onDelete()
+                } label: {
+                    VStack(spacing: 5) {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 17, weight: .bold))
+                        Text("DELETE")
+                            .font(.system(size: 9, weight: .black))
+                            .tracking(0.8)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(width: actionWidth)
+                    .frame(maxHeight: .infinity)
                 }
-                .opacity(offset < 0 ? 1 : 0)
+                .buttonStyle(.plain)
+            }
+            .opacity(abs(visibleOffset) > 1 ? 1 : 0)
+            .allowsHitTesting(abs(visibleOffset) >= actionWidth - 1)
+            .accessibilityHidden(abs(visibleOffset) <= 1)
             
             content
-                .background(Color(hex: "#171717")) // Match background color of messages
-                .offset(x: offset)
+                .offset(x: visibleOffset)
                 .gesture(
                     DragGesture()
-                        .onChanged { value in
-                            offset = value.translation.width
+                        .updating($dragOffset) { value, state, _ in
+                            state = value.translation.width
                         }
                         .onEnded { value in
-                            withAnimation(.spring()) {
-                                if value.translation.width < -80 {
+                            let projectedOffset = offset + value.predictedEndTranslation.width
+                            let completedOffset = offset + value.translation.width
+
+                            if completedOffset <= -fullSwipeThreshold {
+                                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                                withAnimation(.easeIn(duration: 0.16)) {
+                                    offset = -fullSwipeExitOffset
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
                                     onDelete()
-                                    offset = 0
-                                } else if value.translation.width > 80 {
-                                    onUnread()
-                                    offset = 0
+                                }
+                                return
+                            }
+
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                if offset < 0 {
+                                    offset = value.translation.width > revealThreshold / 2 ? 0 : -actionWidth
+                                } else if offset > 0 {
+                                    offset = value.translation.width < -revealThreshold / 2 ? 0 : actionWidth
+                                } else if projectedOffset < -revealThreshold {
+                                    offset = -actionWidth
+                                } else if projectedOffset > revealThreshold {
+                                    offset = actionWidth
                                 } else {
                                     offset = 0
                                 }
@@ -143,6 +206,6 @@ struct ZifrMessageSwipeModifier: ViewModifier {
                         }
                 )
         }
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 }

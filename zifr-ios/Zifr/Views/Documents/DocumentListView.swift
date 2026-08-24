@@ -33,9 +33,18 @@ struct DocumentListView: View {
         contentTopInset + 214
     }
 
+    private var systemBottomSafeAreaInset: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.bottom ?? 0
+    }
+
     private var scanButtonBottomInset: CGFloat {
-        // Clears the 44-point command bar, its 12-point bottom inset, and a 10-point gap.
-        hideActionBar ? 66 : 20
+        // Clears the Home indicator, 44-point command bar, its 12-point padding,
+        // and leaves a stable 10-point gap above the search control.
+        hideActionBar ? systemBottomSafeAreaInset + 66 : 20
     }
 
     var grouped: [String: [CompanyDocument]] {

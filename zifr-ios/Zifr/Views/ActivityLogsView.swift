@@ -7,11 +7,16 @@ struct ActivityLogsView: View {
     
     @State private var isSelecting: Bool = false
     @State private var selectedLogIDs: Set<UUID> = []
+    @State private var feedback: MessageFeedback? = nil
+
+    private var unreadCount: Int {
+        appState.activityLogs.filter { !$0.isRead }.count
+    }
     
     var body: some View {
         ZStack(alignment: .top) {
-            Color(hex: "#171717").ignoresSafeArea()
-            
+            Color.zifrCard.ignoresSafeArea()
+
             VStack(spacing: 0) {
                 // Header
                 HStack {
@@ -21,16 +26,33 @@ struct ActivityLogsView: View {
                     } label: {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.white.opacity(0.9))
                             .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
+                            .background(
+                                Circle()
+                                    .fill(Color.black.opacity(0.70))
+                            )
+                            .background(.regularMaterial, in: Circle())
+                            .overlay(
+                                Circle()
+                                    .stroke(.vaultOutline, lineWidth: 1.5)
+                            )
+                            .shadow(color: Color.black.opacity(0.35), radius: 6, x: 0, y: 3)
                     }
                     
                     Spacer()
                     
-                    Text("MESSAGES")
-                        .zifrLabel()
+                    VStack(spacing: 3) {
+                        Text("MESSAGES")
+                            .font(.system(size: 10, weight: .black))
+                            .tracking(2)
+                            .foregroundStyle(Color.white.opacity(0.65))
+
+                        Text(unreadCount == 1 ? "1 UNREAD" : "\(unreadCount) UNREAD")
+                            .font(.system(size: 8, weight: .bold))
+                            .tracking(1)
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                    }
                     
                     Spacer()
                     
@@ -44,7 +66,7 @@ struct ActivityLogsView: View {
                         } label: {
                             Text("Done")
                                 .font(.system(size: 16, weight: .bold))
-                                .foregroundStyle(Color(hex: "#4f46e5"))
+                                .foregroundStyle(Color(hex: "#C1AA78"))
                         }
                         .frame(width: 44, height: 44)
                     } else if !appState.activityLogs.isEmpty {
@@ -58,24 +80,31 @@ struct ActivityLogsView: View {
                                 Label("Select Messages", systemImage: "checkmark.circle")
                             }
                             
-                            if appState.activityLogs.contains(where: { !$0.isRead }) {
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    Task {
-                                        try? await DataRepository.shared.markAllActivityLogsRead()
-                                        await DataRepository.shared.fetchAllData(appState: appState)
-                                    }
-                                } label: {
-                                    Label("Mark All as Read", systemImage: "envelope.open")
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                Task {
+                                    try? await DataRepository.shared.markAllActivityLogsRead()
+                                    await DataRepository.shared.fetchAllData(appState: appState)
                                 }
+                            } label: {
+                                Label("Mark All as Read", systemImage: "envelope.open")
                             }
+                            .disabled(unreadCount == 0)
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.white.opacity(0.9))
                                 .frame(width: 44, height: 44)
-                                .background(Color.white.opacity(0.1))
-                                .clipShape(Circle())
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.70))
+                                )
+                                .background(.regularMaterial, in: Circle())
+                                .overlay(
+                                    Circle()
+                                        .stroke(.vaultOutline, lineWidth: 1.5)
+                                )
+                                .shadow(color: Color.black.opacity(0.35), radius: 6, x: 0, y: 3)
                         }
                     } else {
                         Color.clear.frame(width: 44, height: 44)
@@ -89,10 +118,10 @@ struct ActivityLogsView: View {
                     VStack(spacing: 16) {
                         Image(systemName: "tray")
                             .font(.system(size: 48, weight: .light))
-                            .foregroundStyle(Color.white.opacity(0.3))
+                            .foregroundStyle(Color(hex: "#C1AA78").opacity(0.75))
                         Text("No messages yet")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                            .foregroundStyle(Color.white.opacity(0.6))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -111,24 +140,25 @@ struct ActivityLogsView: View {
                                         } label: {
                                             Image(systemName: selectedLogIDs.contains(log.id) ? "checkmark.circle.fill" : "circle")
                                                 .font(.system(size: 24))
-                                                .foregroundStyle(selectedLogIDs.contains(log.id) ? Color(hex: "#4f46e5") : Color.white.opacity(0.3))
+                                                .foregroundStyle(selectedLogIDs.contains(log.id) ? Color(hex: "#C1AA78") : Color.white.opacity(0.3))
                                         }
                                         .transition(.move(edge: .leading).combined(with: .opacity))
                                     }
                                     
                                     MessageRowView(log: log, vm: vm)
                                         .modifier(ZifrMessageSwipeModifier(
-                                            onUnread: {
+                                            onReadToggle: {
                                                 Task {
-                                                    try? await DataRepository.shared.markActivityLogUnread(log.id)
+                                                    if log.isRead {
+                                                        try? await DataRepository.shared.markActivityLogUnread(log.id)
+                                                    } else {
+                                                        try? await DataRepository.shared.markActivityLogRead(log.id)
+                                                    }
                                                     await DataRepository.shared.fetchAllData(appState: appState)
                                                 }
                                             },
                                             onDelete: {
-                                                Task {
-                                                    try? await DataRepository.shared.deleteActivityLog(log.id)
-                                                    await DataRepository.shared.fetchAllData(appState: appState)
-                                                }
+                                                deleteMessage(log)
                                             },
                                             isRead: log.isRead
                                         ))
@@ -172,7 +202,88 @@ struct ActivityLogsView: View {
                 }
             }
         }
+        .overlay(alignment: .bottom) {
+            if let feedback {
+                HStack(spacing: 10) {
+                    Image(systemName: feedback.systemImage)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(feedback.tint)
+
+                    Text(feedback.message)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.black.opacity(0.70))
+                )
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(.vaultOutline, lineWidth: 1.5)
+                )
+                .shadow(color: Color.black.opacity(0.45), radius: 10, x: 0, y: 5)
+                .padding(.horizontal, 20)
+                .padding(.bottom, isSelecting && !selectedLogIDs.isEmpty ? 92 : 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
     }
+
+    private func deleteMessage(_ log: ActivityLog) {
+        guard let originalIndex = appState.activityLogs.firstIndex(where: { $0.id == log.id }) else { return }
+
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+            appState.activityLogs.remove(at: originalIndex)
+        }
+        showFeedback("Deleting message…", systemImage: "trash", tint: Color(hex: "#C1AA78"))
+
+        Task {
+            do {
+                try await DataRepository.shared.deleteActivityLog(log.id)
+                await MainActor.run {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    showFeedback("Message deleted", systemImage: "checkmark.circle.fill", tint: Color(hex: "#C1AA78"))
+                }
+            } catch {
+                await MainActor.run {
+                    let restoredIndex = min(originalIndex, appState.activityLogs.count)
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                        appState.activityLogs.insert(log, at: restoredIndex)
+                    }
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    showFeedback("Couldn’t delete message", systemImage: "exclamationmark.triangle.fill", tint: .red)
+                }
+            }
+        }
+    }
+
+    private func showFeedback(_ message: String, systemImage: String, tint: Color) {
+        let newFeedback = MessageFeedback(message: message, systemImage: systemImage, tint: tint)
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            feedback = newFeedback
+        }
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard feedback?.id == newFeedback.id else { return }
+            withAnimation(.easeOut(duration: 0.2)) {
+                feedback = nil
+            }
+        }
+    }
+}
+
+private struct MessageFeedback: Identifiable {
+    let id = UUID()
+    let message: String
+    let systemImage: String
+    let tint: Color
 }
 
 struct MessageRowView: View {
@@ -180,74 +291,81 @@ struct MessageRowView: View {
     let vm: AppViewModel
     @Environment(AppState.self) private var appState
     
-    private var isSecurityConcern: Bool {
-        log.actionType == "security_alert" || log.actionType == "new_device"
-    }
-    
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            ZStack {
-                Circle()
-                    .fill(isSecurityConcern ? Color.red.opacity(0.15) : Color(hex: "#4f46e5").opacity(0.2))
-                    .frame(width: 44, height: 44)
-                
-                Image(systemName: iconForAction(log.actionType))
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(isSecurityConcern ? Color.red : Color(hex: "#4f46e5"))
-            }
-            
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(titleForAction(log.actionType))
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(isSecurityConcern ? Color.red : .white)
-                    Spacer()
-                    Text(timeAgo(log.createdAt))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.4))
-                }
-                
-                Text(log.message)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundStyle(isSecurityConcern ? Color.red.opacity(0.85) : Color.white.opacity(0.7))
-                    .fixedSize(horizontal: false, vertical: true)
-                
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(titleForAction(log.actionType))
+                    .font(.system(size: 12, weight: .black))
+                    .tracking(1.2)
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+                    .textCase(.uppercase)
+
                 if !log.isRead {
-                    HStack {
-                        Spacer()
-                        Button {
-                            Task {
-                                try? await DataRepository.shared.markActivityLogRead(log.id)
-                                await DataRepository.shared.fetchAllData(appState: appState)
-                            }
-                        } label: {
-                            Text("Mark as read")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(isSecurityConcern ? Color.red : Color(hex: "#4f46e5"))
-                        }
-                    }
-                    .padding(.top, 4)
+                    Circle()
+                        .fill(Color(hex: "#C1AA78"))
+                        .frame(width: 6, height: 6)
                 }
+
+                Spacer()
+                Text(timeAgo(log.createdAt))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.4))
+            }
+
+            Text(log.message)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundStyle(Color.white.opacity(log.isRead ? 0.58 : 0.82))
+                .fixedSize(horizontal: false, vertical: true)
+            
+            if !log.isRead {
+                HStack {
+                    Spacer()
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        Task {
+                            try? await DataRepository.shared.markActivityLogRead(log.id)
+                            await DataRepository.shared.fetchAllData(appState: appState)
+                        }
+                    } label: {
+                        Label("MARK READ", systemImage: "envelope.open")
+                            .font(.system(size: 10, weight: .black))
+                            .tracking(0.8)
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                            .padding(.horizontal, 11)
+                            .frame(height: 28)
+                            .background(Color(hex: "#C1AA78").opacity(0.12))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color(hex: "#C1AA78").opacity(0.32), lineWidth: 1)
+                            )
+                    }
+                }
+                .padding(.top, 4)
             }
         }
-        .padding(16)
-        .background(Color.zifrTabBarFill.opacity(0.70))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(log.isRead ? Color.clear : (isSecurityConcern ? Color.red.opacity(0.5) : Color(hex: "#4f46e5").opacity(0.5)), lineWidth: 1)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.black.opacity(0.70))
         )
-    }
-    
-    private func iconForAction(_ type: String) -> String {
-        switch type {
-        case "shared": return "person.2.fill"
-        case "left_resource": return "person.fill.xmark"
-        case "updated_company", "updated_subscription", "updated_card", "updated_institution", "updated_loan", "updated_document": return "pencil"
-        case "new_device": return "iphone.badge.play"
-        case "security_alert": return "shield.exclamation.fill"
-        default: return "bell.fill"
-        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
     
     private func titleForAction(_ type: String) -> String {

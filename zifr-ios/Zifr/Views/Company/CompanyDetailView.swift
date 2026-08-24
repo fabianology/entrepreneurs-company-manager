@@ -194,15 +194,14 @@ struct CompanyDetailView: View {
         .onAppear {
             handleOnAppear()
         }
-        .overlay(alignment: .bottom) {
-            bottomBarInset
-        }
         .overlay {
             tutorialOverlaySection
         }
-        .ignoresSafeArea(edges: .bottom)
         .gesture(edgeSwipeGesture)
         .navigationBarBackButtonHidden(true)
+        }
+        .safeAreaInset(edge: .bottom) {
+            bottomBarInset
         }
     }
 
