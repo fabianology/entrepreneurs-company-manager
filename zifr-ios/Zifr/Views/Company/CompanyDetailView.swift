@@ -313,6 +313,25 @@ struct CompanyDetailView: View {
     }
 
     @ViewBuilder
+    private func bottomControlGlass<S: Shape>(_ shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(
+                    .clear
+                        .tint(Color.zifrTabBarFill.opacity(0.28))
+                        .interactive(),
+                    in: shape
+                )
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    shape.fill(Color.zifrTabBarFill.opacity(0.35))
+                )
+        }
+    }
+
+    @ViewBuilder
     private var bottomBarInset: some View {
         HStack(alignment: .bottom, spacing: 10) {
             // 1. Profile / Admin Button (far left)
@@ -335,10 +354,7 @@ struct CompanyDetailView: View {
                 }
                 .padding(.horizontal, 16)
                 .frame(height: 44)
-                .background(
-                    Capsule()
-                        .fill(Color.zifrTabBarFill.opacity(0.70))
-                )
+                .background(bottomControlGlass(Capsule()))
                 .overlay(
                     Capsule()
                         .stroke(
@@ -504,8 +520,7 @@ struct CompanyDetailView: View {
             vm.path.append(AppViewModel.AppRoute.adminSettings)
         } label: {
             ZStack {
-                Circle()
-                    .fill(Color.zifrTabBarFill.opacity(0.70))
+                bottomControlGlass(Circle())
                     .overlay(
                         Circle()
                             .stroke(
@@ -559,8 +574,7 @@ struct CompanyDetailView: View {
             }
         } label: {
             ZStack {
-                Circle()
-                    .fill(Color.zifrTabBarFill.opacity(0.70))
+                bottomControlGlass(Circle())
                     .overlay(
                         Circle()
                             .stroke(
@@ -589,8 +603,7 @@ struct CompanyDetailView: View {
 
     private var plusButtonLabel: some View {
         ZStack {
-            Circle()
-                .fill(Color.zifrTabBarFill.opacity(0.70))
+            bottomControlGlass(Circle())
                 .overlay(
                     Circle()
                         .stroke(
