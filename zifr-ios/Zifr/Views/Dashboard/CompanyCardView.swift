@@ -185,7 +185,14 @@ struct CompanyCardView: View {
             }
             .padding(.bottom, 16)
         }
-        .background(Color(hex: "#1C1C1E").opacity(0.70))
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.zifrBG)
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.zifrTabBarFill.opacity(0.70))
+            }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(
             RoundedRectangle(cornerRadius: 24)
