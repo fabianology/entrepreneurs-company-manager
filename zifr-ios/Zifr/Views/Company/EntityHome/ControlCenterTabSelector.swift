@@ -1,5 +1,33 @@
 import SwiftUI
 
+private struct ActiveTabLensLabelMotion: AnimatableModifier {
+    var position: CGFloat
+    let destination: CGFloat
+    let tabWidth: CGFloat
+    let innerPadding: CGFloat
+
+    var animatableData: CGFloat {
+        get { position }
+        set { position = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        let distance = min(1, abs(position - destination))
+        let overlap = 1 - distance
+        let rawReveal = max(0, min(1, (overlap - 0.5) / 0.5))
+        let reveal = rawReveal * rawReveal * (3 - (2 * rawReveal))
+
+        content
+            .opacity(reveal)
+            .blur(radius: (1 - reveal) * 3)
+            .scaleEffect(0.96 + (0.04 * reveal))
+            .offset(
+                x: innerPadding + (position * tabWidth),
+                y: (1 - reveal) * 1.5
+            )
+    }
+}
+
 enum EntityHomeTab: String, CaseIterable {
     case financial = "Financial"
     case subscriptions = "Services"
@@ -44,12 +72,15 @@ struct ControlCenterTabSelector: View {
     }
 
     @ViewBuilder
-    private func tabBarGlassBackground<S: Shape>(_ shape: S) -> some View {
+    private func tabBarGlassBackground<S: Shape>(
+        _ shape: S,
+        tintOpacity: Double = 0.28
+    ) -> some View {
         if #available(iOS 26.0, *) {
             Color.clear
                 .glassEffect(
                     .clear
-                        .tint(Color.zifrTabBarFill.opacity(0.28))
+                        .tint(Color.zifrTabBarFill.opacity(tintOpacity))
                         .interactive(),
                     in: shape
                 )
@@ -57,8 +88,18 @@ struct ControlCenterTabSelector: View {
             shape
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    shape.fill(Color.zifrTabBarFill.opacity(0.30))
+                    shape.fill(Color.zifrTabBarFill.opacity(tintOpacity))
                 )
+        }
+    }
+
+    private func selectTab(_ tab: EntityHomeTab) {
+        impactFeedback.impactOccurred()
+        guard tab != activeTab else { return }
+
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+            activeTab = tab
+            dragOffset = 0
         }
     }
     
@@ -85,13 +126,23 @@ struct ControlCenterTabSelector: View {
                 return targetOffset
             }
         }()
+        let pillPosition = (clampedOffset - innerPadding) / tabW
+        let displayedIndex = min(
+            tabs.count - 1,
+            max(0, Int(round(pillPosition)))
+        )
+        let displayedTab = tabs[displayedIndex]
+        let pillAnimation = isDragging
+            ? Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86)
+            : Animation.spring(response: 0.3, dampingFraction: 0.75)
         
         ZStack(alignment: .leading) {
             // 1. Sliding Pill (Active Indicator) - Liquid Glass Pill
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.zifrTabBarFill.opacity(0.70))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            tabBarGlassBackground(
+                RoundedRectangle(cornerRadius: 14),
+                tintOpacity: 0.42
+            )
+                .frame(width: tabW, height: tabH)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
@@ -107,11 +158,14 @@ struct ControlCenterTabSelector: View {
                         )
                 )
                 .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
-                .frame(width: tabW, height: tabH)
                 .offset(x: clampedOffset)
                 // When dragging, use interactiveSpring for instantaneous smooth tracking.
                 // When released, use a bouncy spring to settle into the slot.
-                .animation(isDragging ? .interactiveSpring(response: 0.15, dampingFraction: 0.86) : .spring(response: 0.3, dampingFraction: 0.75), value: clampedOffset)
+                .animation(pillAnimation, value: clampedOffset)
+                // Render the glass above the labels so it refracts their pixels like a lens,
+                // while allowing the buttons underneath to continue receiving interaction.
+                .allowsHitTesting(false)
+                .zIndex(1)
             
             // 2. Tab Labels (Tap targets)
             HStack(spacing: 0) {
@@ -119,11 +173,7 @@ struct ControlCenterTabSelector: View {
                     let isHighlighted = (activeHover != nil ? activeHover == index : currentIndex == index)
                     
                     Button(action: {
-                        impactFeedback.impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
-                            activeTab = tab
-                            dragOffset = 0
-                        }
+                        selectTab(tab)
                     }) {
                         HStack(spacing: 6) {
                             Image(systemName: tab.icon)
@@ -144,6 +194,34 @@ struct ControlCenterTabSelector: View {
                 }
             }
             .padding(.horizontal, innerPadding)
+            .zIndex(0)
+
+            // A crisp label floats over the lens. Its visibility is derived from how much
+            // of the destination tab the pill actually covers, so it never pops in abruptly.
+            HStack(spacing: 6) {
+                Image(systemName: displayedTab.icon)
+                    .font(.system(size: 13.5, weight: .bold))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+
+                Text(displayedTab.rawValue.uppercased())
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .frame(width: tabW, height: tabH)
+            .modifier(
+                ActiveTabLensLabelMotion(
+                    position: pillPosition,
+                    destination: CGFloat(displayedIndex),
+                    tabWidth: tabW,
+                    innerPadding: innerPadding
+                )
+            )
+            .animation(pillAnimation, value: clampedOffset)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .zIndex(2)
         }
         .frame(width: totalW, height: tabH + (innerPadding * 2), alignment: .leading)
         .contentShape(
@@ -177,7 +255,6 @@ struct ControlCenterTabSelector: View {
                     }
                 }
                 .onEnded { value in
-                    let transX = value.translation.width
                     let velX = value.velocity.width
                     let flingX = value.predictedEndTranslation.width
                     
