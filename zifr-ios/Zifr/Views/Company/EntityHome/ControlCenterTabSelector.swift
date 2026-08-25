@@ -42,6 +42,25 @@ struct ControlCenterTabSelector: View {
     private var currentIndex: Int {
         tabs.firstIndex(of: activeTab) ?? 0
     }
+
+    @ViewBuilder
+    private func tabBarGlassBackground<S: Shape>(_ shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(
+                    .clear
+                        .tint(Color.zifrTabBarFill.opacity(0.28))
+                        .interactive(),
+                    in: shape
+                )
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    shape.fill(Color.zifrTabBarFill.opacity(0.30))
+                )
+        }
+    }
     
     var body: some View {
         // Calculate static widths
@@ -189,23 +208,7 @@ struct ControlCenterTabSelector: View {
         .frame(height: 56)
         .padding(.horizontal, 20)
         .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 16,
-                bottomTrailingRadius: 16,
-                topTrailingRadius: 0
-            )
-            .fill(Color.zifrTabBarFill.opacity(0.30))
-            .background(
-                .ultraThinMaterial,
-                in: UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
-                    bottomLeadingRadius: 16,
-                    bottomTrailingRadius: 16,
-                    topTrailingRadius: 0
-                )
-            )
-            .clipShape(
+            tabBarGlassBackground(
                 UnevenRoundedRectangle(
                     topLeadingRadius: 0,
                     bottomLeadingRadius: 16,
