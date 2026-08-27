@@ -1,5 +1,173 @@
 import SwiftUI
 import SwiftData
+
+// MARK: - Standalone Loan Group Card
+struct StandaloneLoanGroupCard: View {
+    let loans: [Loan]
+    let isPaidOff: Bool
+    @Binding var isExpanded: Bool
+    let onEdit: (Loan) -> Void
+    let onAddPayment: (Loan) -> Void
+    let onTogglePaid: (Loan) -> Void
+
+    private var title: String {
+        isPaidOff ? "Paid Off Loans" : "Active Loans"
+    }
+
+    private var totalAmount: Double {
+        loans.reduce(0) {
+            $0 + (isPaidOff ? $1.principalAmount : $1.remainingBalance)
+        }
+    }
+
+    private var totalLabel: String {
+        isPaidOff ? "Paid" : "Remaining"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 16) {
+                    Image(systemName: isPaidOff ? "checkmark.circle.fill" : "banknote.fill")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(
+                            isPaidOff
+                                ? Color(hex: "#C1AA78").opacity(0.75)
+                                : Color.zifrGreen
+                        )
+                        .frame(width: 56, height: 56)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(title)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.white)
+
+                        HStack(spacing: 6) {
+                            Text("\(loans.count)")
+                                .foregroundStyle(.white)
+                            Text(loans.count == 1 ? "Loan" : "Loans")
+                                .foregroundStyle(Color(hex: "#C1AA78"))
+
+                            Circle()
+                                .fill(Color.white.opacity(0.2))
+                                .frame(width: 3, height: 3)
+
+                            Text(totalAmount.currencyString)
+                                .foregroundStyle(.white)
+                                .monospacedDigit()
+                            Text(totalLabel)
+                                .foregroundStyle(Color(hex: "#C1AA78"))
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PremiumButtonStyle())
+            .background(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 24,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 24
+                )
+                .fill(Color.black.opacity(0.70))
+                .overlay(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 24,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 24
+                    )
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            )
+
+            Rectangle()
+                .fill(Color.white.opacity(0.06))
+                .frame(height: 1)
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text(isExpanded ? "Hide Loans" : "Show Loans")
+                        .font(.system(size: 14, weight: .semibold))
+                        .tracking(0.2)
+                        .foregroundStyle(Color.white.opacity(0.5))
+                    Text("(\(loans.count))")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.2))
+                    Spacer()
+                }
+                .padding(.horizontal, 24)
+                .frame(height: 47)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(PremiumButtonStyle())
+
+            if isExpanded {
+                VStack(spacing: 12) {
+                    if loans.isEmpty {
+                        Text(isPaidOff ? "Paid off loans will appear here." : "Active loans will appear here.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.4))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                    } else {
+                        ForEach(loans) { loan in
+                            LoanCardView(
+                                loan: loan,
+                                onEdit: { onEdit(loan) },
+                                onAddPayment: isPaidOff ? nil : { onAddPayment(loan) },
+                                onMarkPaid: { onTogglePaid(loan) }
+                            )
+                            .id(loan.id)
+                        }
+                    }
+                }
+                .padding(12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(hex: "#1C1C1E").opacity(0.40))
+        )
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(title), \(loans.count) \(loans.count == 1 ? "loan" : "loans")")
+    }
+}
+
 // MARK: - Loan Card View
 struct LoanCardView: View {
     let loan: Loan
@@ -130,9 +298,6 @@ struct LoanCardView: View {
         }
     }
 }
-
-
-
 
 
 

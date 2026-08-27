@@ -28,6 +28,8 @@ struct FinancialView: View {
     @State private var paymentLoan: Loan? = nil
     @State private var paymentDraft = LoanPayment(id: UUID(), userId: UUID(), loanId: UUID(), date: Date(), amount: 0.0)
     @State private var showLoanPaymentHUD = false
+    @State private var activeStandaloneLoansExpanded = false
+    @State private var paidOffStandaloneLoansExpanded = false
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -234,6 +236,12 @@ struct FinancialView: View {
                         // Remaining standalone accounts block
                         let standaloneCards = cards.filter { c in !institutions.contains { ($0.name ?? "").lowercased() == (c.institutionName ?? "").lowercased() } }
                         let standaloneLoans = loans.filter { l in !institutions.contains { ($0.name ?? "").lowercased() == (l.lender ?? "").lowercased() } }
+                        let activeStandaloneLoans = standaloneLoans
+                            .filter { !isLoanPaidOff($0) }
+                            .sorted { ($0.maturityDate ?? .distantFuture) < ($1.maturityDate ?? .distantFuture) }
+                        let paidOffStandaloneLoans = standaloneLoans
+                            .filter { isLoanPaidOff($0) }
+                            .sorted { ($0.paidOffDate ?? .distantPast) > ($1.paidOffDate ?? .distantPast) }
                         
                         if !standaloneCards.isEmpty || !standaloneLoans.isEmpty {
                             VStack(alignment: .leading, spacing: 16) {
@@ -245,36 +253,18 @@ struct FinancialView: View {
                                     .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)), alignment: .top)
                                 
                                 standaloneWalletStack(cards: standaloneCards)
-                                ForEach(standaloneLoans) { loan in
-                                    LoanCardView(
-                                        loan: loan, 
-                                        onEdit: { editingLoan = loan },
-                                        onAddPayment: {
-                                            paymentLoan = loan
-                                            paymentDraft = LoanPayment(id: UUID(), userId: loan.userId, loanId: loan.id, date: Date(), amount: 0.0, source: "")
-                                            showLoanPaymentHUD = true
-                                        },
-                                        onMarkPaid: {
-                                            var updatedLoan = loan
-                                            if updatedLoan.status == "Paid Off" {
-                                                updatedLoan.status = "Active"
-                                                updatedLoan.remainingBalance = updatedLoan.principalAmount
-                                                updatedLoan.paidOffDate = nil
-                                            } else {
-                                                updatedLoan.status = "Paid Off"
-                                                updatedLoan.remainingBalance = 0
-                                                updatedLoan.paidOffDate = Date()
-                                            }
-                                            vm.saveLoan(updatedLoan, appState: appState)
-                                        }
+
+                                if !standaloneLoans.isEmpty {
+                                    standaloneLoanDeck(
+                                        activeLoans: activeStandaloneLoans,
+                                        paidOffLoans: paidOffStandaloneLoans
                                     )
-                                    .id(loan.id)
                                 }
                             }
                         }
                         
-                        // Bottom clearance so final item settles comfortably above floating action bar
-                        Spacer().frame(height: 80)
+                        // Match Services: keep the final item fully above the floating search/action controls.
+                        Spacer().frame(height: 120)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -391,6 +381,11 @@ struct FinancialView: View {
             }
             vm.deepLinkModelId = nil
         } else if let l = loans.first(where: { $0.id == id }) {
+            if isLoanPaidOff(l) {
+                paidOffStandaloneLoansExpanded = true
+            } else {
+                activeStandaloneLoansExpanded = true
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     proxy.scrollTo(l.id, anchor: .center)
@@ -398,6 +393,11 @@ struct FinancialView: View {
             }
             vm.deepLinkModelId = nil
         }
+    }
+
+    private func isLoanPaidOff(_ loan: Loan) -> Bool {
+        loan.status == "Paid Off"
+            || (loan.principalAmount > 0 && loan.remainingBalance <= 0.005)
     }
     
     private func togglePop(for cardId: String) {
@@ -618,6 +618,74 @@ struct FinancialView: View {
             .padding(.top, CGFloat(max(0, cards.count - 1)) * peekOffset + 4)
             .padding(.bottom, 16)
         }
+    }
+
+    private func standaloneLoanGroup(
+        loans: [Loan],
+        isPaidOff: Bool,
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        StandaloneLoanGroupCard(
+            loans: loans,
+            isPaidOff: isPaidOff,
+            isExpanded: isExpanded,
+            onEdit: { editingLoan = $0 },
+            onAddPayment: { loan in
+                paymentLoan = loan
+                paymentDraft = LoanPayment(
+                    id: UUID(),
+                    userId: loan.userId,
+                    loanId: loan.id,
+                    date: Date(),
+                    amount: 0.0,
+                    source: ""
+                )
+                showLoanPaymentHUD = true
+            },
+            onTogglePaid: { loan in
+                var updatedLoan = loan
+                if updatedLoan.status == "Paid Off" {
+                    updatedLoan.status = "Active"
+                    updatedLoan.remainingBalance = updatedLoan.principalAmount
+                    updatedLoan.paidOffDate = nil
+                } else {
+                    updatedLoan.status = "Paid Off"
+                    updatedLoan.remainingBalance = 0
+                    updatedLoan.paidOffDate = Date()
+                }
+                vm.saveLoan(updatedLoan, appState: appState)
+            }
+        )
+    }
+
+    private func standaloneLoanDeck(
+        activeLoans: [Loan],
+        paidOffLoans: [Loan]
+    ) -> some View {
+        VStack(spacing: paidOffStandaloneLoansExpanded ? 8 : -60) {
+            standaloneLoanGroup(
+                loans: paidOffLoans,
+                isPaidOff: true,
+                isExpanded: $paidOffStandaloneLoansExpanded
+            )
+            .zIndex(1)
+
+            standaloneLoanGroup(
+                loans: activeLoans,
+                isPaidOff: false,
+                isExpanded: $activeStandaloneLoansExpanded
+            )
+            .zIndex(2)
+            .shadow(color: .black.opacity(0.28), radius: 10, y: 6)
+        }
+        .animation(
+            .spring(response: 0.42, dampingFraction: 0.84),
+            value: activeStandaloneLoansExpanded
+        )
+        .animation(
+            .spring(response: 0.42, dampingFraction: 0.84),
+            value: paidOffStandaloneLoansExpanded
+        )
     }
 
     // Extracted to reduce body complexity for the Swift type-checker
