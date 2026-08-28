@@ -45,6 +45,21 @@ serve(async (req) => {
     });
   }
 
+  const { data: usage, error: usageError } = await supabase.rpc("consume_miloom_usage", {
+    p_kind: "ai_actions",
+    p_amount: 1,
+  });
+  if (usageError) {
+    return new Response(JSON.stringify({ error: "Usage check failed" }), {
+      status: 500, headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (!usage?.allowed) {
+    return new Response(JSON.stringify({ error: "MILOOM_LIMIT:ai_actions", usage }), {
+      status: 429, headers: { "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const body = await req.json();
     const model = body.model || "gemini-2.0-flash";

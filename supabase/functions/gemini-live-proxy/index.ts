@@ -17,6 +17,18 @@ serve(async (req) => {
     return new Response("Expected WebSocket", { status: 426 });
   }
 
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return new Response("Unauthorized", { status: 401 });
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return new Response("Unauthorized", { status: 401 });
+  const { data: initialUsage, error: usageError } = await supabase.rpc("consume_miloom_usage", {
+    p_kind: "voice_seconds", p_amount: 1,
+  });
+  if (usageError || !initialUsage?.allowed) return new Response("MILOOM_LIMIT:voice_seconds", { status: 429 });
+
   // 3. Upgrade the connection
   const { socket: clientSocket, response } = Deno.upgradeWebSocket(req);
 
@@ -25,6 +37,9 @@ serve(async (req) => {
 
   let geminiSocket: WebSocket;
   const messageBuffer: any[] = [];
+  const startedAt = Date.now();
+  let chargedSeconds = 1;
+  let usageTimer: number | undefined;
 
   try {
     geminiSocket = new WebSocket(url.toString());
@@ -72,6 +87,17 @@ serve(async (req) => {
 
   clientSocket.onopen = () => {
     console.log(`Client connected.`);
+    usageTimer = setInterval(async () => {
+      const { data: usage } = await supabase.rpc("consume_miloom_usage", {
+        p_kind: "voice_seconds", p_amount: 15,
+      });
+      if (!usage?.allowed) {
+        clientSocket.send(JSON.stringify({ error: "MILOOM_LIMIT:voice_seconds" }));
+        clientSocket.close(4008, "Voice allowance reached");
+        return;
+      }
+      chargedSeconds += 15;
+    }, 15_000);
   };
 
   clientSocket.onmessage = (event) => {
@@ -84,6 +110,12 @@ serve(async (req) => {
 
   clientSocket.onclose = () => {
     console.log("Client closed connection");
+    if (usageTimer !== undefined) clearInterval(usageTimer);
+    const elapsedSeconds = Math.max(1, Math.ceil((Date.now() - startedAt) / 1000));
+    const remainder = Math.max(0, elapsedSeconds - chargedSeconds);
+    if (remainder > 0) {
+      supabase.rpc("consume_miloom_usage", { p_kind: "voice_seconds", p_amount: remainder });
+    }
     if (geminiSocket.readyState === WebSocket.OPEN) {
       geminiSocket.close();
     }
