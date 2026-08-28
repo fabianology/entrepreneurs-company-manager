@@ -6,6 +6,16 @@ import Security
 class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
+
+    private func refreshMyObligations() async -> Bool {
+        do {
+            try await client.rpc("refresh_my_miloom_obligations").execute()
+            return true
+        } catch {
+            print("Failed to refresh owner briefing obligations: \(error)")
+            return false
+        }
+    }
     
     // MARK: - Fetch All Data
     private func safeFetchTransactions() async -> [Transaction] {
@@ -54,6 +64,7 @@ class DataRepository {
         async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") { (try? await client.from("plaid_items").select("id,company_id,institution_name,status").execute().value) ?? [] }
         async let fConnections: [ResourceConnection] = measure("resource_connections") { (try? await client.from("resource_connections").select().execute().value) ?? [] }
         async let fObligations: [PortfolioObligation] = measure("obligations") { (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? [] }
+        async let fObligationRefresh = refreshMyObligations()
         async let fTransactions = measure("transactions") { await safeFetchTransactions() }
         
         let fetchedCompanies = await fCompanies
@@ -69,7 +80,14 @@ class DataRepository {
         let fetchedNotifications = await fNotifications
         let fetchedPreferences = await fPrefs
         let fetchedConnections = await fConnections
-        let fetchedObligations = await fObligations
+        let initiallyFetchedObligations = await fObligations
+        let obligationRefreshSucceeded = await fObligationRefresh
+        let fetchedObligations: [PortfolioObligation]
+        if obligationRefreshSucceeded {
+            fetchedObligations = (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? initiallyFetchedObligations
+        } else {
+            fetchedObligations = initiallyFetchedObligations
+        }
         let transactions = await fTransactions
         
         let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
@@ -110,9 +128,6 @@ class DataRepository {
                 appState.resourceConnections.append(contentsOf: newConnections)
             }
 
-            let generatedObligations = PortfolioObligationEngine.buildObligations(appState: appState, ownerUserId: currentUserId)
-            let existingFingerprints = Set(fetchedObligations.map(\.fingerprint))
-            appState.obligations.append(contentsOf: generatedObligations.filter { !existingFingerprints.contains($0.fingerprint) })
         }
         appState.isLoading = false
         

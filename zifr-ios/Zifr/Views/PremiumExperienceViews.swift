@@ -127,68 +127,46 @@ struct OwnerBriefingCard: View {
 struct OwnerBriefingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
-    @State private var horizon = 7
+    @State private var selectedTab: OwnerBriefingTab = .current
     @State private var pushService = PushNotificationService.shared
     @State private var showingPreferences = false
+    @State private var collapsedResourceCategories: Set<BriefingResourceCategory> = []
+    @State private var collapsedAgeBuckets: Set<DeferredAgeBucket> = []
+    @State private var mutatingIDs: Set<UUID> = []
+    @State private var pendingDismissal: BriefingDismissalUndo?
+    @State private var undoTask: Task<Void, Never>?
+    @State private var mutationError: String?
 
     var onOpenResource: (PortfolioObligation) -> Void
-
-    private var filtered: [PortfolioObligation] {
-        let limit = Calendar.current.date(byAdding: .day, value: horizon, to: Date()) ?? .distantFuture
-        return appState.openObligations.filter { ($0.dueAt ?? Date()) <= limit }
-    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.zifrBG.ignoresSafeArea()
-                VStack(spacing: 16) {
-                    Picker("Horizon", selection: $horizon) {
-                        Text("Today").tag(0)
-                        Text("7 Days").tag(7)
-                        Text("30 Days").tag(30)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 20)
-
-                    if filtered.isEmpty {
-                        ContentUnavailableView(
-                            "You're Ahead",
-                            systemImage: "checkmark.seal.fill",
-                            description: Text("Nothing needs attention in this period.")
-                        )
-                        .foregroundStyle(.white)
-                    } else {
-                        List {
-                            ForEach(filtered) { obligation in
-                                BriefingObligationRow(
-                                    obligation: obligation,
-                                    onOpen: {
-                                        dismiss()
-                                        onOpenResource(obligation)
-                                    },
-                                    onHandle: { update(obligation, state: .handled) },
-                                    onSnooze: { snooze(obligation) }
-                                )
-                                .listRowBackground(Color.white.opacity(0.045))
-                            }
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    VStack(spacing: 16) {
+                        Picker("Briefing view", selection: $selectedTab) {
+                            Text(OwnerBriefingPresentation.dateLabel(for: context.date)).tag(OwnerBriefingTab.current)
+                            Text("Complete Later").tag(OwnerBriefingTab.completeLater)
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
-                    }
-
-                    if pushService.authorizationStatus != .authorized {
-                        Button {
-                            Task { await pushService.enableWeeklyBriefings() }
-                        } label: {
-                            Label("Enable Private Weekly Briefings", systemImage: "bell.badge")
-                                .font(.system(size: 13, weight: .bold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 13)
-                        }
-                        .buttonStyle(MiloomPrimaryButtonStyle())
+                        .pickerStyle(.segmented)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
+
+                        briefingContent(now: context.date)
+
+                        if pushService.authorizationStatus != .authorized {
+                            Button {
+                                Task { await pushService.enableWeeklyBriefings() }
+                            } label: {
+                                Label("Enable Private Weekly Briefings", systemImage: "bell.badge")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                            }
+                            .buttonStyle(MiloomPrimaryButtonStyle())
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 8)
+                        }
                     }
                 }
             }
@@ -208,26 +186,299 @@ struct OwnerBriefingView: View {
                 BriefingPreferencesSheet()
             }
         }
+        .overlay(alignment: .bottom) {
+            if pendingDismissal != nil {
+                HStack(spacing: 12) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.red)
+                    Text("Reminder dismissed")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer(minLength: 12)
+                    Button("Undo") {
+                        Task { await undoDismissal() }
+                    }
+                    .font(.system(size: 13, weight: .black))
+                    .foregroundStyle(Color.zifrGold)
+                }
+                .padding(.horizontal, 16)
+                .frame(height: 52)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: pendingDismissal?.id)
+        .alert("Couldn’t Update Reminder", isPresented: Binding(
+            get: { mutationError != nil },
+            set: { if !$0 { mutationError = nil } }
+        )) {
+            Button("OK", role: .cancel) { mutationError = nil }
+        } message: {
+            Text(mutationError ?? "Please try again.")
+        }
+        .onDisappear { undoTask?.cancel() }
     }
 
-    private func snooze(_ obligation: PortfolioObligation) {
-        var updated = obligation
-        updated.state = .snoozed
-        updated.snoozedUntil = Calendar.current.date(byAdding: .day, value: 7, to: Date())
-        persist(updated)
+    @ViewBuilder
+    private func briefingContent(now: Date) -> some View {
+        let visible = selectedTab == .current ? appState.openObligations : appState.deferredObligations
+        if visible.isEmpty {
+            ContentUnavailableView(
+                selectedTab == .current ? "You're Ahead" : "Nothing Deferred",
+                systemImage: selectedTab == .current ? "checkmark.seal.fill" : "timer",
+                description: Text(selectedTab == .current
+                    ? "Nothing needs your attention right now."
+                    : "Reminders moved to Complete Later will appear here.")
+            )
+            .foregroundStyle(.white)
+        } else {
+            List {
+                if selectedTab == .current {
+                    currentReminderSections
+                } else {
+                    completeLaterSections(now: now)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
     }
 
-    private func update(_ obligation: PortfolioObligation, state: ObligationState) {
-        var updated = obligation
-        updated.state = state
-        updated.updatedAt = Date()
-        persist(updated)
+    @ViewBuilder
+    private var currentReminderSections: some View {
+        ForEach(BriefingResourceCategory.allCases) { category in
+            let reminders = reminders(in: appState.openObligations, category: category)
+            if !reminders.isEmpty {
+                BriefingAccordionHeader(
+                    title: category.title,
+                    icon: category.icon,
+                    count: reminders.count,
+                    isCollapsed: collapsedResourceCategories.contains(category),
+                    onToggle: { toggle(category) }
+                )
+                if !collapsedResourceCategories.contains(category) {
+                    ForEach(reminders) { reminder in
+                        reminderRow(reminder, isDeferred: false)
+                    }
+                }
+            }
+        }
     }
 
-    private func persist(_ updated: PortfolioObligation) {
-        guard let index = appState.obligations.firstIndex(where: { $0.fingerprint == updated.fingerprint }) else { return }
+    @ViewBuilder
+    private func completeLaterSections(now: Date) -> some View {
+        ForEach(DeferredAgeBucket.allCases) { bucket in
+            let bucketReminders = appState.deferredObligations.filter {
+                DeferredAgeBucket.bucket(
+                    deferredAt: OwnerBriefingPresentation.effectiveDeferredAt(for: $0),
+                    now: now
+                ) == bucket
+            }
+            if !bucketReminders.isEmpty {
+                BriefingAccordionHeader(
+                    title: bucket.title,
+                    icon: "calendar.badge.clock",
+                    count: bucketReminders.count,
+                    isCollapsed: collapsedAgeBuckets.contains(bucket),
+                    onToggle: { toggle(bucket) }
+                )
+                if !collapsedAgeBuckets.contains(bucket) {
+                    ForEach(BriefingResourceCategory.allCases) { category in
+                        let reminders = reminders(in: bucketReminders, category: category)
+                        if !reminders.isEmpty {
+                            BriefingResourceSubheading(category: category, count: reminders.count)
+                            ForEach(reminders) { reminder in
+                                reminderRow(reminder, isDeferred: true)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func reminders(
+        in obligations: [PortfolioObligation],
+        category: BriefingResourceCategory
+    ) -> [PortfolioObligation] {
+        obligations.filter { BriefingResourceCategory.category(for: $0.sourceType) == category }
+    }
+
+    private func toggle(_ category: BriefingResourceCategory) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if collapsedResourceCategories.contains(category) {
+                collapsedResourceCategories.remove(category)
+            } else {
+                collapsedResourceCategories.insert(category)
+            }
+        }
+    }
+
+    private func toggle(_ bucket: DeferredAgeBucket) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            if collapsedAgeBuckets.contains(bucket) {
+                collapsedAgeBuckets.remove(bucket)
+            } else {
+                collapsedAgeBuckets.insert(bucket)
+            }
+        }
+    }
+
+    private func reminderRow(_ obligation: PortfolioObligation, isDeferred: Bool) -> some View {
+        BriefingObligationRow(
+            obligation: obligation,
+            isDeferred: isDeferred,
+            isBusy: mutatingIDs.contains(obligation.id),
+            onOpen: {
+                dismiss()
+                onOpenResource(obligation)
+            },
+            onDismiss: { Task { await dismissObligation(obligation) } },
+            onHandle: { Task { await handle(obligation) } },
+            onDefer: { Task { await deferObligation(obligation) } }
+        )
+        .listRowBackground(Color.white.opacity(0.045))
+        .listRowSeparatorTint(Color.white.opacity(0.06))
+    }
+
+    private func dismissObligation(_ obligation: PortfolioObligation) async {
+        guard let original = await mutate(obligation, update: { updated in
+            updated = OwnerBriefingPresentation.settingState(updated, to: .dismissed, at: Date())
+        }) else { return }
+
+        let undo = BriefingDismissalUndo(original: original)
+        pendingDismissal = undo
+        undoTask?.cancel()
+        undoTask = Task {
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, pendingDismissal?.id == undo.id else { return }
+            pendingDismissal = nil
+        }
+    }
+
+    private func handle(_ obligation: PortfolioObligation) async {
+        _ = await mutate(obligation) { updated in
+            updated = OwnerBriefingPresentation.settingState(updated, to: .handled, at: Date())
+        }
+    }
+
+    private func deferObligation(_ obligation: PortfolioObligation) async {
+        let deferredAt = Date()
+        _ = await mutate(obligation) { updated in
+            updated = OwnerBriefingPresentation.deferring(updated, at: deferredAt)
+        }
+    }
+
+    private func undoDismissal() async {
+        guard let pendingDismissal else { return }
+        undoTask?.cancel()
+        self.pendingDismissal = nil
+        let original = pendingDismissal.original
+        _ = await mutate(original) { updated in
+            updated = OwnerBriefingPresentation.restoringLifecycle(of: updated, from: original, at: Date())
+        }
+    }
+
+    private func mutate(
+        _ obligation: PortfolioObligation,
+        update: (inout PortfolioObligation) -> Void
+    ) async -> PortfolioObligation? {
+        guard !mutatingIDs.contains(obligation.id),
+              let index = appState.obligations.firstIndex(where: { $0.id == obligation.id }) else { return nil }
+
+        mutatingIDs.insert(obligation.id)
+        defer { mutatingIDs.remove(obligation.id) }
+
+        let original = appState.obligations[index]
+        var updated = original
+        update(&updated)
         appState.obligations[index] = updated
-        Task { try? await DataRepository.shared.updateObligation(updated) }
+
+        do {
+            try await DataRepository.shared.updateObligation(updated)
+            return original
+        } catch {
+            if let rollbackIndex = appState.obligations.firstIndex(where: { $0.id == obligation.id }) {
+                appState.obligations[rollbackIndex] = original
+            }
+            mutationError = "Your change could not be saved. The reminder was restored."
+            return nil
+        }
+    }
+}
+
+private struct BriefingDismissalUndo: Identifiable {
+    let id = UUID()
+    let original: PortfolioObligation
+}
+
+private struct BriefingAccordionHeader: View {
+    let title: String
+    let icon: String
+    let count: Int
+    let isCollapsed: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 11) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(Color.zifrGold)
+                    .frame(width: 22)
+                Text(title)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(.white)
+                Text("\(count)")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundStyle(Color.white.opacity(0.45))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.08), in: Capsule())
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.45))
+                    .rotationEffect(.degrees(isCollapsed ? -90 : 0))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 6)
+        .listRowBackground(Color(hex: "#182333").opacity(0.96))
+        .listRowSeparator(.hidden)
+        .accessibilityLabel("\(title), \(count) reminders")
+        .accessibilityHint(isCollapsed ? "Expands this category" : "Collapses this category")
+    }
+}
+
+private struct BriefingResourceSubheading: View {
+    let category: BriefingResourceCategory
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: category.icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(Color.zifrGold.opacity(0.75))
+            Text(category.title.uppercased())
+                .font(.system(size: 10, weight: .black))
+                .tracking(1)
+                .foregroundStyle(Color.white.opacity(0.48))
+            Text("\(count)")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.3))
+            Spacer()
+        }
+        .padding(.top, 5)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 }
 
@@ -308,35 +559,61 @@ private struct BriefingPreferencesSheet: View {
 
 private struct BriefingObligationRow: View {
     let obligation: PortfolioObligation
+    let isDeferred: Bool
+    let isBusy: Bool
     let onOpen: () -> Void
+    let onDismiss: () -> Void
     let onHandle: () -> Void
-    let onSnooze: () -> Void
+    let onDefer: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 11) {
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(color)
-                    .frame(width: 24)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(obligation.title).font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
-                    Text(obligation.summary).font(.system(size: 12)).foregroundStyle(Color.white.opacity(0.55))
-                    if let dueAt = obligation.dueAt {
-                        Text(dueAt.formatted(date: .abbreviated, time: .omitted))
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(color)
+            Button(action: onOpen) {
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: icon)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(color)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(obligation.title).font(.system(size: 14, weight: .bold)).foregroundStyle(.white)
+                        Text(obligation.summary).font(.system(size: 12)).foregroundStyle(Color.white.opacity(0.55))
+                        if let dueAt = obligation.dueAt {
+                            Text(dueAt.formatted(date: .abbreviated, time: .omitted))
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(color)
+                        }
                     }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.25))
                 }
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the related resource")
+
             HStack(spacing: 10) {
-                Button("Open", action: onOpen)
-                Button("Snooze 7d", action: onSnooze)
-                Spacer()
-                Button("Handled", action: onHandle)
+                BriefingIconAction(
+                    icon: "xmark",
+                    label: "Dismiss reminder",
+                    tint: .red,
+                    action: onDismiss
+                )
+                BriefingIconAction(
+                    icon: "checkmark",
+                    label: "Mark as handled",
+                    tint: .green,
+                    action: onHandle
+                )
+                BriefingIconAction(
+                    icon: "timer",
+                    label: isDeferred ? "Restart Complete Later age" : "Complete later",
+                    tint: Color.zifrGold,
+                    action: onDefer
+                )
             }
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(Color.zifrGold)
+            .disabled(isBusy)
+            .opacity(isBusy ? 0.45 : 1)
         }
         .padding(.vertical, 6)
     }
@@ -358,6 +635,30 @@ private struct BriefingObligationRow: View {
         case .document: return "doc.fill"
         default: return "exclamationmark.circle.fill"
         }
+    }
+}
+
+private struct BriefingIconAction: View {
+    let icon: String
+    let label: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .black))
+                .foregroundStyle(tint)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(tint.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(tint.opacity(0.18), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 

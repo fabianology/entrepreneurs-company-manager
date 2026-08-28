@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { json } from "../_shared/http.ts";
 import { sendPrivateBriefing } from "../_shared/apns.ts";
+import { isImmediateCriticalItem, isWeeklyBriefingItem } from "../_shared/briefing.ts";
 
 type Preference = {
   user_id: string;
@@ -45,7 +46,7 @@ Deno.serve(async (request) => {
     admin.from("user_entitlements").select("user_id,status,grace_ends_at").eq("tier", "pro").in("status", ["trial", "active", "grace"]),
     admin.from("user_preferences").select("user_id,briefing_weekday,briefing_time,timezone,weekly_briefing_enabled,critical_alerts_enabled"),
     admin.from("device_push_tokens").select("user_id,token,environment"),
-    admin.from("obligations").select("owner_user_id,id,due_at,severity,state,snoozed_until").in("state", ["open", "snoozed"]),
+    admin.from("obligations").select("owner_user_id,id,due_at,severity,state,deferred_at,snoozed_until").in("state", ["open", "snoozed"]),
   ]);
 
   const prefs = new Map((preferences ?? []).map((value) => [value.user_id, value as Preference]));
@@ -57,9 +58,7 @@ Deno.serve(async (request) => {
     if (entitlement.status === "grace" && entitlement.grace_ends_at && new Date(entitlement.grace_ends_at) < now) continue;
     const preference = prefs.get(entitlement.user_id);
     if (!preference || preference.critical_alerts_enabled !== true) continue;
-    const urgent = (obligations ?? []).filter((item) =>
-      item.owner_user_id === entitlement.user_id && item.severity === "urgent" && item.state === "open"
-    );
+    const urgent = (obligations ?? []).filter((item) => isImmediateCriticalItem(item, entitlement.user_id));
     let newlyClaimed = 0;
     for (const item of urgent) {
       const { error } = await admin.from("critical_alert_deliveries").insert({
@@ -82,11 +81,7 @@ Deno.serve(async (request) => {
     const schedule = localSchedule(now, preference);
     if (schedule.weekday !== schedule.targetWeekday || schedule.hour !== schedule.targetHour || schedule.minute >= 15) continue;
 
-    const active = (obligations ?? []).filter((item) =>
-      item.owner_user_id === entitlement.user_id &&
-      (item.state === "open" || !item.snoozed_until || new Date(item.snoozed_until) <= now) &&
-      (!item.due_at || new Date(item.due_at) <= new Date(now.getTime() + 30 * 86_400_000))
-    );
+    const active = (obligations ?? []).filter((item) => isWeeklyBriefingItem(item, entitlement.user_id, now));
     if (!active.length) continue;
 
     const { error: claimError } = await admin.from("briefing_deliveries").insert({

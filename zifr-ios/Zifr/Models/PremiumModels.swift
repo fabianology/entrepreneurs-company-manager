@@ -319,7 +319,7 @@ enum ObligationSeverity: String, Codable, Hashable {
 
 enum ObligationState: String, Codable, Hashable {
     case open
-    case snoozed
+    case deferred = "snoozed"
     case handled
     case dismissed
 }
@@ -337,6 +337,7 @@ struct PortfolioObligation: Identifiable, Codable, Hashable {
     var summary: String
     var actionType: String
     var state: ObligationState
+    var deferredAt: Date? = nil
     var snoozedUntil: Date?
     var fingerprint: String
     var createdAt: Date
@@ -355,10 +356,155 @@ struct PortfolioObligation: Identifiable, Codable, Hashable {
         case summary
         case actionType = "action_type"
         case state
+        case deferredAt = "deferred_at"
         case snoozedUntil = "snoozed_until"
         case fingerprint
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+enum OwnerBriefingTab: String, CaseIterable, Hashable {
+    case current
+    case completeLater
+}
+
+enum BriefingResourceCategory: String, CaseIterable, Identifiable, Hashable {
+    case company
+    case subscription
+    case institution
+    case card
+    case loan
+    case document
+    case collaborator
+    case other
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .company: return "Companies"
+        case .subscription: return "Subscriptions"
+        case .institution: return "Institutions"
+        case .card: return "Cards"
+        case .loan: return "Loans"
+        case .document: return "Documents"
+        case .collaborator: return "Collaborators"
+        case .other: return "Other"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .company: return "building.2.fill"
+        case .subscription: return "arrow.triangle.2.circlepath"
+        case .institution: return "building.columns.fill"
+        case .card: return "creditcard.fill"
+        case .loan: return "banknote.fill"
+        case .document: return "doc.fill"
+        case .collaborator: return "person.2.fill"
+        case .other: return "exclamationmark.circle.fill"
+        }
+    }
+
+    static func category(for sourceType: ResourceKind) -> BriefingResourceCategory {
+        switch sourceType {
+        case .company: return .company
+        case .subscription: return .subscription
+        case .institution: return .institution
+        case .card: return .card
+        case .loan: return .loan
+        case .document: return .document
+        case .collaborator: return .collaborator
+        }
+    }
+}
+
+enum DeferredAgeBucket: String, CaseIterable, Identifiable, Hashable {
+    case zeroToSeven
+    case eightToFourteen
+    case fifteenToThirty
+    case thirtyOnePlus
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .zeroToSeven: return "0–7 Days"
+        case .eightToFourteen: return "8–14 Days"
+        case .fifteenToThirty: return "15–30 Days"
+        case .thirtyOnePlus: return "31+ Days"
+        }
+    }
+
+    static func bucket(deferredAt: Date, now: Date) -> DeferredAgeBucket {
+        let elapsed = max(0, now.timeIntervalSince(deferredAt))
+        let wholeDays = Int(floor(elapsed / 86_400))
+        switch wholeDays {
+        case ...7: return .zeroToSeven
+        case 8...14: return .eightToFourteen
+        case 15...30: return .fifteenToThirty
+        default: return .thirtyOnePlus
+        }
+    }
+}
+
+enum OwnerBriefingPresentation {
+    static func activeObligations(in obligations: [PortfolioObligation]) -> [PortfolioObligation] {
+        obligations.filter { $0.state == .open }
+    }
+
+    static func deferredObligations(in obligations: [PortfolioObligation]) -> [PortfolioObligation] {
+        obligations.filter { $0.state == .deferred }
+    }
+
+    static func effectiveDeferredAt(for obligation: PortfolioObligation) -> Date {
+        if let deferredAt = obligation.deferredAt { return deferredAt }
+        if let snoozedUntil = obligation.snoozedUntil {
+            return snoozedUntil.addingTimeInterval(-7 * 86_400)
+        }
+        return obligation.updatedAt
+    }
+
+    static func deferring(_ obligation: PortfolioObligation, at date: Date) -> PortfolioObligation {
+        var updated = obligation
+        updated.state = .deferred
+        updated.deferredAt = date
+        updated.snoozedUntil = date.addingTimeInterval(7 * 86_400)
+        updated.updatedAt = date
+        return updated
+    }
+
+    static func settingState(
+        _ obligation: PortfolioObligation,
+        to state: ObligationState,
+        at date: Date
+    ) -> PortfolioObligation {
+        var updated = obligation
+        updated.state = state
+        updated.updatedAt = date
+        return updated
+    }
+
+    static func restoringLifecycle(
+        of obligation: PortfolioObligation,
+        from original: PortfolioObligation,
+        at date: Date
+    ) -> PortfolioObligation {
+        var updated = obligation
+        updated.state = original.state
+        updated.deferredAt = original.deferredAt
+        updated.snoozedUntil = original.snoozedUntil
+        updated.updatedAt = date
+        return updated
+    }
+
+    static func dateLabel(for date: Date, timeZone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "MMMM d yyyy"
+        return formatter.string(from: date)
     }
 }
 

@@ -260,7 +260,7 @@ enum PortfolioObligationEngine {
             guard let persisted = serverState[generated.fingerprint] else { return generated }
             return persisted
         }.filter { obligation in
-            obligation.state == .open || (obligation.state == .snoozed && (obligation.snoozedUntil ?? .distantPast) <= now)
+            obligation.state == .open
         }.sorted {
             if $0.severity != $1.severity { return severityRank($0.severity) > severityRank($1.severity) }
             return ($0.dueAt ?? .distantFuture) < ($1.dueAt ?? .distantFuture)

@@ -75,6 +75,110 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertFalse(body.contains("document"))
     }
 
+    func testDeferredAgeBucketsUseExactElapsedDays() {
+        let day: TimeInterval = 86_400
+        let now = Date(timeIntervalSince1970: 100 * day)
+        let expectations: [(Int, DeferredAgeBucket)] = [
+            (0, .zeroToSeven),
+            (7, .zeroToSeven),
+            (8, .eightToFourteen),
+            (14, .eightToFourteen),
+            (15, .fifteenToThirty),
+            (30, .fifteenToThirty),
+            (31, .thirtyOnePlus),
+        ]
+
+        for (days, expected) in expectations {
+            XCTAssertEqual(
+                DeferredAgeBucket.bucket(deferredAt: now.addingTimeInterval(-Double(days) * day), now: now),
+                expected,
+                "Expected day \(days) to be in \(expected.title)"
+            )
+        }
+        XCTAssertEqual(
+            DeferredAgeBucket.bucket(deferredAt: now.addingTimeInterval(day), now: now),
+            .zeroToSeven
+        )
+    }
+
+    func testCompleteLaterUsesLegacyTimestampFallback() {
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        let expectedDeferredAt = now.addingTimeInterval(-14 * 86_400)
+        let legacy = makeObligation(
+            state: .deferred,
+            deferredAt: nil,
+            snoozedUntil: expectedDeferredAt.addingTimeInterval(7 * 86_400),
+            updatedAt: now
+        )
+        XCTAssertEqual(
+            OwnerBriefingPresentation.effectiveDeferredAt(for: legacy),
+            expectedDeferredAt
+        )
+
+        let missingLegacyDate = makeObligation(state: .deferred, updatedAt: expectedDeferredAt)
+        XCTAssertEqual(
+            OwnerBriefingPresentation.effectiveDeferredAt(for: missingLegacyDate),
+            expectedDeferredAt
+        )
+    }
+
+    func testBriefingCollectionsSeparateActiveAndDeferredStates() {
+        let open = makeObligation(state: .open, severity: .attention)
+        let deferred = makeObligation(state: .deferred)
+        let handled = makeObligation(state: .handled)
+        let dismissed = makeObligation(state: .dismissed)
+        let values = [open, deferred, handled, dismissed]
+
+        XCTAssertEqual(OwnerBriefingPresentation.activeObligations(in: values).map(\.id), [open.id])
+        XCTAssertEqual(OwnerBriefingPresentation.deferredObligations(in: values).map(\.id), [deferred.id])
+
+        let state = AppState()
+        state.obligations = values
+        XCTAssertEqual(state.openObligations.map(\.id), [open.id])
+        XCTAssertEqual(state.deferredObligations.map(\.id), [deferred.id])
+        XCTAssertEqual(state.unreadBriefingCount, 1)
+    }
+
+    func testDeferringAndUndoRestoreLifecycle() {
+        let original = makeObligation(state: .open)
+        let firstDeferral = Date(timeIntervalSince1970: 3_000_000)
+        let deferred = OwnerBriefingPresentation.deferring(original, at: firstDeferral)
+        XCTAssertEqual(deferred.state, .deferred)
+        XCTAssertEqual(deferred.deferredAt, firstDeferral)
+        XCTAssertEqual(deferred.snoozedUntil, firstDeferral.addingTimeInterval(7 * 86_400))
+
+        let resetDate = firstDeferral.addingTimeInterval(10 * 86_400)
+        let reset = OwnerBriefingPresentation.deferring(deferred, at: resetDate)
+        XCTAssertEqual(reset.deferredAt, resetDate)
+
+        let dismissed = OwnerBriefingPresentation.settingState(reset, to: .dismissed, at: resetDate)
+        let restored = OwnerBriefingPresentation.restoringLifecycle(
+            of: dismissed,
+            from: reset,
+            at: resetDate.addingTimeInterval(1)
+        )
+        XCTAssertEqual(restored.state, .deferred)
+        XCTAssertEqual(restored.deferredAt, reset.deferredAt)
+        XCTAssertEqual(restored.snoozedUntil, reset.snoozedUntil)
+    }
+
+    func testBriefingCategoryAndWireStateCompatibility() {
+        XCTAssertEqual(ObligationState.deferred.rawValue, "snoozed")
+        XCTAssertEqual(BriefingResourceCategory.category(for: .subscription), .subscription)
+        XCTAssertEqual(BriefingResourceCategory.category(for: .institution), .institution)
+        XCTAssertEqual(BriefingResourceCategory.category(for: .card), .card)
+        XCTAssertEqual(BriefingResourceCategory.category(for: .loan), .loan)
+        XCTAssertEqual(BriefingResourceCategory.category(for: .document), .document)
+    }
+
+    func testBriefingDateLabelUsesRequestedFormat() {
+        let timeZone = TimeZone(secondsFromGMT: 0)!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let date = calendar.date(from: DateComponents(year: 2027, month: 5, day: 5, hour: 12))!
+        XCTAssertEqual(OwnerBriefingPresentation.dateLabel(for: date, timeZone: timeZone), "May 5 2027")
+    }
+
     @MainActor
     func testDowngradeMakesOnlySelectedCompanyEditable() {
         let owner = UUID()
@@ -94,5 +198,34 @@ final class PremiumEngineTests: XCTestCase {
 
         XCTAssertEqual(state.companies.first(where: { $0.id == readOnly.id })?.name, "Read Only")
         XCTAssertNotNil(state.error)
+    }
+
+    private func makeObligation(
+        state: ObligationState,
+        severity: ObligationSeverity = .info,
+        deferredAt: Date? = nil,
+        snoozedUntil: Date? = nil,
+        updatedAt: Date = Date(timeIntervalSince1970: 1_000_000)
+    ) -> PortfolioObligation {
+        let id = UUID()
+        return PortfolioObligation(
+            id: id,
+            ownerUserId: UUID(),
+            companyId: nil,
+            sourceType: .subscription,
+            sourceId: UUID(),
+            kind: "subscription_renewal",
+            dueAt: nil,
+            severity: severity,
+            title: "Test reminder",
+            summary: "Test summary",
+            actionType: "open_source",
+            state: state,
+            deferredAt: deferredAt,
+            snoozedUntil: snoozedUntil,
+            fingerprint: id.uuidString,
+            createdAt: updatedAt,
+            updatedAt: updatedAt
+        )
     }
 }

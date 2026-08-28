@@ -73,9 +73,11 @@ final class AppState {
     }
 
     var openObligations: [PortfolioObligation] {
-        obligations.filter {
-            $0.state == .open || ($0.state == .snoozed && ($0.snoozedUntil ?? .distantPast) <= Date())
-        }
+        OwnerBriefingPresentation.activeObligations(in: obligations)
+    }
+
+    var deferredObligations: [PortfolioObligation] {
+        OwnerBriefingPresentation.deferredObligations(in: obligations)
     }
 
     var unreadBriefingCount: Int {
