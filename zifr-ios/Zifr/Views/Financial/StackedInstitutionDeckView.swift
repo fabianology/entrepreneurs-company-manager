@@ -41,7 +41,7 @@ struct StackedInstitutionDeckView: View {
             let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == lastInst.name.lowercased() }
             let showPhysicalCards = isExpanded
             let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-            lastHeight = (institutionHeights[lastInst.id] ?? 360) + cardPeekHeight + 16.0
+            lastHeight = (institutionHeights[lastInst.id] ?? 360) + cardPeekHeight
         } else {
             lastHeight = collapsedHeight
         }
@@ -56,7 +56,7 @@ struct StackedInstitutionDeckView: View {
             }
         }
         .frame(height: totalStackHeight, alignment: .top)
-        .padding(.bottom, 24)
+        .padding(.bottom, 20)
         .onPreferenceChange(InstitutionHeightKey.self) { value in
             institutionHeights.merge(value, uniquingKeysWith: { $1 })
         }

@@ -245,16 +245,19 @@ struct FinancialView: View {
                         
                         if !standaloneCards.isEmpty || !standaloneLoans.isEmpty {
                             VStack(alignment: .leading, spacing: 16) {
-                                Text("Other Standalone Accounts")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.3))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.top, 24)
-                                    .overlay(Rectangle().frame(height: 1).foregroundStyle(Color.white.opacity(0.08)), alignment: .top)
-                                
-                                standaloneWalletStack(cards: standaloneCards)
+                                if !standaloneCards.isEmpty {
+                                    standaloneSectionHeading(
+                                        "Standalone Cards",
+                                        topPadding: 10
+                                    )
+                                    standaloneWalletStack(cards: standaloneCards)
+                                }
 
                                 if !standaloneLoans.isEmpty {
+                                    standaloneSectionHeading(
+                                        "Standalone Loans",
+                                        topPadding: standaloneCards.isEmpty ? 10 : 0
+                                    )
                                     standaloneLoanDeck(
                                         activeLoans: activeStandaloneLoans,
                                         paidOffLoans: paidOffStandaloneLoans
@@ -656,6 +659,17 @@ struct FinancialView: View {
                 vm.saveLoan(updatedLoan, appState: appState)
             }
         )
+    }
+
+    private func standaloneSectionHeading(
+        _ title: String,
+        topPadding: CGFloat
+    ) -> some View {
+        Text(title)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(Color.white.opacity(0.3))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, topPadding)
     }
 
     private func standaloneLoanDeck(
