@@ -9,6 +9,7 @@ struct ZifrField: View {
     var keyboardType: UIKeyboardType = .default
     var textContentType: UITextContentType? = nil
     var trailingSystemImage: String? = nil
+    var trailingIconColor: Color = Color(hex: "#1FE400")
     var onTrailingTap: (() -> Void)? = nil
 
     var body: some View {
@@ -42,7 +43,7 @@ struct ZifrField: View {
                     } label: {
                         Image(systemName: icon)
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Color(hex: "#1FE400"))
+                            .foregroundStyle(trailingIconColor)
                     }
                     .buttonStyle(.plain)
                 }
@@ -1139,4 +1140,3 @@ struct DynamicGlassCard<Content: View>: View {
         }
     }
 }
-

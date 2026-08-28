@@ -639,11 +639,11 @@ struct CompanyDetailView: View {
                     } label: {
                         Label("Add Loan", systemImage: "dollarsign.circle")
                     }
-                    Button {
-                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                    } label: {
-                        Label("Add Card", systemImage: "creditcard")
-                    }
+                }
+                Button {
+                    newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                } label: {
+                    Label("Add Card", systemImage: "creditcard")
                 }
                 Button {
                     wizardInstitution = Institution(userId: company.userId, companyId: company.id)

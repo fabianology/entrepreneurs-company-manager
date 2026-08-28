@@ -1094,5 +1094,3 @@ struct ExpandableLoanRow: View {
         return "$\(String(format: "%.0f", value))"
     }
 }
-
-

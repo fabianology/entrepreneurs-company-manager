@@ -85,10 +85,110 @@ struct EditCardSheet: View {
         return snap != currentSnapshot
     }
 
+    private var institutionName: String {
+        (card.institutionName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canSave: Bool {
+        !institutionName.isEmpty
+    }
+
+    private func suggestedInstitutionWebsite(for name: String) -> String {
+        let normalizedName = name
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
+            .lowercased()
+
+        guard !normalizedName.isEmpty else { return "" }
+
+        let knownDomains: [String: String] = [
+            "ally": "ally.com",
+            "allybank": "ally.com",
+            "amex": "americanexpress.com",
+            "americanexpress": "americanexpress.com",
+            "apple": "apple.com",
+            "applecard": "apple.com",
+            "bankofamerica": "bankofamerica.com",
+            "barclays": "barclays.com",
+            "capitalone": "capitalone.com",
+            "charlesschwab": "schwab.com",
+            "chase": "chase.com",
+            "chasebank": "chase.com",
+            "citi": "citi.com",
+            "citibank": "citi.com",
+            "citizens": "citizensbank.com",
+            "citizensbank": "citizensbank.com",
+            "discover": "discover.com",
+            "fidelity": "fidelity.com",
+            "fidelityinvestments": "fidelity.com",
+            "fifththird": "53.com",
+            "fifththirdbank": "53.com",
+            "goldmansachs": "goldmansachs.com",
+            "jpmorgan": "jpmorgan.com",
+            "jpmorganchase": "chase.com",
+            "marcus": "marcus.com",
+            "navyfederal": "navyfederal.org",
+            "navyfederalcreditunion": "navyfederal.org",
+            "paypal": "paypal.com",
+            "pnc": "pnc.com",
+            "pncbank": "pnc.com",
+            "regions": "regions.com",
+            "regionsbank": "regions.com",
+            "sofi": "sofi.com",
+            "synchrony": "synchrony.com",
+            "synchronybank": "synchrony.com",
+            "td": "td.com",
+            "tdbank": "tdbank.com",
+            "truist": "truist.com",
+            "usaa": "usaa.com",
+            "usbank": "usbank.com",
+            "vanguard": "vanguard.com",
+            "venmo": "venmo.com",
+            "wellsfargo": "wellsfargo.com"
+        ]
+
+        if let knownDomain = knownDomains[normalizedName] {
+            return knownDomain
+        }
+
+        let genericSuffixes = [
+            "federalcreditunion",
+            "creditunion",
+            "financialservices",
+            "financial",
+            "nationalbank",
+            "bankandtrust",
+            "banktrust",
+            "bank"
+        ]
+
+        let simplifiedName = genericSuffixes.reduce(normalizedName) { result, suffix in
+            guard result.hasSuffix(suffix), result.count > suffix.count else { return result }
+            return String(result.dropLast(suffix.count))
+        }
+
+        if let knownDomain = knownDomains[simplifiedName] {
+            return knownDomain
+        }
+
+        return "\(simplifiedName).com"
+    }
+
     @ViewBuilder private var institutionDetailsSection: some View {
         if isNewInstitution {
             VStack(alignment: .leading, spacing: 8) {
-                ZifrField(label: "INSTITUTION NAME", placeholder: "e.g. Chase Bank", text: Binding(get: { card.institutionName ?? "" }, set: { card.institutionName = $0 }))
+                ZifrField(
+                    label: "INSTITUTION NAME",
+                    placeholder: "e.g. Chase Bank",
+                    text: Binding(
+                        get: { card.institutionName ?? "" },
+                        set: { newName in
+                            card.institutionName = newName
+                            instWebsite = suggestedInstitutionWebsite(for: newName)
+                        }
+                    )
+                )
                 
                 let matches = institutions.filter { ($0.name ?? "").lowercased().contains((card.institutionName ?? "").lowercased()) && ($0.name ?? "").lowercased() != (card.institutionName ?? "").lowercased() }
                 
@@ -178,6 +278,7 @@ struct EditCardSheet: View {
                 if isNewInstitution || !(card.institutionName ?? "").isEmpty {
                     institutionDetailsSection
                 }
+
             }
         }
     }
@@ -198,6 +299,7 @@ struct EditCardSheet: View {
                     text: Binding(get: { card.cardNumber ?? "" }, set: { card.cardNumber = $0 }),
                     keyboardType: .numberPad,
                     trailingSystemImage: "camera.fill",
+                    trailingIconColor: .zifrBG,
                     onTrailingTap: {
                         showCardScanner = true
                     }
@@ -741,12 +843,14 @@ struct EditCardSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
                         Button("Save") {
+                            card.institutionName = institutionName
                             saveInstitutionData()
                             vm.saveCard(card, appState: appState)
                             dismiss()
                         }
                         .fontWeight(.semibold)
-                        .tint(isDirty ? .green : nil)
+                        .tint(canSave && isDirty ? .green : nil)
+                        .disabled(!canSave)
                     }
                 }
             }
@@ -833,9 +937,11 @@ struct EditCardSheet: View {
     }
 
     private func saveInstitutionData() {
+        guard !institutionName.isEmpty else { return }
+
         if isNewInstitution {
             var newInst = vm.addInstitution(appState: appState, userId: card.userId, companyId: card.companyId)
-            newInst.name = card.institutionName ?? ""
+            newInst.name = institutionName
             newInst.loginUrl = instWebsite
             newInst.username = instLogin
             newInst.password = instPass
@@ -843,7 +949,7 @@ struct EditCardSheet: View {
             newInst.twoFactor = instTwoFactor
             vm.saveInstitution(newInst, appState: appState)
         } else {
-            let instName = (card.institutionName ?? "").lowercased()
+            let instName = institutionName.lowercased()
             if !instName.isEmpty {
                 if var existing = institutions.first(where: { $0.name.lowercased() == instName }) {
                     if !instWebsite.isEmpty { existing.loginUrl = instWebsite }
