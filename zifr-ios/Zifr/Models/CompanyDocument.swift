@@ -9,6 +9,8 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
     var url: String?
     var uploadDate: String?
     var notes: String?
+    var expiresAt: Date?
+    var renewalMetadata: [String: String]
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -19,6 +21,8 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
         case url
         case uploadDate = "upload_date"
         case notes
+        case expiresAt = "expires_at"
+        case renewalMetadata = "renewal_metadata"
     }
     
     init(
@@ -29,7 +33,9 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
         type: String = "Other",
         url: String? = nil,
         uploadDate: String? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        expiresAt: Date? = nil,
+        renewalMetadata: [String: String] = [:]
     ) {
         self.id = id
         self.userId = userId
@@ -39,6 +45,8 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
         self.url = url
         self.uploadDate = uploadDate
         self.notes = notes
+        self.expiresAt = expiresAt
+        self.renewalMetadata = renewalMetadata
     }
 
     static let businessTypes = [

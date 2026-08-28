@@ -42,6 +42,7 @@ struct Subscription: Identifiable, Codable, Hashable {
     var paymentMethod: String?
     var paymentMethodId: UUID?
     var nextRenewal: String?
+    var nextRenewalAt: Date?
     var renew: String
     var status: String
     var subServicesData: [SubService]
@@ -71,6 +72,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.paymentMethod = try container.decodeIfPresent(String.self, forKey: .paymentMethod)
         self.paymentMethodId = try container.decodeIfPresent(UUID.self, forKey: .paymentMethodId)
         self.nextRenewal = try container.decodeIfPresent(String.self, forKey: .nextRenewal)
+        self.nextRenewalAt = try container.decodeIfPresent(Date.self, forKey: .nextRenewalAt)
         self.renew = try container.decodeIfPresent(String.self, forKey: .renew) ?? "Auto"
         self.status = try container.decodeIfPresent(String.self, forKey: .status) ?? "Active"
         self.subServicesData = try container.decodeIfPresent([SubService].self, forKey: .subServicesData) ?? []
@@ -114,6 +116,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         case paymentMethod = "payment_method"
         case paymentMethodId = "payment_method_id"
         case nextRenewal = "next_renewal"
+        case nextRenewalAt = "next_renewal_at"
         case renew
         case status
         case subServicesData = "sub_services_data"
@@ -143,6 +146,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         paymentMethod: String? = nil,
         paymentMethodId: UUID? = nil,
         nextRenewal: String? = nil,
+        nextRenewalAt: Date? = nil,
         renew: String = "Auto",
         status: String = "Active",
         subServices: [SubService] = [],
@@ -170,6 +174,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.paymentMethod = paymentMethod
         self.paymentMethodId = paymentMethodId
         self.nextRenewal = nextRenewal
+        self.nextRenewalAt = nextRenewalAt
         self.renew = renew
         self.status = status
         self.subServicesData = subServices

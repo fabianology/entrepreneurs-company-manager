@@ -15,6 +15,10 @@ final class AppState {
     var activityLogs: [ActivityLog] = []
     var notifications: [AppNotification] = []
     var userPreferences: UserPreferences? = nil
+    var plaidItems: [PlaidItemSummary] = []
+    var entitlementSnapshot: AccessSnapshot = .free
+    var resourceConnections: [ResourceConnection] = []
+    var obligations: [PortfolioObligation] = []
     
     var isLoading: Bool = false
     var error: String? = nil
@@ -58,5 +62,23 @@ final class AppState {
     
     func documents(for companyId: UUID) -> [CompanyDocument] {
         documents.filter { effectiveCompanyId(for: $0.id ?? UUID(), defaultCompanyId: $0.companyId) == companyId }
+    }
+
+    var confirmedConnectionCount: Int {
+        resourceConnections.filter { $0.state == .confirmed }.count
+    }
+
+    var suggestedConnectionCount: Int {
+        resourceConnections.filter { $0.state == .suggested }.count
+    }
+
+    var openObligations: [PortfolioObligation] {
+        obligations.filter {
+            $0.state == .open || ($0.state == .snoozed && ($0.snoozedUntil ?? .distantPast) <= Date())
+        }
+    }
+
+    var unreadBriefingCount: Int {
+        openObligations.filter { $0.severity != .info }.count
     }
 }

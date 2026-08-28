@@ -6,6 +6,7 @@ struct AssistantOnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
+    @Environment(AccessController.self) private var accessController
     @Bindable var vm: AppViewModel
     
     @StateObject private var captureManager = AudioCaptureManager()
@@ -33,6 +34,8 @@ struct AssistantOnboardingView: View {
     @State private var textInput = ""
     @State private var isAIThinking = false
     @State private var restHistory: [[String: Any]] = []
+    @State private var showPremiumUpgrade = false
+    @State private var voiceSessionStartedAt: Date?
     
     @State private var showManualForm = false
     @State private var manualName = ""
@@ -489,9 +492,10 @@ struct AssistantOnboardingView: View {
                         .foregroundStyle(.white)
                         
                         Button("Confirm & Save") {
-                            saveCompany(company)
-                            sendToolResponse(for: call, success: true)
-                            disconnectAndDismiss()
+                            if saveCompany(company) {
+                                sendToolResponse(for: call, success: true)
+                                disconnectAndDismiss()
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -557,17 +561,28 @@ struct AssistantOnboardingView: View {
                         .foregroundStyle(.white)
                         
                         Button("Save Business") {
-                            let userId = authViewModel.currentUser?.id ?? UUID()
-                            vm.addCompany(
+                            let userId = authViewModel.currentUser?.id
+                            guard accessController.request(
+                                .additionalCompany,
+                                source: "assistant_manual_company",
                                 appState: appState,
-                                userId: userId,
-                                name: manualName,
-                                structure: manualStructure,
-                                colorHex: Company.brandColors.first ?? "#000000",
-                                logoData: nil,
-                                website: ""
-                            )
-                            disconnectAndDismiss()
+                                userId: userId
+                            ) else {
+                                showPremiumUpgrade = true
+                                return
+                            }
+                            if let userId {
+                                vm.addCompany(
+                                    appState: appState,
+                                    userId: userId,
+                                    name: manualName,
+                                    structure: manualStructure,
+                                    colorHex: Company.brandColors.first ?? "#000000",
+                                    logoData: nil,
+                                    website: ""
+                                )
+                                disconnectAndDismiss()
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -613,8 +628,12 @@ struct AssistantOnboardingView: View {
             }
         }
         .onDisappear {
+            recordVoiceUsage()
             captureManager.stop()
             client?.disconnect()
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView(gate: accessController.pendingGate)
         }
         .alert(isPresented: $showPermissionAlert) {
             Alert(
@@ -641,6 +660,18 @@ struct AssistantOnboardingView: View {
             }
             return
         }
+
+        guard accessController.request(
+            .liveVoice,
+            source: "assistant_voice",
+            appState: appState,
+            userId: authViewModel.currentUser?.id
+        ) else {
+            isChatMode = true
+            isConnecting = false
+            showPremiumUpgrade = true
+            return
+        }
         
         let minifiedData = vm.generateMinifiedPortfolio(appState: appState)
         let dynamicInstruction = """
@@ -651,6 +682,9 @@ struct AssistantOnboardingView: View {
         
         Here is the exact current state of the user's finances and businesses:
         \(minifiedData)
+
+        Confirmed portfolio relationships and active obligations:
+        \(portfolioIntelligenceContext)
         
         Use this data to answer their questions about their portfolio directly. Do not make up any information.
         """
@@ -705,6 +739,7 @@ struct AssistantOnboardingView: View {
                 await captureManager.start()
                 
                 DispatchQueue.main.async {
+                    self.voiceSessionStartedAt = Date()
                     self.isConnecting = false
                 }
             } catch {
@@ -967,8 +1002,18 @@ struct AssistantOnboardingView: View {
         }
     }
     
-    private func saveCompany(_ company: Company) {
-        let userId = authViewModel.currentUser?.id ?? UUID()
+    @discardableResult
+    private func saveCompany(_ company: Company) -> Bool {
+        guard let userId = authViewModel.currentUser?.id,
+              accessController.request(
+                .additionalCompany,
+                source: "assistant_company_draft",
+                appState: appState,
+                userId: userId
+              ) else {
+            showPremiumUpgrade = true
+            return false
+        }
         vm.addCompany(
             appState: appState,
             userId: userId,
@@ -978,6 +1023,7 @@ struct AssistantOnboardingView: View {
             logoData: nil,
             website: company.website ?? ""
         )
+        return true
     }
     
     private func saveSubscription(_ sub: Subscription) {
@@ -1099,6 +1145,7 @@ struct AssistantOnboardingView: View {
     }
     
     private func disconnectAndDismiss() {
+        recordVoiceUsage()
         captureManager.stop()
         client?.disconnect()
         dismiss()
@@ -1107,6 +1154,9 @@ struct AssistantOnboardingView: View {
     // MARK: - Chat view and Helpers
     
     private func toggleMode() {
+        if !isChatMode {
+            recordVoiceUsage()
+        }
         withAnimation {
             isChatMode.toggle()
         }
@@ -1117,20 +1167,30 @@ struct AssistantOnboardingView: View {
     private func sendUserMessage() {
         let input = textInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
-        
-        chatMessages.append(ChatMessage(sender: .user, text: input))
-        textInput = ""
-        isAIThinking = true
-        
-        chatMessages.append(ChatMessage(sender: .assistant, text: "", isPending: true))
-        
-        self.restHistory.append([
-            "role": "user",
-            "parts": [["text": input]]
-        ])
-        
+
+        guard accessController.request(
+            .aiAction,
+            source: "assistant_chat",
+            appState: appState,
+            userId: authViewModel.currentUser?.id
+        ) else {
+            showPremiumUpgrade = true
+            return
+        }
+
         Task {
+            await MainActor.run {
+                chatMessages.append(ChatMessage(sender: .user, text: input))
+                textInput = ""
+                isAIThinking = true
+                chatMessages.append(ChatMessage(sender: .assistant, text: "", isPending: true))
+                restHistory.append([
+                    "role": "user",
+                    "parts": [["text": input]]
+                ])
+            }
             await executeRESTTurn()
+            await accessController.refresh()
         }
     }
     
@@ -1144,6 +1204,9 @@ struct AssistantOnboardingView: View {
         
         Here is the exact current state of the user's finances and businesses:
         \(minifiedData)
+
+        Confirmed portfolio relationships and active obligations:
+        \(portfolioIntelligenceContext)
         
         Use this data to answer their questions about their portfolio directly. Do not make up any information.
         """
@@ -1217,7 +1280,39 @@ struct AssistantOnboardingView: View {
             }
         }
     }
-    
+
+    private var portfolioIntelligenceContext: String {
+        let confirmed = appState.resourceConnections
+            .filter { $0.state == .confirmed }
+            .prefix(100)
+            .map {
+                "\(resourceName(type: $0.sourceType, id: $0.sourceId)) \($0.relationshipType.label.lowercased()) \(resourceName(type: $0.targetType, id: $0.targetId))"
+            }
+        let obligations = appState.openObligations.prefix(50).map {
+            "\($0.severity.rawValue): \($0.title) — \($0.summary)"
+        }
+        let facts = confirmed + obligations
+        return facts.isEmpty ? "None." : facts.joined(separator: "\n")
+    }
+
+    private func resourceName(type: ResourceKind, id: UUID) -> String {
+        switch type {
+        case .company: return appState.companies.first(where: { $0.id == id })?.name ?? "Company"
+        case .subscription: return appState.subscriptions.first(where: { $0.id == id })?.name ?? "Subscription"
+        case .institution: return appState.institutions.first(where: { $0.id == id })?.name ?? "Institution"
+        case .card: return appState.cards.first(where: { $0.id == id })?.name ?? "Card"
+        case .loan: return appState.loans.first(where: { $0.id == id })?.name ?? "Loan"
+        case .document: return appState.documents.first(where: { $0.id == id })?.name ?? "Document"
+        case .collaborator: return "Trusted guest"
+        }
+    }
+
+    private func recordVoiceUsage() {
+        guard voiceSessionStartedAt != nil else { return }
+        voiceSessionStartedAt = nil
+        Task { await accessController.refresh() }
+    }
+
     private func handleIncomingText(_ text: String) {
         self.isAIThinking = false
         if let lastMsgIndex = chatMessages.lastIndex(where: { $0.sender == .assistant }) {

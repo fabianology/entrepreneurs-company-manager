@@ -30,6 +30,11 @@ struct UserPreferences: Codable {
     var securityEnabled: Bool
     var messagesEnabled: Bool
     var updatedAt: Date?
+    var briefingWeekday: Int?
+    var briefingTime: String?
+    var timezone: String?
+    var weeklyBriefingEnabled: Bool?
+    var criticalAlertsEnabled: Bool?
     
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
@@ -37,5 +42,10 @@ struct UserPreferences: Codable {
         case securityEnabled = "security_enabled"
         case messagesEnabled = "messages_enabled"
         case updatedAt = "updated_at"
+        case briefingWeekday = "briefing_weekday"
+        case briefingTime = "briefing_time"
+        case timezone
+        case weeklyBriefingEnabled = "weekly_briefing_enabled"
+        case criticalAlertsEnabled = "critical_alerts_enabled"
     }
 }

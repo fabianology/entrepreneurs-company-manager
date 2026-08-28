@@ -51,6 +51,9 @@ class DataRepository {
         async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
+        async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") { (try? await client.from("plaid_items").select("id,company_id,institution_name,status").execute().value) ?? [] }
+        async let fConnections: [ResourceConnection] = measure("resource_connections") { (try? await client.from("resource_connections").select().execute().value) ?? [] }
+        async let fObligations: [PortfolioObligation] = measure("obligations") { (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? [] }
         async let fTransactions = measure("transactions") { await safeFetchTransactions() }
         
         let fetchedCompanies = await fCompanies
@@ -60,10 +63,13 @@ class DataRepository {
         let fetchedLoans = await fLoans
         let fetchedLoanPayments = await fLoanPayments
         let fetchedDocuments = await fDocuments
+        let fetchedPlaidItems = await fPlaidItems
         let shares = await fShares
         let fetchedActivityLogs = await fActivity
         let fetchedNotifications = await fNotifications
         let fetchedPreferences = await fPrefs
+        let fetchedConnections = await fConnections
+        let fetchedObligations = await fObligations
         let transactions = await fTransactions
         
         let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
@@ -86,11 +92,28 @@ class DataRepository {
         appState.cards = secureCards
         appState.loans = combinedLoans
         appState.documents = fetchedDocuments
+        appState.plaidItems = fetchedPlaidItems
         appState.resourceShares = shares
         appState.activityLogs = fetchedActivityLogs
         appState.notifications = fetchedNotifications
         appState.userPreferences = fetchedPreferences.first
         appState.transactions = transactions
+        appState.resourceConnections = fetchedConnections
+        appState.obligations = fetchedObligations
+
+        if let currentUserId {
+            let generatedConnections = PortfolioConnectionEngine.buildConnections(appState: appState, ownerUserId: currentUserId)
+            let existingEdges = Set(fetchedConnections.map(Self.connectionIdentity))
+            let newConnections = generatedConnections.filter { !existingEdges.contains(Self.connectionIdentity($0)) }
+            if !newConnections.isEmpty {
+                try? await upsertConnections(newConnections)
+                appState.resourceConnections.append(contentsOf: newConnections)
+            }
+
+            let generatedObligations = PortfolioObligationEngine.buildObligations(appState: appState, ownerUserId: currentUserId)
+            let existingFingerprints = Set(fetchedObligations.map(\.fingerprint))
+            appState.obligations.append(contentsOf: generatedObligations.filter { !existingFingerprints.contains($0.fingerprint) })
+        }
         appState.isLoading = false
         
         // Write count to a file we can read from the host
@@ -102,6 +125,99 @@ class DataRepository {
         if fetchedCompanies.isEmpty, let userId = currentUserId {
             DummyDataSeeder.seed(appState: appState, userId: userId)
         }
+    }
+
+    private static func connectionIdentity(_ connection: ResourceConnection) -> String {
+        "\(connection.sourceType.rawValue):\(connection.sourceId):\(connection.targetType.rawValue):\(connection.targetId):\(connection.relationshipType.rawValue)"
+    }
+
+    // MARK: - Miloom Pro portfolio intelligence
+    func upsertConnections(_ connections: [ResourceConnection]) async throws {
+        guard !connections.isEmpty else { return }
+        try await client.from("resource_connections").upsert(
+            connections,
+            onConflict: "owner_user_id,source_type,source_id,target_type,target_id,relationship_type"
+        ).execute()
+    }
+
+    func updateConnection(_ connection: ResourceConnection) async throws {
+        try await client.from("resource_connections")
+            .update(connection)
+            .eq("id", value: connection.id)
+            .execute()
+    }
+
+    func insertConnection(_ connection: ResourceConnection) async throws {
+        try await client.from("resource_connections").insert(connection).execute()
+    }
+
+    func updateObligation(_ obligation: PortfolioObligation) async throws {
+        try await client.from("obligations")
+            .update(obligation)
+            .eq("id", value: obligation.id)
+            .execute()
+    }
+
+    func registerPushToken(_ token: String, environment: String) async throws {
+        guard let session = try? await client.auth.session else { return }
+        let userId = session.user.id
+        struct PushToken: Encodable {
+            let userId: UUID
+            let token: String
+            let environment: String
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+                case token
+                case environment
+            }
+        }
+        try await client.from("device_push_tokens")
+            .upsert(PushToken(userId: userId, token: token, environment: environment), onConflict: "user_id,token")
+            .execute()
+    }
+
+    func saveBriefingPreferences(
+        weekday: Int,
+        time: String,
+        timezone: String,
+        weeklyEnabled: Bool,
+        criticalEnabled: Bool
+    ) async throws {
+        guard let session = try? await client.auth.session else { return }
+        struct Payload: Encodable {
+            let userId: UUID
+            let remindersEnabled: Bool
+            let securityEnabled: Bool
+            let messagesEnabled: Bool
+            let briefingWeekday: Int
+            let briefingTime: String
+            let timezone: String
+            let weeklyBriefingEnabled: Bool
+            let criticalAlertsEnabled: Bool
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+                case remindersEnabled = "reminders_enabled"
+                case securityEnabled = "security_enabled"
+                case messagesEnabled = "messages_enabled"
+                case briefingWeekday = "briefing_weekday"
+                case briefingTime = "briefing_time"
+                case timezone
+                case weeklyBriefingEnabled = "weekly_briefing_enabled"
+                case criticalAlertsEnabled = "critical_alerts_enabled"
+            }
+        }
+        let payload = Payload(
+            userId: session.user.id,
+            remindersEnabled: true,
+            securityEnabled: true,
+            messagesEnabled: true,
+            briefingWeekday: weekday,
+            briefingTime: time,
+            timezone: timezone,
+            weeklyBriefingEnabled: weeklyEnabled,
+            criticalAlertsEnabled: criticalEnabled
+        )
+        try await client.from("user_preferences").upsert(payload, onConflict: "user_id").execute()
     }
     
     // MARK: - Companies

@@ -45,6 +45,7 @@ struct Loan: Identifiable, Codable, Hashable {
     var monthlyPayment: Double
     var startDate: Date
     var maturityDate: Date?
+    var nextPaymentAt: Date?
     var paidOffDate: Date?
     var status: String
     var notes: String?
@@ -89,6 +90,7 @@ struct Loan: Identifiable, Codable, Hashable {
         case monthlyPayment = "monthly_payment"
         case startDate = "start_date"
         case maturityDate = "maturity_date"
+        case nextPaymentAt = "next_payment_at"
         case paidOffDate = "paid_off_date"
         case status
         case notes
@@ -113,6 +115,7 @@ struct Loan: Identifiable, Codable, Hashable {
         monthlyPayment: Double = 0,
         startDate: Date = Date(),
         maturityDate: Date? = nil,
+        nextPaymentAt: Date? = nil,
         paidOffDate: Date? = nil,
         status: String = "Active",
         notes: String? = nil,
@@ -135,6 +138,7 @@ struct Loan: Identifiable, Codable, Hashable {
         self.monthlyPayment = monthlyPayment
         self.startDate = startDate
         self.maturityDate = maturityDate
+        self.nextPaymentAt = nextPaymentAt
         self.paidOffDate = paidOffDate
         self.status = status
         self.notes = notes

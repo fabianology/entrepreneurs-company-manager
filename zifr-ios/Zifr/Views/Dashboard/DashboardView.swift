@@ -3,6 +3,7 @@ struct DashboardView: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(OnboardingStateManager.self) private var onboardingState
+    @Environment(AccessController.self) private var accessController
     private var companies: [Company] { appState.companies.sorted { $0.lastViewed > $1.lastViewed } }
     private var subscriptions: [Subscription] { appState.subscriptions }
     private var cards: [FinancialCard] { appState.cards }
@@ -24,6 +25,9 @@ struct DashboardView: View {
     @State private var selectedLoan: Loan?
     @State private var selectedDocument: CompanyDocument? = nil
     @State private var showAssistant = false    
+    @State private var showPremiumUpgrade = false
+    @State private var showOwnerBriefingFromPush = false
+    @State private var showDowngradeSelection = false
     
     private var currentUserId: UUID? { authViewModel.currentUser?.id }
     
@@ -59,6 +63,11 @@ struct DashboardView: View {
                         .padding(.bottom, 28)
 
                     List {
+                        OwnerBriefingCard(onOpenResource: openBriefingResource)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 18, trailing: 20))
+
                         ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
                             let row = companyCardRow(for: company)
                             let isLast = index == filteredCompanies.count - 1
@@ -98,7 +107,7 @@ struct DashboardView: View {
                                     // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
                                     Button {
                                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        showAddCompany = true
+                                        requestAddCompany()
                                     } label: {
                                         ZStack {
                                             CompanyCardView(
@@ -210,6 +219,15 @@ struct DashboardView: View {
             .sheet(isPresented: $showAddCompany) {
                 EditCompanySheet(vm: vm, company: nil)
             }
+            .sheet(isPresented: $showPremiumUpgrade) {
+                PremiumUpgradeView(gate: accessController.pendingGate)
+            }
+            .sheet(isPresented: $showOwnerBriefingFromPush) {
+                OwnerBriefingView(onOpenResource: openBriefingResource)
+            }
+            .sheet(isPresented: $showDowngradeSelection) {
+                DowngradeSelectionView()
+            }
             .sheet(item: $editingCompany) { company in
                 EditCompanySheet(vm: vm, company: company)
             }
@@ -286,6 +304,12 @@ struct DashboardView: View {
                     break
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .openOwnerBriefing)) { _ in
+                if accessController.isPro { showOwnerBriefingFromPush = true }
+            }
+            .onAppear { checkDowngradeSelection() }
+            .onChange(of: appState.companies.count) { _, _ in checkDowngradeSelection() }
+            .onChange(of: accessController.snapshot.status) { _, _ in checkDowngradeSelection() }
             }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 10) {
@@ -429,7 +453,7 @@ struct DashboardView: View {
                             onSkip: { onboardingState.skipOnboarding() },
                             onTapTarget: {
                                 onboardingState.currentStep = .notStarted
-                                showAddCompany = true
+                                requestAddCompany()
                             }
                         )
                     } else if onboardingState.isSpotlightingAssistant {
@@ -494,7 +518,7 @@ struct DashboardView: View {
                     TutorialCompletionOverlay(
                         onGetStarted: {
                             onboardingState.exitTutorial(appState: appState)
-                            showAddCompany = true
+                            requestAddCompany()
                         },
                         onExplore: {
                             onboardingState.exitTutorial(appState: appState)
@@ -584,9 +608,47 @@ struct DashboardView: View {
             .frame(width: 44, height: 44)
         } primaryAction: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            showAddCompany = true
+            requestAddCompany()
         }
         .buttonStyle(.plain)
+    }
+
+    private func requestAddCompany() {
+        if accessController.request(
+            .additionalCompany,
+            source: "dashboard_add_company",
+            appState: appState,
+            userId: currentUserId
+        ) {
+            showAddCompany = true
+        } else {
+            showPremiumUpgrade = true
+        }
+    }
+
+    private func checkDowngradeSelection() {
+        showDowngradeSelection = accessController.requiresDowngradeSelection(appState: appState)
+    }
+
+    private func openBriefingResource(_ obligation: PortfolioObligation) {
+        switch obligation.sourceType {
+        case .company:
+            if let company = appState.companies.first(where: { $0.id == obligation.sourceId }) {
+                vm.path.append(company)
+            }
+        case .subscription:
+            selectedSubscription = appState.subscriptions.first { $0.id == obligation.sourceId }
+        case .card:
+            selectedCard = appState.cards.first { $0.id == obligation.sourceId }
+        case .institution:
+            selectedInstitution = appState.institutions.first { $0.id == obligation.sourceId }
+        case .loan:
+            selectedLoan = appState.loans.first { $0.id == obligation.sourceId }
+        case .document:
+            selectedDocument = appState.documents.first { $0.id == obligation.sourceId }
+        case .collaborator:
+            break
+        }
     }
 
     private func openSharedItem(_ share: SharedItem) {

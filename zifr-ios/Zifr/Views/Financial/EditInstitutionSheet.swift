@@ -64,6 +64,12 @@ struct EditInstitutionSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     SharedItemOverrideBanner(resourceId: institution.id, defaultCompanyId: institution.companyId)
+
+                    if !isNew {
+                        ResourceConnectionsSection(
+                            reference: ResourceReference(kind: .institution, resourceId: institution.id)
+                        )
+                    }
                     
                     Group {
                         // ── Card 1: Bank Identity & Login ──────────────

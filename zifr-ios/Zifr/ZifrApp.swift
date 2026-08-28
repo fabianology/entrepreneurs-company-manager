@@ -27,9 +27,11 @@ extension UIColor {
 
 @main
 struct ZifrApp: App {
+    @UIApplicationDelegateAdaptor(MiloomAppDelegate.self) private var appDelegate
     @State private var authViewModel = AuthViewModel()
     @State private var appState = AppState()
     @State private var onboardingState = OnboardingStateManager()
+    @State private var accessController = AccessController()
     @Environment(\.scenePhase) var scenePhase
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
     @State private var backgroundDate: Date? = nil
@@ -55,21 +57,37 @@ struct ZifrApp: App {
             .environment(authViewModel)
             .environment(appState)
             .environment(onboardingState)
+            .environment(accessController)
             .task {
+                StoreService.shared.startListening(accessController: accessController)
                 await authViewModel.checkSession()
                 if authViewModel.isAuthenticated {
+                    await accessController.refresh()
+                    appState.entitlementSnapshot = accessController.snapshot
                     await DataRepository.shared.fetchAllData(appState: appState)
+                    await PushNotificationService.shared.registerPendingTokenIfNeeded()
                 }
             }
             .onChange(of: authViewModel.isAuthenticated) { _, isAuth in
                 if isAuth {
-                    Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                    Task {
+                        await accessController.refresh()
+                        appState.entitlementSnapshot = accessController.snapshot
+                        await DataRepository.shared.fetchAllData(appState: appState)
+                        await PushNotificationService.shared.registerPendingTokenIfNeeded()
+                    }
                 }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .background {
                     backgroundDate = Date()
                 } else if newPhase == .active {
+                    if authViewModel.isAuthenticated {
+                        Task {
+                            await accessController.refresh()
+                            appState.entitlementSnapshot = accessController.snapshot
+                        }
+                    }
                     if let bgDate = backgroundDate {
                         let timeElapsed = Date().timeIntervalSince(bgDate)
                         let timeoutSeconds = Double(autoLockTimeout * 60)
@@ -82,6 +100,9 @@ struct ZifrApp: App {
                     }
                     backgroundDate = nil
                 }
+            }
+            .onChange(of: accessController.snapshot) { _, snapshot in
+                appState.entitlementSnapshot = snapshot
             }
             .onOpenURL { url in
                 Task {

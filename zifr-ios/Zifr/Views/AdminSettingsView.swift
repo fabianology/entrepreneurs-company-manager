@@ -6,6 +6,7 @@ struct AdminSettingsView: View {
     @Environment(AuthViewModel.self) private var authVM
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(AccessController.self) private var accessController
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
@@ -154,16 +155,16 @@ struct AdminSettingsView: View {
                                 Circle()
                                     .fill(Color.white.opacity(0.2))
                                     .frame(width: 44, height: 44)
-                                Image(systemName: "star.fill")
+                                Image(systemName: accessController.isPro ? "checkmark.seal.fill" : "star.fill")
                                     .foregroundStyle(.white)
                                     .font(.system(size: 18))
                             }
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("MILOOM PRO")
+                                Text(accessController.isPro ? "MILOOM PRO" : "UPGRADE TO MILOOM PRO")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(.white)
-                                Text("Unlock all premium features")
+                                Text(accessController.membershipSubtitle)
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.8))
                             }

@@ -11,6 +11,7 @@ struct GlobalSearchView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @Environment(AccessController.self) private var accessController
     @FocusState private var searchFocused: Bool
     @State private var visiblePasswords: Set<UUID> = []
     
@@ -33,6 +34,22 @@ struct GlobalSearchView: View {
         }
         
         return allResults
+    }
+
+    private var relationshipResults: [ResourceConnection] {
+        guard accessController.isPro else { return [] }
+        let ignored = Set(["what", "uses", "used", "this", "which", "show", "connected", "connects", "depends", "documents", "companies", "company", "with", "that", "from", "the"])
+        let tokens = vm.searchQuery.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .map(String.init)
+            .filter { $0.count >= 3 && !ignored.contains($0) }
+        guard !tokens.isEmpty else { return [] }
+        return appState.resourceConnections.filter { connection in
+            guard connection.state == .confirmed else { return false }
+            let source = PortfolioConnectionEngine.displayName(for: connection.source, appState: appState).lowercased()
+            let target = PortfolioConnectionEngine.displayName(for: connection.target, appState: appState).lowercased()
+            return tokens.contains { source.contains($0) || target.contains($0) }
+        }
     }
 
     var body: some View {
@@ -91,7 +108,11 @@ struct GlobalSearchView: View {
                         LazyVStack(spacing: 10) {
                             
 
-                            if results.isEmpty {
+                            if !relationshipResults.isEmpty {
+                                relationshipSearchSection
+                            }
+
+                            if results.isEmpty && relationshipResults.isEmpty {
                                 VStack(spacing: 12) {
                                     Text("No local results for")
                                         .font(.system(size: 14)).foregroundStyle(Color.white.opacity(0.3))
@@ -149,6 +170,47 @@ struct GlobalSearchView: View {
             UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
             UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(white: 1, alpha: 0.5)], for: .normal)
         }
+    }
+
+    private var relationshipSearchSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("CONNECTIONS")
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(1)
+                .foregroundStyle(Color.white.opacity(0.4))
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+
+            VStack(spacing: 0) {
+                ForEach(relationshipResults) { connection in
+                    Button {
+                        navigate(to: connection.target)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "link")
+                                .foregroundStyle(Color.zifrGold)
+                                .frame(width: 34, height: 34)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(PortfolioConnectionEngine.displayName(for: connection.source, appState: appState))
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("\(connection.relationshipType.label) · \(PortfolioConnectionEngine.displayName(for: connection.target, appState: appState))")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.25))
+                        }
+                        .padding(14)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .glassCard(cornerRadius: 16)
+        }
+        .padding(.bottom, 12)
     }
 
 
@@ -345,6 +407,37 @@ struct GlobalSearchView: View {
             vm.deepLinkModelId = result.modelId
             vm.path.append(company)
         }
+        vm.searchQuery = ""
+        dismiss()
+    }
+
+    private func navigate(to reference: ResourceReference) {
+        let companyId: UUID?
+        switch reference.kind {
+        case .company:
+            companyId = reference.resourceId
+        case .subscription:
+            companyId = subscriptions.first(where: { $0.id == reference.resourceId })?.companyId
+        case .institution:
+            companyId = institutions.first(where: { $0.id == reference.resourceId })?.companyId
+        case .card:
+            companyId = cards.first(where: { $0.id == reference.resourceId })?.companyId
+        case .loan:
+            companyId = loans.first(where: { $0.id == reference.resourceId })?.companyId
+        case .document:
+            companyId = documents.first(where: { $0.id == reference.resourceId })?.companyId
+        case .collaborator:
+            companyId = nil
+        }
+        guard let companyId, let company = companies.first(where: { $0.id == companyId }) else { return }
+        vm.selectedCompany = company
+        switch reference.kind {
+        case .subscription: vm.activeTab = .subscriptions
+        case .document: vm.activeTab = .documents
+        default: vm.activeTab = .financial
+        }
+        vm.deepLinkModelId = reference.resourceId
+        vm.path.append(company)
         vm.searchQuery = ""
         dismiss()
     }

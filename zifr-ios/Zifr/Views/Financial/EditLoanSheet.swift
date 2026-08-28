@@ -73,6 +73,12 @@ struct EditLoanSheet: View {
             ScrollView {
                 VStack(spacing: 20) {
                     SharedItemOverrideBanner(resourceId: loan.id, defaultCompanyId: loan.companyId)
+
+                    if !isNew {
+                        ResourceConnectionsSection(
+                            reference: ResourceReference(kind: .loan, resourceId: loan.id)
+                        )
+                    }
                     
                     Group {
                         loanSummarySection()

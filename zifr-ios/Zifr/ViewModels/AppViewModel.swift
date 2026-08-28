@@ -20,6 +20,10 @@ final class AppViewModel {
 
     // CRUD: Companies
     func addCompany(appState: AppState, userId: UUID, name: String, structure: String, colorHex: String, logoData: Data?, website: String) {
+        guard appState.entitlementSnapshot.hasProAccess || appState.companies.filter({ $0.userId == userId }).isEmpty else {
+            appState.error = "Free includes one editable company. Upgrade to add another."
+            return
+        }
         DummyDataSeeder.purge(appState: appState)
         let company = Company(userId: userId, name: name, structure: structure, companyDescription: nil, colorHex: colorHex, logoData: logoData, website: website)
         appState.companies.append(company)
@@ -30,6 +34,7 @@ final class AppViewModel {
     }
 
     func updateCompany(_ company: Company, appState: AppState) {
+        guard canEdit(companyId: company.id, appState: appState) else { return }
         guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
         let original = appState.companies[idx]
         var mutableCompany = company
@@ -62,6 +67,7 @@ final class AppViewModel {
     }
 
     func touchCompany(_ company: Company, appState: AppState) {
+        guard canEdit(companyId: company.id, appState: appState) else { return }
         guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
         let original = appState.companies[idx]
         var mutableCompany = company
@@ -79,6 +85,7 @@ final class AppViewModel {
     }
 
     func saveSub(_ sub: Subscription, appState: AppState) {
+        guard canEdit(companyId: sub.companyId, appState: appState) else { return }
         var mutableSub = sub
         mutableSub.lastUpdated = Date()
         if let idx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) {
@@ -112,6 +119,7 @@ final class AppViewModel {
     }
 
     func saveCard(_ card: FinancialCard, appState: AppState) {
+        guard canEdit(companyId: card.companyId, appState: appState) else { return }
         if let idx = appState.cards.firstIndex(where: { $0.id == card.id }) {
             let original = appState.cards[idx]
             appState.cards[idx] = card
@@ -144,6 +152,7 @@ final class AppViewModel {
     }
 
     func saveInstitution(_ inst: Institution, appState: AppState) {
+        guard canEdit(companyId: inst.companyId, appState: appState) else { return }
         if let idx = appState.institutions.firstIndex(where: { $0.id == inst.id }) {
             let original = appState.institutions[idx]
             appState.institutions[idx] = inst
@@ -205,6 +214,7 @@ final class AppViewModel {
     }
 
     func saveLoan(_ loan: Loan, appState: AppState) {
+        guard canEdit(companyId: loan.companyId, appState: appState) else { return }
         if let idx = appState.loans.firstIndex(where: { $0.id == loan.id }) {
             let original = appState.loans[idx]
             appState.loans[idx] = loan
@@ -236,6 +246,7 @@ final class AppViewModel {
     }
 
     func saveDoc(_ doc: CompanyDocument, appState: AppState) {
+        guard canEdit(companyId: doc.companyId, appState: appState) else { return }
         if let idx = appState.documents.firstIndex(where: { $0.id == doc.id }) {
             let original = appState.documents[idx]
             appState.documents[idx] = doc
@@ -250,6 +261,25 @@ final class AppViewModel {
                 catch { await MainActor.run { appState.documents.removeAll { $0.id == doc.id }; appState.error = "Failed to add document." } }
             }
         }
+    }
+
+    private func canEdit(companyId: UUID, appState: AppState) -> Bool {
+        if appState.entitlementSnapshot.hasProAccess { return true }
+        if appState.resourceShares.contains(where: {
+            $0.resourceId == companyId && ["Editor", "Admin"].contains($0.role)
+        }) { return true }
+        let allowedId = appState.entitlementSnapshot.selectedFreeCompanyId
+            ?? appState.companies
+                .filter { company in
+                    !appState.resourceShares.contains { $0.resourceId == company.id }
+                }
+                .sorted { $0.lastModified < $1.lastModified }
+                .first?.id
+        guard allowedId == companyId else {
+            appState.error = "This company is read-only on Free. Choose it as your Free company or resubscribe to Pro."
+            return false
+        }
+        return true
     }
 
     func deleteDoc(_ doc: CompanyDocument, appState: AppState) {

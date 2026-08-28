@@ -4,6 +4,7 @@ import PhotosUI
 struct EditCompanySheet: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
+    @Environment(AccessController.self) private var accessController
     @Environment(\.dismiss) private var dismiss
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Bindable var vm: AppViewModel
@@ -18,6 +19,7 @@ struct EditCompanySheet: View {
     @State private var selectedPhoto: PhotosPickerItem? = nil
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
+    @State private var showPremiumUpgrade = false
 
     var isEditing: Bool { company != nil }
 
@@ -62,6 +64,12 @@ struct EditCompanySheet: View {
                         .background(Color(hex: "#4f46e5").opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(hex: "#818cf8").opacity(0.3), lineWidth: 1))
+                    }
+
+                    if let company {
+                        ResourceConnectionsSection(
+                            reference: ResourceReference(kind: .company, resourceId: company.id)
+                        )
                     }
 
                     Group {
@@ -357,13 +365,12 @@ struct EditCompanySheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
                         Button("Save") {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        save()
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .tint((hasChanges && !name.isEmpty) ? .green : nil)
-                    .disabled(!hasChanges || name.isEmpty)
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            if save() { dismiss() }
+                        }
+                        .fontWeight(.semibold)
+                        .tint((hasChanges && !name.isEmpty) ? .green : nil)
+                        .disabled(!hasChanges || name.isEmpty)
                     }
                 }
             }
@@ -373,6 +380,9 @@ struct EditCompanySheet: View {
             if let c = company {
                 ShareEntitySheet(resourceId: c.id, resourceType: "company", resourceTitle: c.name)
             }
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView(gate: accessController.pendingGate)
         }
     }
 
@@ -400,7 +410,8 @@ struct EditCompanySheet: View {
         logoData = c.logoData
     }
 
-    private func save() {
+    @discardableResult
+    private func save() -> Bool {
         let normalizedHex = colorHex.lowercased()
         if let c = company {
             var updated = c
@@ -408,6 +419,15 @@ struct EditCompanySheet: View {
             updated.website = website; updated.logoData = logoData
             vm.updateCompany(updated, appState: appState)
         } else {
+            guard accessController.request(
+                .additionalCompany,
+                source: "company_editor",
+                appState: appState,
+                userId: authViewModel.currentUser?.id
+            ) else {
+                showPremiumUpgrade = true
+                return false
+            }
             // Get user ID synchronously from the AuthViewModel
             if let userId = authViewModel.currentUser?.id {
                 vm.addCompany(appState: appState, userId: userId, name: name, structure: structure, colorHex: normalizedHex, logoData: logoData, website: website)
@@ -418,6 +438,7 @@ struct EditCompanySheet: View {
                 vm.addCompany(appState: appState, userId: fallbackId, name: name, structure: structure, colorHex: normalizedHex, logoData: logoData, website: website)
             }
         }
+        return true
     }
 
 
@@ -433,6 +454,9 @@ private func formSection<Content: View>(@ViewBuilder content: () -> Content) -> 
 
 struct ShareEntitySheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authVM
+    @Environment(AccessController.self) private var accessController
     let resourceId: UUID
     let resourceType: String
     let resourceTitle: String
@@ -443,6 +467,7 @@ struct ShareEntitySheet: View {
     @State private var isSending = false
     @State private var successMessage: String?
     @State private var errorMessage: String?
+    @State private var showingPremiumUpgrade = false
     
     let roles = ["Viewer", "Editor", "Admin"]
     
@@ -599,11 +624,23 @@ struct ShareEntitySheet: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPremiumUpgrade) {
+            PremiumUpgradeView(gate: accessController.pendingGate)
+        }
     }
     
     private func sendInvite() {
         let cleanedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !cleanedEmail.isEmpty else { return }
+        guard accessController.request(
+            .guestCollaboration,
+            source: "share_invitation",
+            appState: appState,
+            userId: authVM.currentUser?.id
+        ) else {
+            showingPremiumUpgrade = true
+            return
+        }
         isSending = true
         errorMessage = nil
         successMessage = nil

@@ -10,6 +10,8 @@ struct DocumentListView: View {
     var hideActionBar: Bool = false
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
+    @Environment(AuthViewModel.self) private var authVM
+    @Environment(AccessController.self) private var accessController
 
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
@@ -24,6 +26,7 @@ struct DocumentListView: View {
     @State private var shareResourceTitle: String = "All Documents"
     @AppStorage("aiConsentStatus") private var aiConsentStatus: String = "unset"
     @State private var showAIConsentAlert = false
+    @State private var showPremiumUpgrade = false
 
     private var contentTopInset: CGFloat {
         hideActionBar ? 82 : 70
@@ -209,6 +212,15 @@ struct DocumentListView: View {
         }.overlay(alignment: .bottom) {
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                guard accessController.request(
+                    .documentUpload,
+                    source: "document_scanner",
+                    appState: appState,
+                    userId: authVM.currentUser?.id
+                ) else {
+                    showPremiumUpgrade = true
+                    return
+                }
                 if aiConsentStatus == "unset" {
                     showAIConsentAlert = true
                 } else {
@@ -260,6 +272,9 @@ struct DocumentListView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             ShareEntitySheet(resourceId: shareResourceId, resourceType: shareResourceType, resourceTitle: shareResourceTitle)
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView(gate: accessController.pendingGate)
         }
         .fullScreenCover(isPresented: $isScanning) {
             DocumentScannerView(
@@ -459,7 +474,10 @@ struct DocumentListView: View {
                 
                 if aiConsentStatus != "no" {
                     let extractedText = try await DocumentProcessor.shared.extractText(from: images)
-                    categorization = await GeminiService.shared.categorizeDocument(text: extractedText, isPersonal: company.structure == "Personal")
+                    if accessController.permits(.aiAction, appState: appState, userId: authVM.currentUser?.id) {
+                        categorization = await GeminiService.shared.categorizeDocument(text: extractedText, isPersonal: company.structure == "Personal")
+                        await accessController.refresh()
+                    }
                     filename = categorization?["name"] ?? UUID().uuidString
                 } else {
                     filename = "Scanned_\(Int(Date().timeIntervalSince1970))"
@@ -773,6 +791,8 @@ struct EditDocumentSheet: View {
     let isNew: Bool
     let companyStructure: String
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authVM
+    @Environment(AccessController.self) private var accessController
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
     @State private var showShareSheet = false
@@ -781,6 +801,7 @@ struct EditDocumentSheet: View {
     @State private var showFileImporter = false
     @State private var isUploading = false
     @State private var uploadError: String? = nil
+    @State private var showPremiumUpgrade = false
     
     @State private var inputMode: Int = 0 // 0 = File, 1 = Link
     
@@ -804,12 +825,13 @@ struct EditDocumentSheet: View {
     
     struct Snapshot: Equatable {
         var name, type, url, uploadDate, notes: String
+        var expiresAt: Date?
     }
     
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: doc.name, type: doc.type, url: doc.url ?? "", uploadDate: doc.uploadDate ?? "", notes: doc.notes ?? "")
+        Snapshot(name: doc.name, type: doc.type, url: doc.url ?? "", uploadDate: doc.uploadDate ?? "", notes: doc.notes ?? "", expiresAt: doc.expiresAt)
     }
 
     private var isDirty: Bool {
@@ -855,6 +877,34 @@ struct EditDocumentSheet: View {
                                             Spacer()
                                         }
                                         .cifrField()
+                                    }
+
+                                    Toggle("EXPIRATION OR RENEWAL", isOn: Binding(
+                                        get: { doc.expiresAt != nil },
+                                        set: { enabled in
+                                            doc.expiresAt = enabled
+                                                ? (doc.expiresAt ?? Calendar.current.date(byAdding: .year, value: 1, to: Date()))
+                                                : nil
+                                        }
+                                    ))
+                                    .font(.system(size: 11, weight: .bold))
+                                    .tint(Color.zifrGold)
+
+                                    if doc.expiresAt != nil {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text("Expiration Date").zifrLabel()
+                                            DatePicker(
+                                                "Expiration Date",
+                                                selection: Binding(
+                                                    get: { doc.expiresAt ?? Date() },
+                                                    set: { doc.expiresAt = $0 }
+                                                ),
+                                                displayedComponents: .date
+                                            )
+                                            .labelsHidden()
+                                            .tint(.zifrBlue)
+                                            .cifrField()
+                                        }
                                     }
                                 }
                             }
@@ -903,7 +953,16 @@ struct EditDocumentSheet: View {
                                             HStack(spacing: 12) {
                                                 Button {
                                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                    showFileImporter = true
+                                                    if accessController.request(
+                                                        .documentUpload,
+                                                        source: "document_file_upload",
+                                                        appState: appState,
+                                                        userId: authVM.currentUser?.id
+                                                    ) {
+                                                        showFileImporter = true
+                                                    } else {
+                                                        showPremiumUpgrade = true
+                                                    }
                                                 } label: {
                                                     HStack {
                                                         Spacer()
@@ -966,6 +1025,8 @@ struct EditDocumentSheet: View {
                                     .padding(12).background(Color.white.opacity(0.05))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
+
+                            ResourceConnectionsSection(reference: ResourceReference(kind: .document, resourceId: doc.id))
                             
                             // MARK: – Actions
                             if !isNew {
@@ -1049,6 +1110,16 @@ struct EditDocumentSheet: View {
             }
             .onChange(of: selectedPhotoItem) { _, item in
                 guard let item = item else { return }
+                guard accessController.request(
+                    .documentUpload,
+                    source: "document_photo_upload",
+                    appState: appState,
+                    userId: authVM.currentUser?.id
+                ) else {
+                    selectedPhotoItem = nil
+                    showPremiumUpgrade = true
+                    return
+                }
                 isUploading = true
                 uploadError = nil
                 
@@ -1161,6 +1232,7 @@ struct EditDocumentSheet: View {
                             doc.url = snap.url
                             doc.uploadDate = snap.uploadDate
                             doc.notes = snap.notes
+                            doc.expiresAt = snap.expiresAt
                         }
                         dismiss() 
                     }
@@ -1178,6 +1250,9 @@ struct EditDocumentSheet: View {
             .interactiveDismissDisabled(isNew)
             .sheet(isPresented: $showShareSheet) {
                 ShareEntitySheet(resourceId: doc.id, resourceType: "document", resourceTitle: doc.name.isEmpty ? "Document" : doc.name)
+            }
+            .sheet(isPresented: $showPremiumUpgrade) {
+                PremiumUpgradeView(gate: accessController.pendingGate)
             }
         }
     }

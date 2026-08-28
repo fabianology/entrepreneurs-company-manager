@@ -45,4 +45,16 @@ targets:
         INFOPLIST_FILE: Zifr/Info.plist
         CODE_SIGN_ENTITLEMENTS: Zifr/Zifr.entitlements
     scheme:
-      testTargets: []
+      testTargets:
+        - ZifrTests
+  ZifrTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ZifrTests
+    dependencies:
+      - target: Zifr
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vibing.miloom.tests
+        GENERATE_INFOPLIST_FILE: YES

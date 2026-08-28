@@ -21,6 +21,20 @@
                ReferencedContainer = "container:Zifr.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "9F45B4BAE9AB16D6FB42C659"
+               BuildableName = "ZifrTests.xctest"
+               BlueprintName = "ZifrTests"
+               ReferencedContainer = "container:Zifr.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -39,6 +53,16 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "9F45B4BAE9AB16D6FB42C659"
+               BuildableName = "ZifrTests.xctest"
+               BlueprintName = "ZifrTests"
+               ReferencedContainer = "container:Zifr.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>

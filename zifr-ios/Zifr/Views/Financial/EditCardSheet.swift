@@ -585,6 +585,12 @@ struct EditCardSheet: View {
                 VStack(spacing: 20) {
                     SharedItemOverrideBanner(resourceId: card.id, defaultCompanyId: card.companyId)
 
+                    if !isNew {
+                        ResourceConnectionsSection(
+                            reference: ResourceReference(kind: .card, resourceId: card.id)
+                        )
+                    }
+
                     Group {
                         if !isInstitutionContext {
                             ZifrSheetCard(title: "FINANCIAL INSTITUTION", icon: "building.columns") {

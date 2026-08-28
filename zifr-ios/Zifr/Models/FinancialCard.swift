@@ -12,6 +12,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
     var cardNumber: String?
     var last4: String?
     var expiry: String?
+    var expiresAt: Date?
     var network: String
     var type: String
     var status: String
@@ -40,6 +41,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         case cardNumber = "card_number"
         case last4
         case expiry
+        case expiresAt = "expires_at"
         case network
         case type
         case status
@@ -69,6 +71,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         cardNumber: String? = nil,
         last4: String? = nil,
         expiry: String? = nil,
+        expiresAt: Date? = nil,
         network: String = "Visa",
         type: String = "Credit",
         status: String = "Active",
@@ -96,6 +99,7 @@ struct FinancialCard: Identifiable, Codable, Hashable {
         self.cardNumber = cardNumber
         self.last4 = last4
         self.expiry = expiry
+        self.expiresAt = expiresAt
         self.network = network
         self.type = type
         self.status = status

@@ -288,6 +288,12 @@ struct EditSubscriptionSheet: View {
                 VStack(spacing: 20) {
                     SharedItemOverrideBanner(resourceId: sub.id, defaultCompanyId: sub.companyId)
 
+                    if !isNew {
+                        ResourceConnectionsSection(
+                            reference: ResourceReference(kind: .subscription, resourceId: sub.id)
+                        )
+                    }
+
                     Group {
                         // MARK: – Identity & Service Details Card
                         ZifrSheetCard(title: "SERVICE DETAILS", icon: "lock.shield") {

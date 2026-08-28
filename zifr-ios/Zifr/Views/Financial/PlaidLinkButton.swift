@@ -2,6 +2,9 @@ import SwiftUI
 import LinkKit
 
 struct PlaidLinkButton: View {
+    @SwiftUI.Environment(AppState.self) private var appState
+    @SwiftUI.Environment(AuthViewModel.self) private var authVM
+    @SwiftUI.Environment(AccessController.self) private var accessController
     let companyId: UUID
     var institutionId: UUID? = nil
     var buttonText: String = "Connect Bank via Plaid"
@@ -13,6 +16,7 @@ struct PlaidLinkButton: View {
     @State private var linkHandler: LinkKit.Handler?
     
     @State private var isExchangingToken = false
+    @State private var showingPremiumUpgrade = false
     
     var body: some View {
         Group {
@@ -42,7 +46,16 @@ struct PlaidLinkButton: View {
                 )
             } else {
                 Button {
-                    Task { await startLink() }
+                    if isReconnect || accessController.request(
+                        .plaidConnection,
+                        source: "plaid_link",
+                        appState: appState,
+                        userId: authVM.currentUser?.id
+                    ) {
+                        Task { await startLink() }
+                    } else {
+                        showingPremiumUpgrade = true
+                    }
                 } label: {
                     HStack(spacing: 12) {
                         if isLoading {
@@ -70,6 +83,9 @@ struct PlaidLinkButton: View {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             if let errorMessage { Text(errorMessage) }
+        }
+        .sheet(isPresented: $showingPremiumUpgrade) {
+            PremiumUpgradeView(gate: accessController.pendingGate)
         }
     }
     
