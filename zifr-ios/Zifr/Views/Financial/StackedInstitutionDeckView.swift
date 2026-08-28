@@ -60,6 +60,34 @@ struct StackedInstitutionDeckView: View {
         .onPreferenceChange(InstitutionHeightKey.self) { value in
             institutionHeights.merge(value, uniquingKeysWith: { $1 })
         }
+        .onAppear {
+            setSingleInstitutionDefaultIfNeeded()
+        }
+        .onChange(of: institutions.map(\.id)) { previousInstitutionIds, institutionIds in
+            if institutionIds.count == 1 {
+                if expandedInstId != institutionIds[0] {
+                    setExpandedInstitutionWithoutAnimation(institutionIds[0])
+                }
+            } else if institutionIds.count > previousInstitutionIds.count {
+                poppedCardId = nil
+                setExpandedInstitutionWithoutAnimation(nil)
+            } else if let expandedInstId, !institutionIds.contains(expandedInstId) {
+                self.expandedInstId = nil
+            }
+        }
+    }
+
+    private func setSingleInstitutionDefaultIfNeeded() {
+        guard institutions.count == 1, expandedInstId == nil else { return }
+        setExpandedInstitutionWithoutAnimation(institutions[0].id)
+    }
+
+    private func setExpandedInstitutionWithoutAnimation(_ institutionId: UUID?) {
+        var transaction = SwiftUI.Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            expandedInstId = institutionId
+        }
     }
     
     // MARK: - Per-Institution Slice
