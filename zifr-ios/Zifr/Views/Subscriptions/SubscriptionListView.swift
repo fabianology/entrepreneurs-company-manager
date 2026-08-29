@@ -318,6 +318,9 @@ struct StackedSubscriptionDeckView: View {
                             }
                         )
                         .frame(maxWidth: .infinity)
+                        // Keep the deck's explicit container height from being
+                        // proposed back into the card and creating a growth loop.
+                        .fixedSize(horizontal: false, vertical: true)
                         .clipShape(cardShape)
                         .overlay(
                             cardShape
@@ -455,7 +458,6 @@ struct StackedSubscriptionDeckView: View {
         }
     }
 }
-
 
 
 

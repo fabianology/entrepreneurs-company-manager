@@ -15,7 +15,7 @@ struct AddSubscriptionWizard: View {
     // HUD states
     @State private var showSubServiceHUD = false
     @State private var subDraft = SubService()
-    @State private var subDraftIndex: Int? = nil
+    @State private var subDraftID: String? = nil
     @State private var isNewSubService = false
 
     @State private var showEmailHUD = false
@@ -109,7 +109,11 @@ struct AddSubscriptionWizard: View {
                     cards: cards,
                     onSave: {
                         var services = sub.subServices
-                        if let idx = subDraftIndex {
+                        if let subDraftID {
+                            guard let idx = services.firstIndex(where: { $0.id == subDraftID }) else {
+                                showSubServiceHUD = false
+                                return
+                            }
                             services[idx] = subDraft
                         } else {
                             services.append(subDraft)
@@ -119,8 +123,8 @@ struct AddSubscriptionWizard: View {
                     },
                     onCancel: { showSubServiceHUD = false },
                     onDelete: {
-                        if let idx = subDraftIndex {
-                            sub.subServices.remove(at: idx)
+                        if let subDraftID {
+                            sub.subServices.removeAll { $0.id == subDraftID }
                         }
                         showSubServiceHUD = false
                     }
@@ -531,7 +535,7 @@ struct AddSubscriptionWizard: View {
             VStack(spacing: 12) {
                 Button {
                     subDraft = SubService()
-                    subDraftIndex = nil
+                    subDraftID = nil
                     isNewSubService = true
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     showSubServiceHUD = true
@@ -546,11 +550,10 @@ struct AddSubscriptionWizard: View {
                 }
                 .buttonStyle(MiloomSecondaryButtonStyle())
                 
-                ForEach(sub.subServices.indices, id: \.self) { i in
-                    let ss = sub.subServices[i]
+                ForEach(sub.subServices) { ss in
                     Button {
                         subDraft = ss
-                        subDraftIndex = i
+                        subDraftID = ss.id
                         isNewSubService = false
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showSubServiceHUD = true

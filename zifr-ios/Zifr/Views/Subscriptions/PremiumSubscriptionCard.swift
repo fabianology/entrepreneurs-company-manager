@@ -34,7 +34,7 @@ struct PremiumSubscriptionCard: View {
     // Sub-service HUD state
     @State private var showSubServiceHUD = false
     @State private var subDraft = SubService()
-    @State private var subDraftIndex: Int? = nil
+    @State private var subDraftID: String? = nil
     @State private var isNewSubService = false
 
     // Linked email HUD state
@@ -48,10 +48,16 @@ struct PremiumSubscriptionCard: View {
         sub.billingCycle == "Monthly" ? sub.monthlyTotal : sub.yearlyTotal
     }
     var primaryLabel: String { sub.billingCycle == "Monthly" ? "recur/mo." : "recur/yr." }
+    var displayedPrimaryLabel: String {
+        revealLevel == .full ? (sub.billingCycle == "Monthly" ? "/mo" : "/yr") : primaryLabel
+    }
     var secondaryTotal: Double {
         sub.billingCycle == "Monthly" ? sub.yearlyTotal : sub.monthlyTotal
     }
     var secondaryLabel: String { sub.billingCycle == "Monthly" ? "recur/yr." : "recur/mo." }
+    var displayedSecondaryLabel: String {
+        revealLevel == .full ? (sub.billingCycle == "Monthly" ? "/yr" : "/mo") : secondaryLabel
+    }
     var totalAnnual: Double { (sub.monthlyTotal * 12) + sub.yearlyTotal }
 
     var formattedDueOn: String {
@@ -181,11 +187,11 @@ struct PremiumSubscriptionCard: View {
                                     }
                                     .padding(.top, 2)
                                 } else {
-                                    HStack(spacing: 14) {
-                                        costColumn(value: primaryTotal, label: primaryLabel)
+                                    HStack(spacing: revealLevel == .full ? 10 : 14) {
+                                        costColumn(value: primaryTotal, label: displayedPrimaryLabel)
                                         if secondaryTotal > 0 {
                                             dividerLine()
-                                            costColumn(value: secondaryTotal, label: secondaryLabel)
+                                            costColumn(value: secondaryTotal, label: displayedSecondaryLabel)
                                         }
                                     }
                                 }
@@ -221,7 +227,8 @@ struct PremiumSubscriptionCard: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.leading, 24)
+                    .padding(.trailing, 24)
                     .padding(.top, 10)
                     .padding(.bottom, 10)
                     .simultaneousGesture(
@@ -349,11 +356,10 @@ struct PremiumSubscriptionCard: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 }) {
                 VStack(spacing: 0) {
-                    ForEach(sub.subServices.indices, id: \.self) { i in
-                        let ss = sub.subServices[i]
+                    ForEach(Array(sub.subServices.enumerated()), id: \.element.id) { i, ss in
                         Button {
                             subDraft = ss
-                            subDraftIndex = i
+                            subDraftID = ss.id
                             isNewSubService = false
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             showSubServiceHUD = true
@@ -445,7 +451,7 @@ struct PremiumSubscriptionCard: View {
                     
                     Button {
                         subDraft = SubService()
-                        subDraftIndex = nil
+                        subDraftID = nil
                         isNewSubService = true
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         showSubServiceHUD = true
@@ -559,7 +565,11 @@ struct PremiumSubscriptionCard: View {
                 onSave: {
                     var modifiedSub = sub
                     var services = modifiedSub.subServices
-                    if let idx = subDraftIndex {
+                    if let subDraftID {
+                        guard let idx = services.firstIndex(where: { $0.id == subDraftID }) else {
+                            showSubServiceHUD = false
+                            return
+                        }
                         services[idx] = subDraft
                     } else {
                         services.append(subDraft)
@@ -570,9 +580,9 @@ struct PremiumSubscriptionCard: View {
                 },
                 onCancel: { showSubServiceHUD = false },
                 onDelete: {
-                    if let idx = subDraftIndex {
+                    if let subDraftID {
                         var modifiedSub = sub
-                        modifiedSub.subServices.remove(at: idx)
+                        modifiedSub.subServices.removeAll { $0.id == subDraftID }
                         onSave?(modifiedSub)
                     }
                     showSubServiceHUD = false
@@ -623,9 +633,14 @@ struct PremiumSubscriptionCard: View {
             Text("$\(String(format: "%.0f", value))")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
             Text(label)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color(hex: "#C1AA78"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
         }
     }
 

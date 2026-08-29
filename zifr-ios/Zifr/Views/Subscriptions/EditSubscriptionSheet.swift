@@ -29,7 +29,7 @@ struct EditSubscriptionSheet: View {
     // Sub-service HUD state — lifted here to avoid nested-sheet dismissal bug
     @State private var showSubServiceHUD = false
     @State private var subDraft = SubService()
-    @State private var subDraftIndex: Int? = nil
+    @State private var subDraftID: String? = nil
 
     // Linked email HUD state — also lifted to NavigationStack level
     @State private var showEmailHUD = false
@@ -427,16 +427,16 @@ struct EditSubscriptionSheet: View {
 
                         // MARK: – Supplemental Services
                         SubServicesSection(
-                            sub: sub,
+                            sub: $sub,
                             onAdd: {
                                 subDraft = SubService()
-                                subDraftIndex = nil
+                                subDraftID = nil
                                 showSubServiceHUD = true
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             },
-                            onEdit: { idx, service in
+                            onEdit: { service in
                                 subDraft = service
-                                subDraftIndex = idx
+                                subDraftID = service.id
                                 showSubServiceHUD = true
                             }
                         )
@@ -601,13 +601,17 @@ struct EditSubscriptionSheet: View {
             .sheet(isPresented: $showSubServiceHUD) {
                 SubServiceHUD(
                     draft: $subDraft,
-                    isNew: subDraftIndex == nil,
+                    isNew: subDraftID == nil,
                     companyId: sub.companyId,
                     institutions: institutions,
                     cards: cards,
                     onSave: {
                         var services = sub.subServices
-                        if let idx = subDraftIndex {
+                        if let subDraftID {
+                            guard let idx = services.firstIndex(where: { $0.id == subDraftID }) else {
+                                showSubServiceHUD = false
+                                return
+                            }
                             services[idx] = subDraft
                         } else {
                             services.append(subDraft)
@@ -617,7 +621,9 @@ struct EditSubscriptionSheet: View {
                     },
                     onCancel: { showSubServiceHUD = false },
                     onDelete: {
-                        if let idx = subDraftIndex { sub.subServices.remove(at: idx) }
+                        if let subDraftID {
+                            sub.subServices.removeAll { $0.id == subDraftID }
+                        }
                         showSubServiceHUD = false
                     }
                 )
@@ -688,9 +694,9 @@ struct EditSubscriptionSheet: View {
 // MARK: – Supplemental Services Section
 
 struct SubServicesSection: View {
-    @State var sub: Subscription
+    @Binding var sub: Subscription
     let onAdd: () -> Void
-    let onEdit: (Int, SubService) -> Void
+    let onEdit: (SubService) -> Void
 
     var body: some View {
         ZifrSheetCard(
@@ -701,11 +707,10 @@ struct SubServicesSection: View {
         ) {
             if !sub.subServices.isEmpty {
                 VStack(spacing: 8) {
-                    ForEach(sub.subServices.indices, id: \.self) { i in
-                        let ss = sub.subServices[i]
+                    ForEach(sub.subServices) { ss in
                         Button { 
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            onEdit(i, ss) 
+                            onEdit(ss)
                         } label: {
                             HStack(spacing: 12) {
                                 VStack(alignment: .leading, spacing: 4) {
@@ -752,9 +757,7 @@ struct SubServicesSection: View {
                         .contextMenu {
                             Button(role: .destructive) {
                                 withAnimation {
-                                    var services = sub.subServices
-                                    services.remove(at: i)
-                                    sub.subServices = services
+                                    sub.subServices.removeAll { $0.id == ss.id }
                                 }
                             } label: {
                                 Label("Delete Sub-Service", systemImage: "trash")
