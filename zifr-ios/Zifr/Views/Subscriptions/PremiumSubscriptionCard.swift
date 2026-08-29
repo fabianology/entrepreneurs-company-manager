@@ -20,6 +20,7 @@ struct PremiumSubscriptionCard: View {
     var onSave: ((Subscription) -> Void)? = nil
     var revealLevel: CardRevealLevel = .full
     var isExplicitlyFull: Bool = true
+    var extendsUnderNextCard: Bool = false
     var onExpand: (() -> Void)? = nil
     var onCollapse: (() -> Void)? = nil
     var onDragChanged: ((DragGesture.Value) -> Void)? = nil
@@ -138,10 +139,11 @@ struct PremiumSubscriptionCard: View {
     }
 
     var body: some View {
+        let showsBottomCorners = revealLevel == .full || !extendsUnderNextCard
         let innerShape = UnevenRoundedRectangle(
             topLeadingRadius: 24,
-            bottomLeadingRadius: revealLevel == .full ? 24 : 0,
-            bottomTrailingRadius: revealLevel == .full ? 24 : 0,
+            bottomLeadingRadius: showsBottomCorners ? 24 : 0,
+            bottomTrailingRadius: showsBottomCorners ? 24 : 0,
             topTrailingRadius: 24
         )
         VStack(spacing: 0) {
@@ -544,6 +546,9 @@ struct PremiumSubscriptionCard: View {
                 }
             }
         }
+        // Match the financial deck: a collapsed rear card continues beneath
+        // the next card so its bottom edge cannot show around the front card.
+        .frame(minHeight: extendsUnderNextCard ? 148 : nil, alignment: .top)
         .background(
             innerShape
                 .fill(Color(hex: "#1C1C1E").opacity(0.40))
@@ -647,7 +652,9 @@ struct PremiumSubscriptionCard: View {
     private func dividerLine() -> some View {
         Rectangle()
             .fill(Color.white.opacity(0.06))
-            .frame(width: 1)
+            // A flexible-height divider adopts the hidden card extension's
+            // height and pulls two-column prices below the collapsed header.
+            .frame(width: 1, height: 16)
             .padding(.vertical, 2)
     }
 

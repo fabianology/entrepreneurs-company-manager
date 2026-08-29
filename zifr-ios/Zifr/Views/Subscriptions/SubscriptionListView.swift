@@ -266,6 +266,8 @@ struct StackedSubscriptionDeckView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var cardHeights: [UUID: CGFloat] = [:]
 
+    private let collapsedPeekOffset: CGFloat = 71
+
     private func level(for sub: Subscription, index: Int) -> CardRevealLevel {
         if let lvl = revealLevels[sub.id] { return lvl }
         // Default initial state (Pic 1): Last card in stack is .full, preceding cards are .headerOnly
@@ -281,10 +283,12 @@ struct StackedSubscriptionDeckView: View {
                     ForEach(Array(subscriptions.enumerated()), id: \.element.id) { index, sub in
                         let currentLevel = level(for: sub, index: index)
                         let yOffset = calculateYOffset(forIndex: index)
+                        let extendsUnderNextCard = currentLevel != .full && index < subscriptions.count - 1
+                        let showsBottomCorners = currentLevel == .full || !extendsUnderNextCard
                         let cardShape = UnevenRoundedRectangle(
                             topLeadingRadius: 24,
-                            bottomLeadingRadius: currentLevel == .full ? 24 : 0,
-                            bottomTrailingRadius: currentLevel == .full ? 24 : 0,
+                            bottomLeadingRadius: showsBottomCorners ? 24 : 0,
+                            bottomTrailingRadius: showsBottomCorners ? 24 : 0,
                             topTrailingRadius: 24
                         )
 
@@ -298,6 +302,7 @@ struct StackedSubscriptionDeckView: View {
                             onSave: onSave,
                             revealLevel: currentLevel,
                             isExplicitlyFull: revealLevels[sub.id] == .full,
+                            extendsUnderNextCard: extendsUnderNextCard,
                             onExpand: {
                                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
                                     revealLevels[sub.id] = .full
@@ -370,7 +375,7 @@ struct StackedSubscriptionDeckView: View {
             let lvl = level(for: sub, index: i)
             switch lvl {
             case .headerOnly, .statusRevealed:
-                offset += 68.0
+                offset += collapsedPeekOffset
             case .full:
                 offset += cardHeights[sub.id, default: 340] + 8
             }
@@ -458,6 +463,4 @@ struct StackedSubscriptionDeckView: View {
         }
     }
 }
-
-
 
