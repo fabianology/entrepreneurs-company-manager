@@ -645,7 +645,11 @@ struct TransactionFeedView: View {
     }
 
     private var trackedSubscriptionNames: Set<String> {
-        Set(appState.subscriptions.map { SubscriptionDetector.normalize($0.name) })
+        let relevant = appState.subscriptions.filter { subscription in
+            guard let companyId = resolvedCompanyId else { return true }
+            return subscription.companyId == companyId
+        }
+        return Set(relevant.map { SubscriptionDetector.normalize($0.name) })
     }
 
     private func isTrackedSubscription(_ tx: Transaction) -> Bool {
@@ -659,7 +663,8 @@ struct TransactionFeedView: View {
         return SubscriptionDetector.detect(
             transactions: filteredTransactions,
             existingSubscriptions: appState.subscriptions,
-            filterAccountId: target
+            filterAccountId: target,
+            companyId: resolvedCompanyId
         )
     }
 

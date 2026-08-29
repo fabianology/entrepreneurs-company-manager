@@ -579,11 +579,12 @@ struct Transaction: Identifiable, Codable, Equatable {
     var amount: Double? = 0.0
     var date: String = ""
     var name: String? = ""
+    var merchantWebsite: String? = nil
     var category: [String]? = nil
     var pending: Bool? = false
     
     enum CodingKeys: String, CodingKey {
-        case id, userId = "user_id", companyId = "company_id", institutionId = "institution_id", accountId = "account_id", amount, date, name, category, pending
+        case id, userId = "user_id", companyId = "company_id", institutionId = "institution_id", accountId = "account_id", amount, date, name, merchantWebsite = "merchant_website", category, pending
     }
     
     init() {}
@@ -609,6 +610,7 @@ struct Transaction: Identifiable, Codable, Equatable {
         self.amount = try container.decodeIfPresent(Double.self, forKey: .amount)
         self.date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
         self.name = (try? container.decodeIfPresent(String.self, forKey: .name)) ?? "Unknown"
+        self.merchantWebsite = try container.decodeIfPresent(String.self, forKey: .merchantWebsite)
         self.category = try container.decodeIfPresent([String].self, forKey: .category)
         self.pending = try container.decodeIfPresent(Bool.self, forKey: .pending)
     }

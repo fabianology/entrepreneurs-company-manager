@@ -169,6 +169,16 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(BriefingResourceCategory.category(for: .card), .card)
         XCTAssertEqual(BriefingResourceCategory.category(for: .loan), .loan)
         XCTAssertEqual(BriefingResourceCategory.category(for: .document), .document)
+
+        var potentialSubscription = makeObligation(
+            state: .open,
+            sourceType: .institution,
+            kind: "new_recurring_charge"
+        )
+        XCTAssertEqual(BriefingResourceCategory.category(for: potentialSubscription), .subscription)
+
+        potentialSubscription.sourceType = .card
+        XCTAssertEqual(BriefingResourceCategory.category(for: potentialSubscription), .subscription)
     }
 
     func testBriefingDateLabelUsesRequestedFormat() {
@@ -177,6 +187,343 @@ final class PremiumEngineTests: XCTestCase {
         calendar.timeZone = timeZone
         let date = calendar.date(from: DateComponents(year: 2027, month: 5, day: 5, hour: 12))!
         XCTAssertEqual(OwnerBriefingPresentation.dateLabel(for: date, timeZone: timeZone), "May 5 2027")
+    }
+
+    func testRecurringPaymentDetectionOnlyReturnsUntrackedSubscriptions() {
+        let owner = UUID(), company = UUID()
+        let transactions = [
+            makeTransaction(owner: owner, company: company, name: "Netflix", amount: 19.99, date: "2027-03-05"),
+            makeTransaction(owner: owner, company: company, name: "Netflix", amount: 19.99, date: "2027-04-05"),
+            makeTransaction(owner: owner, company: company, name: "Figma", amount: 15, date: "2027-03-10"),
+            makeTransaction(owner: owner, company: company, name: "Figma", amount: 15, date: "2027-04-10"),
+        ]
+        let tracked = Subscription(userId: owner, companyId: company, name: "Figma")
+
+        let detected = SubscriptionDetector.detect(
+            transactions: transactions,
+            existingSubscriptions: [tracked]
+        )
+
+        XCTAssertEqual(detected.map(\.name), ["Netflix"])
+        XCTAssertEqual(detected.first?.frequency, "Monthly")
+        XCTAssertEqual(detected.first?.occurrences, 2)
+    }
+
+    func testRecurringSuggestionsAreCompanyScopedAndDisappearAfterImport() {
+        let owner = UUID()
+        let companyA = Company(userId: owner, name: "Alpha", structure: "LLC")
+        let companyB = Company(userId: owner, name: "Beta", structure: "LLC")
+        let transactions = [
+            makeTransaction(owner: owner, company: companyA.id, name: "Notion", amount: 20, date: "2027-03-01"),
+            makeTransaction(owner: owner, company: companyA.id, name: "Notion", amount: 20, date: "2027-04-01"),
+            makeTransaction(owner: owner, company: companyB.id, name: "Notion", amount: 20, date: "2027-03-01"),
+            makeTransaction(owner: owner, company: companyB.id, name: "Notion", amount: 20, date: "2027-04-01")
+        ]
+        let alphaSubscription = Subscription(userId: owner, companyId: companyA.id, name: "Notion")
+
+        let allCompanySuggestions = SubscriptionDetector.detect(
+            transactions: transactions,
+            existingSubscriptions: []
+        )
+        XCTAssertEqual(allCompanySuggestions.count, 2)
+        XCTAssertEqual(Set(allCompanySuggestions.map(\.id)).count, 2)
+
+        let companyScoped = SubscriptionDetector.detect(
+            transactions: transactions,
+            existingSubscriptions: [alphaSubscription]
+        )
+
+        XCTAssertEqual(companyScoped.count, 1)
+        XCTAssertEqual(companyScoped.first?.companyId, companyB.id)
+
+        let state = AppState()
+        state.companies = [companyA, companyB]
+        state.transactions = transactions
+        state.subscriptions = [alphaSubscription]
+        let beforeImport = OwnerHealthEngine.snapshot(appState: state, scope: .business)
+        let subscriptionHealth = beforeImport.categories.first { $0.category == .subscription }
+        XCTAssertEqual(subscriptionHealth?.recurringSuggestions.count, 1)
+        XCTAssertEqual(subscriptionHealth?.recurringSuggestions.first?.companyId, companyB.id)
+
+        state.subscriptions.append(Subscription(userId: owner, companyId: companyB.id, name: "Notion"))
+        let afterImport = OwnerHealthEngine.snapshot(appState: state, scope: .business)
+        XCTAssertTrue(afterImport.categories.first { $0.category == .subscription }?.recurringSuggestions.isEmpty == true)
+    }
+
+    func testPendingTransactionsDoNotCreateRecurringSuggestions() {
+        let owner = UUID(), company = UUID()
+        var first = makeTransaction(owner: owner, company: company, name: "Pending Merchant", amount: 25, date: "2027-03-01")
+        var second = makeTransaction(owner: owner, company: company, name: "Pending Merchant", amount: 25, date: "2027-04-01")
+        first.pending = true
+        second.pending = true
+
+        XCTAssertTrue(SubscriptionDetector.detect(
+            transactions: [first, second],
+            existingSubscriptions: []
+        ).isEmpty)
+    }
+
+    func testFinancialMovementsDoNotCreateRecurringSuggestions() {
+        let owner = UUID(), company = UUID()
+        let movements: [(String, [String])] = [
+            ("Zelle payment", ["Transfer"]),
+            ("ATM withdrawal", ["Cash"]),
+            ("Payment To Auto Loan", ["Loan Payment"]),
+            ("Citi Autopay", ["Payment"]),
+            ("DLR AP Monthly Payment", [])
+        ]
+        let transactions = movements.flatMap { name, category in
+            ["2027-03-01", "2027-04-01"].map { date -> Transaction in
+                var transaction = makeTransaction(
+                    owner: owner,
+                    company: company,
+                    name: name,
+                    amount: 50,
+                    date: date
+                )
+                transaction.category = category
+                return transaction
+            }
+        }
+
+        XCTAssertTrue(SubscriptionDetector.detect(
+            transactions: transactions,
+            existingSubscriptions: []
+        ).isEmpty)
+    }
+
+    func testImportedTransactionStreamIsSuppressedOnlyForItsCompany() {
+        let owner = UUID(), companyA = UUID(), companyB = UUID()
+        let transactions = [companyA, companyB].flatMap { company in
+            ["2027-03-01", "2027-04-01"].map {
+                makeTransaction(
+                    owner: owner,
+                    company: company,
+                    name: "Adobe Creative Cloud",
+                    amount: 59.99,
+                    date: $0
+                )
+            }
+        }
+        let imported = Subscription(
+            userId: owner,
+            companyId: companyA,
+            name: "Creative tools",
+            plaidStreamId: "detected_adobe creative cloud"
+        )
+
+        let detected = SubscriptionDetector.detect(
+            transactions: transactions,
+            existingSubscriptions: [imported]
+        )
+
+        XCTAssertEqual(detected.count, 1)
+        XCTAssertEqual(detected.first?.companyId, companyB)
+    }
+
+    func testDismissedRecurringSuggestionReturnsAfterANewTransactionMonth() {
+        let owner = UUID(), company = UUID()
+        let suiteName = "RecurringSuggestionDismissalTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let augustTransactions = [
+            makeTransaction(owner: owner, company: company, name: "Notion", amount: 20, date: "2027-07-12"),
+            makeTransaction(owner: owner, company: company, name: "Notion", amount: 20, date: "2027-08-12")
+        ]
+        let initial = SubscriptionDetector.detect(
+            transactions: augustTransactions,
+            existingSubscriptions: [],
+            dismissalDefaults: defaults
+        )
+        XCTAssertEqual(initial.count, 1)
+
+        RecurringSuggestionDismissalStore.dismiss(initial[0], defaults: defaults)
+        XCTAssertTrue(SubscriptionDetector.detect(
+            transactions: augustTransactions,
+            existingSubscriptions: [],
+            dismissalDefaults: defaults
+        ).isEmpty)
+
+        let septemberTransaction = makeTransaction(
+            owner: owner,
+            company: company,
+            name: "Notion",
+            amount: 20,
+            date: "2027-09-12"
+        )
+        XCTAssertEqual(SubscriptionDetector.detect(
+            transactions: augustTransactions + [septemberTransaction],
+            existingSubscriptions: [],
+            dismissalDefaults: defaults
+        ).count, 1)
+    }
+
+    func testDetectedSubscriptionImportAddsPaymentDayAndWebsite() {
+        let owner = UUID(), company = UUID()
+        var first = makeTransaction(owner: owner, company: company, name: "Adobe", amount: 59.99, date: "2027-03-17")
+        var latest = makeTransaction(owner: owner, company: company, name: "Adobe", amount: 59.99, date: "2027-04-17")
+        first.merchantWebsite = "https://adobe.com"
+        latest.merchantWebsite = "https://adobe.com"
+        let suggestion = SubscriptionDetector.detect(
+            transactions: [first, latest],
+            existingSubscriptions: []
+        )[0]
+
+        let imported = DetectedSubscriptionImportDefaults.make(
+            for: suggestion,
+            existingSubscriptions: []
+        )
+
+        XCTAssertEqual(imported.nextRenewal, "17")
+        XCTAssertEqual(imported.website, "https://adobe.com")
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        XCTAssertEqual(imported.nextRenewalAt.map(formatter.string), "2027-05-17")
+    }
+
+    func testOwnerHealthSeparatesBusinessAndPersonalScopes() {
+        let owner = UUID()
+        let business = Company(
+            userId: owner,
+            name: "Northstar LLC",
+            structure: "LLC",
+            companyDescription: "Consulting",
+            website: "northstar.example"
+        )
+        let personal = Company(
+            userId: owner,
+            name: "Personal",
+            structure: "Individual",
+            companyDescription: "Personal portfolio",
+            website: "personal.example"
+        )
+        let state = AppState()
+        state.companies = [business, personal]
+        state.subscriptions = [
+            Subscription(
+                userId: owner,
+                companyId: business.id,
+                name: "Business SaaS",
+                cost: 25,
+                paymentMethod: "Business Card",
+                nextRenewalAt: Date().addingTimeInterval(10 * 86_400)
+            ),
+            Subscription(
+                userId: owner,
+                companyId: personal.id,
+                name: "Personal Music",
+                cost: 12,
+                paymentMethod: "Personal Card",
+                nextRenewalAt: Date().addingTimeInterval(10 * 86_400)
+            )
+        ]
+        var potential = makeObligation(
+            state: .open,
+            severity: .attention,
+            sourceType: .institution,
+            kind: "new_recurring_charge"
+        )
+        potential.companyId = business.id
+        state.obligations = [potential]
+        state.transactions = [
+            makeTransaction(owner: owner, company: business.id, name: "Shadow SaaS", amount: 40, date: "2027-03-01"),
+            makeTransaction(owner: owner, company: business.id, name: "Shadow SaaS", amount: 40, date: "2027-04-01")
+        ]
+
+        let businessSnapshot = OwnerHealthEngine.snapshot(appState: state, scope: .business)
+        let personalSnapshot = OwnerHealthEngine.snapshot(appState: state, scope: .personal)
+        let businessSubscriptions = businessSnapshot.categories.first { $0.category == .subscription }
+        let personalSubscriptions = personalSnapshot.categories.first { $0.category == .subscription }
+
+        XCTAssertEqual(businessSnapshot.entityCount, 1)
+        XCTAssertEqual(personalSnapshot.entityCount, 1)
+        XCTAssertEqual(businessSubscriptions?.status, .needsAttention)
+        XCTAssertEqual(businessSubscriptions?.affectedEntityNames, ["Northstar LLC"])
+        XCTAssertEqual(personalSubscriptions?.status, .healthy)
+        XCTAssertTrue(personalSnapshot.affectedEntityNames.isEmpty)
+    }
+
+    func testOwnerHealthKeepsMissingOptionalDataSeparateFromHealth() {
+        let owner = UUID()
+        let business = Company(userId: owner, name: "Studio", structure: "LLC")
+        let state = AppState()
+        state.companies = [business]
+        state.cards = [FinancialCard(userId: owner, companyId: business.id, name: "Operating Card")]
+
+        let snapshot = OwnerHealthEngine.snapshot(appState: state, scope: .business)
+        let cards = snapshot.categories.first { $0.category == .card }
+
+        XCTAssertEqual(cards?.status, .healthy)
+        guard case .moreDataUseful(let count) = cards?.dataState else {
+            return XCTFail("Expected incomplete card details to be informational")
+        }
+        XCTAssertEqual(count, 1)
+        XCTAssertEqual(cards?.dataIssues.first?.resourceName, "Operating Card")
+        XCTAssertTrue(cards?.dataIssues.first?.missingFields.contains("Expiration date") == true)
+
+        let issueID = try! XCTUnwrap(cards?.dataIssues.first?.id)
+        let ignoredSnapshot = OwnerHealthEngine.snapshot(
+            appState: state,
+            scope: .business,
+            ignoredDataIssueIDs: [issueID]
+        )
+        let ignoredCards = ignoredSnapshot.categories.first { $0.category == .card }
+        XCTAssertEqual(ignoredCards?.dataState, .complete)
+        XCTAssertTrue(ignoredCards?.dataIssues.isEmpty == true)
+    }
+
+    func testOwnerHealthNamesEntityWithExpiredCard() {
+        let owner = UUID()
+        let business = Company(userId: owner, name: "Acme", structure: "S-Corp")
+        let state = AppState()
+        state.companies = [business]
+        state.cards = [FinancialCard(
+            userId: owner,
+            companyId: business.id,
+            name: "Corporate Card",
+            expiresAt: Date().addingTimeInterval(-86_400),
+            limit: 10_000
+        )]
+
+        let snapshot = OwnerHealthEngine.snapshot(appState: state, scope: .business)
+        let cards = snapshot.categories.first { $0.category == .card }
+
+        XCTAssertEqual(cards?.status, .critical)
+        XCTAssertEqual(cards?.affectedEntityNames, ["Acme"])
+        XCTAssertEqual(snapshot.status, .critical)
+    }
+
+    func testOwnerHealthCreditUtilizationExcludesDebitBalances() {
+        let owner = UUID()
+        let business = Company(userId: owner, name: "Acme", structure: "LLC")
+        let state = AppState()
+        state.companies = [business]
+        state.cards = [
+            FinancialCard(
+                userId: owner,
+                companyId: business.id,
+                name: "Credit",
+                type: "Credit",
+                limit: 2_000,
+                balance: 500
+            ),
+            FinancialCard(
+                userId: owner,
+                companyId: business.id,
+                name: "Debit",
+                type: "Debit",
+                balance: 5_000
+            )
+        ]
+
+        let snapshot = OwnerHealthEngine.snapshot(appState: state, scope: .business)
+        let cards = snapshot.categories.first { $0.category == .card }
+        let utilization = cards?.metrics.first { $0.label == "Utilization" }
+
+        XCTAssertEqual(utilization?.value, "25%")
+        XCTAssertEqual(cards?.status, .healthy)
     }
 
     @MainActor
@@ -203,6 +550,8 @@ final class PremiumEngineTests: XCTestCase {
     private func makeObligation(
         state: ObligationState,
         severity: ObligationSeverity = .info,
+        sourceType: ResourceKind = .subscription,
+        kind: String = "subscription_renewal",
         deferredAt: Date? = nil,
         snoozedUntil: Date? = nil,
         updatedAt: Date = Date(timeIntervalSince1970: 1_000_000)
@@ -212,9 +561,9 @@ final class PremiumEngineTests: XCTestCase {
             id: id,
             ownerUserId: UUID(),
             companyId: nil,
-            sourceType: .subscription,
+            sourceType: sourceType,
             sourceId: UUID(),
-            kind: "subscription_renewal",
+            kind: kind,
             dueAt: nil,
             severity: severity,
             title: "Test reminder",
@@ -227,5 +576,22 @@ final class PremiumEngineTests: XCTestCase {
             createdAt: updatedAt,
             updatedAt: updatedAt
         )
+    }
+
+    private func makeTransaction(
+        owner: UUID,
+        company: UUID,
+        name: String,
+        amount: Double,
+        date: String
+    ) -> Transaction {
+        var transaction = Transaction()
+        transaction.userId = owner
+        transaction.companyId = company
+        transaction.accountId = "checking"
+        transaction.name = name
+        transaction.amount = amount
+        transaction.date = date
+        return transaction
     }
 }

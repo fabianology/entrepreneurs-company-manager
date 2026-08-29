@@ -1,5 +1,72 @@
 import SwiftUI
 
+enum DashboardDisplayMode: String, CaseIterable, Identifiable {
+    case portfolio = "Portfolio"
+    case briefing = "Briefing"
+
+    var id: String { rawValue }
+}
+
+struct DashboardModePicker: View {
+    let selection: DashboardDisplayMode
+    let onSelect: (DashboardDisplayMode) -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(DashboardDisplayMode.allCases) { mode in
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onSelect(mode)
+                } label: {
+                    Text(mode.rawValue.uppercased())
+                        .font(.system(size: 12, weight: .bold))
+                        .tracking(0.7)
+                        .foregroundStyle(selection == mode ? Color.white : Color.white.opacity(0.42))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 40)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background {
+                    if selection == mode {
+                        pickerGlass(
+                            RoundedRectangle(cornerRadius: 13, style: .continuous),
+                            opacity: 0.44
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                .stroke(Color(hex: "#918457").opacity(0.72), lineWidth: 1)
+                        )
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: selection)
+            }
+        }
+        .padding(4)
+        .background {
+            pickerGlass(Capsule(), opacity: 0.25)
+        }
+        .overlay(Capsule().stroke(Color.white.opacity(0.12), lineWidth: 0.7))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Dashboard view")
+    }
+
+    @ViewBuilder
+    private func pickerGlass<S: Shape>(_ shape: S, opacity: Double) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(
+                    .clear.tint(Color.zifrTabBarFill.opacity(opacity)).interactive(),
+                    in: shape
+                )
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(shape.fill(Color.zifrTabBarFill.opacity(opacity)))
+        }
+    }
+}
+
 struct OwnerBriefingCard: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authVM
@@ -9,10 +76,6 @@ struct OwnerBriefingCard: View {
 
     @State private var showingBriefing = false
     @State private var showingUpgrade = false
-
-    private var visibleObligations: [PortfolioObligation] {
-        Array(appState.openObligations.prefix(3))
-    }
 
     var body: some View {
         Button {
@@ -24,89 +87,65 @@ struct OwnerBriefingCard: View {
             }
         } label: {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    Image(systemName: "checklist.checked")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Color.zifrGold)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("OWNER BRIEFING")
-                            .font(.system(size: 12, weight: .black))
-                            .tracking(1.4)
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Owner Briefing")
+                            .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(.white)
-                        Text(accessController.isPro ? "What needs attention across your portfolio" : "Your connected portfolio preview")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.5))
+                        Text(briefingSubtitle)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.4))
                     }
-                    Spacer()
+
+                    Spacer(minLength: 8)
+
                     if !accessController.isPro {
                         Text("PRO")
-                            .font(.system(size: 9, weight: .black))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(Color.zifrGold)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
-                            .background(Color.zifrGold.opacity(0.12))
-                            .clipShape(Capsule())
-                    } else if appState.unreadBriefingCount > 0 {
-                        Text("\(appState.unreadBriefingCount)")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(minWidth: 26, minHeight: 26)
-                            .background(Color.red.opacity(0.8))
-                            .clipShape(Circle())
+                            .background(Color.zifrGold.opacity(0.12), in: Capsule())
                     }
+
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.35))
+                        .foregroundStyle(Color.white.opacity(0.42))
                 }
 
-                if accessController.isPro {
-                    if visibleObligations.isEmpty {
-                        HStack(spacing: 10) {
-                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                            Text("Nothing urgent. Your portfolio is up to date.")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.72))
-                        }
-                    } else {
-                        VStack(spacing: 9) {
-                            ForEach(visibleObligations) { obligation in
-                                HStack(spacing: 10) {
-                                    Circle()
-                                        .fill(color(for: obligation.severity))
-                                        .frame(width: 7, height: 7)
-                                    Text(obligation.title)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color.white.opacity(0.78))
-                                        .lineLimit(1)
-                                    Spacer()
-                                    if let due = obligation.dueAt {
-                                        Text(due, style: .relative)
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                    }
-                                }
+                if !visibleCategories.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(visibleCategories) { category in
+                                categorySummary(
+                                    category,
+                                    count: reminderCount(in: category)
+                                )
                             }
                         }
                     }
-                } else {
-                    Text("Miloom found \(appState.confirmedConnectionCount + appState.suggestedConnectionCount) connections and \(appState.openObligations.count) upcoming items. Upgrade to see your complete portfolio briefing.")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.64))
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(18)
-            .background(
-                LinearGradient(
-                    colors: [Color(hex: "#182333").opacity(0.96), Color(hex: "#11161E").opacity(0.96)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 74)
+            .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .background {
+                ownerBriefingGlass(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
                 )
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.white.opacity(0.16), lineWidth: 0.7)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.zifrGold.opacity(0.24), lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.16), radius: 12, x: 0, y: 5)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Owner Briefing")
+        .accessibilityValue(accessController.isPro && appState.unreadBriefingCount > 0
+            ? "\(appState.unreadBriefingCount) reminders need attention"
+            : accessController.isPro ? "No reminders need attention" : "Pro feature")
         .sheet(isPresented: $showingBriefing) {
             OwnerBriefingView(onOpenResource: onOpenResource)
         }
@@ -115,11 +154,597 @@ struct OwnerBriefingCard: View {
         }
     }
 
-    private func color(for severity: ObligationSeverity) -> Color {
-        switch severity {
-        case .urgent: return .red
-        case .attention: return .orange
-        case .info: return Color.zifrGold
+    private var visibleCategories: [BriefingResourceCategory] {
+        BriefingResourceCategory.allCases.filter { reminderCount(in: $0) > 0 }
+    }
+
+    private var briefingSubtitle: String {
+        guard accessController.isPro else { return "Unlock your portfolio reminders" }
+        let count = appState.openObligations.count
+        if count == 0 { return "No reminders need attention" }
+        return "\(count) reminder\(count == 1 ? "" : "s") need attention"
+    }
+
+    private func reminderCount(in category: BriefingResourceCategory) -> Int {
+        appState.openObligations.reduce(into: 0) { count, obligation in
+            if BriefingResourceCategory.category(for: obligation) == category {
+                count += 1
+            }
+        }
+    }
+
+    private func categorySummary(
+        _ category: BriefingResourceCategory,
+        count: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("\(count)")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+            Text(category.title.uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.4))
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .frame(width: 108, height: 56, alignment: .leading)
+        .background(Color.black.opacity(0.2), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.09), lineWidth: 0.7)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(category.title), \(count) reminder\(count == 1 ? "" : "s")")
+    }
+
+    @ViewBuilder
+    private func ownerBriefingGlass<S: Shape>(_ shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(
+                    .clear
+                        .tint(Color.zifrTabBarFill.opacity(0.28))
+                        .interactive(),
+                    in: shape
+                )
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(shape.fill(Color.zifrTabBarFill.opacity(0.35)))
+        }
+    }
+}
+
+struct OwnerHealthBriefingDashboard: View {
+    @Environment(AppState.self) private var appState
+    @Bindable var vm: AppViewModel
+    @State private var scope: OwnerBriefingScope = .business
+    @State private var showingReminderQueue = false
+    @State private var selectedDataSummary: OwnerHealthCategorySummary?
+    @State private var selectedRecurringReview: RecurringSuggestionReview?
+    @State private var ignoredDataIssueIDs = OwnerHealthDataIssueStore.load()
+
+    var onOpenResource: (PortfolioObligation) -> Void
+    var onOpenHealthResource: (ResourceKind, UUID) -> Void
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let snapshot = OwnerHealthEngine.snapshot(
+                appState: appState,
+                scope: scope,
+                now: context.date,
+                ignoredDataIssueIDs: ignoredDataIssueIDs
+            )
+            let attentionCategories = snapshot.categories.filter(\.requiresAttention)
+            let compactCategories = snapshot.categories.filter { !$0.requiresAttention }
+
+            VStack(alignment: .leading, spacing: 12) {
+                scopePicker
+                portfolioSummary(snapshot: snapshot, date: context.date)
+
+                ForEach(attentionCategories) { summary in
+                    HealthCategoryCard(
+                        summary: summary,
+                        compact: false,
+                        onDataDetails: reviewAction(for: summary)
+                    )
+                }
+
+                VStack(spacing: 7) {
+                    ForEach(compactCategories) { summary in
+                        HealthCategoryCard(
+                            summary: summary,
+                            compact: true,
+                            onDataDetails: reviewAction(for: summary)
+                        )
+                    }
+                }
+            }
+            .animation(.easeInOut(duration: 0.22), value: scope)
+        }
+        .sheet(isPresented: $showingReminderQueue) {
+            OwnerBriefingView(scope: scope, onOpenResource: onOpenResource)
+        }
+        .sheet(item: $selectedDataSummary) { summary in
+            MissingDataDetailSheet(
+                summary: summary,
+                onOpen: { issue in
+                    selectedDataSummary = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        onOpenHealthResource(issue.resourceType, issue.resourceID)
+                    }
+                },
+                onIgnore: ignoreDataIssue,
+                onRestore: restoreDataIssue
+            )
+        }
+        .sheet(item: $selectedRecurringReview) { review in
+            DetectedSubscriptionsSheet(
+                detected: review.suggestions,
+                cardId: nil,
+                cardName: "\(scope.rawValue.lowercased()) accounts",
+                companyId: nil,
+                vm: vm,
+                onDismissAll: { selectedRecurringReview = nil }
+            )
+            .environment(appState)
+        }
+        .onAppear {
+            let hasBusiness = appState.companies.contains { OwnerBriefingScope.business.includes($0) }
+            let hasPersonal = appState.companies.contains { OwnerBriefingScope.personal.includes($0) }
+            if !hasBusiness && hasPersonal {
+                scope = .personal
+            }
+        }
+    }
+
+    private func ignoreDataIssue(_ issue: OwnerHealthDataIssue) {
+        ignoredDataIssueIDs.insert(issue.id)
+        OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
+    }
+
+    private func reviewAction(for summary: OwnerHealthCategorySummary) -> (() -> Void)? {
+        if !summary.recurringSuggestions.isEmpty {
+            return {
+                selectedRecurringReview = RecurringSuggestionReview(suggestions: summary.recurringSuggestions)
+            }
+        }
+        if !summary.dataIssues.isEmpty {
+            return { selectedDataSummary = summary }
+        }
+        return nil
+    }
+
+    private func restoreDataIssue(_ issue: OwnerHealthDataIssue) {
+        ignoredDataIssueIDs.remove(issue.id)
+        OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
+    }
+
+    private var scopedCompanyIDs: Set<UUID> {
+        Set(appState.companies.filter(scope.includes).map(\.id))
+    }
+
+    private var scopedOpenObligations: [PortfolioObligation] {
+        appState.openObligations.filter(matchesScope)
+    }
+
+    private var scopedDeferredObligations: [PortfolioObligation] {
+        appState.deferredObligations.filter(matchesScope)
+    }
+
+    private func matchesScope(_ obligation: PortfolioObligation) -> Bool {
+        guard let companyID = obligation.companyId else { return scope == .business }
+        return scopedCompanyIDs.contains(companyID)
+    }
+
+    private var scopePicker: some View {
+        HStack(spacing: 4) {
+            ForEach(OwnerBriefingScope.allCases) { item in
+                Button {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    withAnimation(.easeInOut(duration: 0.2)) { scope = item }
+                } label: {
+                    Text(item.rawValue)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(scope == item ? .white : Color.white.opacity(0.4))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 34)
+                        .background(
+                            scope == item ? Color.white.opacity(0.09) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 0.7)
+        )
+        .accessibilityLabel("Briefing scope")
+    }
+
+    private func portfolioSummary(snapshot: OwnerHealthSnapshot, date: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(scope.rawValue) Health")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Text("\(snapshot.entityCount) entit\(snapshot.entityCount == 1 ? "y" : "ies") • \(OwnerBriefingPresentation.dateLabel(for: date))")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.42))
+                }
+                Spacer(minLength: 6)
+                VStack(alignment: .trailing, spacing: 7) {
+                    HealthStatusBadge(status: snapshot.status)
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingReminderQueue = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("\(scopedOpenObligations.count) open")
+                                .font(.system(size: 9, weight: .bold))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 8, weight: .black))
+                        }
+                        .foregroundStyle(Color.zifrGold.opacity(0.82))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Review reminders, \(scopedOpenObligations.count) open, \(scopedDeferredObligations.count) complete later")
+                }
+            }
+
+            if snapshot.affectedEntityNames.isEmpty {
+                Text(snapshot.entityCount == 0
+                    ? "Add an entity to begin measuring this part of your portfolio."
+                    : "No known issues need attention across these entities.")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.56))
+            } else {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("ENTITIES NEEDING ATTENTION")
+                        .font(.system(size: 9, weight: .black))
+                        .tracking(1.2)
+                        .foregroundStyle(Color.white.opacity(0.34))
+                    Text(snapshot.affectedEntityNames.joined(separator: " • "))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.zifrTabBarFill.opacity(0.7), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color(hex: "#918457").opacity(0.5), lineWidth: 1)
+        )
+    }
+
+}
+
+private struct HealthCategoryCard: View {
+    let summary: OwnerHealthCategorySummary
+    let compact: Bool
+    let onDataDetails: (() -> Void)?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 5 : 10) {
+            HStack(spacing: 8) {
+                Image(systemName: summary.category.icon)
+                    .font(.system(size: compact ? 12 : 14, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20)
+                Text(summary.category.title)
+                    .font(.system(size: compact ? 12 : 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 3)
+                if compact {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                        .accessibilityHidden(true)
+                } else {
+                    HealthStatusBadge(status: summary.status)
+                }
+            }
+
+            if compact {
+                HStack(alignment: .center, spacing: 10) {
+                    Text(summary.summary)
+                        .font(.system(size: 9, weight: .regular))
+                        .foregroundStyle(Color.white.opacity(0.52))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 9) {
+                        ForEach(summary.metrics.prefix(3)) { metric in
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text(metric.value)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.62)
+                                Text(metric.label.uppercased())
+                                    .font(.system(size: 6, weight: .black))
+                                    .foregroundStyle(Color.white.opacity(0.28))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(summary.summary)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.54))
+                    .lineLimit(3)
+
+                HStack(alignment: .top, spacing: 14) {
+                    ForEach(summary.metrics.prefix(3)) { metric in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(metric.value)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                            Text(metric.label.uppercased())
+                                .font(.system(size: 7, weight: .black))
+                                .tracking(0.5)
+                                .foregroundStyle(Color.white.opacity(0.3))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+            }
+
+            if !compact, !summary.affectedEntityNames.isEmpty {
+                Text(summary.affectedEntityNames.joined(separator: " • "))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(statusColor.opacity(0.88))
+                    .lineLimit(2)
+            }
+
+            HStack(spacing: 5) {
+                Text(summary.recurringSuggestions.isEmpty
+                    ? summary.dataState.title
+                    : "\(summary.recurringSuggestions.count) statement suggestion\(summary.recurringSuggestions.count == 1 ? "" : "s")")
+                    .font(.system(size: compact ? 7 : 8, weight: .bold))
+                    .foregroundStyle(summary.recurringSuggestions.isEmpty ? dataStateColor : Color.zifrGold)
+                    .lineLimit(1)
+                if onDataDetails != nil {
+                    Spacer(minLength: 4)
+                    Text("Review")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(Color.zifrGold)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 7, weight: .black))
+                        .foregroundStyle(Color.zifrGold)
+                }
+            }
+        }
+        .padding(.horizontal, compact ? 11 : 14)
+        .padding(.vertical, compact ? 7 : 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: compact ? 62 : 0, alignment: .top)
+        .background(
+            Color.zifrTabBarFill.opacity(summary.requiresAttention ? 0.78 : 0.52),
+            in: RoundedRectangle(cornerRadius: compact ? 16 : 19, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: compact ? 16 : 19, style: .continuous)
+                .stroke(statusColor.opacity(summary.requiresAttention ? 0.48 : 0.17), lineWidth: 0.8)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: compact ? 16 : 19, style: .continuous))
+        .onTapGesture { onDataDetails?() }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(onDataDetails == nil ? "" : "Shows information that could be added or ignored")
+    }
+
+    private var statusColor: Color {
+        switch summary.status {
+        case .critical: return .red
+        case .needsAttention: return .orange
+        case .healthy: return .green
+        case .notApplicable: return Color.white.opacity(0.3)
+        }
+    }
+
+    private var dataStateColor: Color {
+        switch summary.dataState {
+        case .complete: return Color.green.opacity(0.64)
+        case .moreDataUseful: return Color.zifrGold.opacity(0.75)
+        case .noData: return Color.white.opacity(0.28)
+        }
+    }
+}
+
+private struct MissingDataDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let summary: OwnerHealthCategorySummary
+    let onOpen: (OwnerHealthDataIssue) -> Void
+    let onIgnore: (OwnerHealthDataIssue) -> Void
+    let onRestore: (OwnerHealthDataIssue) -> Void
+
+    @State private var ignoredInSheet: Set<String> = []
+    @State private var lastIgnored: OwnerHealthDataIssue?
+
+    private var visibleIssues: [OwnerHealthDataIssue] {
+        summary.dataIssues.filter { !ignoredInSheet.contains($0.id) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.zifrBG.ignoresSafeArea()
+
+                if visibleIssues.isEmpty {
+                    ContentUnavailableView(
+                        "Suggestions Cleared",
+                        systemImage: "checkmark.circle.fill",
+                        description: Text("There are no remaining data suggestions in this category.")
+                    )
+                    .foregroundStyle(.white)
+                } else {
+                    List {
+                        Section {
+                            Text("Adding these details can improve the briefing, but they are optional and do not affect health on their own.")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+
+                        ForEach(visibleIssues) { issue in
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: summary.category.icon)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 24)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(issue.resourceName)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundStyle(.white)
+                                        Text(issue.entityName)
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.38))
+                                    }
+                                }
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("USEFUL INFORMATION")
+                                        .font(.system(size: 8, weight: .black))
+                                        .tracking(1)
+                                        .foregroundStyle(Color.white.opacity(0.3))
+                                    ForEach(issue.missingFields, id: \.self) { field in
+                                        HStack(spacing: 7) {
+                                            Circle()
+                                                .fill(Color.zifrGold)
+                                                .frame(width: 4, height: 4)
+                                            Text(field)
+                                                .font(.system(size: 12, weight: .regular))
+                                                .foregroundStyle(Color.white.opacity(0.72))
+                                        }
+                                    }
+                                }
+
+                                HStack(spacing: 9) {
+                                    Button {
+                                        onOpen(issue)
+                                    } label: {
+                                        Text("Add information")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.zifrBG)
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 44)
+                                            .background(Color.zifrGold, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        ignoredInSheet.insert(issue.id)
+                                        lastIgnored = issue
+                                        onIgnore(issue)
+                                    } label: {
+                                        Text("Ignore suggestion")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.62))
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 44)
+                                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.vertical, 7)
+                            .listRowBackground(Color.zifrTabBarFill.opacity(0.66))
+                            .listRowSeparator(.hidden)
+                        }
+                    }
+                    .listStyle(.insetGrouped)
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .navigationTitle(summary.category.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundStyle(Color.zifrGold)
+                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if let lastIgnored {
+                HStack(spacing: 10) {
+                    Text("Suggestion ignored")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button("Undo") {
+                        ignoredInSheet.remove(lastIgnored.id)
+                        onRestore(lastIgnored)
+                        self.lastIgnored = nil
+                    }
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.zifrGold)
+                }
+                .padding(.horizontal, 15)
+                .frame(height: 48)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .padding(.horizontal, 20)
+                .padding(.bottom, 10)
+            }
+        }
+    }
+}
+
+private enum OwnerHealthDataIssueStore {
+    private static let key = "ownerHealthIgnoredDataIssues"
+
+    static func load() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
+    }
+
+    static func save(_ values: Set<String>) {
+        UserDefaults.standard.set(Array(values).sorted(), forKey: key)
+    }
+}
+
+private struct RecurringSuggestionReview: Identifiable {
+    let id = UUID()
+    let suggestions: [DetectedSubscription]
+}
+
+private struct HealthStatusBadge: View {
+    let status: OwnerHealthStatus
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(status.title.uppercased())
+                .font(.system(size: 8, weight: .black))
+                .tracking(0.6)
+                .foregroundStyle(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.1), in: Capsule())
+    }
+
+    private var color: Color {
+        switch status {
+        case .critical: return .red
+        case .needsAttention: return .orange
+        case .healthy: return .green
+        case .notApplicable: return Color.white.opacity(0.35)
         }
     }
 }
@@ -137,6 +762,7 @@ struct OwnerBriefingView: View {
     @State private var undoTask: Task<Void, Never>?
     @State private var mutationError: String?
 
+    var scope: OwnerBriefingScope? = nil
     var onOpenResource: (PortfolioObligation) -> Void
 
     var body: some View {
@@ -227,7 +853,7 @@ struct OwnerBriefingView: View {
 
     @ViewBuilder
     private func briefingContent(now: Date) -> some View {
-        let visible = selectedTab == .current ? appState.openObligations : appState.deferredObligations
+        let visible = selectedTab == .current ? scopedOpenObligations : scopedDeferredObligations
         if visible.isEmpty {
             ContentUnavailableView(
                 selectedTab == .current ? "You're Ahead" : "Nothing Deferred",
@@ -253,7 +879,7 @@ struct OwnerBriefingView: View {
     @ViewBuilder
     private var currentReminderSections: some View {
         ForEach(BriefingResourceCategory.allCases) { category in
-            let reminders = reminders(in: appState.openObligations, category: category)
+            let reminders = reminders(in: scopedOpenObligations, category: category)
             if !reminders.isEmpty {
                 BriefingAccordionHeader(
                     title: category.title,
@@ -274,7 +900,7 @@ struct OwnerBriefingView: View {
     @ViewBuilder
     private func completeLaterSections(now: Date) -> some View {
         ForEach(DeferredAgeBucket.allCases) { bucket in
-            let bucketReminders = appState.deferredObligations.filter {
+            let bucketReminders = scopedDeferredObligations.filter {
                 DeferredAgeBucket.bucket(
                     deferredAt: OwnerBriefingPresentation.effectiveDeferredAt(for: $0),
                     now: now
@@ -303,11 +929,30 @@ struct OwnerBriefingView: View {
         }
     }
 
+    private var scopedCompanyIDs: Set<UUID> {
+        guard let scope else { return [] }
+        return Set(appState.companies.filter(scope.includes).map(\.id))
+    }
+
+    private var scopedOpenObligations: [PortfolioObligation] {
+        appState.openObligations.filter(matchesScope)
+    }
+
+    private var scopedDeferredObligations: [PortfolioObligation] {
+        appState.deferredObligations.filter(matchesScope)
+    }
+
+    private func matchesScope(_ obligation: PortfolioObligation) -> Bool {
+        guard let scope else { return true }
+        guard let companyID = obligation.companyId else { return scope == .business }
+        return scopedCompanyIDs.contains(companyID)
+    }
+
     private func reminders(
         in obligations: [PortfolioObligation],
         category: BriefingResourceCategory
     ) -> [PortfolioObligation] {
-        obligations.filter { BriefingResourceCategory.category(for: $0.sourceType) == category }
+        obligations.filter { BriefingResourceCategory.category(for: $0) == category }
     }
 
     private func toggle(_ category: BriefingResourceCategory) {
@@ -430,7 +1075,7 @@ private struct BriefingAccordionHeader: View {
             HStack(spacing: 11) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(Color.zifrGold)
+                    .foregroundStyle(.white)
                     .frame(width: 22)
                 Text(title)
                     .font(.system(size: 14, weight: .bold))
@@ -466,7 +1111,7 @@ private struct BriefingResourceSubheading: View {
         HStack(spacing: 8) {
             Image(systemName: category.icon)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundStyle(Color.zifrGold.opacity(0.75))
+                .foregroundStyle(.white)
             Text(category.title.uppercased())
                 .font(.system(size: 10, weight: .black))
                 .tracking(1)

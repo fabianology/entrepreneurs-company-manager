@@ -1,40 +1,70 @@
 import SwiftUI
 
 // MARK: - Detected Subscription Model
-struct DetectedSubscription: Identifiable, Equatable {
-    var id: String          // normalized merchant key
+struct DetectedSubscription: Identifiable, Hashable {
+    var merchantKey: String // normalized merchant key used for import matching
     var name: String        // display name
     var amount: Double      // average charge amount
     var currency: String
     var frequency: String   // "Monthly" or "Yearly"
     var accountId: String   // plaid account_id this belongs to
+    var companyId: UUID?    // company resolved from the transaction/account context
     var lastChargeDate: String
     var occurrences: Int
     var category: [String]?
+    var website: String?
+
+    /// Keeps identical merchants in different companies/accounts independent in SwiftUI.
+    var id: String {
+        "\(companyId?.uuidString ?? "unscoped"):\(accountId):\(merchantKey)"
+    }
 }
 
 // MARK: - Detection Engine
 struct SubscriptionDetector {
+    private struct GroupKey: Hashable {
+        let merchant: String
+        let companyId: UUID?
+    }
+
     /// Analyses raw transactions and returns recurring charges not yet in subscriptions
     static func detect(
         transactions: [Transaction],
         existingSubscriptions: [Subscription],
-        filterAccountId: String? = nil
+        filterAccountId: String? = nil,
+        companyId fallbackCompanyId: UUID? = nil,
+        dismissalDefaults: UserDefaults = .standard
     ) -> [DetectedSubscription] {
-        
-        let existingStreamIds = Set(existingSubscriptions.compactMap { $0.plaidStreamId })
-        let existingNames = Set(existingSubscriptions.map { normalize($0.name.lowercased()) })
+        let existingNames = Set(existingSubscriptions.map { normalize($0.name) })
+        let existingNamesByCompany = Dictionary(grouping: existingSubscriptions, by: \.companyId)
+            .mapValues { Set($0.map { normalize($0.name) }) }
+        let existingStreams = Set(existingSubscriptions.compactMap(\.plaidStreamId))
+        let existingStreamsByCompany = Dictionary(grouping: existingSubscriptions, by: \.companyId)
+            .mapValues { Set($0.compactMap(\.plaidStreamId)) }
         
         // Group by normalized merchant name (optionally filtered to one account)
-        var txByKey: [String: [Transaction]] = [:]
+        var txByKey: [GroupKey: [Transaction]] = [:]
         for tx in transactions {
             guard let amount = tx.amount, amount > 0 else { continue }
+            guard tx.pending != true else { continue }
             if let filterAcc = filterAccountId, tx.accountId != filterAcc { continue }
             let raw = tx.name ?? ""
-            guard !raw.isEmpty else { continue }
-            let key = normalize(raw)
-            if key.isEmpty { continue }
-            txByKey[key, default: []].append(tx)
+            guard !raw.isEmpty, !isExcludedFinancialMovement(tx) else { continue }
+            let merchantKey = normalize(raw)
+            let resolvedCompanyId = fallbackCompanyId ?? tx.companyId
+            let trackedNames: Set<String>
+            let trackedStreams: Set<String>
+            if let resolvedCompanyId {
+                trackedNames = existingNamesByCompany[resolvedCompanyId] ?? []
+                trackedStreams = existingStreamsByCompany[resolvedCompanyId] ?? []
+            } else {
+                trackedNames = existingNames
+                trackedStreams = existingStreams
+            }
+            if merchantKey.isEmpty
+                || trackedNames.contains(merchantKey)
+                || trackedStreams.contains("detected_\(merchantKey)") { continue }
+            txByKey[GroupKey(merchant: merchantKey, companyId: resolvedCompanyId), default: []].append(tx)
         }
         
         var results: [DetectedSubscription] = []
@@ -62,23 +92,27 @@ struct SubscriptionDetector {
                 continue // too frequent to be a subscription (daily/weekly charges)
             }
             
-            let displayName = cleanDisplayName(sorted.first?.name ?? key)
+            let displayName = cleanDisplayName(sorted.first?.name ?? key.merchant)
             
             let det = DetectedSubscription(
-                id: key,
+                merchantKey: key.merchant,
                 name: displayName,
                 amount: (avg * 100).rounded() / 100,
                 currency: "USD",
                 frequency: frequency,
                 accountId: sorted.first?.accountId ?? "",
+                companyId: key.companyId,
                 lastChargeDate: sorted.first?.date ?? "",
                 occurrences: txs.count,
-                category: sorted.first?.category
+                category: sorted.first?.category,
+                website: sorted.compactMap(\.merchantWebsite).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
             )
             results.append(det)
         }
         
-        return results.sorted { $0.amount > $1.amount }
+        return results
+            .filter { !RecurringSuggestionDismissalStore.isHidden($0, defaults: dismissalDefaults) }
+            .sorted { $0.amount > $1.amount }
     }
     
     static func normalize(_ raw: String) -> String {
@@ -92,6 +126,31 @@ struct SubscriptionDetector {
         s = s.replacingOccurrences(of: #"[^a-z0-9\s]"#, with: "", options: .regularExpression)
         s = s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
         return s
+    }
+
+    private static func isExcludedFinancialMovement(_ transaction: Transaction) -> Bool {
+        let name = (transaction.name ?? "").lowercased()
+        let category = (transaction.category ?? []).joined(separator: " ").lowercased()
+        let excludedCategoryTerms = [
+            "transfer", "payment", "cash", "deposit", "withdrawal"
+        ]
+        if excludedCategoryTerms.contains(where: category.contains) { return true }
+
+        let excludedNamePatterns = [
+            #"\bzelle\b"#,
+            #"\batm\b"#,
+            #"\bwithdrawal\b"#,
+            #"\bpayment to\b"#,
+            #"\bautopay\b"#,
+            #"\bmonthly payment\b"#,
+            #"\bloan payment\b"#,
+            #"\bcredit card payment\b"#,
+            #"\btransfer (to|from)\b"#,
+            #"\bmobile check deposit\b"#
+        ]
+        return excludedNamePatterns.contains { pattern in
+            name.range(of: pattern, options: .regularExpression) != nil
+        }
     }
     
     private static func cleanDisplayName(_ raw: String) -> String {
@@ -111,6 +170,111 @@ struct SubscriptionDetector {
         df.dateFormat = "yyyy-MM-dd"
         guard let d1 = df.date(from: start), let d2 = df.date(from: end) else { return 0 }
         return abs(Int(d2.timeIntervalSince(d1) / 86400))
+    }
+}
+
+// MARK: - Persistent suggestion lifecycle and import defaults
+struct RecurringSuggestionDismissalStore {
+    private static let defaultsKey = "miloom.recurringSuggestionDismissedMonths.v1"
+
+    static func dismiss(_ suggestion: DetectedSubscription, defaults: UserDefaults = .standard) {
+        guard let month = monthToken(for: suggestion.lastChargeDate) else { return }
+        var records = defaults.dictionary(forKey: defaultsKey) as? [String: String] ?? [:]
+        records[suggestion.id] = month
+        defaults.set(records, forKey: defaultsKey)
+    }
+
+    static func isHidden(_ suggestion: DetectedSubscription, defaults: UserDefaults = .standard) -> Bool {
+        guard let currentMonth = monthToken(for: suggestion.lastChargeDate),
+              let dismissedMonth = (defaults.dictionary(forKey: defaultsKey) as? [String: String])?[suggestion.id]
+        else { return false }
+        return currentMonth <= dismissedMonth
+    }
+
+    static func clear(_ suggestion: DetectedSubscription, defaults: UserDefaults = .standard) {
+        var records = defaults.dictionary(forKey: defaultsKey) as? [String: String] ?? [:]
+        records.removeValue(forKey: suggestion.id)
+        defaults.set(records, forKey: defaultsKey)
+    }
+
+    private static func monthToken(for dateString: String) -> String? {
+        guard dateString.count >= 7 else { return nil }
+        return String(dateString.prefix(7))
+    }
+}
+
+struct DetectedSubscriptionImportDefaults {
+    let nextRenewal: String?
+    let nextRenewalAt: Date?
+    let website: String?
+
+    static func make(
+        for suggestion: DetectedSubscription,
+        existingSubscriptions: [Subscription],
+        calendar: Calendar = Calendar(identifier: .gregorian)
+    ) -> DetectedSubscriptionImportDefaults {
+        var calendar = calendar
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let chargeDate = parseDate(suggestion.lastChargeDate, calendar: calendar)
+
+        let nextRenewal: String?
+        let nextRenewalAt: Date?
+        if suggestion.frequency == "Yearly", let chargeDate {
+            let formatter = DateFormatter()
+            formatter.calendar = calendar
+            formatter.timeZone = calendar.timeZone
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "MMM d"
+            nextRenewal = formatter.string(from: chargeDate)
+            nextRenewalAt = calendar.date(byAdding: .year, value: 1, to: chargeDate)
+        } else if let chargeDate {
+            let day = calendar.component(.day, from: chargeDate)
+            nextRenewal = String(day)
+            nextRenewalAt = calendar.nextDate(
+                after: chargeDate,
+                matching: DateComponents(day: day),
+                matchingPolicy: .nextTimePreservingSmallerComponents,
+                direction: .forward
+            )
+        } else {
+            nextRenewal = nil
+            nextRenewalAt = nil
+        }
+
+        return DetectedSubscriptionImportDefaults(
+            nextRenewal: nextRenewal,
+            nextRenewalAt: nextRenewalAt,
+            website: resolvedWebsite(for: suggestion, existingSubscriptions: existingSubscriptions)
+        )
+    }
+
+    private static func parseDate(_ value: String, calendar: Calendar) -> Date? {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+
+    private static func resolvedWebsite(
+        for suggestion: DetectedSubscription,
+        existingSubscriptions: [Subscription]
+    ) -> String? {
+        if let website = suggestion.website?.trimmingCharacters(in: .whitespacesAndNewlines), !website.isEmpty {
+            return website
+        }
+        if let known = existingSubscriptions.first(where: {
+            ($0.plaidStreamId == "detected_\(suggestion.merchantKey)"
+                || SubscriptionDetector.normalize($0.name) == suggestion.merchantKey)
+                && !($0.website ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        })?.website {
+            return known
+        }
+
+        let domain = suggestion.name.lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9]"#, with: "", options: .regularExpression)
+        return domain.isEmpty ? nil : "\(domain).com"
     }
 }
 
@@ -307,6 +471,7 @@ struct DetectedSubscriptionsSheet: View {
                                         isAdded: added.contains(det.id),
                                         onAdd: { Task<Void, Never> { await addSubscription(det) } },
                                         onSkip: {
+                                            RecurringSuggestionDismissalStore.dismiss(det)
                                             withAnimation(.spring(response: 0.35)) {
                                                 _ = skipped.insert(det.id)
                                             }
@@ -332,10 +497,14 @@ struct DetectedSubscriptionsSheet: View {
             )
         }
         .onAppear {
-            let existingNames = Set(appState.subscriptions.map { SubscriptionDetector.normalize($0.name) })
-            let existingStreams = Set(appState.subscriptions.compactMap { $0.plaidStreamId })
             for det in detected {
-                if existingNames.contains(det.id) || existingStreams.contains("detected_\(det.id)") {
+                let targetCompanyId = det.companyId ?? companyId
+                let relevantSubscriptions = appState.subscriptions.filter {
+                    targetCompanyId == nil || $0.companyId == targetCompanyId
+                }
+                let existingNames = Set(relevantSubscriptions.map { SubscriptionDetector.normalize($0.name) })
+                let existingStreams = Set(relevantSubscriptions.compactMap { $0.plaidStreamId })
+                if existingNames.contains(det.merchantKey) || existingStreams.contains("detected_\(det.merchantKey)") {
                     _ = added.insert(det.id)
                 }
             }
@@ -361,10 +530,14 @@ struct DetectedSubscriptionsSheet: View {
         let matchCard = cardId != nil ? appState.cards.first(where: { $0.id == cardId }) :
             appState.cards.first(where: { $0.plaidAccountId == det.accountId })
         
-        guard let targetCompanyId = companyId ?? matchCard?.companyId ?? appState.companies.first?.id else {
+        guard let targetCompanyId = det.companyId ?? companyId ?? matchCard?.companyId ?? appState.companies.first?.id else {
             isAdding = nil
             return
         }
+        let importDefaults = DetectedSubscriptionImportDefaults.make(
+            for: det,
+            existingSubscriptions: appState.subscriptions
+        )
         
         let newSub = Subscription(
             userId: userId,
@@ -375,10 +548,13 @@ struct DetectedSubscriptionsSheet: View {
             billingCycle: det.frequency,
             paymentMethod: matchCard.map { "\($0.network ?? "Card") •••• \($0.last4 ?? "")" },
             paymentMethodId: matchCard?.id,
+            nextRenewal: importDefaults.nextRenewal,
+            nextRenewalAt: importDefaults.nextRenewalAt,
             renew: "Auto",
             status: "Active",
+            website: importDefaults.website,
             pricingModel: "paid",
-            plaidStreamId: "detected_\(det.id)",
+            plaidStreamId: "detected_\(det.merchantKey)",
             plaidAccountId: det.accountId
         )
         
@@ -387,6 +563,8 @@ struct DetectedSubscriptionsSheet: View {
             try await DataRepository.shared.insertSubscription(newSub)
             await MainActor.run {
                 appState.subscriptions.append(newSub)
+                RecurringSuggestionDismissalStore.clear(det)
+                resolveRecurringObligations(for: det, companyId: targetCompanyId)
                 withAnimation(.spring(response: 0.35)) {
                     _ = added.insert(det.id)
                 }
@@ -398,6 +576,27 @@ struct DetectedSubscriptionsSheet: View {
             }
         }
         isAdding = nil
+    }
+
+    @MainActor
+    private func resolveRecurringObligations(for det: DetectedSubscription, companyId: UUID) {
+        let normalized = det.merchantKey.replacingOccurrences(of: " ", with: "")
+        let matchingIndices = appState.obligations.indices.filter { index in
+            let obligation = appState.obligations[index]
+            guard obligation.kind == "new_recurring_charge", obligation.companyId == companyId else { return false }
+            let fingerprintKey = obligation.fingerprint.split(separator: ":").last.map(String.init) ?? ""
+            return fingerprintKey == det.merchantKey || fingerprintKey == normalized
+        }
+
+        for index in matchingIndices {
+            appState.obligations[index] = OwnerBriefingPresentation.settingState(
+                appState.obligations[index],
+                to: .handled,
+                at: Date()
+            )
+            let updated = appState.obligations[index]
+            Task { try? await DataRepository.shared.updateObligation(updated) }
+        }
     }
 }
 

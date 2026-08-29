@@ -418,6 +418,639 @@ enum BriefingResourceCategory: String, CaseIterable, Identifiable, Hashable {
         case .collaborator: return .collaborator
         }
     }
+
+    static func category(for obligation: PortfolioObligation) -> BriefingResourceCategory {
+        // A recurring-charge candidate is a subscription blind spot even though
+        // its navigation target remains the card or institution where it appeared.
+        if obligation.kind == "new_recurring_charge" {
+            return .subscription
+        }
+        return category(for: obligation.sourceType)
+    }
+}
+
+enum OwnerBriefingScope: String, CaseIterable, Identifiable, Hashable {
+    case business = "Business"
+    case personal = "Personal"
+
+    var id: String { rawValue }
+
+    func includes(_ company: Company) -> Bool {
+        let normalized = company.structure.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let isPersonal = normalized == "individual" || normalized == "household"
+        return self == .personal ? isPersonal : !isPersonal
+    }
+}
+
+enum OwnerHealthStatus: String, Hashable {
+    case critical
+    case needsAttention
+    case healthy
+    case notApplicable
+
+    var title: String {
+        switch self {
+        case .critical: return "Critical"
+        case .needsAttention: return "Needs Attention"
+        case .healthy: return "Healthy"
+        case .notApplicable: return "No Data"
+        }
+    }
+
+    var priority: Int {
+        switch self {
+        case .critical: return 3
+        case .needsAttention: return 2
+        case .healthy: return 1
+        case .notApplicable: return 0
+        }
+    }
+}
+
+enum OwnerHealthDataState: Hashable {
+    case complete
+    case moreDataUseful(Int)
+    case noData
+
+    var title: String {
+        switch self {
+        case .complete: return "Data complete"
+        case .moreDataUseful(let count):
+            return "More data useful for \(count) item\(count == 1 ? "" : "s")"
+        case .noData: return "No records added"
+        }
+    }
+}
+
+struct OwnerHealthMetric: Identifiable, Hashable {
+    let label: String
+    let value: String
+
+    var id: String { "\(label):\(value)" }
+}
+
+struct OwnerHealthDataIssue: Identifiable, Hashable {
+    let resourceType: ResourceKind
+    let resourceID: UUID
+    let resourceName: String
+    let entityName: String
+    let missingFields: [String]
+
+    var id: String {
+        let fields = missingFields.sorted().joined(separator: "|")
+        return "\(resourceType.rawValue):\(resourceID.uuidString):\(fields)"
+    }
+}
+
+struct OwnerHealthCategorySummary: Identifiable, Hashable {
+    let category: BriefingResourceCategory
+    let status: OwnerHealthStatus
+    let dataState: OwnerHealthDataState
+    let summary: String
+    let metrics: [OwnerHealthMetric]
+    let affectedEntityNames: [String]
+    let dataIssues: [OwnerHealthDataIssue]
+    let recurringSuggestions: [DetectedSubscription]
+
+    var id: BriefingResourceCategory { category }
+    var requiresAttention: Bool { status == .critical || status == .needsAttention }
+}
+
+struct OwnerHealthSnapshot: Hashable {
+    let scope: OwnerBriefingScope
+    let entityCount: Int
+    let status: OwnerHealthStatus
+    let affectedEntityNames: [String]
+    let categories: [OwnerHealthCategorySummary]
+}
+
+enum OwnerHealthEngine {
+    static func snapshot(
+        appState: AppState,
+        scope: OwnerBriefingScope,
+        now: Date = Date(),
+        ignoredDataIssueIDs: Set<String> = []
+    ) -> OwnerHealthSnapshot {
+        let scopedCompanies = appState.companies.filter(scope.includes)
+        let scopedCompanyIDs = Set(scopedCompanies.map(\.id))
+        let companiesByID = Dictionary(uniqueKeysWithValues: appState.companies.map { ($0.id, $0) })
+
+        func effectiveCompanyID(resourceID: UUID, companyID: UUID) -> UUID {
+            appState.localCompanyOverrides[resourceID.uuidString] ?? companyID
+        }
+
+        func isInScope(resourceID: UUID, companyID: UUID) -> Bool {
+            scopedCompanyIDs.contains(effectiveCompanyID(resourceID: resourceID, companyID: companyID))
+        }
+
+        let subscriptions = appState.subscriptions.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
+        let institutions = appState.institutions.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
+        let cards = appState.cards.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
+        let loans = appState.loans.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
+        let documents = appState.documents.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
+        let scopedObligations = appState.openObligations.filter { obligation in
+            guard let companyID = obligation.companyId else { return scope == .business }
+            return scopedCompanyIDs.contains(companyID)
+        }
+
+        func categoryObligations(in category: BriefingResourceCategory) -> [PortfolioObligation] {
+            scopedObligations.filter { BriefingResourceCategory.category(for: $0) == category }
+        }
+
+        func entityName(for companyID: UUID?) -> String? {
+            guard let companyID else { return nil }
+            return companiesByID[companyID]?.name
+        }
+
+        func entityNames(
+            for categoryObligations: [PortfolioObligation],
+            additionalCompanyIDs: Set<UUID> = []
+        ) -> [String] {
+            let obligationNames = categoryObligations.compactMap { entityName(for: $0.companyId) }
+            let derivedNames = additionalCompanyIDs.compactMap { companiesByID[$0]?.name }
+            return Array(Set(obligationNames + derivedNames)).sorted()
+        }
+
+        func status(
+            resourceCount: Int,
+            categoryObligations: [PortfolioObligation],
+            hasCriticalCondition: Bool = false,
+            hasAttentionCondition: Bool = false
+        ) -> OwnerHealthStatus {
+            if hasCriticalCondition || categoryObligations.contains(where: { $0.severity == .urgent }) {
+                return .critical
+            }
+            if hasAttentionCondition || !categoryObligations.isEmpty {
+                return .needsAttention
+            }
+            return resourceCount == 0 ? .notApplicable : .healthy
+        }
+
+        func visibleIssues(_ issues: [OwnerHealthDataIssue]) -> [OwnerHealthDataIssue] {
+            issues.filter { !ignoredDataIssueIDs.contains($0.id) }
+        }
+
+        func dataState(resourceCount: Int, issues: [OwnerHealthDataIssue]) -> OwnerHealthDataState {
+            guard resourceCount > 0 else { return .noData }
+            return issues.isEmpty ? .complete : .moreDataUseful(issues.count)
+        }
+
+        func nonempty(_ value: String?) -> Bool {
+            guard let value else { return false }
+            return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+
+        let companyObligations = categoryObligations(in: .company)
+        let companyIssues = visibleIssues(scopedCompanies.compactMap { company in
+            var fields: [String] = []
+            if !nonempty(company.name) { fields.append("Name") }
+            if !nonempty(company.structure) { fields.append("Structure") }
+            if !nonempty(company.website) { fields.append("Website") }
+            if !nonempty(company.companyDescription) { fields.append("Description") }
+            guard !fields.isEmpty else { return nil }
+            return OwnerHealthDataIssue(
+                resourceType: .company,
+                resourceID: company.id,
+                resourceName: nonempty(company.name) ? company.name : "Unnamed entity",
+                entityName: nonempty(company.name) ? company.name : "Unassigned entity",
+                missingFields: fields
+            )
+        })
+        let companyStatus = status(resourceCount: scopedCompanies.count, categoryObligations: companyObligations)
+        let companySummary = OwnerHealthCategorySummary(
+            category: .company,
+            status: companyStatus,
+            dataState: dataState(resourceCount: scopedCompanies.count, issues: companyIssues),
+            summary: companyStatus.requiresAttentionText(
+                attention: "Company records need review.",
+                healthy: "Your entity structure is organized.",
+                empty: scope == .business ? "No business entities added." : "No personal profiles added."
+            ),
+            metrics: [
+                OwnerHealthMetric(label: "Entities", value: "\(scopedCompanies.count)"),
+                OwnerHealthMetric(label: "Complete", value: "\(max(0, scopedCompanies.count - companyIssues.count))")
+            ],
+            affectedEntityNames: entityNames(for: companyObligations),
+            dataIssues: companyIssues,
+            recurringSuggestions: []
+        )
+
+        // Transaction-derived candidates are canonical for recurring-charge blind spots.
+        // Persisted recurring obligations can lag after an import, so only use them for
+        // reminder lifecycle while this snapshot recalculates suggestions from live data.
+        let subscriptionObligations = categoryObligations(in: .subscription).filter {
+            $0.kind != "new_recurring_charge"
+        }
+        let activeSubscriptions = subscriptions.filter { $0.status.caseInsensitiveCompare("Active") == .orderedSame }
+        func transactionCompanyID(_ transaction: Transaction) -> UUID? {
+            if let companyId = transaction.companyId { return companyId }
+            if let card = appState.cards.first(where: { $0.plaidAccountId == transaction.accountId }) {
+                return effectiveCompanyID(resourceID: card.id, companyID: card.companyId)
+            }
+            if let institution = appState.institutions.first(where: {
+                $0.id == transaction.institutionId || $0.accounts.contains(where: { $0.id == transaction.accountId })
+            }) {
+                return effectiveCompanyID(resourceID: institution.id, companyID: institution.companyId)
+            }
+            return nil
+        }
+        let recurringSuggestions = scopedCompanies.flatMap { company in
+            let companyTransactions = appState.transactions.filter { transactionCompanyID($0) == company.id }
+            let companySubscriptions = subscriptions.filter { $0.companyId == company.id }
+            return SubscriptionDetector.detect(
+                transactions: companyTransactions,
+                existingSubscriptions: companySubscriptions,
+                companyId: company.id
+            )
+        }
+        let subscriptionIssues = visibleIssues(subscriptions.compactMap { subscription in
+            var fields: [String] = []
+            if !nonempty(subscription.name) { fields.append("Name") }
+            if !subscription.isFree && subscription.cost <= 0 { fields.append("Cost") }
+            if !nonempty(subscription.billingCycle) { fields.append("Billing cycle") }
+            if !nonempty(subscription.paymentMethod) { fields.append("Payment method") }
+            if subscription.nextRenewalAt == nil && !nonempty(subscription.nextRenewal) { fields.append("Next renewal") }
+            if !nonempty(subscription.status) { fields.append("Status") }
+            guard !fields.isEmpty else { return nil }
+            let companyID = effectiveCompanyID(resourceID: subscription.id, companyID: subscription.companyId)
+            return OwnerHealthDataIssue(
+                resourceType: .subscription,
+                resourceID: subscription.id,
+                resourceName: nonempty(subscription.name) ? subscription.name : "Unnamed subscription",
+                entityName: companiesByID[companyID]?.name ?? "Unknown entity",
+                missingFields: fields
+            )
+        })
+        let subscriptionStatus = status(
+            resourceCount: subscriptions.count,
+            categoryObligations: subscriptionObligations,
+            hasAttentionCondition: !recurringSuggestions.isEmpty
+        )
+        let subscriptionSummaryText: String
+        if !recurringSuggestions.isEmpty {
+            subscriptionSummaryText = "\(recurringSuggestions.count) recurring charge\(recurringSuggestions.count == 1 ? " looks" : "s look") like a subscription."
+        } else if subscriptions.isEmpty {
+            subscriptionSummaryText = "No subscriptions added."
+        } else if !subscriptionObligations.isEmpty {
+            subscriptionSummaryText = "Subscription activity needs review."
+        } else {
+            subscriptionSummaryText = "Tracked subscriptions are caught up."
+        }
+        let subscriptionSummary = OwnerHealthCategorySummary(
+            category: .subscription,
+            status: subscriptionStatus,
+            dataState: dataState(resourceCount: subscriptions.count, issues: subscriptionIssues),
+            summary: subscriptionSummaryText,
+            metrics: [
+                OwnerHealthMetric(label: "Active", value: "\(activeSubscriptions.count)"),
+                OwnerHealthMetric(label: "Monthly", value: currency(activeSubscriptions.reduce(0) { $0 + ($1.estimatedAnnualCost / 12) })),
+                OwnerHealthMetric(label: "Suggested", value: "\(recurringSuggestions.count)")
+            ],
+            affectedEntityNames: Array(Set(
+                entityNames(for: subscriptionObligations)
+                    + recurringSuggestions.compactMap { $0.companyId.flatMap { companiesByID[$0]?.name } }
+            )).sorted(),
+            dataIssues: subscriptionIssues,
+            recurringSuggestions: recurringSuggestions
+        )
+
+        let institutionObligations = categoryObligations(in: .institution)
+        let disconnectedInstitutions = institutions.filter(\.isDisconnected)
+        let negativeAccounts = institutions.flatMap(\.accounts).filter { $0.balance < 0 }
+        let institutionAttentionIDs = Set(disconnectedInstitutions.map {
+            effectiveCompanyID(resourceID: $0.id, companyID: $0.companyId)
+        } + institutions.filter { institution in
+            institution.accounts.contains(where: { $0.balance < 0 })
+        }.map {
+            effectiveCompanyID(resourceID: $0.id, companyID: $0.companyId)
+        })
+        let institutionIssues = visibleIssues(institutions.compactMap { institution in
+            var fields: [String] = []
+            if !nonempty(institution.name) { fields.append("Name") }
+            if institution.accounts.isEmpty { fields.append("At least one account") }
+            guard !fields.isEmpty else { return nil }
+            let companyID = effectiveCompanyID(resourceID: institution.id, companyID: institution.companyId)
+            return OwnerHealthDataIssue(
+                resourceType: .institution,
+                resourceID: institution.id,
+                resourceName: nonempty(institution.name) ? institution.name : "Unnamed institution",
+                entityName: companiesByID[companyID]?.name ?? "Unknown entity",
+                missingFields: fields
+            )
+        })
+        let institutionStatus = status(
+            resourceCount: institutions.count,
+            categoryObligations: institutionObligations,
+            hasAttentionCondition: !disconnectedInstitutions.isEmpty || !negativeAccounts.isEmpty
+        )
+        let accountBalance = institutions.flatMap(\.accounts).reduce(0) { $0 + $1.balance }
+        let institutionSummaryText: String
+        if !disconnectedInstitutions.isEmpty {
+            institutionSummaryText = "\(disconnectedInstitutions.count) institution connection\(disconnectedInstitutions.count == 1 ? "" : "s") need attention."
+        } else if !negativeAccounts.isEmpty {
+            institutionSummaryText = "\(negativeAccounts.count) account balance\(negativeAccounts.count == 1 ? "" : "s") are below zero."
+        } else if institutions.isEmpty {
+            institutionSummaryText = "No institutions added."
+        } else {
+            institutionSummaryText = "Connected accounts show no known issues."
+        }
+        let institutionSummary = OwnerHealthCategorySummary(
+            category: .institution,
+            status: institutionStatus,
+            dataState: dataState(resourceCount: institutions.count, issues: institutionIssues),
+            summary: institutionSummaryText,
+            metrics: [
+                OwnerHealthMetric(label: "Institutions", value: "\(institutions.count)"),
+                OwnerHealthMetric(label: "Accounts", value: "\(institutions.flatMap(\.accounts).count)"),
+                OwnerHealthMetric(label: "Balance", value: currency(accountBalance))
+            ],
+            affectedEntityNames: entityNames(for: institutionObligations, additionalCompanyIDs: institutionAttentionIDs),
+            dataIssues: institutionIssues,
+            recurringSuggestions: []
+        )
+
+        let cardObligations = categoryObligations(in: .card)
+        let expiredCards = cards.filter {
+            $0.status.caseInsensitiveCompare("Expired") == .orderedSame || ($0.expiresAt.map { $0 < now } ?? false)
+        }
+        let expiringCards = cards.filter {
+            guard let expiry = $0.expiresAt else { return false }
+            return expiry >= now && expiry <= now.addingTimeInterval(90 * 86_400)
+        }
+        let endingPromos = cards.filter {
+            guard let end = $0.promoEnds else { return false }
+            return end >= now && end <= now.addingTimeInterval(60 * 86_400)
+        }
+        let creditCards = cards.filter { $0.type.caseInsensitiveCompare("Credit") == .orderedSame }
+        let highUtilizationCards = creditCards.filter { $0.limit > 0 && ($0.balance / $0.limit) >= 0.9 }
+        let cardAttentionResources = expiredCards + expiringCards + endingPromos + highUtilizationCards
+        let cardAttentionIDs = Set(cardAttentionResources.map {
+            effectiveCompanyID(resourceID: $0.id, companyID: $0.companyId)
+        })
+        let cardIssues = visibleIssues(cards.compactMap { card in
+            var fields: [String] = []
+            if !nonempty(card.name) { fields.append("Name") }
+            if !nonempty(card.last4) { fields.append("Last four digits") }
+            if card.expiresAt == nil && !nonempty(card.expiry) { fields.append("Expiration date") }
+            if !nonempty(card.institutionName) { fields.append("Institution") }
+            if card.type.caseInsensitiveCompare("Credit") == .orderedSame && card.limit <= 0 { fields.append("Credit limit") }
+            guard !fields.isEmpty else { return nil }
+            let companyID = effectiveCompanyID(resourceID: card.id, companyID: card.companyId)
+            return OwnerHealthDataIssue(
+                resourceType: .card,
+                resourceID: card.id,
+                resourceName: nonempty(card.name) ? card.name : "Unnamed card",
+                entityName: companiesByID[companyID]?.name ?? "Unknown entity",
+                missingFields: fields
+            )
+        })
+        let cardStatus = status(
+            resourceCount: cards.count,
+            categoryObligations: cardObligations,
+            hasCriticalCondition: !expiredCards.isEmpty,
+            hasAttentionCondition: !expiringCards.isEmpty || !endingPromos.isEmpty || !highUtilizationCards.isEmpty
+        )
+        let totalCardBalance = creditCards.reduce(0) { $0 + $1.balance }
+        let totalCardLimit = creditCards.reduce(0) { $0 + $1.limit }
+        let utilization = totalCardLimit > 0 ? (totalCardBalance / totalCardLimit) * 100 : 0
+        let cardSummaryText: String
+        if !expiredCards.isEmpty {
+            cardSummaryText = "\(expiredCards.count) card\(expiredCards.count == 1 ? " is" : "s are") expired."
+        } else if !expiringCards.isEmpty || !endingPromos.isEmpty {
+            cardSummaryText = "Card or promotional deadlines are approaching."
+        } else if !highUtilizationCards.isEmpty {
+            cardSummaryText = "\(highUtilizationCards.count) card\(highUtilizationCards.count == 1 ? " has" : "s have") high utilization."
+        } else if cards.isEmpty {
+            cardSummaryText = "No cards added."
+        } else {
+            cardSummaryText = "No known card deadlines need attention."
+        }
+        let cardSummary = OwnerHealthCategorySummary(
+            category: .card,
+            status: cardStatus,
+            dataState: dataState(resourceCount: cards.count, issues: cardIssues),
+            summary: cardSummaryText,
+            metrics: [
+                OwnerHealthMetric(label: "Cards", value: "\(cards.count)"),
+                OwnerHealthMetric(label: "Balance", value: currency(totalCardBalance)),
+                OwnerHealthMetric(label: "Utilization", value: percent(utilization))
+            ],
+            affectedEntityNames: entityNames(for: cardObligations, additionalCompanyIDs: cardAttentionIDs),
+            dataIssues: cardIssues,
+            recurringSuggestions: []
+        )
+
+        let loanObligations = categoryObligations(in: .loan)
+        let activeLoans = loans.filter {
+            $0.status.caseInsensitiveCompare("Active") == .orderedSame && $0.remainingBalance > 0
+        }
+        let overdueLoans = activeLoans.filter { loan in
+            (loan.nextPaymentAt.map { $0 < now } ?? false)
+                || (loan.maturityDate.map { $0 < now } ?? false)
+        }
+        let loanAttentionIDs = Set(overdueLoans.map {
+            effectiveCompanyID(resourceID: $0.id, companyID: $0.companyId)
+        })
+        let loanIssues = visibleIssues(loans.compactMap { loan in
+            var fields: [String] = []
+            if !nonempty(loan.name) { fields.append("Name") }
+            if loan.role.caseInsensitiveCompare("Borrower") == .orderedSame && !nonempty(loan.lender) { fields.append("Lender") }
+            if loan.principalAmount <= 0 { fields.append("Principal amount") }
+            if loan.status.caseInsensitiveCompare("Active") == .orderedSame && loan.monthlyPayment <= 0 { fields.append("Monthly payment") }
+            if loan.status.caseInsensitiveCompare("Active") == .orderedSame && loan.nextPaymentAt == nil { fields.append("Next payment date") }
+            if loan.maturityDate == nil { fields.append("Maturity date") }
+            guard !fields.isEmpty else { return nil }
+            let companyID = effectiveCompanyID(resourceID: loan.id, companyID: loan.companyId)
+            return OwnerHealthDataIssue(
+                resourceType: .loan,
+                resourceID: loan.id,
+                resourceName: nonempty(loan.name) ? loan.name : "Unnamed loan",
+                entityName: companiesByID[companyID]?.name ?? "Unknown entity",
+                missingFields: fields
+            )
+        })
+        let loanStatus = status(
+            resourceCount: loans.count,
+            categoryObligations: loanObligations,
+            hasCriticalCondition: !overdueLoans.isEmpty
+        )
+        let outstandingBalance = activeLoans.reduce(0) { $0 + $1.remainingBalance }
+        let monthlyPayments = activeLoans.reduce(0) { $0 + $1.monthlyPayment }
+        let loanSummaryText: String
+        if !overdueLoans.isEmpty {
+            loanSummaryText = "\(overdueLoans.count) loan\(overdueLoans.count == 1 ? " has" : "s have") an overdue recorded date."
+        } else if !loanObligations.isEmpty {
+            loanSummaryText = "Loan activity needs review."
+        } else if activeLoans.isEmpty {
+            loanSummaryText = loans.isEmpty ? "No loans added." : "No active loan balances."
+        } else {
+            loanSummaryText = "No recorded loan payments are overdue."
+        }
+        let loanSummary = OwnerHealthCategorySummary(
+            category: .loan,
+            status: loanStatus,
+            dataState: dataState(resourceCount: loans.count, issues: loanIssues),
+            summary: loanSummaryText,
+            metrics: [
+                OwnerHealthMetric(label: "Active", value: "\(activeLoans.count)"),
+                OwnerHealthMetric(label: "Outstanding", value: currency(outstandingBalance)),
+                OwnerHealthMetric(label: "Monthly", value: currency(monthlyPayments))
+            ],
+            affectedEntityNames: entityNames(for: loanObligations, additionalCompanyIDs: loanAttentionIDs),
+            dataIssues: loanIssues,
+            recurringSuggestions: []
+        )
+
+        let documentObligations = categoryObligations(in: .document)
+        let expiredDocuments = documents.filter { $0.expiresAt.map { $0 < now } ?? false }
+        let expiringDocuments = documents.filter {
+            guard let expiry = $0.expiresAt else { return false }
+            return expiry >= now && expiry <= now.addingTimeInterval(60 * 86_400)
+        }
+        let documentAttentionResources = expiredDocuments + expiringDocuments
+        let documentAttentionIDs = Set(documentAttentionResources.map {
+            effectiveCompanyID(resourceID: $0.id, companyID: $0.companyId)
+        })
+        let documentIssues = visibleIssues(documents.compactMap { document in
+            var fields: [String] = []
+            if !nonempty(document.name) { fields.append("Name") }
+            if !nonempty(document.url) { fields.append("Document file") }
+            guard !fields.isEmpty else { return nil }
+            let companyID = effectiveCompanyID(resourceID: document.id, companyID: document.companyId)
+            return OwnerHealthDataIssue(
+                resourceType: .document,
+                resourceID: document.id,
+                resourceName: nonempty(document.name) ? document.name : "Unnamed document",
+                entityName: companiesByID[companyID]?.name ?? "Unknown entity",
+                missingFields: fields
+            )
+        })
+        let documentStatus = status(
+            resourceCount: documents.count,
+            categoryObligations: documentObligations,
+            hasCriticalCondition: !expiredDocuments.isEmpty,
+            hasAttentionCondition: !expiringDocuments.isEmpty
+        )
+        let documentSummaryText: String
+        if !expiredDocuments.isEmpty {
+            documentSummaryText = "\(expiredDocuments.count) document\(expiredDocuments.count == 1 ? " has" : "s have") expired."
+        } else if !expiringDocuments.isEmpty {
+            documentSummaryText = "\(expiringDocuments.count) document\(expiringDocuments.count == 1 ? " expires" : "s expire") within 60 days."
+        } else if documents.isEmpty {
+            documentSummaryText = "No documents added."
+        } else {
+            documentSummaryText = "No tracked documents expire soon."
+        }
+        let documentSummary = OwnerHealthCategorySummary(
+            category: .document,
+            status: documentStatus,
+            dataState: dataState(resourceCount: documents.count, issues: documentIssues),
+            summary: documentSummaryText,
+            metrics: [
+                OwnerHealthMetric(label: "Documents", value: "\(documents.count)"),
+                OwnerHealthMetric(label: "Expiring", value: "\(expiringDocuments.count)"),
+                OwnerHealthMetric(label: "Expired", value: "\(expiredDocuments.count)")
+            ],
+            affectedEntityNames: entityNames(for: documentObligations, additionalCompanyIDs: documentAttentionIDs),
+            dataIssues: documentIssues,
+            recurringSuggestions: []
+        )
+
+        func companyID(forSharedResource resourceID: UUID) -> UUID? {
+            if scopedCompanyIDs.contains(resourceID) { return resourceID }
+            if let item = appState.subscriptions.first(where: { $0.id == resourceID }) {
+                return effectiveCompanyID(resourceID: item.id, companyID: item.companyId)
+            }
+            if let item = appState.institutions.first(where: { $0.id == resourceID }) {
+                return effectiveCompanyID(resourceID: item.id, companyID: item.companyId)
+            }
+            if let item = appState.cards.first(where: { $0.id == resourceID }) {
+                return effectiveCompanyID(resourceID: item.id, companyID: item.companyId)
+            }
+            if let item = appState.loans.first(where: { $0.id == resourceID }) {
+                return effectiveCompanyID(resourceID: item.id, companyID: item.companyId)
+            }
+            if let item = appState.documents.first(where: { $0.id == resourceID }) {
+                return effectiveCompanyID(resourceID: item.id, companyID: item.companyId)
+            }
+            return nil
+        }
+
+        let shares = appState.resourceShares.filter {
+            guard let companyID = companyID(forSharedResource: $0.resourceId) else { return false }
+            return scopedCompanyIDs.contains(companyID)
+        }
+        let collaboratorObligations = categoryObligations(in: .collaborator)
+        let collaboratorStatus = status(resourceCount: shares.count, categoryObligations: collaboratorObligations)
+        let collaboratorSummary = OwnerHealthCategorySummary(
+            category: .collaborator,
+            status: collaboratorStatus,
+            dataState: shares.isEmpty ? .noData : .complete,
+            summary: shares.isEmpty
+                ? "No collaborators have access."
+                : collaboratorObligations.isEmpty
+                    ? "Collaborator access has no known issues."
+                    : "Collaborator access needs review.",
+            metrics: [
+                OwnerHealthMetric(label: "People", value: "\(Set(shares.map(\.userId)).count)"),
+                OwnerHealthMetric(label: "Shared items", value: "\(shares.count)")
+            ],
+            affectedEntityNames: entityNames(for: collaboratorObligations),
+            dataIssues: [],
+            recurringSuggestions: []
+        )
+
+        let otherObligations = categoryObligations(in: .other)
+        let otherStatus = status(resourceCount: otherObligations.count, categoryObligations: otherObligations)
+        let otherSummary = OwnerHealthCategorySummary(
+            category: .other,
+            status: otherStatus,
+            dataState: otherObligations.isEmpty ? .noData : .complete,
+            summary: otherObligations.isEmpty ? "No uncategorized issues." : "Uncategorized items need review.",
+            metrics: [OwnerHealthMetric(label: "Items", value: "\(otherObligations.count)")],
+            affectedEntityNames: entityNames(for: otherObligations),
+            dataIssues: [],
+            recurringSuggestions: []
+        )
+
+        let categories = [
+            companySummary, subscriptionSummary, institutionSummary, cardSummary,
+            loanSummary, documentSummary, collaboratorSummary, otherSummary
+        ]
+        let snapshotStatus = categories.map(\.status).max(by: { $0.priority < $1.priority }) ?? .notApplicable
+        let affectedNames = Array(Set(categories.flatMap(\.affectedEntityNames))).sorted()
+
+        return OwnerHealthSnapshot(
+            scope: scope,
+            entityCount: scopedCompanies.count,
+            status: snapshotStatus,
+            affectedEntityNames: affectedNames,
+            categories: categories
+        )
+    }
+
+    private static func currency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = abs(value) < 100 ? 2 : 0
+        return formatter.string(from: NSNumber(value: value)) ?? "$0"
+    }
+
+    private static func percent(_ value: Double) -> String {
+        guard value.isFinite else { return "0%" }
+        return "\(Int(value.rounded()))%"
+    }
+}
+
+private extension OwnerHealthStatus {
+    func requiresAttentionText(attention: String, healthy: String, empty: String) -> String {
+        switch self {
+        case .critical, .needsAttention: return attention
+        case .healthy: return healthy
+        case .notApplicable: return empty
+        }
+    }
 }
 
 enum DeferredAgeBucket: String, CaseIterable, Identifiable, Hashable {

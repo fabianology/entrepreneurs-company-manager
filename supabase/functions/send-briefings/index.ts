@@ -38,6 +38,9 @@ Deno.serve(async (request) => {
   }
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const { error: insightRefreshError } = await admin.rpc("refresh_miloom_subscription_insights", { p_user_id: null });
+  if (insightRefreshError) console.error("Subscription insight refresh failed", insightRefreshError);
+
   const { error: refreshError } = await admin.rpc("refresh_miloom_obligations", { p_user_id: null });
   if (refreshError) return json({ error: refreshError.message }, 500);
   await admin.rpc("maintain_miloom_downgrades");

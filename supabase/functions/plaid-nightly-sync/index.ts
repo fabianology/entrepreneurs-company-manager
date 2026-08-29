@@ -143,6 +143,7 @@ serve(async (req) => {
             category: tx.category || [],
             merchant_name: tx.merchant_name || tx.name,
             name: tx.name || tx.merchant_name,
+            merchant_website: tx.website || tx.counterparties?.find((party: any) => party.website)?.website || null,
             date: tx.date,
             pending: tx.pending || false,
             company_id: item.company_id,

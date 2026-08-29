@@ -233,11 +233,21 @@ enum PortfolioObligationEngine {
             }
         }
 
-        let existingNames = Set(appState.subscriptions.map { SubscriptionDetector.normalize($0.name) })
+        let recurringTransactions = appState.transactions.map { transaction -> Transaction in
+            guard transaction.companyId == nil else { return transaction }
+            var enriched = transaction
+            let card = appState.cards.first { $0.plaidAccountId == transaction.accountId }
+            let institution = appState.institutions.first { institution in
+                institution.id == transaction.institutionId
+                    || institution.accounts.contains { $0.id == transaction.accountId }
+            }
+            enriched.companyId = card?.companyId ?? institution?.companyId
+            return enriched
+        }
         for recurring in SubscriptionDetector.detect(
-            transactions: appState.transactions,
+            transactions: recurringTransactions,
             existingSubscriptions: appState.subscriptions
-        ) where !existingNames.contains(SubscriptionDetector.normalize(recurring.name)) {
+        ) {
             let card = appState.cards.first { $0.plaidAccountId == recurring.accountId }
             let institution = appState.institutions.first { institution in
                 institution.accounts.contains { $0.id == recurring.accountId }
