@@ -48,16 +48,14 @@ struct PremiumSubscriptionCard: View {
     var primaryTotal: Double {
         sub.billingCycle == "Monthly" ? sub.monthlyTotal : sub.yearlyTotal
     }
-    var primaryLabel: String { sub.billingCycle == "Monthly" ? "recur/mo." : "recur/yr." }
     var displayedPrimaryLabel: String {
-        revealLevel == .full ? (sub.billingCycle == "Monthly" ? "/mo" : "/yr") : primaryLabel
+        sub.billingCycle == "Monthly" ? "/mo" : "/yr"
     }
     var secondaryTotal: Double {
         sub.billingCycle == "Monthly" ? sub.yearlyTotal : sub.monthlyTotal
     }
-    var secondaryLabel: String { sub.billingCycle == "Monthly" ? "recur/yr." : "recur/mo." }
     var displayedSecondaryLabel: String {
-        revealLevel == .full ? (sub.billingCycle == "Monthly" ? "/yr" : "/mo") : secondaryLabel
+        sub.billingCycle == "Monthly" ? "/yr" : "/mo"
     }
     var totalAnnual: Double { (sub.monthlyTotal * 12) + sub.yearlyTotal }
 
