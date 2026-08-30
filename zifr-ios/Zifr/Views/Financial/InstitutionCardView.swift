@@ -125,15 +125,12 @@ struct InstitutionCardView: View {
                                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
                         )
                 )
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 10)
-                        .onChanged { value in
-                            onDragChanged?(value)
-                        }
-                        .onEnded { value in
-                            onDragEnded?(value)
-                        }
-                )
+                .overlay(alignment: .bottom) {
+                    StackCardDragZone(
+                        onChanged: { value in onDragChanged?(value) },
+                        onEnded: { value in onDragEnded?(value) }
+                    )
+                }
 
                     // ── Credentials (tap-to-copy) ────
                     VStack(alignment: .leading, spacing: 8) {
@@ -403,4 +400,3 @@ struct InstitutionCardView: View {
         }
     }
 }
-

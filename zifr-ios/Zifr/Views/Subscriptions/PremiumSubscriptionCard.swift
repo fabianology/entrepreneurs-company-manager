@@ -233,15 +233,12 @@ struct PremiumSubscriptionCard: View {
                     .padding(.trailing, 24)
                     .padding(.top, 10)
                     .padding(.bottom, 10)
-                    .simultaneousGesture(
-                        DragGesture(minimumDistance: 4)
-                            .onChanged { value in
-                                onDragChanged?(value)
-                            }
-                            .onEnded { value in
-                                onDragEnded?(value)
-                            }
-                    )
+                    .overlay(alignment: .bottom) {
+                        StackCardDragZone(
+                            onChanged: { value in onDragChanged?(value) },
+                            onEnded: { value in onDragEnded?(value) }
+                        )
+                    }
 
                         // Status row — Dot + pipes style
                         if revealLevel >= .statusRevealed && !sub.isFree {

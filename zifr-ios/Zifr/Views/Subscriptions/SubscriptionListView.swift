@@ -267,6 +267,9 @@ struct StackedSubscriptionDeckView: View {
     @State private var cardHeights: [UUID: CGFloat] = [:]
 
     private let collapsedPeekOffset: CGFloat = 71
+    private let dragCommitDistance: CGFloat = 24
+    private let projectedDragCommitDistance: CGFloat = 64
+    private let maximumDragPreview: CGFloat = 28
 
     private func level(for sub: Subscription, index: Int) -> CardRevealLevel {
         if let lvl = revealLevels[sub.id] { return lvl }
@@ -301,17 +304,17 @@ struct StackedSubscriptionDeckView: View {
                             onBankTapped: onBankTapped,
                             onSave: onSave,
                             revealLevel: currentLevel,
-                            isExplicitlyFull: revealLevels[sub.id] == .full,
+                            isExplicitlyFull: currentLevel == .full,
                             extendsUnderNextCard: extendsUnderNextCard,
                             onExpand: {
-                                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                                    revealLevels[sub.id] = .full
+                                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                                    expandOnly(sub)
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 }
                             },
                             onCollapse: {
-                                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                                    revealLevels.removeValue(forKey: sub.id)
+                                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                                    revealLevels[sub.id] = .headerOnly
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 }
                             },
@@ -412,15 +415,16 @@ struct StackedSubscriptionDeckView: View {
     }
 
     private func handleDragChange(value: DragGesture.Value, index: Int, sub: Subscription) {
+        guard abs(value.translation.height) > abs(value.translation.width) else { return }
         draggingCardId = sub.id
-        dragOffset = value.translation.height
+        dragOffset = limitedDragPreview(for: value.translation.height)
     }
 
     private func handleDragEnd(value: DragGesture.Value, index: Int, sub: Subscription) {
         let dx = value.translation.width
         let dy = value.translation.height
         let distance = hypot(dx, dy)
-        let velocity = value.predictedEndTranslation.height - value.translation.height
+        let projectedDy = value.predictedEndTranslation.height
 
         // ── Tap detection (< 8pt movement) → no-op, sheet opens via header tap ──
         if distance < 8 {
@@ -429,18 +433,23 @@ struct StackedSubscriptionDeckView: View {
             return
         }
 
-        let threshold: CGFloat = 35
-        let velocityThreshold: CGFloat = 120
+        guard abs(dy) > abs(dx) else {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+                dragOffset = 0
+                draggingCardId = nil
+            }
+            return
+        }
 
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.82, blendDuration: 0)) {
-            if dy > 0 && (dy > threshold || velocity > velocityThreshold) {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.86, blendDuration: 0)) {
+            if dy > 0 && (dy > dragCommitDistance || projectedDy > projectedDragCommitDistance) {
                 // ── Pulling DOWN on this card → expand this card to full ──
                 let currentLvl = level(for: sub, index: index)
                 if currentLvl != .full {
-                    revealLevels[sub.id] = .full
+                    expandOnly(sub)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
-            } else if dy < 0 && (dy < -threshold || velocity < -velocityThreshold) {
+            } else if dy < 0 && (dy < -dragCommitDistance || projectedDy < -projectedDragCommitDistance) {
                 // ── Pulling UP on this card → collapse the card ABOVE (index - 1) ──
                 if index > 0 {
                     let aboveSub = subscriptions[index - 1]
@@ -462,5 +471,22 @@ struct StackedSubscriptionDeckView: View {
             draggingCardId = nil
         }
     }
-}
 
+    /// Keeps the stack accordion-like: opening one card closes every other
+    /// card, including the bottom card that starts open by default.
+    private func expandOnly(_ sub: Subscription) {
+        revealLevels = Dictionary(
+            uniqueKeysWithValues: subscriptions.map { ($0.id, CardRevealLevel.headerOnly) }
+        )
+        revealLevels[sub.id] = .full
+    }
+
+    /// Gives the deck a short, rubber-banded preview without allowing the
+    /// user's finger to pull an unlimited amount of empty space into the stack.
+    private func limitedDragPreview(for translation: CGFloat) -> CGFloat {
+        let direction: CGFloat = translation < 0 ? -1 : 1
+        let magnitude = abs(translation)
+        let resistedMagnitude = maximumDragPreview * (1 - exp(-magnitude / 28))
+        return direction * min(resistedMagnitude, maximumDragPreview)
+    }
+}

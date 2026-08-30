@@ -1,5 +1,26 @@
 import SwiftUI
 
+// MARK: - Stacked Card Drag Zone
+/// Reserves one small, invisible pull/push target so vertical drags everywhere
+/// else on a card remain available to the surrounding ScrollView.
+struct StackCardDragZone: View {
+    let onChanged: (DragGesture.Value) -> Void
+    let onEnded: (DragGesture.Value) -> Void
+
+    var body: some View {
+        Color.clear
+            .frame(width: 84, height: 22)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 8)
+                    .onChanged(onChanged)
+                    .onEnded(onEnded)
+            )
+            .accessibilityLabel("Card pull area")
+            .accessibilityHint("Swipe down to open the card or up to close it")
+    }
+}
+
 // MARK: - ZifrField (CiFr-style text input — bg-[#111111] border white/10 rounded-2xl)
 struct ZifrField: View {
     let label: String

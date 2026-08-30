@@ -28,6 +28,9 @@ struct StackedInstitutionDeckView: View {
     
     // Collapsed header height — matches subscription card overlap
     private let collapsedHeight: CGFloat = 68
+    private let dragCommitDistance: CGFloat = 24
+    private let projectedDragCommitDistance: CGFloat = 64
+    private let maximumDragPreview: CGFloat = 28
     
     private var totalStackHeight: CGFloat {
         guard !institutions.isEmpty else { return 0 }
@@ -41,7 +44,7 @@ struct StackedInstitutionDeckView: View {
             let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == lastInst.name.lowercased() }
             let showPhysicalCards = isExpanded
             let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-            lastHeight = (institutionHeights[lastInst.id] ?? 360) + cardPeekHeight
+            lastHeight = (institutionHeights[lastInst.id] ?? collapsedHeight) + cardPeekHeight
         } else {
             lastHeight = collapsedHeight
         }
@@ -58,7 +61,11 @@ struct StackedInstitutionDeckView: View {
         .frame(height: totalStackHeight, alignment: .top)
         .padding(.bottom, 20)
         .onPreferenceChange(InstitutionHeightKey.self) { value in
-            institutionHeights.merge(value, uniquingKeysWith: { $1 })
+            let hasChangedHeight = value.contains { institutionHeights[$0.key] != $0.value }
+            guard hasChangedHeight else { return }
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                institutionHeights.merge(value, uniquingKeysWith: { $1 })
+            }
         }
         .onAppear {
             setSingleInstitutionDefaultIfNeeded()
@@ -129,7 +136,10 @@ struct StackedInstitutionDeckView: View {
             if expandedInstId == inst.id {
                 let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == inst.name.lowercased() }
                 let cardPeekHeight: CGFloat = instCards.isEmpty ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
-                offset += (institutionHeights[inst.id] ?? 360) + cardPeekHeight + 8.0
+                // Start from the compact header height, then animate to the
+                // measured content height. A large guessed fallback caused the
+                // deck to flash an empty 360pt gap when a new card opened.
+                offset += (institutionHeights[inst.id] ?? collapsedHeight) + cardPeekHeight + 8.0
             } else {
                 offset += collapsedHeight
             }
@@ -151,15 +161,16 @@ struct StackedInstitutionDeckView: View {
     // MARK: - Drag Gesture Handlers
 
     private func handleDragChange(value: DragGesture.Value, inst: Institution) {
+        guard abs(value.translation.height) > abs(value.translation.width) else { return }
         draggingCardId = inst.id
-        dragOffset = value.translation.height
+        dragOffset = limitedDragPreview(for: value.translation.height)
     }
 
     private func handleDragEnd(value: DragGesture.Value, index: Int, inst: Institution) {
         let dx = value.translation.width
         let dy = value.translation.height
         let distance = hypot(dx, dy)
-        let velocity = value.predictedEndTranslation.height - value.translation.height
+        let projectedDy = value.predictedEndTranslation.height
 
         // If distance < 8pt, treated as tap -> handled by .onTapGesture
         if distance < 8 {
@@ -168,18 +179,23 @@ struct StackedInstitutionDeckView: View {
             return
         }
 
-        let threshold: CGFloat = 35
-        let velocityThreshold: CGFloat = 120
+        guard abs(dy) > abs(dx) else {
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.9)) {
+                dragOffset = 0
+                draggingCardId = nil
+            }
+            return
+        }
 
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.82, blendDuration: 0)) {
-            if dy > 0 && (dy > threshold || velocity > velocityThreshold) {
+        withAnimation(.spring(response: 0.36, dampingFraction: 0.86, blendDuration: 0)) {
+            if dy > 0 && (dy > dragCommitDistance || projectedDy > projectedDragCommitDistance) {
                 // Drag down -> expand card
                 if expandedInstId != inst.id {
                     expandedInstId = inst.id
                     poppedCardId = nil
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
-            } else if dy < 0 && (dy < -threshold || velocity < -velocityThreshold) {
+            } else if dy < 0 && (dy < -dragCommitDistance || projectedDy < -projectedDragCommitDistance) {
                 // Drag up -> collapse card
                 if expandedInstId == inst.id {
                     expandedInstId = nil
@@ -198,6 +214,15 @@ struct StackedInstitutionDeckView: View {
             dragOffset = 0
             draggingCardId = nil
         }
+    }
+
+    /// Gives the deck a short, rubber-banded preview without allowing the
+    /// user's finger to pull an unlimited amount of empty space into the stack.
+    private func limitedDragPreview(for translation: CGFloat) -> CGFloat {
+        let direction: CGFloat = translation < 0 ? -1 : 1
+        let magnitude = abs(translation)
+        let resistedMagnitude = maximumDragPreview * (1 - exp(-magnitude / 28))
+        return direction * min(resistedMagnitude, maximumDragPreview)
     }
     
     // MARK: - Collapsed Header (matches original InstitutionCardView header exactly)
@@ -275,6 +300,16 @@ struct StackedInstitutionDeckView: View {
         .padding(.vertical, 10)
         .frame(height: collapsedHeight, alignment: .center)
         .frame(maxWidth: .infinity)
+        .overlay(alignment: .bottom) {
+            StackCardDragZone(
+                onChanged: { value in
+                    handleDragChange(value: value, inst: inst)
+                },
+                onEnded: { value in
+                    handleDragEnd(value: value, index: index, inst: inst)
+                }
+            )
+        }
         .frame(height: isLast ? collapsedHeight : collapsedHeight + 80, alignment: .top)
         .background(
             cardShape
@@ -304,15 +339,6 @@ struct StackedInstitutionDeckView: View {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             }
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 4)
-                .onChanged { value in
-                    handleDragChange(value: value, inst: inst)
-                }
-                .onEnded { value in
-                    handleDragEnd(value: value, index: index, inst: inst)
-                }
-        )
     }
     
     // MARK: - Expanded Institution
