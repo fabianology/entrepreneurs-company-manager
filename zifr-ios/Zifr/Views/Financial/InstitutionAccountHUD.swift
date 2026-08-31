@@ -6,12 +6,16 @@ struct InstitutionAccountHUD: View {
     @Binding var draft: InstitutionAccount
     let isNew: Bool
     let institutionName: String
+    var institutionId: UUID? = nil
     var availableCards: [FinancialCard] = []
+    let companyId: UUID
+    @Bindable var vm: AppViewModel
     let onSave: () -> Void
     let onCancel: () -> Void
     var onDelete: (() -> Void)? = nil
     
     @State private var initialDraft: InstitutionAccount? = nil
+    @State private var showTransactions = false
     
     private var isDirty: Bool {
         guard let initial = initialDraft else { return isNew && !draft.name.isEmpty }
@@ -19,6 +23,9 @@ struct InstitutionAccountHUD: View {
                draft.last4 != initial.last4 ||
                draft.type != initial.type ||
                draft.balance != initial.balance ||
+               draft.accountNumber != initial.accountNumber ||
+               draft.routingNumber != initial.routingNumber ||
+               draft.wireRoutingNumber != initial.wireRoutingNumber ||
                draft.linkedCardId != initial.linkedCardId
     }
 
@@ -106,6 +113,28 @@ struct InstitutionAccountHUD: View {
                                 keyboardType: .numberPad
                             )
 
+                            if !(draft.wireRoutingNumber ?? "").isEmpty {
+                                ZifrField(
+                                    label: "WIRE ROUTING NUMBER",
+                                    placeholder: "Provided when different from ACH",
+                                    text: Binding(
+                                        get: { draft.wireRoutingNumber ?? "" },
+                                        set: { draft.wireRoutingNumber = $0 }
+                                    ),
+                                    keyboardType: .numberPad
+                                )
+                            }
+
+                            if draft.isTokenizedAccountNumber == true {
+                                Label(
+                                    "Plaid supplied a bank-issued tokenized ACH number. The recognizable account mask remains •••• \(draft.last4).",
+                                    systemImage: "checkmark.shield.fill"
+                                )
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("BALANCE")
                                     .font(.system(size: 12, weight: .regular))
@@ -124,6 +153,30 @@ struct InstitutionAccountHUD: View {
                                 .background(Color(hex: "#2C2C2E"))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
+
+                            if !isNew {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    showTransactions = true
+                                } label: {
+                                    HStack {
+                                        Text("TRANSACTIONS")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .tracking(0.5)
+                                            .foregroundStyle(.white)
+                                        Spacer()
+                                        Image(systemName: "receipt")
+                                            .foregroundStyle(Color.white.opacity(0.4))
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                }
+                                .buttonStyle(PremiumButtonStyle())
+                                .padding(.top, 4)
                             }
                         }
                     }
@@ -156,6 +209,14 @@ struct InstitutionAccountHUD: View {
             .background(Color(hex: "#1C1C1E"))
             .onAppear {
                 initialDraft = draft
+            }
+            .sheet(isPresented: $showTransactions) {
+                TransactionFeedView(
+                    accountId: draft.plaidAccountId ?? draft.id,
+                    companyId: companyId,
+                    institutionId: institutionId,
+                    vm: vm
+                )
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)

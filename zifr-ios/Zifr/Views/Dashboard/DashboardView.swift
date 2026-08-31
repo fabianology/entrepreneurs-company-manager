@@ -27,6 +27,7 @@ struct DashboardView: View {
     @State private var showAssistant = false    
     @State private var showPremiumUpgrade = false
     @State private var showDowngradeSelection = false
+    @State private var showConnectionGraph = false
     @State private var dashboardMode: DashboardDisplayMode = .portfolio
     
     private var currentUserId: UUID? { authViewModel.currentUser?.id }
@@ -71,7 +72,8 @@ struct DashboardView: View {
                             OwnerHealthBriefingDashboard(
                                 vm: vm,
                                 onOpenResource: openBriefingResource,
-                                onOpenHealthResource: openHealthResource
+                                onOpenHealthResource: openHealthResource,
+                                onExploreConnections: { showConnectionGraph = true }
                             )
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
@@ -248,6 +250,12 @@ struct DashboardView: View {
                 AssistantOnboardingView(vm: vm)
                     .environment(appState)
             }
+            .fullScreenCover(isPresented: $showConnectionGraph) {
+                ConnectionGraphView { reference in
+                    openHealthResource(reference.kind, reference.resourceId)
+                }
+                .environment(appState)
+            }
             .sheet(item: $selectedSubscription) { sub in
                 EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false, onSave: {})
             }
@@ -399,7 +407,7 @@ struct DashboardView: View {
                             }
                         }
                     )
-                    
+
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         showAssistant = true

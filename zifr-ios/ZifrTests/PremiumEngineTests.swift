@@ -2,6 +2,32 @@ import XCTest
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testTransactionDecodesWithoutOptionalMerchantWebsiteColumn() throws {
+        let owner = UUID()
+        let transactionId = UUID()
+        let json = """
+        {
+          "id": "\(transactionId.uuidString)",
+          "user_id": "\(owner.uuidString)",
+          "account_id": "checking",
+          "amount": 42.50,
+          "currency": "USD",
+          "date": "2026-08-30",
+          "name": "Example Merchant",
+          "merchant_name": "Example Merchant",
+          "category": ["Shops"],
+          "pending": false
+        }
+        """
+
+        let transaction = try JSONDecoder().decode(Transaction.self, from: Data(json.utf8))
+
+        XCTAssertEqual(transaction.id, transactionId)
+        XCTAssertEqual(transaction.userId, owner)
+        XCTAssertNil(transaction.merchantWebsite)
+        XCTAssertEqual(transaction.merchantName, "Example Merchant")
+    }
+
     func testEntitlementStatesRespectTrialGraceAndRevocation() {
         XCTAssertTrue(AccessSnapshot(tier: .pro, status: .trial, limits: .pro).hasProAccess)
         XCTAssertTrue(AccessSnapshot(tier: .pro, status: .active, limits: .pro).hasProAccess)
@@ -47,6 +73,89 @@ final class PremiumEngineTests: XCTestCase {
         state.resourceConnections = [rejected]
         let regenerated = PortfolioConnectionEngine.buildConnections(appState: state, ownerUserId: owner)
         XCTAssertFalse(regenerated.contains { $0.relationshipType == .usesLogin })
+    }
+
+    func testConnectionGraphBuildsMaskedSharedEmailHub() {
+        let owner = UUID(), companyA = UUID(), companyB = UUID()
+        let subscriptionA = Subscription(userId: owner, companyId: companyA, name: "Figma", loginId: "admin@example.com")
+        let subscriptionB = Subscription(userId: owner, companyId: companyB, name: "AWS", loginId: "ADMIN@example.com")
+        let state = AppState()
+        state.companies = [
+            Company(id: companyA, userId: owner, name: "Studio", structure: "LLC"),
+            Company(id: companyB, userId: owner, name: "Holdings", structure: "LLC")
+        ]
+        state.subscriptions = [subscriptionA, subscriptionB]
+        state.resourceConnections = [ResourceConnection(
+            ownerUserId: owner,
+            sourceType: .subscription,
+            sourceId: subscriptionA.id,
+            targetType: .subscription,
+            targetId: subscriptionB.id,
+            relationshipType: .usesLogin,
+            origin: .inferred,
+            confidence: 0.92,
+            state: .suggested,
+            inferenceKey: "email:admin@example.com:subscription:\(subscriptionA.id):subscription:\(subscriptionB.id)"
+        )]
+
+        let graph = ConnectionGraphBuilder.build(appState: state)
+        let emailNode = graph.nodes.first { $0.kind == .sharedEmail }
+        XCTAssertEqual(emailNode?.displayName, "admin@example.com")
+        XCTAssertEqual(emailNode?.canvasLabel, "a•••@example.com")
+        XCTAssertEqual(emailNode.map { graph.edges(for: $0.id).count }, 2)
+        XCTAssertTrue(emailNode.map { graph.edges(for: $0.id).allSatisfy { $0.state == .suggested } } ?? false)
+    }
+
+    func testConnectionGraphExcludesRejectedEmailHub() {
+        let owner = UUID(), company = UUID()
+        let subscription = Subscription(userId: owner, companyId: company, name: "Figma")
+        let institution = Institution(userId: owner, companyId: company, name: "Bank")
+        let state = AppState()
+        state.companies = [Company(id: company, userId: owner, name: "Studio", structure: "LLC")]
+        state.subscriptions = [subscription]
+        state.institutions = [institution]
+        state.resourceConnections = [ResourceConnection(
+            ownerUserId: owner,
+            sourceType: .subscription,
+            sourceId: subscription.id,
+            targetType: .institution,
+            targetId: institution.id,
+            relationshipType: .usesLogin,
+            origin: .inferred,
+            confidence: 0.92,
+            state: .rejected,
+            inferenceKey: "email:admin@example.com:subscription:\(subscription.id):institution:\(institution.id)"
+        )]
+
+        let graph = ConnectionGraphBuilder.build(appState: state)
+        XCTAssertFalse(graph.nodes.contains { $0.kind == .sharedEmail })
+        XCTAssertFalse(graph.edges.contains { $0.relationship == .usesLogin })
+    }
+
+    func testConnectionGraphDegreeSizingIsMonotonicAndCapped() {
+        let isolated = ConnectionGraphBuilder.radius(kind: .resource(.company), degree: 0)
+        let connected = ConnectionGraphBuilder.radius(kind: .resource(.company), degree: 4)
+        let hub = ConnectionGraphBuilder.radius(kind: .resource(.company), degree: 10_000)
+        XCTAssertLessThan(isolated, connected)
+        XCTAssertLessThanOrEqual(connected, hub)
+        XCTAssertEqual(hub, 52)
+    }
+
+    func testConnectionGraphLayoutIsDeterministicAndFinite() {
+        let graph = ConnectionGraph(
+            nodes: [
+                ConnectionGraphNode(id: "a", kind: .resource(.company), reference: nil, displayName: "A", canvasLabel: "A"),
+                ConnectionGraphNode(id: "b", kind: .resource(.subscription), reference: nil, displayName: "B", canvasLabel: "B")
+            ],
+            edges: [ConnectionGraphEdge(
+                id: "a-b", sourceID: "a", targetID: "b", relationship: .belongsTo,
+                state: .confirmed, connectionIDs: []
+            )]
+        )
+        let first = ConnectionGraphLayoutEngine.positions(for: graph, iterations: 20)
+        let second = ConnectionGraphLayoutEngine.positions(for: graph, iterations: 20)
+        XCTAssertEqual(first, second)
+        XCTAssertTrue(first.values.allSatisfy { $0.x.isFinite && $0.y.isFinite })
     }
 
     func testExpiringCardProducesOneConsolidatedImpactObligation() {
@@ -207,6 +316,180 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(detected.map(\.name), ["Netflix"])
         XCTAssertEqual(detected.first?.frequency, "Monthly")
         XCTAssertEqual(detected.first?.occurrences, 2)
+    }
+
+    func testTransactionIntelligenceResolvesCompanyAndAccountFromPlaidContext() {
+        let owner = UUID()
+        let company = Company(userId: owner, name: "Acme", structure: "LLC")
+        let institution = Institution(
+            userId: owner,
+            companyId: company.id,
+            name: "SoFi",
+            accounts: [
+                InstitutionAccount(
+                    id: "plaid-checking",
+                    name: "Operating Checking",
+                    type: "Checking",
+                    last4: "5525"
+                )
+            ]
+        )
+        var transaction = Transaction()
+        transaction.userId = owner
+        transaction.accountId = "plaid-checking"
+        transaction.name = "Office Depot"
+
+        let resolved = TransactionIntelligence.resolve(
+            transaction,
+            companies: [company],
+            institutions: [institution],
+            cards: []
+        )
+
+        XCTAssertEqual(resolved.companyId, company.id)
+        XCTAssertEqual(resolved.companyName, "Acme")
+        XCTAssertEqual(resolved.accountName, "Operating Checking")
+        XCTAssertEqual(resolved.institutionName, "SoFi")
+    }
+
+    func testTransactionIntelligenceUsesCardContextWhenInstitutionAccountIsAbsent() {
+        let owner = UUID()
+        let company = Company(userId: owner, name: "Studio", structure: "LLC")
+        let card = FinancialCard(
+            userId: owner,
+            companyId: company.id,
+            name: "Citi Business",
+            institutionName: "Citi",
+            last4: "1001",
+            plaidAccountId: "plaid-card"
+        )
+        var transaction = Transaction()
+        transaction.userId = owner
+        transaction.accountId = "plaid-card"
+        transaction.name = "Figma"
+
+        let resolved = TransactionIntelligence.resolve(
+            transaction,
+            companies: [company],
+            institutions: [],
+            cards: [card]
+        )
+
+        XCTAssertEqual(resolved.companyId, company.id)
+        XCTAssertEqual(resolved.accountName, "Citi Business")
+        XCTAssertEqual(resolved.institutionName, "Citi")
+    }
+
+    func testTransactionPortfolioSummarySeparatesMoneyInOutAndPending() {
+        let owner = UUID(), companyId = UUID()
+        var expense = makeTransaction(owner: owner, company: companyId, name: "Software", amount: 120, date: "2027-08-01")
+        var income = makeTransaction(owner: owner, company: companyId, name: "Client payment", amount: -500, date: "2027-08-02")
+        var pending = makeTransaction(owner: owner, company: companyId, name: "Pending meal", amount: 40, date: "2027-08-03")
+        pending.pending = true
+        expense.accountId = "checking"
+        income.accountId = "checking"
+
+        let records = [expense, income, pending].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+        let summary = TransactionIntelligence.summary(for: records)
+
+        XCTAssertEqual(summary.moneyOut, 120)
+        XCTAssertEqual(summary.moneyIn, 500)
+        XCTAssertEqual(summary.pendingCount, 1)
+    }
+
+    func testTransactionSearchUsesCleanMerchantAndResolvedContext() {
+        let owner = UUID(), companyId = UUID()
+        var transaction = makeTransaction(
+            owner: owner,
+            company: companyId,
+            name: "SQ *NOTION LABS 1234",
+            amount: 20,
+            date: "2027-08-01"
+        )
+        transaction.merchantName = "Notion"
+        let record = ResolvedTransaction(
+            transaction: transaction,
+            companyId: companyId,
+            companyName: "Design Studio",
+            accountName: "Operating Checking",
+            institutionName: "Mercury"
+        )
+
+        XCTAssertEqual(TransactionIntelligence.displayName(for: transaction), "Notion")
+        XCTAssertTrue(TransactionIntelligence.matchesSearch(record, query: "notion"))
+        XCTAssertTrue(TransactionIntelligence.matchesSearch(record, query: "mercury"))
+        XCTAssertTrue(TransactionIntelligence.matchesSearch(record, query: "design"))
+        XCTAssertFalse(TransactionIntelligence.matchesSearch(record, query: "airline"))
+    }
+
+    func testDuplicateChargeDetectorFindsNearlyIdenticalPostedChargesWithinThreeDays() {
+        let owner = UUID(), company = UUID()
+        var first = makeTransaction(owner: owner, company: company, name: "Figma", amount: 15.00, date: "2027-08-10")
+        var second = makeTransaction(owner: owner, company: company, name: "FIGMA INC", amount: 15.01, date: "2027-08-12")
+        first.merchantName = "Figma"
+        second.merchantName = "Figma"
+        first.plaidTransactionId = "plaid-first"
+        second.plaidTransactionId = "plaid-second"
+        let records = [first, second].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+
+        let alerts = DuplicateChargeDetector.detect(records: records)
+
+        XCTAssertEqual(alerts.count, 1)
+        XCTAssertEqual(alerts.first?.displayName, "Figma")
+        XCTAssertEqual(alerts.first?.records.count, 2)
+        XCTAssertEqual(alerts.first?.possibleDuplicateAmount, 15.00)
+    }
+
+    func testDuplicateChargeDetectorExcludesPendingTransfersAndDistantCharges() {
+        let owner = UUID(), company = UUID()
+        var pendingA = makeTransaction(owner: owner, company: company, name: "Pending Vendor", amount: 25, date: "2027-08-10")
+        var pendingB = makeTransaction(owner: owner, company: company, name: "Pending Vendor", amount: 25, date: "2027-08-11")
+        pendingA.pending = true
+        pendingB.pending = true
+
+        var transferA = makeTransaction(owner: owner, company: company, name: "Bank transfer", amount: 100, date: "2027-08-10")
+        var transferB = makeTransaction(owner: owner, company: company, name: "Bank transfer", amount: 100, date: "2027-08-11")
+        transferA.category = ["Transfer"]
+        transferB.category = ["Transfer"]
+
+        let distant = [
+            makeTransaction(owner: owner, company: company, name: "Adobe", amount: 59.99, date: "2027-08-01"),
+            makeTransaction(owner: owner, company: company, name: "Adobe", amount: 59.99, date: "2027-08-20")
+        ]
+        let records = ([pendingA, pendingB, transferA, transferB] + distant).map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+
+        XCTAssertTrue(DuplicateChargeDetector.detect(records: records).isEmpty)
+    }
+
+    func testDuplicateChargeDetectorKeepsCompaniesSeparateAndPersistsDismissal() {
+        let owner = UUID(), companyA = UUID(), companyB = UUID()
+        let transactions = [companyA, companyB].flatMap { company in
+            ["2027-08-10", "2027-08-11"].map {
+                makeTransaction(owner: owner, company: company, name: "Notion", amount: 20, date: $0)
+            }
+        }
+        let records = transactions.map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+        let alerts = DuplicateChargeDetector.detect(records: records)
+        XCTAssertEqual(alerts.count, 2)
+        XCTAssertEqual(Set(alerts.compactMap(\.companyId)), Set([companyA, companyB]))
+
+        let suiteName = "DuplicateChargeDismissalTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let dismissedAlert = alerts[0]
+        XCTAssertFalse(DuplicateChargeDismissalStore.isDismissed(dismissedAlert, defaults: defaults))
+        DuplicateChargeDismissalStore.dismiss(dismissedAlert, defaults: defaults)
+        XCTAssertTrue(DuplicateChargeDismissalStore.isDismissed(dismissedAlert, defaults: defaults))
+        DuplicateChargeDismissalStore.clear(dismissedAlert, defaults: defaults)
+        XCTAssertFalse(DuplicateChargeDismissalStore.isDismissed(dismissedAlert, defaults: defaults))
     }
 
     func testRecurringSuggestionsAreCompanyScopedAndDisappearAfterImport() {

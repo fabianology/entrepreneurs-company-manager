@@ -226,6 +226,7 @@ struct OwnerHealthBriefingDashboard: View {
 
     var onOpenResource: (PortfolioObligation) -> Void
     var onOpenHealthResource: (ResourceKind, UUID) -> Void
+    var onExploreConnections: () -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -415,6 +416,32 @@ struct OwnerHealthBriefingDashboard: View {
                         .lineLimit(2)
                 }
             }
+
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                onExploreConnections()
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "point.3.connected.trianglepath.dotted")
+                        .font(.system(size: 13, weight: .bold))
+                    Text("EXPLORE CONNECTIONS")
+                        .font(.system(size: 10, weight: .black))
+                        .tracking(1.1)
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 10, weight: .black))
+                }
+                .foregroundStyle(Color.zifrGold)
+                .frame(height: 38)
+                .padding(.horizontal, 12)
+                .background(Color.zifrGold.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.zifrGold.opacity(0.24), lineWidth: 0.7)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens an interactive map of every company and shared touchpoint")
         }
         .padding(15)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -59,6 +59,7 @@ struct CompanyDetailView: View {
     @State private var assistantStrokeRotation: Double = 0.0
     @State private var showFinancialReport = false
     @State private var showSubscriptionReport = false
+    @State private var showTransactionCenter = false
 
     // Tutorial frame targets — populated by TutorialFrameKey preferences
     @State private var tutFrameHeader: CGRect = .zero
@@ -138,6 +139,10 @@ struct CompanyDetailView: View {
                 institutions: institutions,
                 cards: cards
             )
+        }
+        .sheet(isPresented: $showTransactionCenter) {
+            PortfolioTransactionCenterView(vm: vm)
+                .environment(appState)
         }
         .fullScreenCover(isPresented: $showAssistant) {
             AssistantOnboardingView(vm: vm)
@@ -454,6 +459,10 @@ struct CompanyDetailView: View {
 
                     Spacer(minLength: 8)
 
+                    if vm.activeTab == .financial {
+                        transactionHeaderButton
+                    }
+
                     headerActionMenu
                 }
 
@@ -488,6 +497,21 @@ struct CompanyDetailView: View {
                 )
         )
         .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
+    }
+
+    private var transactionHeaderButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showTransactionCenter = true
+        } label: {
+            Image(systemName: "list.bullet.rectangle.portrait")
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.70))
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("All transactions")
     }
 
     @ViewBuilder

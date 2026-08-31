@@ -604,6 +604,7 @@ struct TransactionFeedView: View {
     var cardId: UUID? = nil
     var cardName: String? = nil
     var companyId: UUID? = nil
+    var institutionId: UUID? = nil
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
@@ -624,24 +625,72 @@ struct TransactionFeedView: View {
     @State private var syncError: String? = nil
     @State private var hasSyncedOnAppear = false
 
-    // Resolve the right Plaid account_id for filtering
-    private func resolvedAccountId() -> String {
-        let matchingCard = appState.cards.first { $0.id.uuidString == accountId || $0.plaidAccountId == accountId }
-        let matchingInstAcc = appState.institutions.flatMap(\.accounts).first { $0.id == accountId }
-        if let pId = matchingCard?.plaidAccountId { return pId }
-        if let card = matchingCard, let l4 = card.last4, !l4.isEmpty,
-           let acc = appState.institutions.flatMap(\.accounts).first(where: { $0.last4 == l4 }) {
-            return acc.id
+    private var resolvedInstitutionId: UUID? {
+        if let institutionId { return institutionId }
+
+        if let institution = appState.institutions.first(where: { institution in
+            (companyId == nil || institution.companyId == companyId) &&
+            institution.accounts.contains(where: { account in
+                account.id == accountId || account.plaidAccountId == accountId
+            })
+        }) {
+            return institution.id
         }
-        if let pId = matchingInstAcc?.id { return pId }
-        return accountId
+
+        if let card = appState.cards.first(where: {
+            $0.id.uuidString == accountId || $0.plaidAccountId == accountId
+        }), let institutionName = card.institutionName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !institutionName.isEmpty {
+            return appState.institutions.first(where: {
+                $0.companyId == card.companyId &&
+                $0.name.caseInsensitiveCompare(institutionName) == .orderedSame
+            })?.id
+        }
+        return nil
+    }
+
+    // Include both legacy local IDs and the canonical Plaid account ID. Older
+    // account JSON did not decode plaid_account_id, which made valid rows appear
+    // missing even though they were already stored.
+    private func resolvedAccountIds() -> Set<String> {
+        var ids: Set<String> = [accountId]
+        let companyInstitutions = appState.institutions.filter {
+            companyId == nil || $0.companyId == companyId
+        }
+        let matchingCard = appState.cards.first {
+            $0.id.uuidString == accountId || $0.plaidAccountId == accountId
+        }
+        let matchingAccount = companyInstitutions
+            .flatMap(\.accounts)
+            .first { $0.id == accountId || $0.plaidAccountId == accountId }
+
+        if let card = matchingCard {
+            ids.insert(card.id.uuidString)
+            if let plaidId = card.plaidAccountId { ids.insert(plaidId) }
+            if let last4 = card.last4, !last4.isEmpty,
+               let account = companyInstitutions.flatMap(\.accounts).first(where: { $0.last4 == last4 }) {
+                ids.insert(account.id)
+                if let plaidId = account.plaidAccountId { ids.insert(plaidId) }
+            }
+        }
+        if let account = matchingAccount {
+            ids.insert(account.id)
+            if let plaidId = account.plaidAccountId { ids.insert(plaidId) }
+        }
+        return ids
+    }
+
+    // Resolve the preferred Plaid account_id for subscription detection.
+    private func resolvedAccountId() -> String {
+        let ids = resolvedAccountIds()
+        return ids.first(where: { $0 != accountId }) ?? accountId
     }
 
     private var filteredTransactions: [Transaction] {
-        let target = resolvedAccountId()
-        return appState.transactions.filter { tx in
-            tx.accountId == target || tx.accountId == accountId
-        }.sorted(by: { $0.date > $1.date })
+        let ids = resolvedAccountIds()
+        return appState.transactions
+            .filter { ids.contains($0.accountId) }
+            .sorted(by: { $0.date > $1.date })
     }
 
     private var trackedSubscriptionNames: Set<String> {
@@ -732,6 +781,15 @@ struct TransactionFeedView: View {
                     }
                 } else {
                     List {
+                        if let syncError {
+                            Section {
+                                Label(syncError, systemImage: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.orange)
+                                    .listRowBackground(Color.orange.opacity(0.08))
+                            }
+                        }
+
                         // Detected subscriptions banner
                         if !detectedSubscriptions.isEmpty {
                             Section {
@@ -816,8 +874,9 @@ struct TransactionFeedView: View {
                 print("DEBUG resolvedAccountId = \(resolvedAccountId())")
                 print("DEBUG filteredTransactions.count = \(filteredTransactions.count)")
 
-                // Auto-sync once on appear if no transactions loaded
-                if !hasSyncedOnAppear {
+                // Existing rows render immediately. Only auto-sync an empty feed;
+                // users can explicitly refresh a populated account from the toolbar.
+                if !hasSyncedOnAppear && filteredTransactions.isEmpty {
                     hasSyncedOnAppear = true
                     Task { await syncAndRefresh() }
                 }
@@ -859,10 +918,12 @@ struct TransactionFeedView: View {
     @MainActor
     private func syncAndRefresh() async {
         isSyncing = true
+        defer { isSyncing = false }
         syncError = nil
         do {
-            // Call the nightly sync edge function to pull fresh Plaid data
-            try await PlaidService.shared.syncSubscriptions()
+            // Account sheets should sync only their bank. Syncing every linked bank
+            // made opening one account slow and could time out before it refreshed.
+            try await PlaidService.shared.syncSubscriptions(institutionId: resolvedInstitutionId)
         } catch {
             // Don't show error if it's just "no Plaid items" — still refresh
             let msg = error.localizedDescription
@@ -870,9 +931,13 @@ struct TransactionFeedView: View {
                 syncError = msg
             }
         }
-        // Always refresh app state after sync attempt
-        await DataRepository.shared.fetchAllData(appState: appState)
-        isSyncing = false
+        // Fetch transactions directly. fetchAllData can legitimately no-op while
+        // another dashboard load is running, leaving this sheet stale.
+        do {
+            try await DataRepository.shared.refreshTransactions(appState: appState)
+        } catch {
+            if syncError == nil { syncError = error.localizedDescription }
+        }
     }
 
     private func formatCurrency(_ value: Double) -> String {
