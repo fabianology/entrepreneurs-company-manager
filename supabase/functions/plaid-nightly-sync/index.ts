@@ -570,6 +570,16 @@ serve(async (req) => {
           }
         }
 
+        // Archived access tokens can stop returning account metadata after a
+        // reconnect. Once current transactions exist, recover unique account
+        // matches from exact transaction overlap (or a one-to-one singleton).
+        const { data: overlapReconciledAccounts, error: overlapReconcileError } = await supabaseAdmin
+          .rpc('reconcile_plaid_history_by_overlap', {
+            p_user_id: item.user_id,
+            p_current_item_id: item.id
+          })
+        if (overlapReconcileError) throw overlapReconcileError
+
         const { data: duplicateCount, error: duplicateError } = await supabaseAdmin
           .rpc('reconcile_plaid_transaction_duplicates', { p_user_id: item.user_id })
         if (duplicateError) throw duplicateError
@@ -586,7 +596,7 @@ serve(async (req) => {
           success: true,
           transactions_found: allTransactions.length,
           transactions_saved: allTransactions.length,
-          history_accounts_reconciled: reconciledHistoryAccounts,
+          history_accounts_reconciled: reconciledHistoryAccounts + (overlapReconciledAccounts ?? 0),
           duplicates_suppressed: duplicateCount ?? 0
         })
       } catch (err) {
