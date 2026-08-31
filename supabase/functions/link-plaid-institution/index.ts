@@ -43,7 +43,7 @@ serve(async (req) => {
     // A reconnect or reinstall can produce a new Item for an existing visible
     // institution. Archive the replaced row before activating the new one so
     // history stays intact and the unique active-connection invariant holds.
-    const { error: replaceError } = await admin
+    const { data: replaced, error: replaceError } = await admin
       .from('plaid_items')
       .update({
         status: 'archived',
@@ -54,6 +54,7 @@ serve(async (req) => {
       .eq('institution_id', institution.id)
       .eq('status', 'active')
       .neq('id', item.id)
+      .select('id')
     if (replaceError) throw replaceError
 
     const { error: updateError } = await admin
@@ -85,6 +86,18 @@ serve(async (req) => {
       .neq('id', item.id)
       .select('id')
     if (archiveError) throw archiveError
+
+    const archivedItemIds = [
+      ...(replaced || []).map(row => row.id),
+      ...(archived || []).map(row => row.id)
+    ]
+    if (archivedItemIds.length > 0) {
+      const { error: accountArchiveError } = await admin
+        .from('plaid_accounts')
+        .update({ status: 'archived', last_seen_at: new Date().toISOString() })
+        .in('plaid_item_id', archivedItemIds)
+      if (accountArchiveError) throw accountArchiveError
+    }
 
     return new Response(JSON.stringify({
       success: true,

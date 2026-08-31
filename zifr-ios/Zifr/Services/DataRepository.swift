@@ -10,7 +10,7 @@ class DataRepository {
     // Keep this projection compatible with the production transaction schema.
     // `merchant_website` is optional enrichment and has not been deployed to every
     // environment; Transaction's custom decoder safely leaves it nil when omitted.
-    private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,amount,currency,date,name,merchant_name,category,pending"
+    private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,canonical_account_id,amount,currency,date,name,merchant_name,category,pending"
 
     private func fetchCompanies() async -> Result<[Company], Error> {
         do {
@@ -42,6 +42,7 @@ class DataRepository {
             return try await client
                 .from("plaid_transactions")
                 .select(Self.transactionColumns)
+                .eq("is_superseded_duplicate", value: false)
                 .order("date", ascending: false)
                 .execute()
                 .value
@@ -65,6 +66,7 @@ class DataRepository {
             try await client
                 .from("plaid_transactions")
                 .select(Self.transactionColumns)
+                .eq("is_superseded_duplicate", value: false)
                 .order("date", ascending: false)
                 .execute()
                 .value
@@ -677,6 +679,8 @@ struct Transaction: Identifiable, Codable, Equatable {
     var institutionId: UUID? = nil
     var plaidTransactionId: String? = nil
     var accountId: String = ""
+    var sourceAccountId: String? = nil
+    var canonicalAccountId: String? = nil
     var amount: Double? = 0.0
     var currency: String = "USD"
     var date: String = ""
@@ -693,6 +697,7 @@ struct Transaction: Identifiable, Codable, Equatable {
         case institutionId = "institution_id"
         case plaidTransactionId = "plaid_transaction_id"
         case accountId = "account_id"
+        case canonicalAccountId = "canonical_account_id"
         case amount
         case currency
         case date
@@ -723,7 +728,14 @@ struct Transaction: Identifiable, Codable, Equatable {
         self.companyId = try container.decodeIfPresent(UUID.self, forKey: .companyId)
         self.institutionId = try container.decodeIfPresent(UUID.self, forKey: .institutionId)
         self.plaidTransactionId = try container.decodeIfPresent(String.self, forKey: .plaidTransactionId)
-        self.accountId = try container.decodeIfPresent(String.self, forKey: .accountId) ?? ""
+        let sourceAccountId = try container.decodeIfPresent(String.self, forKey: .accountId) ?? ""
+        self.sourceAccountId = sourceAccountId
+        self.canonicalAccountId = try container.decodeIfPresent(String.self, forKey: .canonicalAccountId)
+        if let canonicalAccountId, !canonicalAccountId.isEmpty {
+            self.accountId = canonicalAccountId
+        } else {
+            self.accountId = sourceAccountId
+        }
         self.amount = try container.decodeIfPresent(Double.self, forKey: .amount)
         self.currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
         self.date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""

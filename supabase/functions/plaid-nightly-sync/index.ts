@@ -50,6 +50,166 @@ serve(async (req) => {
       return await response.json()
     }
 
+    const normalizeIdentity = (value: any) =>
+      String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+    const accountTypesMatch = (left: any, right: any) => {
+      const leftType = normalizeIdentity(left?.type)
+      const rightType = normalizeIdentity(right?.type)
+      const leftSubtype = normalizeIdentity(left?.subtype)
+      const rightSubtype = normalizeIdentity(right?.subtype)
+      if (leftType && rightType && leftType !== rightType) return false
+      return !leftSubtype || !rightSubtype || leftSubtype === rightSubtype
+    }
+
+    const accountNames = (account: any) => new Set(
+      [account?.official_name, account?.name]
+        .map(normalizeIdentity)
+        .filter(Boolean)
+    )
+
+    const accountSnapshot = (
+      item: any,
+      account: any,
+      status: 'active' | 'archived'
+    ) => ({
+      user_id: item.user_id,
+      plaid_item_id: item.id,
+      account_id: account.account_id,
+      persistent_account_id: account.persistent_account_id ?? null,
+      institution_id: status === 'active' ? item.institution_id : null,
+      company_id: item.company_id,
+      name: account.name ?? null,
+      official_name: account.official_name ?? null,
+      mask: account.mask ?? null,
+      account_type: account.type ?? null,
+      subtype: account.subtype ?? null,
+      status,
+      ...(status === 'active' ? {
+        canonical_account_id: account.account_id,
+        canonical_institution_id: item.institution_id,
+        canonical_company_id: item.company_id,
+        match_method: 'source',
+        matched_at: new Date().toISOString()
+      } : {}),
+      last_seen_at: new Date().toISOString()
+    })
+
+    const persistAccountSnapshots = async (
+      item: any,
+      accounts: any[],
+      status: 'active' | 'archived'
+    ) => {
+      if (accounts.length === 0) return
+      const { error: snapshotError } = await supabaseAdmin
+        .from('plaid_accounts')
+        .upsert(
+          accounts.map((account: any) => accountSnapshot(item, account, status)),
+          { onConflict: 'plaid_item_id,account_id' }
+        )
+      if (snapshotError) throw snapshotError
+    }
+
+    const matchReplacementAccount = (archivedAccount: any, currentAccounts: any[]) => {
+      const persistentId = archivedAccount.persistent_account_id
+      if (persistentId) {
+        const persistentMatches = currentAccounts.filter((candidate: any) =>
+          candidate.persistent_account_id === persistentId
+        )
+        if (persistentMatches.length === 1) {
+          return { account: persistentMatches[0], method: 'persistent_account_id' }
+        }
+      }
+
+      if (archivedAccount.mask) {
+        const maskMatches = currentAccounts.filter((candidate: any) =>
+          candidate.mask === archivedAccount.mask &&
+          accountTypesMatch(archivedAccount, candidate)
+        )
+        if (maskMatches.length === 1) {
+          return { account: maskMatches[0], method: 'mask_and_type' }
+        }
+      }
+
+      const archivedNames = accountNames(archivedAccount)
+      if (archivedNames.size > 0) {
+        const nameMatches = currentAccounts.filter((candidate: any) => {
+          if (!accountTypesMatch(archivedAccount, candidate)) return false
+          return [...accountNames(candidate)].some(name => archivedNames.has(name))
+        })
+        if (nameMatches.length === 1) {
+          return { account: nameMatches[0], method: 'name_and_type' }
+        }
+      }
+      return null
+    }
+
+    const reconcileArchivedHistory = async (item: any, currentAccounts: any[]) => {
+      if (!item.plaid_institution_id || currentAccounts.length === 0) return 0
+
+      const { data: archivedItems, error: archivedError } = await supabaseAdmin
+        .from('plaid_items')
+        .select('id,access_token,user_id,company_id,institution_id,institution_name,plaid_institution_id')
+        .eq('user_id', item.user_id)
+        .eq('company_id', item.company_id)
+        .eq('plaid_institution_id', item.plaid_institution_id)
+        .eq('status', 'archived')
+        .eq('error_code', 'SUPERSEDED_CONNECTION')
+        .neq('id', item.id)
+      if (archivedError) throw archivedError
+
+      let reconciledAccounts = 0
+      for (const archivedItem of (archivedItems || [])) {
+        const archivedData = await plaidRequest('/accounts/get', archivedItem.access_token)
+        if (archivedData.error_code) {
+          console.warn(
+            `Could not snapshot archived Item ${archivedItem.id}: ${archivedData.error_code}`
+          )
+          continue
+        }
+
+        const archivedAccounts = archivedData.accounts || []
+        await persistAccountSnapshots(archivedItem, archivedAccounts, 'archived')
+
+        for (const archivedAccount of archivedAccounts) {
+          const match = matchReplacementAccount(archivedAccount, currentAccounts)
+          if (!match) continue
+
+          const matchedAt = new Date().toISOString()
+          const { error: accountMatchError } = await supabaseAdmin
+            .from('plaid_accounts')
+            .update({
+              canonical_account_id: match.account.account_id,
+              canonical_institution_id: item.institution_id,
+              canonical_company_id: item.company_id,
+              match_method: match.method,
+              matched_at: matchedAt,
+              last_seen_at: matchedAt
+            })
+            .eq('plaid_item_id', archivedItem.id)
+            .eq('account_id', archivedAccount.account_id)
+          if (accountMatchError) throw accountMatchError
+
+          const { error: transactionMatchError } = await supabaseAdmin
+            .from('plaid_transactions')
+            .update({
+              persistent_account_id: match.account.persistent_account_id ?? null,
+              canonical_account_id: match.account.account_id,
+              account_match_method: match.method,
+              institution_id: item.institution_id,
+              company_id: item.company_id,
+              is_superseded_duplicate: false,
+              superseded_by_transaction_id: null
+            })
+            .eq('plaid_item_id', archivedItem.id)
+            .eq('account_id', archivedAccount.account_id)
+          if (transactionMatchError) throw transactionMatchError
+          reconciledAccounts++
+        }
+      }
+      return reconciledAccounts
+    }
+
     // A user-triggered refresh is scoped to that user and, for an account sheet,
     // to that institution. The service-role cron still refreshes every active item.
     let itemsQuery = supabaseAdmin
@@ -61,6 +221,7 @@ serve(async (req) => {
         company_id,
         institution_id,
         institution_name,
+        plaid_institution_id,
         institutions (
           id,
           name,
@@ -131,6 +292,8 @@ serve(async (req) => {
         // Auth numbers remain client-only because only the iOS app can encrypt them.
         const currentAccounts = item.institutions.accounts_data || []
         const plaidAccounts = balanceData.accounts || []
+        await persistAccountSnapshots(item, plaidAccounts, 'active')
+        const reconciledHistoryAccounts = await reconcileArchivedHistory(item, plaidAccounts)
         const updatedAccounts = currentAccounts.reduce((deduplicated: any[], account: any) => {
           const duplicateIndex = deduplicated.findIndex((candidate: any) => candidate.id === account.id)
           if (duplicateIndex >= 0) deduplicated[duplicateIndex] = { ...deduplicated[duplicateIndex], ...account }
@@ -376,6 +539,13 @@ serve(async (req) => {
             plaid_item_id: item.id,
             plaid_transaction_id: tx.transaction_id,
             account_id: tx.account_id,
+            persistent_account_id: plaidAccounts.find((account: any) =>
+              account.account_id === tx.account_id
+            )?.persistent_account_id ?? null,
+            canonical_account_id: tx.account_id,
+            account_match_method: 'source',
+            is_superseded_duplicate: false,
+            superseded_by_transaction_id: null,
             amount: tx.amount,
             currency: tx.iso_currency_code || 'USD',
             category: tx.category || [],
@@ -400,6 +570,10 @@ serve(async (req) => {
           }
         }
 
+        const { data: duplicateCount, error: duplicateError } = await supabaseAdmin
+          .rpc('reconcile_plaid_transaction_duplicates', { p_user_id: item.user_id })
+        if (duplicateError) throw duplicateError
+
         // ── C. Update item sync timestamp ───────────────────────────────
         await supabaseAdmin.from('plaid_items')
           .update({ last_synced_at: new Date().toISOString(), status: 'active', error_code: null })
@@ -411,7 +585,9 @@ serve(async (req) => {
           institution_name: item.institution_name,
           success: true,
           transactions_found: allTransactions.length,
-          transactions_saved: allTransactions.length
+          transactions_saved: allTransactions.length,
+          history_accounts_reconciled: reconciledHistoryAccounts,
+          duplicates_suppressed: duplicateCount ?? 0
         })
       } catch (err) {
         console.error(`Failed to sync item ${item.id}:`, err)

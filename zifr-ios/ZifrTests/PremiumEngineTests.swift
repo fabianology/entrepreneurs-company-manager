@@ -57,6 +57,26 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(transaction.merchantName, "Example Merchant")
     }
 
+    func testTransactionUsesCanonicalAccountAfterPlaidReconnect() throws {
+        let json = """
+        {
+          "account_id": "archived-source-account",
+          "canonical_account_id": "current-visible-account",
+          "amount": 19.99,
+          "currency": "USD",
+          "date": "2026-08-30",
+          "name": "Example Merchant",
+          "pending": false
+        }
+        """
+
+        let transaction = try JSONDecoder().decode(Transaction.self, from: Data(json.utf8))
+
+        XCTAssertEqual(transaction.sourceAccountId, "archived-source-account")
+        XCTAssertEqual(transaction.canonicalAccountId, "current-visible-account")
+        XCTAssertEqual(transaction.accountId, "current-visible-account")
+    }
+
     func testEntitlementStatesRespectTrialGraceAndRevocation() {
         XCTAssertTrue(AccessSnapshot(tier: .pro, status: .trial, limits: .pro).hasProAccess)
         XCTAssertTrue(AccessSnapshot(tier: .pro, status: .active, limits: .pro).hasProAccess)
