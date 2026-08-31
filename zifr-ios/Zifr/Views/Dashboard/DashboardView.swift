@@ -158,6 +158,14 @@ struct DashboardView: View {
             .scrollContentBackground(.hidden)
             .background(Color.clear)
             .scrollIndicators(.hidden)
+            .task {
+                // Fallback for OAuth/root-view timing: the dashboard should never
+                // remain on its placeholder simply because the first auth callback
+                // arrived before the app-level loader attached.
+                if appState.companies.isEmpty {
+                    await DataRepository.shared.fetchAllData(appState: appState)
+                }
+            }
             .onAppear {
                 onboardingState.evaluateState(appState: appState)
             }

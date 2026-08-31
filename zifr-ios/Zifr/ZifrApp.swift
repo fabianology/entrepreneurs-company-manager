@@ -62,21 +62,20 @@ struct ZifrApp: App {
                 StoreService.shared.startListening(accessController: accessController)
                 await authViewModel.checkSession()
             }
-            .onChange(of: authViewModel.isAuthenticated) { _, isAuth in
-                if isAuth {
-                    Task {
-                        // Company data should not wait for entitlement or push-network
-                        // work. Start these independent operations together.
-                        async let accessRefresh: Void = accessController.refresh()
-                        async let dataRefresh: Void = DataRepository.shared.fetchAllData(appState: appState)
-                        async let pushRegistration: Void = PushNotificationService.shared.registerPendingTokenIfNeeded()
+            .task(id: authViewModel.isAuthenticated) {
+                guard authViewModel.isAuthenticated else { return }
 
-                        await dataRefresh
-                        await accessRefresh
-                        appState.entitlementSnapshot = accessController.snapshot
-                        await pushRegistration
-                    }
-                }
+                // A task keyed to authentication runs for both a restored session and
+                // a fresh OAuth login. An onChange handler can be replaced as the root
+                // view switches from LoginView to RootView and miss that first load.
+                async let accessRefresh: Void = accessController.refresh()
+                async let dataRefresh: Void = DataRepository.shared.fetchAllData(appState: appState)
+                async let pushRegistration: Void = PushNotificationService.shared.registerPendingTokenIfNeeded()
+
+                await dataRefresh
+                await accessRefresh
+                appState.entitlementSnapshot = accessController.snapshot
+                await pushRegistration
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .background {

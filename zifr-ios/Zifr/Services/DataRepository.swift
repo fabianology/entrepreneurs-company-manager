@@ -6,6 +6,7 @@ import Security
 class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
+    private static let transactionPageSize = 1_000
 
     // Keep this projection compatible with the production transaction schema.
     // `merchant_website` is optional enrichment and has not been deployed to every
@@ -37,16 +38,36 @@ class DataRepository {
     }
     
     // MARK: - Fetch All Data
-    private func safeFetchTransactions() async -> [Transaction] {
-        do {
-            return try await client
+    private func fetchTransactions() async throws -> [Transaction] {
+        var transactions: [Transaction] = []
+        var pageStart = 0
+
+        while true {
+            let page: [Transaction] = try await client
                 .from("plaid_transactions")
                 .select(Self.transactionColumns)
                 .eq("is_superseded_duplicate", value: false)
                 .eq("is_stale_pending_duplicate", value: false)
                 .order("date", ascending: false)
+                .order("id", ascending: false)
+                .range(
+                    from: pageStart,
+                    to: pageStart + Self.transactionPageSize - 1
+                )
                 .execute()
                 .value
+
+            transactions.append(contentsOf: page)
+            guard page.count == Self.transactionPageSize else { break }
+            pageStart += Self.transactionPageSize
+        }
+
+        return transactions
+    }
+
+    private func safeFetchTransactions() async -> [Transaction] {
+        do {
+            return try await fetchTransactions()
         }
         catch { 
             print("Failed to fetch transactions! Error details: \(String(describing: error))")
@@ -64,14 +85,7 @@ class DataRepository {
     @MainActor
     func refreshTransactions(appState: AppState) async throws {
         let transactions: [Transaction] = try await measure("transactions") {
-            try await client
-                .from("plaid_transactions")
-                .select(Self.transactionColumns)
-                .eq("is_superseded_duplicate", value: false)
-                .eq("is_stale_pending_duplicate", value: false)
-                .order("date", ascending: false)
-                .execute()
-                .value
+            try await fetchTransactions()
         }
         appState.transactions = transactions
     }

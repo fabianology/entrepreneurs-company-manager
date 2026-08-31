@@ -536,6 +536,32 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertTrue(DuplicateChargeDetector.detect(records: records).isEmpty)
     }
 
+    func testDuplicateChargeDetectorKeepsAccountsSeparate() {
+        let owner = UUID(), company = UUID()
+        var checkingCharge = makeTransaction(
+            owner: owner,
+            company: company,
+            name: "Corner Market",
+            amount: 42,
+            date: "2027-08-10"
+        )
+        var creditCharge = makeTransaction(
+            owner: owner,
+            company: company,
+            name: "Corner Market",
+            amount: 42,
+            date: "2027-08-10"
+        )
+        checkingCharge.accountId = "checking"
+        creditCharge.accountId = "credit-card"
+
+        let records = [checkingCharge, creditCharge].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+
+        XCTAssertTrue(DuplicateChargeDetector.detect(records: records).isEmpty)
+    }
+
     func testDuplicateChargeDetectorKeepsCompaniesSeparateAndPersistsDismissal() {
         let owner = UUID(), companyA = UUID(), companyB = UUID()
         let transactions = [companyA, companyB].flatMap { company in

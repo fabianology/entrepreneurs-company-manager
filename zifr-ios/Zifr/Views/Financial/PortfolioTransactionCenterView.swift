@@ -64,6 +64,7 @@ enum DuplicateChargeDetector {
     private struct MerchantScope: Hashable {
         let merchantKey: String
         let companyId: UUID?
+        let accountId: String
         let currency: String
     }
 
@@ -85,6 +86,7 @@ enum DuplicateChargeDetector {
             MerchantScope(
                 merchantKey: SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record.transaction)),
                 companyId: record.companyId,
+                accountId: record.accountId,
                 currency: record.transaction.currency
             )
         }
@@ -1108,7 +1110,7 @@ private struct DuplicateChargeReviewSheet: View {
                                 Text("Possible Duplicate Charges")
                                     .font(.system(size: 19, weight: .bold))
                                     .foregroundStyle(.white)
-                                Text("Miloom only flags posted charges with the same merchant, company, and nearly identical amount within three days.")
+                                Text("Miloom only flags posted charges on the same account with the same merchant and nearly identical amount within three days.")
                                     .font(.system(size: 12))
                                     .foregroundStyle(Color.white.opacity(0.5))
                                     .multilineTextAlignment(.center)
