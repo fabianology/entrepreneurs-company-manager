@@ -49,6 +49,99 @@ struct EditInstitutionSheet: View {
         loans.filter { ($0.lender ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
     }
 
+    private struct SyncHealthPresentation {
+        let title: String
+        let detail: String
+        let icon: String
+        let color: Color
+    }
+
+    private var plaidItem: PlaidItemSummary? {
+        let visibleItems = appState.plaidItems.filter {
+            !["archived", "deleted"].contains($0.status)
+        }
+        if let exact = visibleItems.first(where: { $0.institutionId == institution.id }) {
+            return exact
+        }
+        return visibleItems.first(where: {
+            $0.companyId == institution.companyId &&
+            ($0.institutionName ?? "").caseInsensitiveCompare(institution.name) == .orderedSame
+        })
+    }
+
+    private var institutionTransactionCount: Int {
+        appState.transactions.filter { $0.institutionId == institution.id }.count
+    }
+
+    private var syncHealth: SyncHealthPresentation? {
+        guard let item = plaidItem else {
+            if institution.isDisconnected {
+                return SyncHealthPresentation(
+                    title: "Reconnect required",
+                    detail: "Plaid access needs attention",
+                    icon: "exclamationmark.triangle.fill",
+                    color: .red
+                )
+            }
+            return nil
+        }
+
+        let countText = institutionTransactionCount == 1
+            ? "1 transaction"
+            : "\(institutionTransactionCount) transactions"
+        if institution.isDisconnected || item.requiresReconnect {
+            return SyncHealthPresentation(
+                title: "Reconnect required",
+                detail: item.errorCode ?? "Plaid access needs attention",
+                icon: "exclamationmark.triangle.fill",
+                color: .red
+            )
+        }
+        if item.status == "pending_link" {
+            return SyncHealthPresentation(
+                title: "Finishing connection",
+                detail: "Account data will appear after setup completes",
+                icon: "clock.fill",
+                color: .orange
+            )
+        }
+        if let errorCode = item.errorCode, !errorCode.isEmpty {
+            return SyncHealthPresentation(
+                title: "Sync needs attention",
+                detail: errorCode.replacingOccurrences(of: "_", with: " ").capitalized,
+                icon: "exclamationmark.circle.fill",
+                color: .orange
+            )
+        }
+
+        let lastSync = item.lastSyncedAt ?? institution.lastSyncedAt
+        guard let lastSync else {
+            return SyncHealthPresentation(
+                title: "Waiting for first sync",
+                detail: countText,
+                icon: "clock.arrow.circlepath",
+                color: .orange
+            )
+        }
+        let relative = RelativeDateTimeFormatter()
+        relative.unitsStyle = .abbreviated
+        let updated = "Updated \(relative.localizedString(for: lastSync, relativeTo: Date()))"
+        if item.isStale() {
+            return SyncHealthPresentation(
+                title: "Sync delayed",
+                detail: "\(updated) • \(countText)",
+                icon: "clock.badge.exclamationmark.fill",
+                color: .orange
+            )
+        }
+        return SyncHealthPresentation(
+            title: "Plaid up to date",
+            detail: "\(updated) • \(countText)",
+            icon: "checkmark.circle.fill",
+            color: .zifrGreen
+        )
+    }
+
     @State private var showAccountHUD = false
     @State private var accountDraft = InstitutionAccount()
     @State private var accountDraftIndex: Int? = nil
@@ -285,10 +378,34 @@ struct EditInstitutionSheet: View {
                                         }
                                         .buttonStyle(MiloomSecondaryButtonStyle())
                                         
-                                        Text("Last synced on: \(institution.lastSyncedAt?.formatted(date: .abbreviated, time: .shortened) ?? "Never")")
-                                            .font(.system(size: 11, weight: .medium))
-                                            .foregroundStyle(Color.white.opacity(0.4))
-                                            .frame(maxWidth: .infinity, alignment: .center)
+                                        if let syncHealth {
+                                            HStack(alignment: .top, spacing: 8) {
+                                                Image(systemName: syncHealth.icon)
+                                                    .font(.system(size: 12, weight: .bold))
+                                                    .foregroundStyle(syncHealth.color)
+                                                    .padding(.top, 1)
+
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(syncHealth.title)
+                                                        .font(.system(size: 12, weight: .semibold))
+                                                        .foregroundStyle(syncHealth.color)
+                                                    Text(syncHealth.detail)
+                                                        .font(.system(size: 10, weight: .medium))
+                                                        .foregroundStyle(Color.white.opacity(0.48))
+                                                }
+
+                                                Spacer(minLength: 0)
+                                            }
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 10)
+                                            .background(syncHealth.color.opacity(0.08))
+                                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 10)
+                                                    .stroke(syncHealth.color.opacity(0.2), lineWidth: 1)
+                                            )
+                                        }
                                     }
                                 }
                             }
