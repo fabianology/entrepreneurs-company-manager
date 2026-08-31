@@ -493,6 +493,67 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertFalse(TransactionIntelligence.matchesSearch(record, query: "airline"))
     }
 
+    func testTransactionOverrideUpdatesMerchantCategorySearchAndSummary() {
+        let owner = UUID(), companyId = UUID()
+        var transaction = makeTransaction(
+            owner: owner,
+            company: companyId,
+            name: "Unrecognized ACH",
+            amount: 250,
+            date: "2027-08-01"
+        )
+        transaction.personalFinancePrimary = "GENERAL_SERVICES"
+        var correction = TransactionOverride(userId: owner, transactionId: transaction.id)
+        correction.merchantName = "Owner Transfer"
+        correction.categoryPrimary = "TRANSFER"
+        correction.categoryDetailed = "INTERNAL_ACCOUNT_TRANSFER"
+        correction.flowOverride = .transfer
+        correction.note = "Movement between company accounts"
+
+        let record = TransactionIntelligence.resolveAll(
+            [transaction],
+            companies: [],
+            institutions: [],
+            cards: [],
+            overrides: [correction]
+        )[0]
+        let summary = TransactionIntelligence.summary(for: [record])
+
+        XCTAssertEqual(TransactionIntelligence.displayName(for: record), "Owner Transfer")
+        XCTAssertEqual(TransactionIntelligence.categoryPrimary(for: record), "TRANSFER")
+        XCTAssertEqual(TransactionIntelligence.categoryDetailed(for: record), "INTERNAL_ACCOUNT_TRANSFER")
+        XCTAssertEqual(TransactionIntelligence.effectiveFlow(for: record), .transfer)
+        XCTAssertTrue(TransactionIntelligence.matchesSearch(record, query: "company accounts"))
+        XCTAssertEqual(summary.moneyOut, 0)
+        XCTAssertEqual(summary.moneyIn, 0)
+        XCTAssertEqual(summary.financialMovementCount, 1)
+    }
+
+    func testTransactionOverrideCanReclassifyIncomingAmountAsExpense() {
+        let owner = UUID(), companyId = UUID()
+        let transaction = makeTransaction(
+            owner: owner,
+            company: companyId,
+            name: "Corrected debit",
+            amount: -75,
+            date: "2027-08-01"
+        )
+        var correction = TransactionOverride(userId: owner, transactionId: transaction.id)
+        correction.flowOverride = .expense
+
+        let record = TransactionIntelligence.resolveAll(
+            [transaction],
+            companies: [],
+            institutions: [],
+            cards: [],
+            overrides: [correction]
+        )[0]
+        let summary = TransactionIntelligence.summary(for: [record])
+
+        XCTAssertEqual(summary.moneyOut, 75)
+        XCTAssertEqual(summary.moneyIn, 0)
+    }
+
     func testDuplicateChargeDetectorFindsNearlyIdenticalPostedChargesWithinThreeDays() {
         let owner = UUID(), company = UUID()
         var first = makeTransaction(owner: owner, company: company, name: "Figma", amount: 15.00, date: "2027-08-10")

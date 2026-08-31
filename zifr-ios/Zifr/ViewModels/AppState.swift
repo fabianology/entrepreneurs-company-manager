@@ -11,6 +11,7 @@ final class AppState {
     var loans: [Loan] = []
     var documents: [CompanyDocument] = []
     var transactions: [Transaction] = []
+    var transactionOverrides: [TransactionOverride] = []
     var resourceShares: [ResourceShare] = []
     var activityLogs: [ActivityLog] = []
     var notifications: [AppNotification] = []

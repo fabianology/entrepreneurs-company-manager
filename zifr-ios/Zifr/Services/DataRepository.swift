@@ -132,6 +132,13 @@ class DataRepository {
         async let fObligations: [PortfolioObligation] = measure("obligations") { (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? [] }
         async let fObligationRefresh = refreshMyObligations()
         async let fTransactions = measure("transactions") { await safeFetchTransactions() }
+        async let fTransactionOverrides: [TransactionOverride] = measure("transaction_overrides") {
+            (try? await client
+                .from("plaid_transaction_overrides")
+                .select()
+                .execute()
+                .value) ?? []
+        }
         
         let fetchedSubscriptions = await fSubscriptions
         let fetchedInstitutions = await fInstitutions
@@ -154,6 +161,7 @@ class DataRepository {
             fetchedObligations = initiallyFetchedObligations
         }
         let transactions = await fTransactions
+        let transactionOverrides = await fTransactionOverrides
         
         let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
         let secureInst = fetchedInstitutions.map { decryptInstitutionSecrets($0) }
@@ -180,6 +188,7 @@ class DataRepository {
         appState.notifications = fetchedNotifications
         appState.userPreferences = fetchedPreferences.first
         appState.transactions = transactions
+        appState.transactionOverrides = transactionOverrides
         appState.resourceConnections = fetchedConnections
         appState.obligations = fetchedObligations
 
@@ -247,6 +256,31 @@ class DataRepository {
             "assign_plaid_transaction_company",
             params: Parameters(transactionId: transactionId, companyId: companyId)
         ).execute()
+    }
+
+    func upsertTransactionOverride(_ override: TransactionOverride) async throws -> TransactionOverride {
+        let saved: [TransactionOverride] = try await client
+            .from("plaid_transaction_overrides")
+            .upsert(override, onConflict: "user_id,transaction_id")
+            .select()
+            .execute()
+            .value
+        guard let result = saved.first else {
+            throw NSError(
+                domain: "Miloom.TransactionOverride",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The correction was saved but could not be reloaded."]
+            )
+        }
+        return result
+    }
+
+    func deleteTransactionOverride(transactionId: UUID) async throws {
+        try await client
+            .from("plaid_transaction_overrides")
+            .delete()
+            .eq("transaction_id", value: transactionId)
+            .execute()
     }
 
     func registerPushToken(_ token: String, environment: String) async throws {
@@ -685,6 +719,50 @@ class DataRepository {
             .delete()
             .eq("id", value: invitationId)
             .execute()
+    }
+}
+
+enum TransactionFlowOverride: String, Codable, CaseIterable, Identifiable, Hashable {
+    case expense
+    case income
+    case transfer
+    case refund
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .expense: return "Expense"
+        case .income: return "Income"
+        case .transfer: return "Transfer"
+        case .refund: return "Refund"
+        }
+    }
+}
+
+struct TransactionOverride: Identifiable, Codable, Equatable, Hashable {
+    var id: UUID = UUID()
+    var userId: UUID
+    var transactionId: UUID
+    var merchantName: String?
+    var categoryPrimary: String?
+    var categoryDetailed: String?
+    var flowOverride: TransactionFlowOverride?
+    var note: String?
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case transactionId = "transaction_id"
+        case merchantName = "merchant_name"
+        case categoryPrimary = "category_primary"
+        case categoryDetailed = "category_detailed"
+        case flowOverride = "flow_override"
+        case note
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
 }
 

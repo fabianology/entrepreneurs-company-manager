@@ -22,6 +22,23 @@ struct ResolvedTransaction: Identifiable, Equatable {
     let companyName: String
     let accountName: String
     let institutionName: String
+    let override: TransactionOverride?
+
+    init(
+        transaction: Transaction,
+        companyId: UUID?,
+        companyName: String,
+        accountName: String,
+        institutionName: String,
+        override: TransactionOverride? = nil
+    ) {
+        self.transaction = transaction
+        self.companyId = companyId
+        self.companyName = companyName
+        self.accountName = accountName
+        self.institutionName = institutionName
+        self.override = override
+    }
 
     var id: UUID { transaction.id }
     var accountId: String { transaction.accountId }
@@ -79,12 +96,12 @@ enum DuplicateChargeDetector {
             let transaction = record.transaction
             return transaction.pending != true
                 && (transaction.amount ?? 0) > 0
-                && !TransactionIntelligence.isFinancialMovement(transaction)
-                && !SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: transaction)).isEmpty
+                && TransactionIntelligence.effectiveFlow(for: record) != .transfer
+                && !SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record)).isEmpty
         }
         let scoped = Dictionary(grouping: eligible) { record in
             MerchantScope(
-                merchantKey: SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record.transaction)),
+                merchantKey: SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record)),
                 companyId: record.companyId,
                 accountId: record.accountId,
                 currency: record.transaction.currency
@@ -116,7 +133,7 @@ enum DuplicateChargeDetector {
                 cluster.forEach { consumed.insert($0.id) }
                 alerts.append(DuplicateChargeAlert(
                     merchantKey: scope.merchantKey,
-                    displayName: TransactionIntelligence.displayName(for: cluster.last?.transaction ?? base.transaction),
+                    displayName: TransactionIntelligence.displayName(for: cluster.last ?? base),
                     amount: baseAmount,
                     currency: scope.currency,
                     companyId: scope.companyId,
@@ -194,7 +211,8 @@ enum TransactionIntelligence {
         _ transactions: [Transaction],
         companies: [Company],
         institutions: [Institution],
-        cards: [FinancialCard]
+        cards: [FinancialCard],
+        overrides: [TransactionOverride] = []
     ) -> [ResolvedTransaction] {
         let companiesById = companies.reduce(into: [UUID: Company]()) { $0[$1.id] = $1 }
         let institutionsById = institutions.reduce(into: [UUID: Institution]()) { $0[$1.id] = $1 }
@@ -215,6 +233,9 @@ enum TransactionIntelligence {
             if let plaidAccountId = card.plaidAccountId?.nonEmpty {
                 cardsByAccountId[plaidAccountId] = card
             }
+        }
+        let overridesByTransactionId = overrides.reduce(into: [UUID: TransactionOverride]()) {
+            $0[$1.transactionId] = $1
         }
 
         return transactions
@@ -239,7 +260,8 @@ enum TransactionIntelligence {
                     companyId: resolvedCompanyId,
                     companyName: companyName,
                     accountName: accountName,
-                    institutionName: institutionName
+                    institutionName: institutionName,
+                    override: overridesByTransactionId[transaction.id]
                 )
             }
             .sorted {
@@ -256,6 +278,19 @@ enum TransactionIntelligence {
             if transaction.companyId == nil {
                 transaction.companyId = record.companyId
             }
+            if let merchantName = record.override?.merchantName?.nonEmpty {
+                transaction.merchantName = merchantName
+                transaction.name = merchantName
+            }
+            if let primary = record.override?.categoryPrimary?.nonEmpty {
+                transaction.personalFinancePrimary = primary
+            }
+            if let detailed = record.override?.categoryDetailed?.nonEmpty {
+                transaction.personalFinanceDetailed = detailed
+            }
+            if record.override?.flowOverride == .transfer {
+                transaction.category = ["Transfer"]
+            }
             return transaction
         }
     }
@@ -264,6 +299,22 @@ enum TransactionIntelligence {
         transaction.merchantName?.nonEmpty
             ?? transaction.name?.nonEmpty
             ?? "Unknown transaction"
+    }
+
+    static func displayName(for record: ResolvedTransaction) -> String {
+        record.override?.merchantName?.nonEmpty ?? displayName(for: record.transaction)
+    }
+
+    static func categoryPrimary(for record: ResolvedTransaction) -> String? {
+        record.override?.categoryPrimary?.nonEmpty
+            ?? record.transaction.personalFinancePrimary?.nonEmpty
+            ?? record.transaction.category?.first?.nonEmpty
+    }
+
+    static func categoryDetailed(for record: ResolvedTransaction) -> String? {
+        record.override?.categoryDetailed?.nonEmpty
+            ?? record.transaction.personalFinanceDetailed?.nonEmpty
+            ?? record.transaction.category?.dropFirst().first?.nonEmpty
     }
 
     static func isFinancialMovement(_ transaction: Transaction) -> Bool {
@@ -294,6 +345,16 @@ enum TransactionIntelligence {
         return patterns.contains { name.range(of: $0, options: .regularExpression) != nil }
     }
 
+    static func effectiveFlow(for record: ResolvedTransaction) -> TransactionFlowOverride {
+        if let flowOverride = record.override?.flowOverride {
+            return flowOverride
+        }
+        if isFinancialMovement(record.transaction) {
+            return .transfer
+        }
+        return (record.transaction.amount ?? 0) < 0 ? .income : .expense
+    }
+
     static func summary(for records: [ResolvedTransaction]) -> TransactionPortfolioSummary {
         var moneyOut = 0.0
         var moneyIn = 0.0
@@ -306,15 +367,19 @@ enum TransactionIntelligence {
                 pendingCount += 1
                 continue
             }
-            if isFinancialMovement(transaction) {
+            let flow = effectiveFlow(for: record)
+            if flow == .transfer {
                 financialMovementCount += 1
                 continue
             }
             let amount = transaction.amount ?? 0
-            if amount >= 0 {
-                moneyOut += amount
-            } else {
+            switch flow {
+            case .expense:
+                moneyOut += abs(amount)
+            case .income, .refund:
                 moneyIn += abs(amount)
+            case .transfer:
+                break
             }
         }
 
@@ -331,11 +396,14 @@ enum TransactionIntelligence {
         guard !normalizedQuery.isEmpty else { return true }
         let transaction = record.transaction
         let searchable = [
-            displayName(for: transaction),
+            displayName(for: record),
             transaction.name ?? "",
             record.companyName,
             record.accountName,
             record.institutionName,
+            categoryPrimary(for: record) ?? "",
+            categoryDetailed(for: record) ?? "",
+            record.override?.note ?? "",
             (transaction.category ?? []).joined(separator: " ")
         ].joined(separator: " ").lowercased()
         return searchable.contains(normalizedQuery)
@@ -376,6 +444,7 @@ struct PortfolioTransactionCenterView: View {
     @State private var analyzedDuplicateAlerts: [DuplicateChargeAlert] = []
     @State private var isPreparing = true
     @State private var analysisRevision = UUID()
+    @State private var selectedTransaction: ResolvedTransaction?
 
     private var filteredRecords: [ResolvedTransaction] {
         allRecords.filter { record in
@@ -392,11 +461,11 @@ struct PortfolioTransactionCenterView: View {
             default: break
             }
 
-            let amount = transaction.amount ?? 0
+            let effectiveFlow = TransactionIntelligence.effectiveFlow(for: record)
             switch flowFilter {
             case .all: return true
-            case .moneyOut: return amount >= 0
-            case .moneyIn: return amount < 0
+            case .moneyOut: return effectiveFlow == .expense
+            case .moneyIn: return effectiveFlow == .income || effectiveFlow == .refund
             }
         }
     }
@@ -433,70 +502,42 @@ struct PortfolioTransactionCenterView: View {
         }.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
     }
 
+    private var analysisInputSignature: Int {
+        var hasher = Hasher()
+        for transaction in appState.transactions {
+            hasher.combine(transaction.id)
+            hasher.combine(transaction.companyId)
+            hasher.combine(transaction.institutionId)
+            hasher.combine(transaction.accountId)
+            hasher.combine(transaction.amount)
+            hasher.combine(transaction.date)
+            hasher.combine(transaction.merchantName)
+            hasher.combine(transaction.personalFinancePrimary)
+            hasher.combine(transaction.personalFinanceDetailed)
+            hasher.combine(transaction.pending)
+        }
+        appState.transactionOverrides.forEach { hasher.combine($0) }
+        appState.companies.forEach { hasher.combine($0) }
+        appState.institutions.forEach { hasher.combine($0) }
+        appState.cards.forEach { hasher.combine($0) }
+        appState.subscriptions.forEach { hasher.combine($0) }
+        return hasher.finalize()
+    }
+
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.zifrBG.ignoresSafeArea()
-
-                if isPreparing {
-                    loadingState("Preparing transactions…")
-                } else if allRecords.isEmpty && isSyncing {
-                    loadingState("Syncing all accounts…")
-                } else if allRecords.isEmpty {
-                    emptyState
-                } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 16) {
-                            summaryCard
-                            searchAndFilters
-                            reviewQueueCard
-
-                            if !detectedSubscriptions.isEmpty {
-                                DetectedSubscriptionsBanner(
-                                    detected: detectedSubscriptions,
-                                    cardId: nil,
-                                    cardName: "your accounts",
-                                    companyId: nil,
-                                    vm: vm
-                                )
-                            }
-
-                            if filteredRecords.isEmpty {
-                                filteredEmptyState
-                            } else {
-                                ForEach(groupedRecords, id: \.date) { group in
-                                    transactionSection(group)
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-                        .padding(.bottom, 36)
-                    }
-                    .refreshable { await syncAndRefresh() }
-                }
+        transactionNavigation
+            .presentationDetents([.fraction(0.92), .large])
+            .task(id: analysisInputSignature) {
+                await rebuildAnalysis(showLoading: allRecords.isEmpty)
             }
+    }
+
+    private var transactionNavigation: some View {
+        NavigationStack {
+            transactionContent
             .navigationTitle("Transactions")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Task { await syncAndRefresh() }
-                    } label: {
-                        if isSyncing {
-                            ProgressView().tint(Color.zifrGold)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .foregroundStyle(Color.zifrGold)
-                        }
-                    }
-                    .disabled(isSyncing)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                }
-            }
+            .toolbar { transactionToolbar }
             .sheet(isPresented: $showDuplicateReview) {
                 DuplicateChargeReviewSheet(
                     alerts: duplicateAlerts,
@@ -506,25 +547,87 @@ struct PortfolioTransactionCenterView: View {
                     }
                 )
             }
+            .sheet(item: $selectedTransaction) { record in
+                TransactionDetailSheet(
+                    record: record,
+                    onSave: { draft in
+                        try await saveOverride(draft, for: record)
+                    },
+                    onReset: {
+                        try await resetOverride(for: record)
+                    }
+                )
+            }
         }
-        .presentationDetents([.fraction(0.92), .large])
-        .task {
-            await rebuildAnalysis(showLoading: true)
+    }
+
+    @ViewBuilder
+    private var transactionContent: some View {
+        ZStack {
+            Color.zifrBG.ignoresSafeArea()
+
+            if isPreparing {
+                loadingState("Preparing transactions…")
+            } else if allRecords.isEmpty && isSyncing {
+                loadingState("Syncing all accounts…")
+            } else if allRecords.isEmpty {
+                emptyState
+            } else {
+                transactionList
+            }
         }
-        .onChange(of: appState.transactions) { _, _ in
-            Task { await rebuildAnalysis() }
+    }
+
+    private var transactionList: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                summaryCard
+                searchAndFilters
+                reviewQueueCard
+
+                if !detectedSubscriptions.isEmpty {
+                    DetectedSubscriptionsBanner(
+                        detected: detectedSubscriptions,
+                        cardId: nil,
+                        cardName: "your accounts",
+                        companyId: nil,
+                        vm: vm
+                    )
+                }
+
+                if filteredRecords.isEmpty {
+                    filteredEmptyState
+                } else {
+                    ForEach(groupedRecords, id: \.date) { group in
+                        transactionSection(group)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 36)
         }
-        .onChange(of: appState.companies) { _, _ in
-            Task { await rebuildAnalysis() }
+        .refreshable { await syncAndRefresh() }
+    }
+
+    @ToolbarContentBuilder
+    private var transactionToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button {
+                Task { await syncAndRefresh() }
+            } label: {
+                if isSyncing {
+                    ProgressView().tint(Color.zifrGold)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(Color.zifrGold)
+                }
+            }
+            .disabled(isSyncing)
         }
-        .onChange(of: appState.institutions) { _, _ in
-            Task { await rebuildAnalysis() }
-        }
-        .onChange(of: appState.cards) { _, _ in
-            Task { await rebuildAnalysis() }
-        }
-        .onChange(of: appState.subscriptions) { _, _ in
-            Task { await rebuildAnalysis() }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Done") { dismiss() }
+                .fontWeight(.semibold)
         }
     }
 
@@ -796,7 +899,6 @@ struct PortfolioTransactionCenterView: View {
 
     private func transactionRow(_ record: ResolvedTransaction) -> some View {
         let transaction = record.transaction
-        let amount = transaction.amount ?? 0
         let assignableCompanies = appState.companies
             .filter { $0.userId == transaction.userId }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -804,15 +906,15 @@ struct PortfolioTransactionCenterView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(transactionColor(transaction).opacity(0.16))
+                        .fill(transactionColor(record).opacity(0.16))
                         .frame(width: 42, height: 42)
-                    Image(systemName: transactionIcon(transaction))
+                    Image(systemName: transactionIcon(record))
                         .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(transactionColor(transaction))
+                        .foregroundStyle(transactionColor(record))
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(TransactionIntelligence.displayName(for: transaction))
+                    Text(TransactionIntelligence.displayName(for: record))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
@@ -828,6 +930,10 @@ struct PortfolioTransactionCenterView: View {
                             Text("· Possible duplicate")
                                 .foregroundStyle(.orange)
                         }
+                        if record.override != nil {
+                            Text("· Reviewed")
+                                .foregroundStyle(Color.zifrGold)
+                        }
                     }
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.45))
@@ -836,13 +942,18 @@ struct PortfolioTransactionCenterView: View {
 
                 Spacer(minLength: 8)
 
-                Text(signedAmount(amount, currency: transaction.currency))
+                Text(signedAmount(for: record))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(amount < 0 ? Color.zifrGreen : .white)
+                    .foregroundStyle(transactionAmountColor(record))
                     .lineLimit(1)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                selectedTransaction = record
+            }
+            .accessibilityAddTraits(.isButton)
 
             if record.companyId == nil {
                 Divider().overlay(Color.white.opacity(0.06)).padding(.leading, 58)
@@ -985,13 +1096,15 @@ struct PortfolioTransactionCenterView: View {
         let institutions = appState.institutions
         let cards = appState.cards
         let subscriptions = appState.subscriptions
+        let overrides = appState.transactionOverrides
 
         let analysis = await Task.detached(priority: .userInitiated) {
             let records = TransactionIntelligence.resolveAll(
                 transactions,
                 companies: companies,
                 institutions: institutions,
-                cards: cards
+                cards: cards,
+                overrides: overrides
             )
             return TransactionCenterAnalysis(
                 records: records,
@@ -1031,19 +1144,68 @@ struct PortfolioTransactionCenterView: View {
         }
     }
 
-    private func transactionIcon(_ transaction: Transaction) -> String {
+    @MainActor
+    private func saveOverride(
+        _ draft: TransactionOverrideDraft,
+        for record: ResolvedTransaction
+    ) async throws {
+        if draft.isEmpty {
+            try await resetOverride(for: record)
+            return
+        }
+
+        var transactionOverride = record.override ?? TransactionOverride(
+            userId: record.transaction.userId,
+            transactionId: record.id
+        )
+        transactionOverride.merchantName = draft.merchantName
+        transactionOverride.categoryPrimary = draft.categoryPrimary
+        transactionOverride.categoryDetailed = draft.categoryDetailed
+        transactionOverride.flowOverride = draft.flowOverride
+        transactionOverride.note = draft.note
+        transactionOverride.updatedAt = Date()
+
+        let saved = try await DataRepository.shared.upsertTransactionOverride(transactionOverride)
+        if let index = appState.transactionOverrides.firstIndex(where: { $0.transactionId == record.id }) {
+            appState.transactionOverrides[index] = saved
+        } else {
+            appState.transactionOverrides.append(saved)
+        }
+    }
+
+    @MainActor
+    private func resetOverride(for record: ResolvedTransaction) async throws {
+        guard appState.transactionOverrides.contains(where: { $0.transactionId == record.id }) else { return }
+        try await DataRepository.shared.deleteTransactionOverride(transactionId: record.id)
+        appState.transactionOverrides.removeAll { $0.transactionId == record.id }
+    }
+
+    private func transactionIcon(_ record: ResolvedTransaction) -> String {
+        let transaction = record.transaction
         if transaction.pending == true { return "clock.fill" }
-        if (transaction.amount ?? 0) < 0 { return "arrow.down.left" }
-        let category = (transaction.category ?? []).joined(separator: " ").lowercased()
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income: return "arrow.down.left"
+        case .refund: return "arrow.uturn.left"
+        case .transfer: return "arrow.left.arrow.right"
+        case .expense: break
+        }
+        let category = [
+            TransactionIntelligence.categoryPrimary(for: record),
+            TransactionIntelligence.categoryDetailed(for: record)
+        ].compactMap { $0 }.joined(separator: " ").lowercased()
         if category.contains("food") || category.contains("restaurant") { return "fork.knife" }
         if category.contains("travel") { return "airplane" }
-        if TransactionIntelligence.isFinancialMovement(transaction) { return "arrow.left.arrow.right" }
         return "creditcard.fill"
     }
 
-    private func transactionColor(_ transaction: Transaction) -> Color {
+    private func transactionColor(_ record: ResolvedTransaction) -> Color {
+        let transaction = record.transaction
         if transaction.pending == true { return .orange }
-        return (transaction.amount ?? 0) < 0 ? Color.zifrGreen : Color(hex: "#1A7077")
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income, .refund: return Color.zifrGreen
+        case .transfer: return Color.zifrGold
+        case .expense: return Color(hex: "#1A7077")
+        }
     }
 
     private func sectionDate(_ value: String) -> String {
@@ -1059,12 +1221,501 @@ struct PortfolioTransactionCenterView: View {
         return output.string(from: date).uppercased()
     }
 
-    private func signedAmount(_ amount: Double, currency: String) -> String {
+    private func signedAmount(for record: ResolvedTransaction) -> String {
+        let amount = record.transaction.amount ?? 0
+        let currency = record.transaction.currency
         let absolute = formatCurrency(abs(amount), currency: currency)
-        return amount < 0 ? "+\(absolute)" : "−\(absolute)"
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income, .refund:
+            return "+\(absolute)"
+        case .expense:
+            return "−\(absolute)"
+        case .transfer:
+            return amount < 0 ? "+\(absolute)" : "−\(absolute)"
+        }
+    }
+
+    private func transactionAmountColor(_ record: ResolvedTransaction) -> Color {
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income, .refund: return Color.zifrGreen
+        case .transfer: return Color.zifrGold
+        case .expense: return .white
+        }
     }
 
     private func formatCurrency(_ amount: Double, currency: String = "USD") -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency
+        formatter.maximumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: amount)) ?? "$\(String(format: "%.2f", amount))"
+    }
+}
+
+struct TransactionOverrideDraft: Equatable {
+    var merchantName: String?
+    var categoryPrimary: String?
+    var categoryDetailed: String?
+    var flowOverride: TransactionFlowOverride?
+    var note: String?
+
+    var isEmpty: Bool {
+        merchantName == nil
+            && categoryPrimary == nil
+            && categoryDetailed == nil
+            && flowOverride == nil
+            && note == nil
+    }
+}
+
+private struct TransactionDetailSheet: View {
+    let record: ResolvedTransaction
+    let onSave: (TransactionOverrideDraft) async throws -> Void
+    let onReset: () async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var merchantName: String
+    @State private var categoryPrimary: String
+    @State private var categoryDetailed: String
+    @State private var flowSelection: String
+    @State private var note: String
+    @State private var isSaving = false
+    @State private var saveError: String?
+    @State private var showResetConfirmation = false
+
+    private static let primaryCategories = [
+        "FOOD_AND_DRINK",
+        "GENERAL_MERCHANDISE",
+        "TRANSPORTATION",
+        "TRAVEL",
+        "RENT_AND_UTILITIES",
+        "ENTERTAINMENT",
+        "MEDICAL",
+        "GENERAL_SERVICES",
+        "INCOME",
+        "TRANSFER",
+        "OTHER"
+    ]
+
+    init(
+        record: ResolvedTransaction,
+        onSave: @escaping (TransactionOverrideDraft) async throws -> Void,
+        onReset: @escaping () async throws -> Void
+    ) {
+        self.record = record
+        self.onSave = onSave
+        self.onReset = onReset
+        _merchantName = State(initialValue: TransactionIntelligence.displayName(for: record))
+        _categoryPrimary = State(initialValue: TransactionIntelligence.categoryPrimary(for: record) ?? "")
+        _categoryDetailed = State(initialValue: TransactionIntelligence.categoryDetailed(for: record) ?? "")
+        _flowSelection = State(initialValue: record.override?.flowOverride?.rawValue ?? "automatic")
+        _note = State(initialValue: record.override?.note ?? "")
+    }
+
+    private var draft: TransactionOverrideDraft {
+        let rawMerchant = TransactionIntelligence.displayName(for: record.transaction)
+        let rawPrimary = record.transaction.personalFinancePrimary?.nonEmpty
+            ?? record.transaction.category?.first?.nonEmpty
+        let rawDetailed = record.transaction.personalFinanceDetailed?.nonEmpty
+            ?? record.transaction.category?.dropFirst().first?.nonEmpty
+        let cleanedMerchant = merchantName.nonEmpty
+        let cleanedPrimary = categoryPrimary.nonEmpty
+        let cleanedDetailed = categoryDetailed.nonEmpty
+
+        return TransactionOverrideDraft(
+            merchantName: cleanedMerchant == rawMerchant.nonEmpty ? nil : cleanedMerchant,
+            categoryPrimary: cleanedPrimary == rawPrimary ? nil : cleanedPrimary,
+            categoryDetailed: cleanedDetailed == rawDetailed ? nil : cleanedDetailed,
+            flowOverride: TransactionFlowOverride(rawValue: flowSelection),
+            note: note.nonEmpty
+        )
+    }
+
+    private var persistedDraft: TransactionOverrideDraft {
+        TransactionOverrideDraft(
+            merchantName: record.override?.merchantName?.nonEmpty,
+            categoryPrimary: record.override?.categoryPrimary?.nonEmpty,
+            categoryDetailed: record.override?.categoryDetailed?.nonEmpty,
+            flowOverride: record.override?.flowOverride,
+            note: record.override?.note?.nonEmpty
+        )
+    }
+
+    private var isDirty: Bool { draft != persistedDraft }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.zifrBG.ignoresSafeArea()
+                ScrollView {
+                    VStack(spacing: 16) {
+                        transactionHero
+                        sourceDetails
+                        correctionForm
+                        if record.override != nil {
+                            Button(role: .destructive) {
+                                showResetConfirmation = true
+                            } label: {
+                                Label("Reset to Plaid Data", systemImage: "arrow.uturn.backward")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 46)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 36)
+                }
+            }
+            .navigationTitle("Transaction Details")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { await save() }
+                    } label: {
+                        if isSaving {
+                            ProgressView().tint(Color.zifrGold)
+                        } else {
+                            Text("Save").fontWeight(.semibold)
+                        }
+                    }
+                    .disabled(isSaving || !isDirty)
+                }
+            }
+            .confirmationDialog(
+                "Reset this transaction?",
+                isPresented: $showResetConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Reset to Plaid Data", role: .destructive) {
+                    Task { await reset() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your merchant, category, cash-flow, and note corrections will be removed. The original Plaid transaction stays intact.")
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private var transactionHero: some View {
+        VStack(spacing: 10) {
+            merchantMark
+            Text(merchantName.nonEmpty ?? "Unknown transaction")
+                .font(.system(size: 21, weight: .bold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Text(formatCurrency(abs(record.transaction.amount ?? 0), currency: record.transaction.currency))
+                .font(.system(size: 30, weight: .black, design: .rounded))
+                .foregroundStyle(flowColor)
+            HStack(spacing: 7) {
+                Label(flowLabel, systemImage: flowIcon)
+                if record.transaction.pending == true {
+                    Text("·")
+                    Label("Pending", systemImage: "clock.fill")
+                        .foregroundStyle(.orange)
+                }
+                if record.override != nil {
+                    Text("·")
+                    Label("Reviewed", systemImage: "checkmark.seal.fill")
+                        .foregroundStyle(Color.zifrGold)
+                }
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.white.opacity(0.55))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 22)
+        .padding(.horizontal, 16)
+        .background(Color.white.opacity(0.055))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.zifrGold.opacity(0.28), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private var merchantMark: some View {
+        if let value = record.transaction.merchantLogoURL,
+           let url = URL(string: value) {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image.resizable().scaledToFit()
+                } else {
+                    merchantFallback
+                }
+            }
+            .frame(width: 54, height: 54)
+            .background(Color.white.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        } else {
+            merchantFallback
+        }
+    }
+
+    private var merchantFallback: some View {
+        Image(systemName: flowIcon)
+            .font(.system(size: 21, weight: .bold))
+            .foregroundStyle(flowColor)
+            .frame(width: 54, height: 54)
+            .background(flowColor.opacity(0.14))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var sourceDetails: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionTitle("PLAID DETAILS", icon: "building.columns")
+            detailRow("Institution", record.institutionName)
+            detailRow("Account", record.accountName)
+            detailRow("Company", record.companyName)
+            detailRow("Posted", formattedDate(record.transaction.date))
+            if let authorizedDate = record.transaction.authorizedDate?.nonEmpty {
+                detailRow("Authorized", formattedDate(authorizedDate))
+            }
+            if let channel = record.transaction.paymentChannel?.nonEmpty {
+                detailRow("Channel", displayLabel(channel))
+            }
+            if let originalName = record.transaction.name?.nonEmpty,
+               originalName.localizedCaseInsensitiveCompare(merchantName) != .orderedSame {
+                detailRow("Original", originalName)
+            }
+            if let website = record.transaction.merchantWebsite?.nonEmpty,
+               let url = normalizedURL(website) {
+                HStack {
+                    Text("Website")
+                    Spacer()
+                    Link(destination: url) {
+                        HStack(spacing: 5) {
+                            Text(website).lineLimit(1)
+                            Image(systemName: "arrow.up.right")
+                        }
+                    }
+                    .foregroundStyle(Color.zifrGold)
+                }
+                .font(.system(size: 12, weight: .medium))
+                .padding(.vertical, 11)
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.045))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var correctionForm: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            sectionTitle("REVIEW & CORRECT", icon: "slider.horizontal.3")
+
+            fieldLabel("MERCHANT NAME")
+            TextField("Merchant name", text: $merchantName)
+                .textInputAutocapitalization(.words)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 13)
+                .frame(height: 44)
+                .background(Color.white.opacity(0.065))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            fieldLabel("PRIMARY CATEGORY")
+            Menu {
+                Button("Use Plaid Category") {
+                    categoryPrimary = record.transaction.personalFinancePrimary
+                        ?? record.transaction.category?.first
+                        ?? ""
+                }
+                Divider()
+                ForEach(Self.primaryCategories, id: \.self) { category in
+                    Button(displayLabel(category)) { categoryPrimary = category }
+                }
+            } label: {
+                HStack {
+                    Text(categoryPrimary.nonEmpty.map(displayLabel) ?? "Choose a category")
+                        .foregroundStyle(categoryPrimary.isEmpty ? Color.white.opacity(0.4) : .white)
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.4))
+                }
+                .padding(.horizontal, 13)
+                .frame(height: 44)
+                .background(Color.white.opacity(0.065))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            fieldLabel("DETAILED CATEGORY")
+            TextField("Optional detailed category", text: $categoryDetailed)
+                .textInputAutocapitalization(.words)
+                .foregroundStyle(.white)
+                .padding(.horizontal, 13)
+                .frame(height: 44)
+                .background(Color.white.opacity(0.065))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            fieldLabel("CASH-FLOW TYPE")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
+                flowButton(value: "automatic", label: "Automatic", icon: "wand.and.stars")
+                ForEach(TransactionFlowOverride.allCases) { flow in
+                    flowButton(value: flow.rawValue, label: flow.label, icon: icon(for: flow))
+                }
+            }
+
+            fieldLabel("NOTE")
+            TextField("Optional note", text: $note, axis: .vertical)
+                .lineLimit(2...5)
+                .foregroundStyle(.white)
+                .padding(13)
+                .background(Color.white.opacity(0.065))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            if let saveError {
+                Label(saveError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text("Corrections change Miloom's summaries and insights. Plaid's original data is never overwritten.")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.38))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.045))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func sectionTitle(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 11, weight: .black))
+            .tracking(1.2)
+            .foregroundStyle(Color.zifrGold)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, 5)
+    }
+
+    private func fieldLabel(_ value: String) -> some View {
+        Text(value)
+            .font(.system(size: 9, weight: .bold))
+            .tracking(0.8)
+            .foregroundStyle(Color.white.opacity(0.42))
+    }
+
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .foregroundStyle(Color.white.opacity(0.45))
+            Spacer(minLength: 18)
+            Text(value)
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.trailing)
+        }
+        .font(.system(size: 12, weight: .medium))
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) {
+            Divider().overlay(Color.white.opacity(0.06))
+        }
+    }
+
+    private func flowButton(value: String, label: String, icon: String) -> some View {
+        Button {
+            flowSelection = value
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                Text(label)
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(flowSelection == value ? Color.zifrBG : .white)
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .background(flowSelection == value ? Color.zifrGold : Color.white.opacity(0.065))
+            .clipShape(RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var selectedFlow: TransactionFlowOverride {
+        TransactionFlowOverride(rawValue: flowSelection)
+            ?? TransactionIntelligence.effectiveFlow(for: record)
+    }
+
+    private var flowLabel: String {
+        flowSelection == "automatic" ? "\(selectedFlow.label) · Automatic" : selectedFlow.label
+    }
+
+    private var flowIcon: String { icon(for: selectedFlow) }
+
+    private var flowColor: Color {
+        switch selectedFlow {
+        case .expense: return .white
+        case .income, .refund: return Color.zifrGreen
+        case .transfer: return Color.zifrGold
+        }
+    }
+
+    private func icon(for flow: TransactionFlowOverride) -> String {
+        switch flow {
+        case .expense: return "arrow.up.right"
+        case .income: return "arrow.down.left"
+        case .transfer: return "arrow.left.arrow.right"
+        case .refund: return "arrow.uturn.left"
+        }
+    }
+
+    @MainActor
+    private func save() async {
+        guard isDirty else { return }
+        isSaving = true
+        saveError = nil
+        do {
+            try await onSave(draft)
+            dismiss()
+        } catch {
+            saveError = "Could not save this correction: \(error.localizedDescription)"
+            isSaving = false
+        }
+    }
+
+    @MainActor
+    private func reset() async {
+        isSaving = true
+        saveError = nil
+        do {
+            try await onReset()
+            dismiss()
+        } catch {
+            saveError = "Could not reset this transaction: \(error.localizedDescription)"
+            isSaving = false
+        }
+    }
+
+    private func formattedDate(_ value: String) -> String {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.dateFormat = "yyyy-MM-dd"
+        guard let date = input.date(from: value) else { return value }
+        let output = DateFormatter()
+        output.dateStyle = .medium
+        return output.string(from: date)
+    }
+
+    private func displayLabel(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "_", with: " ")
+            .lowercased()
+            .capitalized
+    }
+
+    private func normalizedURL(_ value: String) -> URL? {
+        if let url = URL(string: value), url.scheme != nil { return url }
+        return URL(string: "https://\(value)")
+    }
+
+    private func formatCurrency(_ amount: Double, currency: String) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = currency
