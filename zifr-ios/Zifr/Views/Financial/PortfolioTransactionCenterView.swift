@@ -31,6 +31,7 @@ struct TransactionPortfolioSummary: Equatable {
     let moneyOut: Double
     let moneyIn: Double
     let pendingCount: Int
+    let financialMovementCount: Int
 }
 
 private struct TransactionCenterAnalysis {
@@ -77,7 +78,7 @@ enum DuplicateChargeDetector {
             let transaction = record.transaction
             return transaction.pending != true
                 && (transaction.amount ?? 0) > 0
-                && !isFinancialMovement(transaction)
+                && !TransactionIntelligence.isFinancialMovement(transaction)
                 && !SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: transaction)).isEmpty
         }
         let scoped = Dictionary(grouping: eligible) { record in
@@ -150,24 +151,6 @@ enum DuplicateChargeDetector {
         ))
     }
 
-    private static func isFinancialMovement(_ transaction: Transaction) -> Bool {
-        let category = (transaction.category ?? []).joined(separator: " ").lowercased()
-        if ["transfer", "payment", "cash", "deposit", "withdrawal"].contains(where: category.contains) {
-            return true
-        }
-
-        let name = TransactionIntelligence.displayName(for: transaction).lowercased()
-        let patterns = [
-            #"\bzelle\b"#,
-            #"\batm\b"#,
-            #"\bwithdrawal\b"#,
-            #"\bautopay\b"#,
-            #"\b(card|loan) payment\b"#,
-            #"\btransfer (to|from)\b"#,
-            #"\bmobile check deposit\b"#
-        ]
-        return patterns.contains { name.range(of: $0, options: .regularExpression) != nil }
-    }
 }
 
 enum DuplicateChargeDismissalStore {
@@ -281,15 +264,48 @@ enum TransactionIntelligence {
             ?? "Unknown transaction"
     }
 
+    static func isFinancialMovement(_ transaction: Transaction) -> Bool {
+        let personalFinance = [
+            transaction.personalFinancePrimary,
+            transaction.personalFinanceDetailed
+        ]
+            .compactMap { $0?.lowercased() }
+            .joined(separator: " ")
+        let legacyCategory = (transaction.category ?? []).joined(separator: " ").lowercased()
+        let classification = "\(personalFinance) \(legacyCategory)"
+        if ["transfer", "payment", "cash", "deposit", "withdrawal"].contains(where: classification.contains) {
+            return true
+        }
+
+        let name = displayName(for: transaction).lowercased()
+        let patterns = [
+            #"\bzelle\b"#,
+            #"\batm\b"#,
+            #"\bwithdrawal\b"#,
+            #"\bpayment to\b"#,
+            #"\bautopay\b"#,
+            #"\bmonthly payment\b"#,
+            #"\b(card|loan) payment\b"#,
+            #"\btransfer (to|from)\b"#,
+            #"\bmobile check deposit\b"#
+        ]
+        return patterns.contains { name.range(of: $0, options: .regularExpression) != nil }
+    }
+
     static func summary(for records: [ResolvedTransaction]) -> TransactionPortfolioSummary {
         var moneyOut = 0.0
         var moneyIn = 0.0
         var pendingCount = 0
+        var financialMovementCount = 0
 
         for record in records {
             let transaction = record.transaction
             if transaction.pending == true {
                 pendingCount += 1
+                continue
+            }
+            if isFinancialMovement(transaction) {
+                financialMovementCount += 1
                 continue
             }
             let amount = transaction.amount ?? 0
@@ -303,7 +319,8 @@ enum TransactionIntelligence {
         return TransactionPortfolioSummary(
             moneyOut: moneyOut,
             moneyIn: moneyIn,
-            pendingCount: pendingCount
+            pendingCount: pendingCount,
+            financialMovementCount: financialMovementCount
         )
     }
 
@@ -530,9 +547,18 @@ struct PortfolioTransactionCenterView: View {
             }
 
             HStack(spacing: 10) {
-                summaryMetric(title: "MONEY OUT", value: formatCurrency(summary.moneyOut), color: .white)
-                summaryMetric(title: "MONEY IN", value: formatCurrency(summary.moneyIn), color: Color.zifrGreen)
+                summaryMetric(title: "SPENT", value: formatCurrency(summary.moneyOut), color: .white)
+                summaryMetric(title: "RECEIVED", value: formatCurrency(summary.moneyIn), color: Color.zifrGreen)
                 summaryMetric(title: "PENDING", value: "\(summary.pendingCount)", color: .orange)
+            }
+
+            if summary.financialMovementCount > 0 {
+                Label(
+                    "Excludes \(summary.financialMovementCount) posted transfers and payments",
+                    systemImage: "arrow.left.arrow.right"
+                )
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.42))
             }
         }
         .padding(16)
@@ -1009,7 +1035,7 @@ struct PortfolioTransactionCenterView: View {
         let category = (transaction.category ?? []).joined(separator: " ").lowercased()
         if category.contains("food") || category.contains("restaurant") { return "fork.knife" }
         if category.contains("travel") { return "airplane" }
-        if category.contains("transfer") || category.contains("payment") { return "arrow.left.arrow.right" }
+        if TransactionIntelligence.isFinancialMovement(transaction) { return "arrow.left.arrow.right" }
         return "creditcard.fill"
     }
 

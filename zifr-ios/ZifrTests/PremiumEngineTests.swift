@@ -446,6 +446,26 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(summary.moneyOut, 120)
         XCTAssertEqual(summary.moneyIn, 500)
         XCTAssertEqual(summary.pendingCount, 1)
+        XCTAssertEqual(summary.financialMovementCount, 0)
+    }
+
+    func testTransactionPortfolioSummaryExcludesTransfersAndPayments() {
+        let owner = UUID(), companyId = UUID()
+        var purchase = makeTransaction(owner: owner, company: companyId, name: "Software", amount: 120, date: "2027-08-01")
+        var transfer = makeTransaction(owner: owner, company: companyId, name: "Internal transfer", amount: 800, date: "2027-08-02")
+        var cardPayment = makeTransaction(owner: owner, company: companyId, name: "Card autopay", amount: -500, date: "2027-08-03")
+        purchase.category = ["Service", "Software"]
+        transfer.category = ["Transfer", "Internal Account Transfer"]
+        cardPayment.personalFinancePrimary = "TRANSFER_OUT"
+
+        let records = [purchase, transfer, cardPayment].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+        let summary = TransactionIntelligence.summary(for: records)
+
+        XCTAssertEqual(summary.moneyOut, 120)
+        XCTAssertEqual(summary.moneyIn, 0)
+        XCTAssertEqual(summary.financialMovementCount, 2)
     }
 
     func testTransactionSearchUsesCleanMerchantAndResolvedContext() {

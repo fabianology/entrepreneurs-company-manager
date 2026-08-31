@@ -129,28 +129,7 @@ struct SubscriptionDetector {
     }
 
     private static func isExcludedFinancialMovement(_ transaction: Transaction) -> Bool {
-        let name = (transaction.name ?? "").lowercased()
-        let category = (transaction.category ?? []).joined(separator: " ").lowercased()
-        let excludedCategoryTerms = [
-            "transfer", "payment", "cash", "deposit", "withdrawal"
-        ]
-        if excludedCategoryTerms.contains(where: category.contains) { return true }
-
-        let excludedNamePatterns = [
-            #"\bzelle\b"#,
-            #"\batm\b"#,
-            #"\bwithdrawal\b"#,
-            #"\bpayment to\b"#,
-            #"\bautopay\b"#,
-            #"\bmonthly payment\b"#,
-            #"\bloan payment\b"#,
-            #"\bcredit card payment\b"#,
-            #"\btransfer (to|from)\b"#,
-            #"\bmobile check deposit\b"#
-        ]
-        return excludedNamePatterns.contains { pattern in
-            name.range(of: pattern, options: .regularExpression) != nil
-        }
+        TransactionIntelligence.isFinancialMovement(transaction)
     }
     
     private static func cleanDisplayName(_ raw: String) -> String {

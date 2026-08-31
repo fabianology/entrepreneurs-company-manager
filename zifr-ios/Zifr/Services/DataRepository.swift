@@ -10,7 +10,7 @@ class DataRepository {
     // Keep this projection compatible with the production transaction schema.
     // `merchant_website` is optional enrichment and has not been deployed to every
     // environment; Transaction's custom decoder safely leaves it nil when omitted.
-    private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,canonical_account_id,amount,currency,date,name,merchant_name,category,pending"
+    private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,canonical_account_id,amount,currency,date,authorized_date,name,merchant_name,merchant_website,merchant_logo_url,payment_channel,personal_finance_primary,personal_finance_detailed,personal_finance_confidence,category,pending"
 
     private func fetchCompanies() async -> Result<[Company], Error> {
         do {
@@ -43,6 +43,7 @@ class DataRepository {
                 .from("plaid_transactions")
                 .select(Self.transactionColumns)
                 .eq("is_superseded_duplicate", value: false)
+                .eq("is_stale_pending_duplicate", value: false)
                 .order("date", ascending: false)
                 .execute()
                 .value
@@ -67,6 +68,7 @@ class DataRepository {
                 .from("plaid_transactions")
                 .select(Self.transactionColumns)
                 .eq("is_superseded_duplicate", value: false)
+                .eq("is_stale_pending_duplicate", value: false)
                 .order("date", ascending: false)
                 .execute()
                 .value
@@ -684,9 +686,15 @@ struct Transaction: Identifiable, Codable, Equatable {
     var amount: Double? = 0.0
     var currency: String = "USD"
     var date: String = ""
+    var authorizedDate: String? = nil
     var name: String? = ""
     var merchantName: String? = nil
     var merchantWebsite: String? = nil
+    var merchantLogoURL: String? = nil
+    var paymentChannel: String? = nil
+    var personalFinancePrimary: String? = nil
+    var personalFinanceDetailed: String? = nil
+    var personalFinanceConfidence: String? = nil
     var category: [String]? = nil
     var pending: Bool? = false
     
@@ -701,9 +709,15 @@ struct Transaction: Identifiable, Codable, Equatable {
         case amount
         case currency
         case date
+        case authorizedDate = "authorized_date"
         case name
         case merchantName = "merchant_name"
         case merchantWebsite = "merchant_website"
+        case merchantLogoURL = "merchant_logo_url"
+        case paymentChannel = "payment_channel"
+        case personalFinancePrimary = "personal_finance_primary"
+        case personalFinanceDetailed = "personal_finance_detailed"
+        case personalFinanceConfidence = "personal_finance_confidence"
         case category
         case pending
     }
@@ -739,9 +753,15 @@ struct Transaction: Identifiable, Codable, Equatable {
         self.amount = try container.decodeIfPresent(Double.self, forKey: .amount)
         self.currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
         self.date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
+        self.authorizedDate = try container.decodeIfPresent(String.self, forKey: .authorizedDate)
         self.name = (try? container.decodeIfPresent(String.self, forKey: .name)) ?? "Unknown"
         self.merchantName = try container.decodeIfPresent(String.self, forKey: .merchantName)
         self.merchantWebsite = try container.decodeIfPresent(String.self, forKey: .merchantWebsite)
+        self.merchantLogoURL = try container.decodeIfPresent(String.self, forKey: .merchantLogoURL)
+        self.paymentChannel = try container.decodeIfPresent(String.self, forKey: .paymentChannel)
+        self.personalFinancePrimary = try container.decodeIfPresent(String.self, forKey: .personalFinancePrimary)
+        self.personalFinanceDetailed = try container.decodeIfPresent(String.self, forKey: .personalFinanceDetailed)
+        self.personalFinanceConfidence = try container.decodeIfPresent(String.self, forKey: .personalFinanceConfidence)
         self.category = try container.decodeIfPresent([String].self, forKey: .category)
         self.pending = try container.decodeIfPresent(Bool.self, forKey: .pending)
     }

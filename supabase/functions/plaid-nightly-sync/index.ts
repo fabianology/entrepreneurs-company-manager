@@ -550,9 +550,23 @@ serve(async (req) => {
             currency: tx.iso_currency_code || 'USD',
             category: tx.category || [],
             merchant_name: tx.merchant_name || tx.name,
+            merchant_website: tx.website ?? null,
+            merchant_logo_url: tx.logo_url ?? null,
+            merchant_entity_id: tx.merchant_entity_id ?? null,
             name: tx.name || tx.merchant_name,
             date: tx.date,
+            authorized_date: tx.authorized_date ?? null,
             pending: tx.pending || false,
+            pending_transaction_id: tx.pending_transaction_id ?? null,
+            payment_channel: tx.payment_channel ?? null,
+            personal_finance_primary: tx.personal_finance_category?.primary ?? null,
+            personal_finance_detailed: tx.personal_finance_category?.detailed ?? null,
+            personal_finance_confidence: tx.personal_finance_category?.confidence_level ?? null,
+            transaction_code: tx.transaction_code ?? null,
+            location: tx.location ?? null,
+            counterparties: tx.counterparties ?? [],
+            is_stale_pending_duplicate: false,
+            posted_transaction_id: null,
             company_id: item.company_id,
             institution_id: item.institution_id
           }))
@@ -584,6 +598,10 @@ serve(async (req) => {
           .rpc('reconcile_plaid_transaction_duplicates', { p_user_id: item.user_id })
         if (duplicateError) throw duplicateError
 
+        const { data: stalePendingCount, error: pendingError } = await supabaseAdmin
+          .rpc('reconcile_plaid_pending_transactions', { p_user_id: item.user_id })
+        if (pendingError) throw pendingError
+
         // ── C. Update item sync timestamp ───────────────────────────────
         await supabaseAdmin.from('plaid_items')
           .update({ last_synced_at: new Date().toISOString(), status: 'active', error_code: null })
@@ -597,7 +615,8 @@ serve(async (req) => {
           transactions_found: allTransactions.length,
           transactions_saved: allTransactions.length,
           history_accounts_reconciled: reconciledHistoryAccounts + (overlapReconciledAccounts ?? 0),
-          duplicates_suppressed: duplicateCount ?? 0
+          duplicates_suppressed: duplicateCount ?? 0,
+          stale_pending_suppressed: stalePendingCount ?? 0
         })
       } catch (err) {
         console.error(`Failed to sync item ${item.id}:`, err)
