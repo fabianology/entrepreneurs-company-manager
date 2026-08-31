@@ -51,6 +51,164 @@ struct TransactionPortfolioSummary: Equatable {
     let financialMovementCount: Int
 }
 
+struct CashFlowPeriodSummary: Equatable {
+    let moneyOut: Double
+    let moneyIn: Double
+    let transactionCount: Int
+
+    var net: Double { moneyIn - moneyOut }
+}
+
+struct CashFlowExpenseConcentration: Equatable {
+    let key: String
+    let label: String
+    let amount: Double
+    let transactionCount: Int
+    let share: Double
+}
+
+struct CashFlowInsightSnapshot: Equatable {
+    let current: CashFlowPeriodSummary
+    let previous: CashFlowPeriodSummary
+    let topExpenseCategory: CashFlowExpenseConcentration?
+    let largestExpense: ResolvedTransaction?
+
+    var netChange: Double { current.net - previous.net }
+    var hasCurrentActivity: Bool { current.transactionCount > 0 }
+}
+
+enum CashFlowInsightEngine {
+    private struct CategoryBucket {
+        var label: String
+        var amount: Double
+        var transactionCount: Int
+    }
+
+    static func analyze(
+        records: [ResolvedTransaction],
+        anchorDate: Date = Date(),
+        calendar: Calendar = Calendar(identifier: .gregorian)
+    ) -> CashFlowInsightSnapshot {
+        let calendar = calendar
+        let anchor = calendar.startOfDay(for: anchorDate)
+        let currentStart = calendar.date(byAdding: .day, value: -29, to: anchor)!
+        let previousEnd = calendar.date(byAdding: .day, value: -30, to: anchor)!
+        let previousStart = calendar.date(byAdding: .day, value: -59, to: anchor)!
+
+        let posted = records.compactMap { record -> (ResolvedTransaction, Date)? in
+            guard record.transaction.pending != true,
+                  let date = parseDate(record.transaction.date, calendar: calendar) else { return nil }
+            return (record, date)
+        }
+        let currentRecords = posted
+            .filter { $0.1 >= currentStart && $0.1 <= anchor }
+            .map(\.0)
+        let previousRecords = posted
+            .filter { $0.1 >= previousStart && $0.1 <= previousEnd }
+            .map(\.0)
+
+        let currentSummary = periodSummary(for: currentRecords)
+        let previousSummary = periodSummary(for: previousRecords)
+        let currentExpenses = currentRecords.filter {
+            TransactionIntelligence.effectiveFlow(for: $0) == .expense
+                && abs($0.transaction.amount ?? 0) > 0.005
+        }
+        let topCategory = expenseConcentration(
+            from: currentExpenses,
+            totalExpense: currentSummary.moneyOut
+        )
+        let largestExpense = currentExpenses.max {
+            abs($0.transaction.amount ?? 0) < abs($1.transaction.amount ?? 0)
+        }
+
+        return CashFlowInsightSnapshot(
+            current: currentSummary,
+            previous: previousSummary,
+            topExpenseCategory: topCategory,
+            largestExpense: largestExpense
+        )
+    }
+
+    private static func periodSummary(for records: [ResolvedTransaction]) -> CashFlowPeriodSummary {
+        var moneyOut = 0.0
+        var moneyIn = 0.0
+        var transactionCount = 0
+
+        for record in records {
+            let amount = abs(record.transaction.amount ?? 0)
+            guard amount > 0.005 else { continue }
+            switch TransactionIntelligence.effectiveFlow(for: record) {
+            case .expense:
+                moneyOut += amount
+                transactionCount += 1
+            case .income, .refund:
+                moneyIn += amount
+                transactionCount += 1
+            case .transfer:
+                break
+            }
+        }
+
+        return CashFlowPeriodSummary(
+            moneyOut: moneyOut,
+            moneyIn: moneyIn,
+            transactionCount: transactionCount
+        )
+    }
+
+    private static func expenseConcentration(
+        from records: [ResolvedTransaction],
+        totalExpense: Double
+    ) -> CashFlowExpenseConcentration? {
+        guard totalExpense > 0 else { return nil }
+        var buckets: [String: CategoryBucket] = [:]
+
+        for record in records {
+            let rawCategory = TransactionIntelligence.categoryPrimary(for: record)?.nonEmpty ?? "OTHER"
+            let key = rawCategory.uppercased()
+            let label = displayLabel(rawCategory)
+            var bucket = buckets[key] ?? CategoryBucket(label: label, amount: 0, transactionCount: 0)
+            bucket.amount += abs(record.transaction.amount ?? 0)
+            bucket.transactionCount += 1
+            buckets[key] = bucket
+        }
+
+        guard let winner = buckets.sorted(by: {
+            if $0.value.amount == $1.value.amount { return $0.key < $1.key }
+            return $0.value.amount > $1.value.amount
+        }).first else { return nil }
+        return CashFlowExpenseConcentration(
+            key: winner.key,
+            label: winner.value.label,
+            amount: winner.value.amount,
+            transactionCount: winner.value.transactionCount,
+            share: winner.value.amount / totalExpense
+        )
+    }
+
+    private static func parseDate(_ value: String, calendar: Calendar) -> Date? {
+        let components = value.split(separator: "-", omittingEmptySubsequences: false)
+        guard components.count == 3,
+              let year = Int(components[0]),
+              let month = Int(components[1]),
+              let day = Int(components[2]) else { return nil }
+        return calendar.date(from: DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: year,
+            month: month,
+            day: day
+        ))
+    }
+
+    private static func displayLabel(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "_", with: " ")
+            .lowercased()
+            .capitalized
+    }
+}
+
 private struct TransactionCenterAnalysis {
     let records: [ResolvedTransaction]
     let detectedSubscriptions: [DetectedSubscription]
@@ -96,7 +254,7 @@ enum DuplicateChargeDetector {
             let transaction = record.transaction
             return transaction.pending != true
                 && (transaction.amount ?? 0) > 0
-                && TransactionIntelligence.effectiveFlow(for: record) != .transfer
+                && TransactionIntelligence.effectiveFlow(for: record) == .expense
                 && !SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record)).isEmpty
         }
         let scoped = Dictionary(grouping: eligible) { record in
@@ -266,7 +424,7 @@ enum TransactionIntelligence {
             }
             .sorted {
                 if $0.transaction.date == $1.transaction.date {
-                    return displayName(for: $0.transaction) < displayName(for: $1.transaction)
+                    return displayName(for: $0) < displayName(for: $1)
                 }
                 return $0.transaction.date > $1.transaction.date
             }
@@ -288,8 +446,15 @@ enum TransactionIntelligence {
             if let detailed = record.override?.categoryDetailed?.nonEmpty {
                 transaction.personalFinanceDetailed = detailed
             }
-            if record.override?.flowOverride == .transfer {
+            switch record.override?.flowOverride {
+            case .expense:
+                transaction.amount = abs(transaction.amount ?? 0)
+            case .income, .refund:
+                transaction.amount = -abs(transaction.amount ?? 0)
+            case .transfer:
                 transaction.category = ["Transfer"]
+            case nil:
+                break
             }
             return transaction
         }
@@ -395,14 +560,18 @@ enum TransactionIntelligence {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !normalizedQuery.isEmpty else { return true }
         let transaction = record.transaction
+        let primaryCategory = categoryPrimary(for: record) ?? ""
+        let detailedCategory = categoryDetailed(for: record) ?? ""
         let searchable = [
             displayName(for: record),
             transaction.name ?? "",
             record.companyName,
             record.accountName,
             record.institutionName,
-            categoryPrimary(for: record) ?? "",
-            categoryDetailed(for: record) ?? "",
+            primaryCategory,
+            primaryCategory.replacingOccurrences(of: "_", with: " "),
+            detailedCategory,
+            detailedCategory.replacingOccurrences(of: "_", with: " "),
             record.override?.note ?? "",
             (transaction.category ?? []).joined(separator: " ")
         ].joined(separator: " ").lowercased()
@@ -478,6 +647,18 @@ struct PortfolioTransactionCenterView: View {
 
     private var summary: TransactionPortfolioSummary {
         TransactionIntelligence.summary(for: filteredRecords)
+    }
+
+    private var cashFlowScopeRecords: [ResolvedTransaction] {
+        allRecords.filter { record in
+            if let selectedCompanyId, record.companyId != selectedCompanyId { return false }
+            if let selectedAccountId, record.accountId != selectedAccountId { return false }
+            return true
+        }
+    }
+
+    private var cashFlowInsights: CashFlowInsightSnapshot {
+        CashFlowInsightEngine.analyze(records: cashFlowScopeRecords)
     }
 
     private var duplicateAlerts: [DuplicateChargeAlert] {
@@ -583,6 +764,7 @@ struct PortfolioTransactionCenterView: View {
             LazyVStack(alignment: .leading, spacing: 16) {
                 summaryCard
                 searchAndFilters
+                cashFlowInsightsCard
                 reviewQueueCard
 
                 if !detectedSubscriptions.isEmpty {
@@ -684,6 +866,215 @@ struct PortfolioTransactionCenterView: View {
                 .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var cashFlowInsightsCard: some View {
+        let insights = cashFlowInsights
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Label("CASH-FLOW INSIGHTS", systemImage: "waveform.path.ecg")
+                    .font(.system(size: 11, weight: .black))
+                    .tracking(1.2)
+                    .foregroundStyle(Color.zifrGold)
+                Spacer()
+                Text("LAST 30 DAYS")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.38))
+            }
+
+            if insights.hasCurrentActivity {
+                cashFlowNetSummary(insights)
+
+                VStack(spacing: 0) {
+                    if let category = insights.topExpenseCategory {
+                        Button {
+                            applyExpenseCategory(category)
+                        } label: {
+                            insightActionRow(
+                                icon: "chart.pie.fill",
+                                title: category.label,
+                                subtitle: "Top spend · \(formatCurrency(category.amount)) · \(percent(category.share)) of outflow",
+                                trailing: "View"
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Filters the transaction list to this spending category")
+                    }
+
+                    if insights.topExpenseCategory != nil, insights.largestExpense != nil {
+                        Divider().overlay(Color.white.opacity(0.07)).padding(.leading, 43)
+                    }
+
+                    if let largestExpense = insights.largestExpense {
+                        Button {
+                            selectedTransaction = largestExpense
+                        } label: {
+                            insightActionRow(
+                                icon: "arrow.up.right.circle.fill",
+                                title: TransactionIntelligence.displayName(for: largestExpense),
+                                subtitle: "Largest outflow · \(formattedInsightDate(largestExpense.transaction.date))",
+                                trailing: formatCurrency(abs(largestExpense.transaction.amount ?? 0))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Opens this transaction for review")
+                    }
+                }
+                .background(Color.white.opacity(0.035))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.35))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("No recent cash-flow activity")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("Sync Plaid or choose another company or account to analyze the last 30 days.")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                    }
+                }
+            }
+        }
+        .padding(15)
+        .background(Color.white.opacity(0.045))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.zifrGold.opacity(0.2), lineWidth: 1))
+    }
+
+    private func cashFlowNetSummary(_ insights: CashFlowInsightSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("NET CASH FLOW")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.42))
+                    Text(signedCurrency(insights.current.net))
+                        .font(.system(size: 26, weight: .black, design: .rounded))
+                        .foregroundStyle(netCashFlowColor(insights.current.net))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 3) {
+                    Text("IN")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.42))
+                    Text(formatCurrency(insights.current.moneyIn))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.green)
+                    Text("OUT  \(formatCurrency(insights.current.moneyOut))")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                }
+            }
+
+            Label(
+                cashFlowComparisonText(insights),
+                systemImage: cashFlowComparisonIcon(insights)
+            )
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(cashFlowComparisonColor(insights))
+        }
+        .padding(14)
+        .background(netCashFlowColor(insights.current.net).opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 15))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(cashFlowAccessibilityLabel(insights))
+    }
+
+    private func insightActionRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        trailing: String
+    ) -> some View {
+        HStack(spacing: 11) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.zifrGold)
+                .frame(width: 31, height: 31)
+                .background(Color.zifrGold.opacity(0.12))
+                .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.43))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(trailing)
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.zifrGold)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+
+    private func applyExpenseCategory(_ category: CashFlowExpenseConcentration) {
+        searchText = category.label
+        flowFilter = .moneyOut
+        postingFilter = .posted
+        showNeedsReviewOnly = false
+    }
+
+    private func cashFlowComparisonText(_ insights: CashFlowInsightSnapshot) -> String {
+        guard insights.previous.transactionCount > 0 else {
+            return "No prior 30-day activity to compare"
+        }
+        let direction = insights.netChange >= 0 ? "better" : "lower"
+        return "\(formatCurrency(abs(insights.netChange))) \(direction) than the previous 30 days"
+    }
+
+    private func cashFlowAccessibilityLabel(_ insights: CashFlowInsightSnapshot) -> String {
+        "Last 30 days. Net cash flow \(signedCurrency(insights.current.net)). "
+            + "Income \(formatCurrency(insights.current.moneyIn)). "
+            + "Outflow \(formatCurrency(insights.current.moneyOut)). "
+            + cashFlowComparisonText(insights)
+    }
+
+    private func cashFlowComparisonIcon(_ insights: CashFlowInsightSnapshot) -> String {
+        guard insights.previous.transactionCount > 0 else { return "minus.circle" }
+        return insights.netChange >= 0 ? "arrow.up.right" : "arrow.down.right"
+    }
+
+    private func cashFlowComparisonColor(_ insights: CashFlowInsightSnapshot) -> Color {
+        guard insights.previous.transactionCount > 0 else { return Color.white.opacity(0.42) }
+        return insights.netChange >= 0 ? .green : .orange
+    }
+
+    private func netCashFlowColor(_ value: Double) -> Color {
+        if value > 0.005 { return .green }
+        if value < -0.005 { return .orange }
+        return .white
+    }
+
+    private func signedCurrency(_ value: Double) -> String {
+        if value > 0.005 { return "+\(formatCurrency(value))" }
+        if value < -0.005 { return "−\(formatCurrency(abs(value)))" }
+        return formatCurrency(0)
+    }
+
+    private func percent(_ value: Double) -> String {
+        "\(Int((value * 100).rounded()))%"
+    }
+
+    private func formattedInsightDate(_ value: String) -> String {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.dateFormat = "yyyy-MM-dd"
+        guard let date = input.date(from: value) else { return value }
+        let output = DateFormatter()
+        output.dateFormat = "MMM d"
+        return output.string(from: date)
     }
 
     private var searchAndFilters: some View {
@@ -1225,6 +1616,7 @@ struct PortfolioTransactionCenterView: View {
         let amount = record.transaction.amount ?? 0
         let currency = record.transaction.currency
         let absolute = formatCurrency(abs(amount), currency: currency)
+        if abs(amount) <= 0.005 { return formatCurrency(0, currency: currency) }
         switch TransactionIntelligence.effectiveFlow(for: record) {
         case .income, .refund:
             return "+\(absolute)"

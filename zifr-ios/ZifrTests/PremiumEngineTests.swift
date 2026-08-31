@@ -554,6 +554,160 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(summary.moneyIn, 0)
     }
 
+    func testTransactionFlowOverridesProtectDuplicateAndRecurringDetection() {
+        let owner = UUID(), companyId = UUID()
+        let firstIncome = makeTransaction(
+            owner: owner, company: companyId, name: "Client deposit", amount: 500, date: "2027-08-20"
+        )
+        let secondIncome = makeTransaction(
+            owner: owner, company: companyId, name: "Client deposit", amount: 500, date: "2027-08-21"
+        )
+        var firstCorrection = TransactionOverride(userId: owner, transactionId: firstIncome.id)
+        firstCorrection.flowOverride = .income
+        var secondCorrection = TransactionOverride(userId: owner, transactionId: secondIncome.id)
+        secondCorrection.flowOverride = .refund
+        let records = TransactionIntelligence.resolveAll(
+            [firstIncome, secondIncome],
+            companies: [],
+            institutions: [],
+            cards: [],
+            overrides: [firstCorrection, secondCorrection]
+        )
+        let enriched = TransactionIntelligence.enrichedTransactions(from: records)
+
+        XCTAssertTrue(DuplicateChargeDetector.detect(records: records).isEmpty)
+        XCTAssertEqual(enriched.map(\.amount), [-500, -500])
+        XCTAssertTrue(SubscriptionDetector.detect(
+            transactions: enriched,
+            existingSubscriptions: []
+        ).isEmpty)
+    }
+
+    func testEnrichedTransactionsNormalizeExpenseAndTransferOverrides() {
+        let owner = UUID(), companyId = UUID()
+        let correctedExpense = makeTransaction(
+            owner: owner, company: companyId, name: "Corrected expense", amount: -75, date: "2027-08-20"
+        )
+        let correctedTransfer = makeTransaction(
+            owner: owner, company: companyId, name: "Owner movement", amount: 200, date: "2027-08-21"
+        )
+        var expenseOverride = TransactionOverride(userId: owner, transactionId: correctedExpense.id)
+        expenseOverride.flowOverride = .expense
+        var transferOverride = TransactionOverride(userId: owner, transactionId: correctedTransfer.id)
+        transferOverride.flowOverride = .transfer
+        let records = TransactionIntelligence.resolveAll(
+            [correctedExpense, correctedTransfer],
+            companies: [],
+            institutions: [],
+            cards: [],
+            overrides: [expenseOverride, transferOverride]
+        )
+        let enriched = TransactionIntelligence.enrichedTransactions(from: records)
+
+        XCTAssertEqual(enriched.first(where: { $0.id == correctedExpense.id })?.amount, 75)
+        XCTAssertEqual(enriched.first(where: { $0.id == correctedTransfer.id })?.category, ["Transfer"])
+    }
+
+    func testCashFlowInsightsCompareRollingThirtyDayPeriodsAndExcludeNoise() {
+        let owner = UUID(), companyId = UUID()
+        let currentExpense = makeTransaction(
+            owner: owner, company: companyId, name: "Current expense", amount: 100, date: "2027-08-20"
+        )
+        let currentIncome = makeTransaction(
+            owner: owner, company: companyId, name: "Client income", amount: -400, date: "2027-08-15"
+        )
+        var transfer = makeTransaction(
+            owner: owner, company: companyId, name: "Internal transfer", amount: 2_000, date: "2027-08-18"
+        )
+        transfer.category = ["Transfer"]
+        var pending = makeTransaction(
+            owner: owner, company: companyId, name: "Pending expense", amount: 50, date: "2027-08-19"
+        )
+        pending.pending = true
+        let previousExpense = makeTransaction(
+            owner: owner, company: companyId, name: "Previous expense", amount: 200, date: "2027-07-20"
+        )
+        let previousIncome = makeTransaction(
+            owner: owner, company: companyId, name: "Previous income", amount: -100, date: "2027-07-15"
+        )
+        let records = [currentExpense, currentIncome, transfer, pending, previousExpense, previousIncome].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+
+        let insights = CashFlowInsightEngine.analyze(
+            records: records,
+            anchorDate: utcDate("2027-08-30")
+        )
+
+        XCTAssertEqual(insights.current.moneyOut, 100)
+        XCTAssertEqual(insights.current.moneyIn, 400)
+        XCTAssertEqual(insights.current.net, 300)
+        XCTAssertEqual(insights.current.transactionCount, 2)
+        XCTAssertEqual(insights.previous.moneyOut, 200)
+        XCTAssertEqual(insights.previous.moneyIn, 100)
+        XCTAssertEqual(insights.previous.net, -100)
+        XCTAssertEqual(insights.netChange, 400)
+    }
+
+    func testCashFlowInsightsUseCorrectedCategoriesAndFindLargestExpense() {
+        let owner = UUID(), companyId = UUID()
+        var mealOne = makeTransaction(
+            owner: owner, company: companyId, name: "Meal one", amount: 60, date: "2027-08-20"
+        )
+        mealOne.personalFinancePrimary = "GENERAL_MERCHANDISE"
+        var mealTwo = makeTransaction(
+            owner: owner, company: companyId, name: "Meal two", amount: 40, date: "2027-08-21"
+        )
+        mealTwo.personalFinancePrimary = "FOOD_AND_DRINK"
+        var software = makeTransaction(
+            owner: owner, company: companyId, name: "Software", amount: 80, date: "2027-08-22"
+        )
+        software.personalFinancePrimary = "GENERAL_SERVICES"
+        var correction = TransactionOverride(userId: owner, transactionId: mealOne.id)
+        correction.categoryPrimary = "FOOD_AND_DRINK"
+
+        let records = TransactionIntelligence.resolveAll(
+            [mealOne, mealTwo, software],
+            companies: [],
+            institutions: [],
+            cards: [],
+            overrides: [correction]
+        )
+        let insights = CashFlowInsightEngine.analyze(
+            records: records,
+            anchorDate: utcDate("2027-08-30")
+        )
+
+        XCTAssertEqual(insights.topExpenseCategory?.key, "FOOD_AND_DRINK")
+        XCTAssertEqual(insights.topExpenseCategory?.label, "Food And Drink")
+        XCTAssertEqual(insights.topExpenseCategory?.amount, 100)
+        XCTAssertEqual(insights.topExpenseCategory?.transactionCount, 2)
+        XCTAssertEqual(insights.topExpenseCategory?.share ?? 0, 100.0 / 180.0, accuracy: 0.0001)
+        XCTAssertEqual(TransactionIntelligence.displayName(for: insights.largestExpense!), "Software")
+    }
+
+    func testCashFlowInsightsReportNoActivityOutsideCurrentWindow() {
+        let owner = UUID(), companyId = UUID()
+        let oldExpense = makeTransaction(
+            owner: owner, company: companyId, name: "Old expense", amount: 100, date: "2027-01-01"
+        )
+        let zeroAmount = makeTransaction(
+            owner: owner, company: companyId, name: "Zero authorization", amount: 0, date: "2027-08-29"
+        )
+        let records = [oldExpense, zeroAmount].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+
+        let insights = CashFlowInsightEngine.analyze(
+            records: records,
+            anchorDate: utcDate("2027-08-30")
+        )
+
+        XCTAssertFalse(insights.hasCurrentActivity)
+        XCTAssertNil(insights.topExpenseCategory)
+        XCTAssertNil(insights.largestExpense)
+    }
+
     func testDuplicateChargeDetectorFindsNearlyIdenticalPostedChargesWithinThreeDays() {
         let owner = UUID(), company = UUID()
         var first = makeTransaction(owner: owner, company: company, name: "Figma", amount: 15.00, date: "2027-08-10")
@@ -1032,5 +1186,9 @@ final class PremiumEngineTests: XCTestCase {
         transaction.amount = amount
         transaction.date = date
         return transaction
+    }
+
+    private func utcDate(_ value: String) -> Date {
+        ISO8601DateFormatter().date(from: "\(value)T12:00:00Z")!
     }
 }
