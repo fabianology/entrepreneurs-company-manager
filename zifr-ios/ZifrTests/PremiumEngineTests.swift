@@ -2,6 +2,35 @@ import XCTest
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testPlaidConnectionHealthDetectsReconnectAndStaleItems() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        let reconnect = PlaidItemSummary(
+            id: UUID(),
+            companyId: UUID(),
+            institutionId: UUID(),
+            institutionName: "Example Bank",
+            status: "requires_reauth",
+            errorCode: "ITEM_LOGIN_REQUIRED",
+            lastSyncedAt: now,
+            createdAt: now
+        )
+        XCTAssertTrue(reconnect.requiresReconnect)
+        XCTAssertFalse(reconnect.isStale(referenceDate: now))
+
+        let stale = PlaidItemSummary(
+            id: UUID(),
+            companyId: UUID(),
+            institutionId: UUID(),
+            institutionName: "Example Bank",
+            status: "active",
+            errorCode: nil,
+            lastSyncedAt: now.addingTimeInterval(-49 * 60 * 60),
+            createdAt: now.addingTimeInterval(-60 * 60 * 60)
+        )
+        XCTAssertFalse(stale.requiresReconnect)
+        XCTAssertTrue(stale.isStale(referenceDate: now))
+    }
+
     func testTransactionDecodesWithoutOptionalMerchantWebsiteColumn() throws {
         let owner = UUID()
         let transactionId = UUID()

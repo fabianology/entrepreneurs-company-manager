@@ -103,7 +103,13 @@ class DataRepository {
         async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
-        async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") { (try? await client.from("plaid_items").select("id,company_id,institution_name,status").execute().value) ?? [] }
+        async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") {
+            (try? await client
+                .from("plaid_items")
+                .select("id,company_id,institution_id,institution_name,status,error_code,last_synced_at,created_at")
+                .execute()
+                .value) ?? []
+        }
         async let fConnections: [ResourceConnection] = measure("resource_connections") { (try? await client.from("resource_connections").select().execute().value) ?? [] }
         async let fObligations: [PortfolioObligation] = measure("obligations") { (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? [] }
         async let fObligationRefresh = refreshMyObligations()

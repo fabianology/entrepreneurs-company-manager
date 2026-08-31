@@ -66,7 +66,10 @@ serve(async (req) => {
       plaid_institution_id: institution_id,
       institution_name,
       products: ['transactions', 'auth', 'liabilities', 'balance'],
-      status: 'active'
+      // The item becomes active only after the institution cascade is saved and
+      // link-plaid-institution attaches it. Cancelled Link flows no longer count
+      // as visible connections or get picked up by nightly sync.
+      status: 'pending_link'
     })
     
     if (insertError) throw new Error(`Database Insert Error: ${insertError.message}`)

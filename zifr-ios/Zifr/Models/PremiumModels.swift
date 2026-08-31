@@ -137,14 +137,31 @@ struct AccessSnapshot: Codable, Hashable {
 struct PlaidItemSummary: Identifiable, Codable, Hashable {
     var id: UUID
     var companyId: UUID
+    var institutionId: UUID?
     var institutionName: String?
     var status: String
+    var errorCode: String?
+    var lastSyncedAt: Date?
+    var createdAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id
         case companyId = "company_id"
+        case institutionId = "institution_id"
         case institutionName = "institution_name"
         case status
+        case errorCode = "error_code"
+        case lastSyncedAt = "last_synced_at"
+        case createdAt = "created_at"
+    }
+
+    var requiresReconnect: Bool {
+        status == "requires_reauth" || errorCode == "ITEM_LOGIN_REQUIRED"
+    }
+
+    func isStale(referenceDate: Date = Date()) -> Bool {
+        guard status == "active", let lastSyncedAt else { return status == "active" }
+        return referenceDate.timeIntervalSince(lastSyncedAt) > 48 * 60 * 60
     }
 }
 
