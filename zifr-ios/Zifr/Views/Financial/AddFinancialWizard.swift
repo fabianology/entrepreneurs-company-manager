@@ -35,6 +35,7 @@ struct AddFinancialWizard: View {
     @State private var hasManuallyEditedWebsite = false
     @State private var isNewInstitution: Bool = true
     @State private var linkedPlaidItemId: String? = nil
+    @State private var isSaving = false
 
     var body: some View {
         NavigationStack {
@@ -84,13 +85,18 @@ struct AddFinancialWizard: View {
                                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                                     saveAllAndDismiss()
                                 } label: {
-                                    Text("Save")
-                                        .font(.system(size: 16, weight: .bold))
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 54)
+                                    Group {
+                                        if isSaving {
+                                            ProgressView().tint(.white)
+                                        } else {
+                                            Text("Save").font(.system(size: 16, weight: .bold))
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 54)
                                 }
                                 .buttonStyle(MiloomPrimaryButtonStyle())
-                                .disabled(!canSaveBottom)
+                                .disabled(!canSaveBottom || isSaving)
                                 .padding(.top, 16)
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
@@ -130,7 +136,7 @@ struct AddFinancialWizard: View {
                     }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(canSave ? Color(hex: "#30D158") : Color.white.opacity(0.3))
-                    .disabled(!canSave)
+                    .disabled(!canSave || isSaving)
                 }
             }
             .sheet(isPresented: $showAccountHUD) {
@@ -138,7 +144,10 @@ struct AddFinancialWizard: View {
                     draft: $accountDraft,
                     isNew: isNewAccount,
                     institutionName: institution.name.isEmpty ? "New Institution" : institution.name,
+                    institutionId: institution.id,
                     availableCards: cards,
+                    companyId: institution.companyId,
+                    vm: vm,
                     onSave: {
                         if let idx = accountDraftIndex {
                             accounts[idx] = accountDraft
@@ -231,9 +240,11 @@ struct AddFinancialWizard: View {
     }
 
     private func saveAllAndDismiss() {
+        guard !isSaving else { return }
+
         // Prepare the institution and its accounts
         var instToSave = institution
-        instToSave.accountsData.append(contentsOf: accounts)
+        instToSave.accountsData = mergedAccounts(existing: instToSave.accountsData, imported: accounts)
         
         // Prepare cards and loans with the correct association
         var finalCards = cards
@@ -250,27 +261,175 @@ struct AddFinancialWizard: View {
             finalLoans[i].userId = instToSave.userId
         }
         
-        // Use VM to persist everything
-        vm.saveFinancialInstitutionCascade(institution: instToSave, cards: finalCards, loans: finalLoans, appState: appState)
-        
-        if let plaidItemId = linkedPlaidItemId {
-            Task {
+        isSaving = true
+        Task {
+            do {
+                try await vm.saveFinancialInstitutionCascade(
+                    institution: instToSave,
+                    cards: finalCards,
+                    loans: finalLoans,
+                    appState: appState
+                )
+
+                if let plaidItemId = linkedPlaidItemId {
                 struct LinkRequest: Encodable {
                     let item_id: String
                     let institution_id: String
                 }
-                do {
                     let req = LinkRequest(item_id: plaidItemId, institution_id: instToSave.id.uuidString)
                     let options = FunctionInvokeOptions(body: try JSONEncoder().encode(req))
                     try await SupabaseService.shared.client.functions.invoke("link-plaid-institution", options: options)
                     try? await PlaidService.shared.syncSubscriptions(institutionId: instToSave.id)
-                } catch {
-                    print("Failed to link plaid item: \(error)")
+                }
+
+                await MainActor.run {
+                    isSaving = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isSaving = false
+                    appState.error = "The Plaid data could not be saved. Your connection is still available—tap Save to retry."
                 }
             }
         }
-        
-        dismiss()
+    }
+
+    private func normalizedIdentity(_ value: String?) -> String {
+        (value ?? "")
+            .lowercased()
+            .unicodeScalars
+            .filter(CharacterSet.alphanumerics.contains)
+            .map(String.init)
+            .joined()
+    }
+
+    private func existingInstitution(named name: String) -> Institution? {
+        let identity = normalizedIdentity(name)
+        guard !identity.isEmpty else { return nil }
+
+        return (allInstitutions + appState.institutions).first {
+            $0.companyId == institution.companyId && normalizedIdentity($0.name) == identity
+        }
+    }
+
+    private func matchingAccount(_ imported: InstitutionAccount, in existing: [InstitutionAccount]) -> Int? {
+        if let index = existing.firstIndex(where: { $0.id == imported.id }) {
+            return index
+        }
+        if let persistentId = imported.persistentAccountId, !persistentId.isEmpty,
+           let index = existing.firstIndex(where: { $0.persistentAccountId == persistentId }) {
+            return index
+        }
+
+        let identityMatches = existing.indices.filter {
+            normalizedIdentity(existing[$0].name) == normalizedIdentity(imported.name)
+                && normalizedIdentity(existing[$0].type) == normalizedIdentity(imported.type)
+        }
+        if !imported.last4.isEmpty,
+           let exactMaskMatch = identityMatches.first(where: { existing[$0].last4 == imported.last4 }) {
+            return exactMaskMatch
+        }
+        if identityMatches.count == 1,
+           imported.last4.isEmpty || existing[identityMatches[0]].last4.isEmpty {
+            return identityMatches[0]
+        }
+        return nil
+    }
+
+    private func mergedAccount(existing: InstitutionAccount, imported: InstitutionAccount) -> InstitutionAccount {
+        var result = existing
+        result.id = imported.id
+        if !imported.name.isEmpty { result.name = imported.name }
+        if !imported.type.isEmpty { result.type = imported.type }
+        if !imported.last4.isEmpty { result.last4 = imported.last4 }
+        result.accountNumber = imported.accountNumber ?? result.accountNumber
+        result.routingNumber = imported.routingNumber ?? result.routingNumber
+        result.wireRoutingNumber = imported.wireRoutingNumber ?? result.wireRoutingNumber
+        result.isTokenizedAccountNumber = imported.isTokenizedAccountNumber ?? result.isTokenizedAccountNumber
+        result.balance = imported.balance
+        result.availableBalance = imported.availableBalance ?? result.availableBalance
+        if !imported.currency.isEmpty { result.currency = imported.currency }
+        result.apy = imported.apy ?? result.apy
+        result.ownershipType = imported.ownershipType ?? result.ownershipType
+        result.verificationStatus = imported.verificationStatus ?? result.verificationStatus
+        result.persistentAccountId = imported.persistentAccountId ?? result.persistentAccountId
+        return result
+    }
+
+    private func mergedAccounts(existing: [InstitutionAccount], imported: [InstitutionAccount]) -> [InstitutionAccount] {
+        var result: [InstitutionAccount] = []
+        for account in existing {
+            if let index = result.firstIndex(where: { $0.id == account.id }) {
+                result[index] = mergedAccount(existing: result[index], imported: account)
+            } else {
+                result.append(account)
+            }
+        }
+        for account in imported {
+            if let index = matchingAccount(account, in: result) {
+                result[index] = mergedAccount(existing: result[index], imported: account)
+            } else {
+                result.append(account)
+            }
+        }
+        return result
+    }
+
+    private func matchingCard(for account: PlaidService.PlaidAccount, institutionName: String) -> FinancialCard? {
+        let candidates = cards + appState.cards
+        if let card = candidates.first(where: {
+            $0.companyId == institution.companyId && $0.plaidAccountId == account.account_id
+        }) {
+            return card
+        }
+
+        let last4 = account.mask ?? String(account.account_id.suffix(4))
+        guard !last4.isEmpty else { return nil }
+        return candidates.first {
+            $0.companyId == institution.companyId
+                && ($0.plaidAccountId == nil || $0.plaidAccountId?.isEmpty == true)
+                && $0.last4 == last4
+                && normalizedIdentity($0.name) == normalizedIdentity(account.name)
+                && normalizedIdentity($0.institutionName) == normalizedIdentity(institutionName)
+        }
+    }
+
+    private func matchingLoan(for account: PlaidService.PlaidAccount, institutionName: String) -> Loan? {
+        let candidates = loans + appState.loans
+        if let loan = candidates.first(where: {
+            $0.companyId == institution.companyId && $0.plaidAccountId == account.account_id
+        }) {
+            return loan
+        }
+
+        let loanName = account.liability_details?.loan_name ?? account.name
+        return candidates.first {
+            $0.companyId == institution.companyId
+                && ($0.plaidAccountId == nil || $0.plaidAccountId?.isEmpty == true)
+                && normalizedIdentity($0.name) == normalizedIdentity(loanName)
+                && normalizedIdentity($0.lender) == normalizedIdentity(institutionName)
+        }
+    }
+
+    private func upsertCard(_ card: FinancialCard) {
+        if let index = cards.firstIndex(where: {
+            $0.id == card.id || ($0.plaidAccountId != nil && $0.plaidAccountId == card.plaidAccountId)
+        }) {
+            cards[index] = card
+        } else {
+            cards.append(card)
+        }
+    }
+
+    private func upsertLoan(_ loan: Loan) {
+        if let index = loans.firstIndex(where: {
+            $0.id == loan.id || ($0.plaidAccountId != nil && $0.plaidAccountId == loan.plaidAccountId)
+        }) {
+            loans[index] = loan
+        } else {
+            loans.append(loan)
+        }
     }
 
     // MARK: - Header
@@ -471,10 +630,17 @@ struct AddFinancialWizard: View {
                             .replacingOccurrences(of: ".", with: "")
                             .replacingOccurrences(of: "&", with: "and")
                         
-                        institution.name = instName
-                        institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
-                        institution.username = "plaid-connected"
-                        institution.password = "••••••••"
+                        if let existing = existingInstitution(named: instName) {
+                            institution = existing
+                            isNewInstitution = false
+                            institution.isDisconnected = false
+                            if institution.loginUrl?.isEmpty != false {
+                                institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
+                            }
+                        } else {
+                            institution.name = instName
+                            institution.loginUrl = cleanName.isEmpty ? "" : cleanName + ".com"
+                        }
                         hasManuallyEditedWebsite = true
                         
                         // Convert Plaid accounts to our domain models
@@ -482,43 +648,81 @@ struct AddFinancialWizard: View {
                             let balance = pa.balances.current ?? pa.balances.available ?? 0.0
                             let apr = pa.liability_details?.effectiveAPR ?? 0.0
                             let minPayment = pa.liability_details?.effectiveMinimumPayment ?? 0.0
-                            
-                            let nextPaymentDateStr = pa.liability_details?.next_payment_due_date
-                            var nextDate: Date? = nil
-                            if let ds = nextPaymentDateStr {
-                                let df = DateFormatter()
-                                df.dateFormat = "yyyy-MM-dd"
-                                nextDate = df.date(from: ds)
-                            }
+                            let nextDate = plaidDate(pa.liability_details?.next_payment_due_date)
                             
                             if pa.type == "credit" {
-                                var newCard = FinancialCard(userId: institution.userId, companyId: institution.companyId)
+                                var newCard = matchingCard(for: pa, institutionName: instName)
+                                    ?? FinancialCard(userId: institution.userId, companyId: institution.companyId)
+                                newCard.userId = institution.userId
+                                newCard.companyId = institution.companyId
                                 newCard.name = pa.name
                                 newCard.type = "Credit"
                                 newCard.last4 = pa.mask ?? String(pa.account_id.suffix(4))
                                 newCard.plaidAccountId = pa.account_id
-                                newCard.balance = balance
-                                newCard.apr = apr
-                                newCard.moPayment = minPayment
+                                if pa.balances.current != nil || pa.balances.available != nil {
+                                    newCard.balance = balance
+                                }
+                                if let limit = pa.balances.limit { newCard.limit = limit }
+                                if pa.liability_details?.effectiveAPR != nil { newCard.apr = apr }
+                                if pa.liability_details?.effectiveMinimumPayment != nil { newCard.moPayment = minPayment }
+                                if let nextDate {
+                                    newCard.paidOn = String(Calendar.current.component(.day, from: nextDate))
+                                }
                                 newCard.institutionName = instName
-                                cards.append(newCard)
+                                upsertCard(newCard)
                             } else if pa.type == "loan" {
-                                var newLoan = Loan(userId: institution.userId, companyId: institution.companyId)
-                                newLoan.name = pa.name
+                                var newLoan = matchingLoan(for: pa, institutionName: instName)
+                                    ?? Loan(userId: institution.userId, companyId: institution.companyId)
+                                newLoan.userId = institution.userId
+                                newLoan.companyId = institution.companyId
+                                newLoan.name = pa.liability_details?.loan_name ?? pa.name
                                 newLoan.lender = instName
-                                newLoan.remainingBalance = balance
-                                newLoan.interestRate = apr
-                                newLoan.monthlyPayment = minPayment
-                                loans.append(newLoan)
+                                newLoan.plaidAccountId = pa.account_id
+                                if let principal = pa.liability_details?.origination_principal_amount {
+                                    newLoan.principalAmount = principal
+                                } else if newLoan.principalAmount == 0, pa.balances.current != nil || pa.balances.available != nil {
+                                    newLoan.principalAmount = balance
+                                }
+                                if pa.balances.current != nil || pa.balances.available != nil {
+                                    newLoan.remainingBalance = balance
+                                }
+                                if pa.liability_details?.effectiveAPR != nil { newLoan.interestRate = apr }
+                                if pa.liability_details?.effectiveMinimumPayment != nil { newLoan.monthlyPayment = minPayment }
+                                if let startDate = plaidDate(pa.liability_details?.origination_date) { newLoan.startDate = startDate }
+                                if let maturityDate = plaidDate(
+                                    pa.liability_details?.maturity_date ?? pa.liability_details?.expected_payoff_date
+                                ) { newLoan.maturityDate = maturityDate }
+                                if let nextDate { newLoan.nextPaymentAt = nextDate }
+                                if let term = pa.liability_details?.loan_term {
+                                    newLoan.term = term
+                                    let parsed = plaidTerm(term)
+                                    newLoan.termYears = parsed.years
+                                    newLoan.termMonths = parsed.months
+                                }
+                                upsertLoan(newLoan)
                             } else {
                                 let newAcc = InstitutionAccount(
                                     id: pa.account_id,
-                                    name: pa.name,
+                                    name: pa.official_name ?? pa.name,
                                     type: (pa.subtype ?? pa.type).capitalized,
-                                    last4: String(pa.account_id.suffix(4)),
-                                    balance: balance
+                                    last4: pa.mask ?? String(pa.account_id.suffix(4)),
+                                    accountNumber: pa.account_number,
+                                    routingNumber: pa.routing_number,
+                                    wireRoutingNumber: pa.wire_routing_number,
+                                    isTokenizedAccountNumber: pa.is_tokenized_account_number ?? false,
+                                    balance: balance,
+                                    availableBalance: pa.balances.available,
+                                    currency: pa.balances.iso_currency_code ?? pa.balances.unofficial_currency_code ?? "USD",
+                                    apy: pa.apy,
+                                    ownershipType: pa.ownership_type,
+                                    verificationStatus: pa.verification_status,
+                                    persistentAccountId: pa.persistent_account_id
                                 )
-                                accounts.append(newAcc)
+                                if let index = matchingAccount(newAcc, in: accounts) {
+                                    accounts[index] = mergedAccount(existing: accounts[index], imported: newAcc)
+                                } else {
+                                    accounts.append(newAcc)
+                                }
                             }
                         }
                         
@@ -818,6 +1022,23 @@ struct AddFinancialWizard: View {
     }
     
     // MARK: - Helpers
+    private func plaidDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+
+    private func plaidTerm(_ value: String) -> (years: Int, months: Int) {
+        let number = Int(value.split(separator: " ").first ?? "") ?? 0
+        let lowercased = value.lowercased()
+        if lowercased.contains("year") {
+            return (number, 0)
+        }
+        return (number / 12, number % 12)
+    }
+
     private func nextButton(disabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text("Next")

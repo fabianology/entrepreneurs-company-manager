@@ -29,7 +29,12 @@ final class AppViewModel {
         appState.companies.append(company)
         Task {
             do { try await DataRepository.shared.insertCompany(company) }
-            catch { await MainActor.run { appState.companies.removeAll { $0.id == company.id }; appState.error = "Failed to add company." } }
+            catch {
+                await MainActor.run {
+                    appState.companies.removeAll { $0.id == company.id }
+                    appState.error = "Failed to add company."
+                }
+            }
         }
     }
 
@@ -169,10 +174,53 @@ final class AppViewModel {
         }
     }
 
-    func saveFinancialInstitutionCascade(institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState) {
-        saveInstitution(institution, appState: appState)
-        for card in cards { saveCard(card, appState: appState) }
-        for loan in loans { saveLoan(loan, appState: appState) }
+    @MainActor
+    func saveFinancialInstitutionCascade(institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState) async throws {
+        guard canEdit(companyId: institution.companyId, appState: appState) else {
+            throw NSError(
+                domain: "AppViewModel",
+                code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "You do not have permission to edit this company."]
+            )
+        }
+
+        let originalInstitutions = appState.institutions
+        let originalCards = appState.cards
+        let originalLoans = appState.loans
+        if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
+            appState.institutions[index] = institution
+        } else {
+            appState.institutions.append(institution)
+        }
+        for card in cards {
+            if let index = appState.cards.firstIndex(where: { $0.id == card.id }) {
+                appState.cards[index] = card
+            } else {
+                appState.cards.append(card)
+            }
+        }
+        for loan in loans {
+            if let index = appState.loans.firstIndex(where: { $0.id == loan.id }) {
+                appState.loans[index] = loan
+            } else {
+                appState.loans.append(loan)
+            }
+        }
+
+        do {
+            try await DataRepository.shared.upsertInstitution(institution)
+            for card in cards {
+                try await DataRepository.shared.upsertCard(card)
+            }
+            for loan in loans {
+                try await DataRepository.shared.upsertLoan(loan)
+            }
+        } catch {
+            appState.institutions = originalInstitutions
+            appState.cards = originalCards
+            appState.loans = originalLoans
+            throw error
+        }
     }
 
     func deleteInstitution(_ inst: Institution, appState: AppState) {

@@ -377,7 +377,10 @@ struct EditInstitutionSheet: View {
                     draft: $accountDraft,
                     isNew: accountDraftIndex == nil,
                     institutionName: institution.name.isEmpty ? "Institution" : institution.name,
+                    institutionId: institution.id,
                     availableCards: appState.cards.filter { $0.companyId == institution.companyId },
+                    companyId: institution.companyId,
+                    vm: vm,
                     onSave: {
                         var accs = institution.accounts
                         if let idx = accountDraftIndex {
@@ -395,13 +398,30 @@ struct EditInstitutionSheet: View {
                     onDelete: {
                         if let idx = accountDraftIndex {
                             let acc = institution.accounts[idx]
-                            vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
-                            institution.accounts.remove(at: idx)
+                            var updatedInstitution = institution
+                            updatedInstitution.accounts.remove(at: idx)
                             if !isNew {
-                                vm.saveInstitution(institution, appState: appState)
+                                Task {
+                                    do {
+                                        try await vm.saveFinancialInstitutionCascade(
+                                            institution: updatedInstitution,
+                                            cards: [],
+                                            loans: [],
+                                            appState: appState
+                                        )
+                                        institution = updatedInstitution
+                                        vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
+                                        showAccountHUD = false
+                                    } catch {
+                                        appState.error = "The account could not be deleted. Please try again."
+                                    }
+                                }
+                            } else {
+                                institution = updatedInstitution
+                                vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
+                                showAccountHUD = false
                             }
                         }
-                        showAccountHUD = false
                     }
                 )
                 .presentationDetents([.fraction(0.70), .large])

@@ -67,7 +67,12 @@ serve(async (req) => {
       plaidPayload.access_token = accessToken
     } else {
       // Standard Mode
-      plaidPayload.products = ['transactions', 'auth']
+      // Transactions is the core product. Auth is best-effort so credit cards and
+      // other non-ACH accounts are not filtered out of Link. Liabilities consent
+      // lets us enrich supported credit and loan accounts after linking.
+      plaidPayload.products = ['transactions']
+      plaidPayload.optional_products = ['auth']
+      plaidPayload.additional_consented_products = ['liabilities']
     }
 
     const plaidRes = await fetch(`https://${plaidEnv}.plaid.com/link/token/create`, {

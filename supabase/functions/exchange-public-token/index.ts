@@ -65,16 +65,16 @@ serve(async (req) => {
       item_id: exchangeData.item_id,
       plaid_institution_id: institution_id,
       institution_name,
-      products: ['transactions', 'auth', 'balance'],
+      products: ['transactions', 'auth', 'liabilities', 'balance'],
       status: 'active'
     })
     
     if (insertError) throw new Error(`Database Insert Error: ${insertError.message}`)
 
-    // 6. Immediately fetch initial balances so we can return them to the UI
-    const balanceRes = await fetch(
-      `https://${plaidEnv}.plaid.com/accounts/balance/get`,
-      {
+    // 6. Fetch every supported enrichment source. Auth and Liabilities are
+    // best-effort because not every institution/account supports them.
+    const plaidRequest = async (path: string) => {
+      const response = await fetch(`https://${plaidEnv}.plaid.com${path}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -82,14 +82,56 @@ serve(async (req) => {
           secret: plaidSecret,
           access_token: exchangeData.access_token
         })
-      }
+      })
+      return await response.json()
+    }
+
+    const balanceData = await plaidRequest('/accounts/balance/get')
+    if (balanceData.error_code) {
+      throw new Error(balanceData.error_message || balanceData.error_code)
+    }
+
+    const [authData, liabilityData] = await Promise.all([
+      plaidRequest('/auth/get').catch(() => ({})),
+      plaidRequest('/liabilities/get').catch(() => ({}))
+    ])
+
+    const achByAccount = new Map(
+      (authData.numbers?.ach || []).map((number: any) => [number.account_id, number])
     )
-    const balanceData = await balanceRes.json()
+    const authAccountById = new Map(
+      (authData.accounts || []).map((account: any) => [account.account_id, account])
+    )
+    const liabilityByAccount = new Map<string, any>()
+    for (const liability of (liabilityData.liabilities?.credit || [])) {
+      if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'credit' })
+    }
+    for (const liability of (liabilityData.liabilities?.mortgage || [])) {
+      if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'mortgage' })
+    }
+    for (const liability of (liabilityData.liabilities?.student || [])) {
+      if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'student' })
+    }
+
+    const enrichedAccounts = (balanceData.accounts || []).map((account: any) => {
+      const ach = achByAccount.get(account.account_id) as any
+      const authAccount = authAccountById.get(account.account_id) as any
+      const liability = liabilityByAccount.get(account.account_id)
+      return {
+        ...account,
+        account_number: ach?.account || liability?.account_number || null,
+        routing_number: ach?.routing || null,
+        wire_routing_number: ach?.wire_routing || null,
+        is_tokenized_account_number: ach?.is_tokenized_account_number || false,
+        verification_status: authAccount?.verification_status || account.verification_status || null,
+        liability_details: liability || null
+      }
+    })
 
     return new Response(JSON.stringify({
       success: true,
       item_id: exchangeData.item_id,
-      accounts: balanceData.accounts || []
+      accounts: enrichedAccounts
     }), { 
       status: 200,
       headers: { 'Content-Type': 'application/json' } 

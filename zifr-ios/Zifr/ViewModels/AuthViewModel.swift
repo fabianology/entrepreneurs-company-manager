@@ -79,10 +79,14 @@ final class AuthViewModel: NSObject {
     func checkSession() async {
         checkBiometrics()
         do {
+            // `session` performs one SDK-managed refresh only when needed. Calling
+            // refreshSession() here races Supabase's automatic refresh and can rotate
+            // the same refresh token twice, leaving startup requests unauthorized.
             let session = try await SupabaseService.shared.client.auth.session
+            let verifiedUser = try await SupabaseService.shared.client.auth.user(jwt: session.accessToken)
             await MainActor.run {
                 self.session = session
-                self.currentUser = session.user
+                self.currentUser = verifiedUser
                 self.hasCachedSession = true
                 if self.isBiometricEnabled && self.isBiometricsAvailable {
                     self.isAuthenticated = false

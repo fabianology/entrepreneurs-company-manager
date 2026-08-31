@@ -307,7 +307,10 @@ struct InstitutionCardView: View {
                 draft: $accountDraft,
                 isNew: false,
                 institutionName: institution.name.isEmpty ? "Bank" : institution.name,
+                institutionId: institution.id,
                 availableCards: appState.cards.filter { $0.companyId == institution.companyId },
+                companyId: institution.companyId,
+                vm: vm,
                 onSave: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         var updatedInst = institution
@@ -320,12 +323,23 @@ struct InstitutionCardView: View {
                 onDelete: {
                     if let idx = institution.accounts.firstIndex(where: { $0.id == accountDraft.id }) {
                         let acc = institution.accounts[idx]
-                        vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
                         var updatedInst = institution
                         updatedInst.accounts.remove(at: idx)
-                        vm.saveInstitution(updatedInst, appState: appState)
+                        Task {
+                            do {
+                                try await vm.saveFinancialInstitutionCascade(
+                                    institution: updatedInst,
+                                    cards: [],
+                                    loans: [],
+                                    appState: appState
+                                )
+                                vm.cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name)
+                                editingAccount = nil
+                            } catch {
+                                appState.error = "The account could not be deleted. Please try again."
+                            }
+                        }
                     }
-                    editingAccount = nil
                 }
             )
             .presentationDetents([.fraction(0.70), .large])

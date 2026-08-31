@@ -3,18 +3,56 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
 
 serve(async (req) => {
   try {
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey
     )
+
+    const authorization = req.headers.get('Authorization') ?? ''
+    const bearerToken = authorization.replace(/^Bearer\s+/i, '')
+    const isServiceRequest = bearerToken === serviceRoleKey
+    let callerUserId: string | null = null
+    if (!isServiceRequest) {
+      if (!bearerToken) {
+        return new Response(JSON.stringify({ error: 'Authentication required' }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 401
+        })
+      }
+      const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(bearerToken)
+      if (authError || !authData.user) {
+        return new Response(JSON.stringify({ error: 'Invalid or expired session' }), {
+          headers: { 'Content-Type': 'application/json' },
+          status: 401
+        })
+      }
+      callerUserId = authData.user.id
+    }
+    const requestBody = await req.json().catch(() => ({}))
+    const requestedInstitutionId = requestBody?.institution_id ?? null
 
     const plaidEnv = Deno.env.get('PLAID_ENV') || 'sandbox'
     const clientId = Deno.env.get('PLAID_CLIENT_ID')
     const secret = Deno.env.get('PLAID_SECRET')
     const plaidBase = `https://${plaidEnv}.plaid.com`
 
-    // 1. Fetch all active Plaid items
-    const { data: plaidItems, error } = await supabaseAdmin
+    const plaidRequest = async (path: string, accessToken: string) => {
+      const response = await fetch(`${plaidBase}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          secret,
+          access_token: accessToken
+        })
+      })
+      return await response.json()
+    }
+
+    // A user-triggered refresh is scoped to that user and, for an account sheet,
+    // to that institution. The service-role cron still refreshes every active item.
+    let itemsQuery = supabaseAdmin
       .from('plaid_items')
       .select(`
         id,
@@ -22,34 +60,32 @@ serve(async (req) => {
         user_id,
         company_id,
         institution_id,
+        institution_name,
         institutions (
           id,
+          name,
           accounts_data
         )
       `)
       .eq('status', 'active')
       .not('institution_id', 'is', null)
 
+    if (callerUserId) itemsQuery = itemsQuery.eq('user_id', callerUserId)
+    if (requestedInstitutionId) itemsQuery = itemsQuery.eq('institution_id', requestedInstitutionId)
+    const { data: plaidItems, error } = await itemsQuery
+
     if (error) throw error
 
     let syncedCount = 0
     let transactionCount = 0
+    const results: any[] = []
 
     for (const item of (plaidItems || [])) {
       if (!item.institutions) continue
 
       try {
         // ── A. Fetch Balances ──────────────────────────────────────────
-        const balanceRes = await fetch(`${plaidBase}/accounts/balance/get`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            client_id: clientId,
-            secret: secret,
-            access_token: item.access_token
-          })
-        })
-        const balanceData = await balanceRes.json()
+        const balanceData = await plaidRequest('/accounts/balance/get', item.access_token)
 
         if (balanceData.error_code) {
           console.error(`Plaid balance error for item ${item.id}:`, balanceData.error_message)
@@ -61,28 +97,230 @@ serve(async (req) => {
               .update({ is_disconnected: true })
               .eq('id', item.institution_id)
           }
+          results.push({
+            item_id: item.id,
+            institution_name: item.institution_name,
+            success: false,
+            error_code: balanceData.error_code,
+            error: balanceData.error_message ?? 'Plaid balance request failed'
+          })
           continue
         }
 
-        // Merge balances back into institutions.accounts_data
+        // Liabilities enrich supported card records. Auth numbers are imported
+        // during Link and encrypted by the iOS client; the sync must not replace
+        // those encrypted values with raw account/routing numbers.
+        const liabilityData = await plaidRequest('/liabilities/get', item.access_token).catch(() => ({}))
+        if (liabilityData.error_code && !['PRODUCT_NOT_READY', 'PRODUCTS_NOT_SUPPORTED', 'ADDITIONAL_CONSENT_REQUIRED'].includes(liabilityData.error_code)) {
+          console.error(`Plaid liabilities error for item ${item.id}:`, liabilityData.error_message)
+        }
+
+        const liabilityByAccount = new Map<string, any>()
+        for (const liability of (liabilityData.liabilities?.credit || [])) {
+          if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'credit' })
+        }
+        for (const liability of (liabilityData.liabilities?.mortgage || [])) {
+          if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'mortgage' })
+        }
+        for (const liability of (liabilityData.liabilities?.student || [])) {
+          if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'student' })
+        }
+
+        // Merge Plaid fields back into institutions.accounts_data and restore
+        // any missing non-liability account after a transient client save failure.
+        // Auth numbers remain client-only because only the iOS app can encrypt them.
         const currentAccounts = item.institutions.accounts_data || []
         const plaidAccounts = balanceData.accounts || []
-        const updatedAccounts = currentAccounts.map((acc: any) => {
-          const pAcc = plaidAccounts.find((p: any) =>
-            p.mask === acc.last4 || (p.account_id && p.account_id.endsWith(acc.last4))
+        const updatedAccounts = currentAccounts.reduce((deduplicated: any[], account: any) => {
+          const duplicateIndex = deduplicated.findIndex((candidate: any) => candidate.id === account.id)
+          if (duplicateIndex >= 0) deduplicated[duplicateIndex] = { ...deduplicated[duplicateIndex], ...account }
+          else deduplicated.push(account)
+          return deduplicated
+        }, [])
+        const normalizedIdentity = (value: any) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        for (const pAcc of plaidAccounts.filter((account: any) => !['credit', 'loan'].includes(account.type))) {
+          let existingIndex = updatedAccounts.findIndex((acc: any) =>
+            pAcc.account_id === acc.id ||
+            pAcc.account_id === acc.plaid_account_id ||
+            (pAcc.mask && pAcc.mask === acc.last4 && pAcc.name === acc.name)
           )
-          return pAcc
-            ? { ...acc, balance: pAcc.balances.current ?? pAcc.balances.available ?? acc.balance, plaid_account_id: pAcc.account_id }
-            : acc
-        })
+          if (existingIndex < 0) {
+            const plaidNames = [pAcc.official_name, pAcc.name]
+              .map(normalizedIdentity)
+              .filter(Boolean)
+            const plaidType = normalizedIdentity(pAcc.subtype ?? pAcc.type)
+            const identityMatches = updatedAccounts
+              .map((acc: any, index: number) => ({ acc, index }))
+              .filter(({ acc }: any) =>
+                plaidNames.includes(normalizedIdentity(acc.name)) &&
+                normalizedIdentity(acc.type) === plaidType
+              )
+            const exactMaskMatch = identityMatches.find(({ acc }: any) =>
+              pAcc.mask && acc.last4 === pAcc.mask
+            )
+            if (exactMaskMatch) existingIndex = exactMaskMatch.index
+            else if (
+              identityMatches.length === 1 &&
+              (!pAcc.mask || !identityMatches[0].acc.last4)
+            ) existingIndex = identityMatches[0].index
+          }
+          const existing = existingIndex >= 0 ? updatedAccounts[existingIndex] : null
+          const merged = {
+            cardHolder: '',
+            expiry: '',
+            network: '',
+            status: 'Active',
+            paidFrom: '',
+            paidOn: '',
+            autopay: 'N/A',
+            ...existing,
+            id: pAcc.account_id,
+            name: pAcc.official_name ?? pAcc.name ?? existing?.name ?? '',
+            type: String(pAcc.subtype ?? pAcc.type ?? existing?.type ?? 'Other')
+              .split(' ')
+              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' '),
+            last4: pAcc.mask ?? existing?.last4 ?? '',
+            balance: pAcc.balances.current ?? pAcc.balances.available ?? existing?.balance ?? 0,
+            currency: pAcc.balances.iso_currency_code ?? pAcc.balances.unofficial_currency_code ?? existing?.currency ?? 'USD',
+            limit: pAcc.balances.limit ?? existing?.limit ?? 0,
+            availableBalance: pAcc.balances.available ?? existing?.availableBalance,
+            apy: pAcc.apy ?? existing?.apy,
+            ownershipType: pAcc.ownership_type ?? existing?.ownershipType,
+            verificationStatus: pAcc.verification_status ?? existing?.verificationStatus,
+            persistentAccountId: pAcc.persistent_account_id ?? existing?.persistentAccountId,
+            plaid_account_id: pAcc.account_id
+          }
+          if (existingIndex >= 0) updatedAccounts[existingIndex] = merged
+          else updatedAccounts.push(merged)
+        }
 
         await supabaseAdmin.from('institutions')
           .update({ accounts_data: updatedAccounts, last_synced_at: new Date().toISOString(), is_disconnected: false })
           .eq('id', item.institution_id)
 
-        // ── B. Fetch Transactions (last 90 days) ────────────────────────
+        // Keep Plaid-backed cards current using Balance and Liabilities fields.
+        for (const pAcc of plaidAccounts.filter((account: any) => account.type === 'credit')) {
+          const liability = liabilityByAccount.get(pAcc.account_id)
+          const preferredAPR = liability?.aprs?.find((apr: any) => apr.apr_type === 'purchase_apr')
+            ?? liability?.aprs?.[0]
+          const cardUpdate: Record<string, any> = {}
+          const currentBalance = pAcc.balances.current ?? pAcc.balances.available
+          if (currentBalance != null) cardUpdate.balance = currentBalance
+          if (pAcc.balances.limit != null) cardUpdate.limit = pAcc.balances.limit
+          if (preferredAPR?.apr_percentage != null) cardUpdate.apr = preferredAPR.apr_percentage
+          if (liability?.minimum_payment_amount != null) cardUpdate.mo_payment = liability.minimum_payment_amount
+          if (liability?.next_payment_due_date) {
+            cardUpdate.paid_on = String(Number(liability.next_payment_due_date.split('-')[2]))
+          }
+
+          const { data: existingCard } = await supabaseAdmin
+            .from('financial_cards')
+            .select('id')
+            .eq('user_id', item.user_id)
+            .eq('plaid_account_id', pAcc.account_id)
+            .maybeSingle()
+
+          const institutionName = item.institutions.name ?? item.institution_name ?? ''
+          if (existingCard && Object.keys(cardUpdate).length === 0) continue
+          const cardPayload = existingCard ? cardUpdate : {
+            id: crypto.randomUUID(),
+            user_id: item.user_id,
+            company_id: item.company_id,
+            name: pAcc.name ?? pAcc.official_name ?? 'Plaid Card',
+            institution_name: institutionName,
+            last4: pAcc.mask ?? String(pAcc.account_id).slice(-4),
+            network: 'Other',
+            type: 'Credit',
+            status: 'Active',
+            limit: pAcc.balances.limit ?? 0,
+            paid_on: liability?.next_payment_due_date
+              ? String(Number(liability.next_payment_due_date.split('-')[2]))
+              : null,
+            autopay: 'N/A',
+            balance: currentBalance ?? 0,
+            mo_payment: liability?.minimum_payment_amount ?? 0,
+            apr: preferredAPR?.apr_percentage ?? 0,
+            promo_apr: 0,
+            card_holder_type: 'Mine',
+            plaid_account_id: pAcc.account_id
+          }
+          const cardQuery = existingCard
+            ? supabaseAdmin.from('financial_cards').update(cardPayload).eq('id', existingCard.id)
+            : supabaseAdmin.from('financial_cards').insert(cardPayload)
+          const { error: cardError } = await cardQuery
+          if (cardError) console.error(`Failed to persist Plaid card ${pAcc.account_id}:`, cardError)
+        }
+
+        // Keep imported loans current when the Plaid loan identifier is present.
+        for (const pAcc of plaidAccounts.filter((account: any) => account.type === 'loan')) {
+          const liability = liabilityByAccount.get(pAcc.account_id)
+          const loanUpdate: Record<string, any> = {}
+          const remainingBalance = pAcc.balances.current ?? pAcc.balances.available
+          if (remainingBalance != null) loanUpdate.remaining_balance = remainingBalance
+          if (liability?.origination_principal_amount != null) {
+            loanUpdate.principal_amount = liability.origination_principal_amount
+          }
+          const interestRate = liability?.interest_rate?.percentage ?? liability?.interest_rate_percentage
+          if (interestRate != null) loanUpdate.interest_rate = interestRate
+          const payment = liability?.next_monthly_payment ?? liability?.minimum_payment_amount
+          if (payment != null) loanUpdate.monthly_payment = payment
+          if (liability?.origination_date) loanUpdate.start_date = liability.origination_date
+          if (liability?.maturity_date || liability?.expected_payoff_date) {
+            loanUpdate.maturity_date = liability.maturity_date ?? liability.expected_payoff_date
+          }
+          if (liability?.next_payment_due_date) loanUpdate.next_payment_at = liability.next_payment_due_date
+          if (liability?.loan_term) {
+            loanUpdate.term = liability.loan_term
+            const termValue = Number(String(liability.loan_term).split(' ')[0]) || 0
+            const isYears = String(liability.loan_term).toLowerCase().includes('year')
+            loanUpdate.term_years = isYears ? termValue : Math.floor(termValue / 12)
+            loanUpdate.term_months = isYears ? 0 : termValue % 12
+          }
+
+          const { data: existingLoan } = await supabaseAdmin
+            .from('loans')
+            .select('id')
+            .eq('user_id', item.user_id)
+            .eq('plaid_account_id', pAcc.account_id)
+            .maybeSingle()
+
+          const institutionName = item.institutions.name ?? item.institution_name ?? ''
+          if (existingLoan && Object.keys(loanUpdate).length === 0) continue
+          const termValue = Number(String(liability?.loan_term ?? '').split(' ')[0]) || 0
+          const termIsYears = String(liability?.loan_term ?? '').toLowerCase().includes('year')
+          const loanPayload = existingLoan ? loanUpdate : {
+            id: crypto.randomUUID(),
+            user_id: item.user_id,
+            company_id: item.company_id,
+            role: 'Borrower',
+            lender: institutionName,
+            name: liability?.loan_name ?? pAcc.name ?? pAcc.official_name ?? 'Plaid Loan',
+            principal_amount: liability?.origination_principal_amount ?? remainingBalance ?? 0,
+            remaining_balance: remainingBalance ?? 0,
+            interest_type: 'Percentage',
+            interest_rate: liability?.interest_rate?.percentage ?? liability?.interest_rate_percentage ?? 0,
+            term: liability?.loan_term ?? '0 months',
+            term_years: termIsYears ? termValue : Math.floor(termValue / 12),
+            term_months: termIsYears ? 0 : termValue % 12,
+            schedule_frequency: 'Monthly',
+            monthly_payment: liability?.next_monthly_payment ?? liability?.minimum_payment_amount ?? 0,
+            start_date: liability?.origination_date ?? new Date().toISOString(),
+            maturity_date: liability?.maturity_date ?? liability?.expected_payoff_date ?? null,
+            next_payment_at: liability?.next_payment_due_date ?? null,
+            status: 'Active',
+            plaid_account_id: pAcc.account_id
+          }
+          const loanQuery = existingLoan
+            ? supabaseAdmin.from('loans').update(loanPayload).eq('id', existingLoan.id)
+            : supabaseAdmin.from('loans').insert(loanPayload)
+          const { error: loanError } = await loanQuery
+          if (loanError) console.error(`Failed to persist Plaid loan ${pAcc.account_id}:`, loanError)
+        }
+
+        // ── B. Fetch Transactions (up to Plaid's two-year range) ────────
         const endDate = new Date().toISOString().split('T')[0]
-        const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        const startDate = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
         console.log(`Fetching transactions for item ${item.id}, range: ${startDate} to ${endDate}, env: ${plaidEnv}`)
 
         let allTransactions: any[] = []
@@ -107,7 +345,7 @@ serve(async (req) => {
 
           if (txData.error_code) {
             console.error(`Plaid transactions error for item ${item.id}: code=${txData.error_code} msg=${txData.error_message}`)
-            break
+            throw new Error(`${txData.error_code}: ${txData.error_message ?? 'Plaid transaction request failed'}`)
           }
 
           const batch = txData.transactions || []
@@ -143,7 +381,6 @@ serve(async (req) => {
             category: tx.category || [],
             merchant_name: tx.merchant_name || tx.name,
             name: tx.name || tx.merchant_name,
-            merchant_website: tx.website || tx.counterparties?.find((party: any) => party.website)?.website || null,
             date: tx.date,
             pending: tx.pending || false,
             company_id: item.company_id,
@@ -156,6 +393,7 @@ serve(async (req) => {
 
           if (txErr) {
             console.error(`Error saving transactions for item ${item.id}:`, txErr)
+            throw txErr
           } else {
             transactionCount += dbTxs.length
             console.log(`Saved ${dbTxs.length} transactions for item ${item.id}`)
@@ -168,15 +406,35 @@ serve(async (req) => {
           .eq('id', item.id)
 
         syncedCount++
+        results.push({
+          item_id: item.id,
+          institution_name: item.institution_name,
+          success: true,
+          transactions_found: allTransactions.length,
+          transactions_saved: allTransactions.length
+        })
       } catch (err) {
         console.error(`Failed to sync item ${item.id}:`, err)
+        const message = err instanceof Error ? err.message : String(err)
+        await supabaseAdmin.from('plaid_items')
+          .update({ error_code: 'TRANSACTION_SYNC_FAILED' })
+          .eq('id', item.id)
+        results.push({
+          item_id: item.id,
+          institution_name: item.institution_name,
+          success: false,
+          error_code: 'TRANSACTION_SYNC_FAILED',
+          error: message
+        })
       }
     }
 
     return new Response(JSON.stringify({
       success: true,
       synced: syncedCount,
-      transactions_saved: transactionCount
+      failed: results.filter((result) => !result.success).length,
+      transactions_saved: transactionCount,
+      items: results
     }), {
       headers: { "Content-Type": "application/json" },
       status: 200,

@@ -12,13 +12,21 @@ extension String {
 
 struct InstitutionAccount: Codable, Identifiable, Hashable {
     var id: String = UUID().uuidString
+    var plaidAccountId: String? = nil
     var name: String = ""
     var type: String = "Checking"
     var last4: String = ""
     var accountNumber: String? = nil
     var routingNumber: String? = nil
+    var wireRoutingNumber: String? = nil
+    var isTokenizedAccountNumber: Bool? = nil
     var balance: Double = 0
+    var availableBalance: Double? = nil
     var currency: String = "USD"
+    var apy: Double? = nil
+    var ownershipType: String? = nil
+    var verificationStatus: String? = nil
+    var persistentAccountId: String? = nil
     var cardHolder: String = ""
     var expiry: String = ""
     var network: String = ""
@@ -28,6 +36,15 @@ struct InstitutionAccount: Codable, Identifiable, Hashable {
     var paidOn: String = ""
     var autopay: String = "N/A"
     var linkedCardId: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case plaidAccountId = "plaid_account_id"
+        case name, type, last4, accountNumber, routingNumber, wireRoutingNumber
+        case isTokenizedAccountNumber, balance, availableBalance, currency, apy
+        case ownershipType, verificationStatus, persistentAccountId, cardHolder
+        case expiry, network, status, limit, paidFrom, paidOn, autopay, linkedCardId
+    }
 
     static let allTypes = [
         "Checking", "Savings", "Investing", "CD",

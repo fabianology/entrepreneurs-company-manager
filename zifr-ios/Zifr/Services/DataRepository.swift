@@ -7,6 +7,25 @@ class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
 
+    // Keep this projection compatible with the production transaction schema.
+    // `merchant_website` is optional enrichment and has not been deployed to every
+    // environment; Transaction's custom decoder safely leaves it nil when omitted.
+    private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,amount,currency,date,name,merchant_name,category,pending"
+
+    private func fetchCompanies() async -> Result<[Company], Error> {
+        do {
+            let companies: [Company] = try await client
+                .from("companies")
+                .select()
+                .execute()
+                .value
+            return .success(companies)
+        } catch {
+            print("Failed to fetch companies: \(error)")
+            return .failure(error)
+        }
+    }
+
     private func refreshMyObligations() async -> Bool {
         do {
             try await client.rpc("refresh_my_miloom_obligations").execute()
@@ -19,7 +38,14 @@ class DataRepository {
     
     // MARK: - Fetch All Data
     private func safeFetchTransactions() async -> [Transaction] {
-        do { return try await client.from("plaid_transactions").select().execute().value }
+        do {
+            return try await client
+                .from("plaid_transactions")
+                .select(Self.transactionColumns)
+                .order("date", ascending: false)
+                .execute()
+                .value
+        }
         catch { 
             print("Failed to fetch transactions! Error details: \(String(describing: error))")
             if let decodingError = error as? DecodingError {
@@ -31,6 +57,19 @@ class DataRepository {
             }
             return [] 
         }
+    }
+
+    @MainActor
+    func refreshTransactions(appState: AppState) async throws {
+        let transactions: [Transaction] = try await measure("transactions") {
+            try await client
+                .from("plaid_transactions")
+                .select(Self.transactionColumns)
+                .order("date", ascending: false)
+                .execute()
+                .value
+        }
+        appState.transactions = transactions
     }
 
     private func safeFetchShares() async -> [ResourceShare] {
@@ -45,12 +84,15 @@ class DataRepository {
     func fetchAllData(appState: AppState) async {
         if appState.isLoading { return }
         appState.isLoading = true
-        
-        // PRE-WARM: Fire a single, ultra-lightweight query to force any pending token refreshes or connection handshakes.
-        // If we blast 11 concurrent queries while the SDK is still refreshing the auth token on launch, it locks the queue for 11 seconds!
-        _ = try? await client.from("user_preferences").select("id").limit(1).execute()
-        
-        async let fCompanies: [Company] = measure("companies") { (try? await client.from("companies").select("id, user_id, name, structure, company_description, color_hex, website, last_modified, last_viewed").execute().value) ?? [] }
+        defer { appState.isLoading = false }
+
+        // Companies drive the first dashboard paint. Publish them immediately rather
+        // than holding them until every secondary portfolio request has completed.
+        let fetchedCompaniesResult = await measure("companies") { await fetchCompanies() }
+        if case .success(let fetchedCompanies) = fetchedCompaniesResult {
+            appState.companies = fetchedCompanies
+        }
+
         async let fSubscriptions: [Subscription] = measure("subscriptions") { (try? await client.from("subscriptions").select().execute().value) ?? [] }
         async let fInstitutions: [Institution] = measure("institutions") { (try? await client.from("institutions").select().execute().value) ?? [] }
         async let fCards: [FinancialCard] = measure("cards") { (try? await client.from("financial_cards").select().execute().value) ?? [] }
@@ -67,7 +109,6 @@ class DataRepository {
         async let fObligationRefresh = refreshMyObligations()
         async let fTransactions = measure("transactions") { await safeFetchTransactions() }
         
-        let fetchedCompanies = await fCompanies
         let fetchedSubscriptions = await fSubscriptions
         let fetchedInstitutions = await fInstitutions
         let fetchedCards = await fCards
@@ -91,7 +132,7 @@ class DataRepository {
         let transactions = await fTransactions
         
         let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
-        let secureInst = fetchedInstitutions.map { i -> Institution in var m = i; m.password = SecurityService.shared.decrypt(i.password); return m }
+        let secureInst = fetchedInstitutions.map { decryptInstitutionSecrets($0) }
         let secureCards = fetchedCards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
         
         let paymentsByLoan = Dictionary(grouping: fetchedLoanPayments, by: { $0.loanId })
@@ -104,7 +145,6 @@ class DataRepository {
         let session = try? await client.auth.session
         let currentUserId = session?.user.id
         
-        appState.companies = fetchedCompanies
         appState.subscriptions = secureSubs
         appState.institutions = secureInst
         appState.cards = secureCards
@@ -129,17 +169,12 @@ class DataRepository {
             }
 
         }
-        appState.isLoading = false
-        
         // Write count to a file we can read from the host
         if let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let fileURL = docsDir.appendingPathComponent("tx_count.txt")
             try? "\(transactions.count)".write(to: fileURL, atomically: true, encoding: .utf8)
         }
 
-        if fetchedCompanies.isEmpty, let userId = currentUserId {
-            DummyDataSeeder.seed(appState: appState, userId: userId)
-        }
     }
 
     private static func connectionIdentity(_ connection: ResourceConnection) -> String {
@@ -171,6 +206,23 @@ class DataRepository {
             .update(obligation)
             .eq("id", value: obligation.id)
             .execute()
+    }
+
+    func assignPlaidTransaction(_ transactionId: UUID, to companyId: UUID) async throws {
+        struct Parameters: Encodable {
+            let transactionId: UUID
+            let companyId: UUID
+
+            enum CodingKeys: String, CodingKey {
+                case transactionId = "p_transaction_id"
+                case companyId = "p_company_id"
+            }
+        }
+
+        try await client.rpc(
+            "assign_plaid_transaction_company",
+            params: Parameters(transactionId: transactionId, companyId: companyId)
+        ).execute()
     }
 
     func registerPushToken(_ token: String, environment: String) async throws {
@@ -292,13 +344,18 @@ class DataRepository {
         var secureCard = card; secureCard.password = SecurityService.shared.encrypt(secureCard.password)
         try await client.from("financial_cards").update(secureCard).eq("id", value: card.id).execute()
     }
+    func upsertCard(_ card: FinancialCard) async throws {
+        var secureCard = card
+        secureCard.password = SecurityService.shared.encrypt(secureCard.password)
+        try await client.from("financial_cards").upsert(secureCard).execute()
+    }
     func deleteCard(_ id: UUID) async throws {
         try await client.from("financial_cards").delete().eq("id", value: id).execute()
     }
     
     // MARK: - Institutions
     func insertInstitution(_ inst: Institution) async throws {
-        var secureInst = inst; secureInst.password = SecurityService.shared.encrypt(secureInst.password)
+        let secureInst = encryptInstitutionSecrets(inst)
         try await client.from("institutions").insert(secureInst).execute()
     }
     func updateInstitution(_ inst: Institution) async throws {
@@ -306,8 +363,38 @@ class DataRepository {
             let log = ActivityLog(userId: inst.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_institution", message: "\(session.user.email ?? "Someone") updated the shared institution '\(inst.name)'.", resourceId: inst.id, resourceType: "institution")
             try? await insertActivityLog(log)
         }
-        var secureInst = inst; secureInst.password = SecurityService.shared.encrypt(secureInst.password)
+        let secureInst = encryptInstitutionSecrets(inst)
         try await client.from("institutions").update(secureInst).eq("id", value: inst.id).execute()
+    }
+    func upsertInstitution(_ inst: Institution) async throws {
+        let secureInst = encryptInstitutionSecrets(inst)
+        try await client.from("institutions").upsert(secureInst).execute()
+    }
+
+    private func encryptInstitutionSecrets(_ institution: Institution) -> Institution {
+        var secured = institution
+        secured.password = SecurityService.shared.encrypt(secured.password)
+        secured.accounts = secured.accounts.map { account in
+            var securedAccount = account
+            securedAccount.accountNumber = SecurityService.shared.encrypt(account.accountNumber)
+            securedAccount.routingNumber = SecurityService.shared.encrypt(account.routingNumber)
+            securedAccount.wireRoutingNumber = SecurityService.shared.encrypt(account.wireRoutingNumber)
+            return securedAccount
+        }
+        return secured
+    }
+
+    private func decryptInstitutionSecrets(_ institution: Institution) -> Institution {
+        var decrypted = institution
+        decrypted.password = SecurityService.shared.decrypt(decrypted.password)
+        decrypted.accounts = decrypted.accounts.map { account in
+            var decryptedAccount = account
+            decryptedAccount.accountNumber = SecurityService.shared.decrypt(account.accountNumber)
+            decryptedAccount.routingNumber = SecurityService.shared.decrypt(account.routingNumber)
+            decryptedAccount.wireRoutingNumber = SecurityService.shared.decrypt(account.wireRoutingNumber)
+            return decryptedAccount
+        }
+        return decrypted
     }
     func deleteInstitution(_ id: UUID) async throws {
         // Optional Plaid backend cleanup
@@ -340,6 +427,13 @@ class DataRepository {
         try await client.from("loans").update(loan).eq("id", value: loan.id).execute()
         
         // Sync loan payments
+        try? await client.from("loan_payments").delete().eq("loan_id", value: loan.id).execute()
+        if let payments = loan.payments, !payments.isEmpty {
+            try? await client.from("loan_payments").insert(payments).execute()
+        }
+    }
+    func upsertLoan(_ loan: Loan) async throws {
+        try await client.from("loans").upsert(loan).execute()
         try? await client.from("loan_payments").delete().eq("loan_id", value: loan.id).execute()
         if let payments = loan.payments, !payments.isEmpty {
             try? await client.from("loan_payments").insert(payments).execute()
@@ -575,16 +669,32 @@ struct Transaction: Identifiable, Codable, Equatable {
     var userId: UUID = UUID()
     var companyId: UUID? = nil
     var institutionId: UUID? = nil
+    var plaidTransactionId: String? = nil
     var accountId: String = ""
     var amount: Double? = 0.0
+    var currency: String = "USD"
     var date: String = ""
     var name: String? = ""
+    var merchantName: String? = nil
     var merchantWebsite: String? = nil
     var category: [String]? = nil
     var pending: Bool? = false
     
     enum CodingKeys: String, CodingKey {
-        case id, userId = "user_id", companyId = "company_id", institutionId = "institution_id", accountId = "account_id", amount, date, name, merchantWebsite = "merchant_website", category, pending
+        case id
+        case userId = "user_id"
+        case companyId = "company_id"
+        case institutionId = "institution_id"
+        case plaidTransactionId = "plaid_transaction_id"
+        case accountId = "account_id"
+        case amount
+        case currency
+        case date
+        case name
+        case merchantName = "merchant_name"
+        case merchantWebsite = "merchant_website"
+        case category
+        case pending
     }
     
     init() {}
@@ -606,10 +716,13 @@ struct Transaction: Identifiable, Codable, Equatable {
         self.userId = try container.decodeIfPresent(UUID.self, forKey: .userId) ?? UUID()
         self.companyId = try container.decodeIfPresent(UUID.self, forKey: .companyId)
         self.institutionId = try container.decodeIfPresent(UUID.self, forKey: .institutionId)
+        self.plaidTransactionId = try container.decodeIfPresent(String.self, forKey: .plaidTransactionId)
         self.accountId = try container.decodeIfPresent(String.self, forKey: .accountId) ?? ""
         self.amount = try container.decodeIfPresent(Double.self, forKey: .amount)
+        self.currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? "USD"
         self.date = try container.decodeIfPresent(String.self, forKey: .date) ?? ""
         self.name = (try? container.decodeIfPresent(String.self, forKey: .name)) ?? "Unknown"
+        self.merchantName = try container.decodeIfPresent(String.self, forKey: .merchantName)
         self.merchantWebsite = try container.decodeIfPresent(String.self, forKey: .merchantWebsite)
         self.category = try container.decodeIfPresent([String].self, forKey: .category)
         self.pending = try container.decodeIfPresent(Bool.self, forKey: .pending)
@@ -701,12 +814,6 @@ extension DataRepository {
         let end = Date()
         let time = end.timeIntervalSince(start)
         print("⏱️ [DataRepository] \(name) took \(time) seconds")
-        
-        if time > 5.0 {
-            Task { @MainActor in
-                NotificationCenter.default.post(name: Notification.Name("SlowQueryDetected"), object: "\(name) took \(String(format: "%.1f", time))s")
-            }
-        }
         
         return result
     }

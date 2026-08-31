@@ -61,20 +61,20 @@ struct ZifrApp: App {
             .task {
                 StoreService.shared.startListening(accessController: accessController)
                 await authViewModel.checkSession()
-                if authViewModel.isAuthenticated {
-                    await accessController.refresh()
-                    appState.entitlementSnapshot = accessController.snapshot
-                    await DataRepository.shared.fetchAllData(appState: appState)
-                    await PushNotificationService.shared.registerPendingTokenIfNeeded()
-                }
             }
             .onChange(of: authViewModel.isAuthenticated) { _, isAuth in
                 if isAuth {
                     Task {
-                        await accessController.refresh()
+                        // Company data should not wait for entitlement or push-network
+                        // work. Start these independent operations together.
+                        async let accessRefresh: Void = accessController.refresh()
+                        async let dataRefresh: Void = DataRepository.shared.fetchAllData(appState: appState)
+                        async let pushRegistration: Void = PushNotificationService.shared.registerPendingTokenIfNeeded()
+
+                        await dataRefresh
+                        await accessRefresh
                         appState.entitlementSnapshot = accessController.snapshot
-                        await DataRepository.shared.fetchAllData(appState: appState)
-                        await PushNotificationService.shared.registerPendingTokenIfNeeded()
+                        await pushRegistration
                     }
                 }
             }
@@ -134,11 +134,6 @@ struct ZifrApp: App {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(appState.error ?? "An unknown error occurred.")
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SlowQueryDetected"))) { notification in
-                if let msg = notification.object as? String {
-                    appState.error = "Slow DB Query: \(msg)"
-                }
             }
         }
     }

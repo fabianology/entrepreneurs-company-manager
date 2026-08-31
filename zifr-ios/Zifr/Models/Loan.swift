@@ -49,6 +49,7 @@ struct Loan: Identifiable, Codable, Hashable {
     var paidOffDate: Date?
     var status: String
     var notes: String?
+    var plaidAccountId: String?
     var payments: [LoanPayment]? = nil
 
     var borrower: String? {
@@ -94,6 +95,7 @@ struct Loan: Identifiable, Codable, Hashable {
         case paidOffDate = "paid_off_date"
         case status
         case notes
+        case plaidAccountId = "plaid_account_id"
     }
     
     init(
@@ -119,6 +121,7 @@ struct Loan: Identifiable, Codable, Hashable {
         paidOffDate: Date? = nil,
         status: String = "Active",
         notes: String? = nil,
+        plaidAccountId: String? = nil,
         payments: [LoanPayment]? = nil
     ) {
         self.id = id
@@ -142,6 +145,7 @@ struct Loan: Identifiable, Codable, Hashable {
         self.paidOffDate = paidOffDate
         self.status = status
         self.notes = notes
+        self.plaidAccountId = plaidAccountId
         self.payments = payments
         if let b = borrower, !b.isEmpty {
             self.borrower = b
