@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import {
+  PlaidAPIError,
+  plaidConfigFromEnvironment,
+  plaidRequest as plaidAPIRequest,
+  plaidWebhookURL,
+  requestPlaidTransactionSync
+} from "../_shared/plaid.ts"
 
 serve(async (req) => {
   try {
@@ -36,6 +43,8 @@ serve(async (req) => {
     const clientId = Deno.env.get('PLAID_CLIENT_ID')
     const secret = Deno.env.get('PLAID_SECRET')
     const plaidBase = `https://${plaidEnv}.plaid.com`
+    const plaidSyncConfig = plaidConfigFromEnvironment()
+    const webhookURL = plaidWebhookURL()
 
     const plaidRequest = async (path: string, accessToken: string) => {
       const response = await fetch(`${plaidBase}${path}`, {
@@ -222,6 +231,9 @@ serve(async (req) => {
         institution_id,
         institution_name,
         plaid_institution_id,
+        status,
+        cursor,
+        webhook_url,
         institutions (
           id,
           name,
@@ -242,9 +254,26 @@ serve(async (req) => {
     const results: any[] = []
 
     for (const item of (plaidItems || [])) {
-      if (!item.institutions) continue
+      const institution: any = Array.isArray(item.institutions)
+        ? item.institutions[0]
+        : item.institutions
+      if (!institution) continue
 
       try {
+        // Backfill the webhook on Items linked before event-driven sync was
+        // introduced. The stored URL avoids an extra Plaid call thereafter.
+        if (item.webhook_url !== webhookURL) {
+          await plaidAPIRequest(plaidSyncConfig, '/item/webhook/update', {
+            access_token: item.access_token,
+            webhook: webhookURL
+          })
+          const { error: webhookError } = await supabaseAdmin.from('plaid_items')
+            .update({ webhook_url: webhookURL, webhook_configured_at: new Date().toISOString() })
+            .eq('id', item.id)
+          if (webhookError) throw webhookError
+          item.webhook_url = webhookURL
+        }
+
         // ── A. Fetch Balances ──────────────────────────────────────────
         const balanceData = await plaidRequest('/accounts/balance/get', item.access_token)
 
@@ -290,7 +319,7 @@ serve(async (req) => {
         // Merge Plaid fields back into institutions.accounts_data and restore
         // any missing non-liability account after a transient client save failure.
         // Auth numbers remain client-only because only the iOS app can encrypt them.
-        const currentAccounts = item.institutions.accounts_data || []
+        const currentAccounts = institution.accounts_data || []
         const plaidAccounts = balanceData.accounts || []
         await persistAccountSnapshots(item, plaidAccounts, 'active')
         const reconciledHistoryAccounts = await reconcileArchivedHistory(item, plaidAccounts)
@@ -384,7 +413,7 @@ serve(async (req) => {
             .eq('plaid_account_id', pAcc.account_id)
             .maybeSingle()
 
-          const institutionName = item.institutions.name ?? item.institution_name ?? ''
+          const institutionName = institution.name ?? item.institution_name ?? ''
           if (existingCard && Object.keys(cardUpdate).length === 0) continue
           const cardPayload = existingCard ? cardUpdate : {
             id: crypto.randomUUID(),
@@ -448,7 +477,7 @@ serve(async (req) => {
             .eq('plaid_account_id', pAcc.account_id)
             .maybeSingle()
 
-          const institutionName = item.institutions.name ?? item.institution_name ?? ''
+          const institutionName = institution.name ?? item.institution_name ?? ''
           if (existingLoan && Object.keys(loanUpdate).length === 0) continue
           const termValue = Number(String(liability?.loan_term ?? '').split(' ')[0]) || 0
           const termIsYears = String(liability?.loan_term ?? '').toLowerCase().includes('year')
@@ -481,154 +510,46 @@ serve(async (req) => {
           if (loanError) console.error(`Failed to persist Plaid loan ${pAcc.account_id}:`, loanError)
         }
 
-        // ── B. Fetch Transactions (up to Plaid's two-year range) ────────
-        const endDate = new Date().toISOString().split('T')[0]
-        const startDate = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        console.log(`Fetching transactions for item ${item.id}, range: ${startDate} to ${endDate}, env: ${plaidEnv}`)
-
-        let allTransactions: any[] = []
-        let hasMore = true
-        let offset = 0
-
-        while (hasMore) {
-          const txRes = await fetch(`${plaidBase}/transactions/get`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              client_id: clientId,
-              secret: secret,
-              access_token: item.access_token,
-              start_date: startDate,
-              end_date: endDate,
-              options: { count: 500, offset }
-            })
-          })
-          const txData = await txRes.json()
-          console.log(`Plaid /transactions/get response for item ${item.id}: status=${txRes.status}, total=${txData.total_transactions}, batch=${(txData.transactions||[]).length}, error=${txData.error_code||'none'}, msg=${txData.error_message||'none'}`)
-
-          if (txData.error_code) {
-            console.error(`Plaid transactions error for item ${item.id}: code=${txData.error_code} msg=${txData.error_message}`)
-            throw new Error(`${txData.error_code}: ${txData.error_message ?? 'Plaid transaction request failed'}`)
-          }
-
-          const batch = txData.transactions || []
-          allTransactions = allTransactions.concat(batch)
-          const total = txData.total_transactions || 0
-          hasMore = total > 0 && allTransactions.length < total
-          offset += batch.length
-          if (batch.length === 0) break
-        }
-        console.log(`Total transactions fetched for item ${item.id}: ${allTransactions.length}`)
-
-        if (allTransactions.length > 0) {
-          // Map Plaid account_id to our institution account
-          const accountIdMap: Record<string, string> = {}
-          for (const acc of updatedAccounts) {
-            if (acc.plaid_account_id) accountIdMap[acc.plaid_account_id] = acc.id
-          }
-          // Also try matching by last4 from balanceData
-          for (const pAcc of plaidAccounts) {
-            if (pAcc.account_id && pAcc.mask) {
-              const matched = updatedAccounts.find((a: any) => a.last4 === pAcc.mask)
-              if (matched) accountIdMap[pAcc.account_id] = matched.id
-            }
-          }
-
-          const dbTxs = allTransactions.map((tx: any) => ({
-            user_id: item.user_id,
-            plaid_item_id: item.id,
-            plaid_transaction_id: tx.transaction_id,
-            account_id: tx.account_id,
-            persistent_account_id: plaidAccounts.find((account: any) =>
-              account.account_id === tx.account_id
-            )?.persistent_account_id ?? null,
-            canonical_account_id: tx.account_id,
-            account_match_method: 'source',
-            is_superseded_duplicate: false,
-            superseded_by_transaction_id: null,
-            amount: tx.amount,
-            currency: tx.iso_currency_code || 'USD',
-            category: tx.category || [],
-            merchant_name: tx.merchant_name || tx.name,
-            merchant_website: tx.website ?? null,
-            merchant_logo_url: tx.logo_url ?? null,
-            merchant_entity_id: tx.merchant_entity_id ?? null,
-            name: tx.name || tx.merchant_name,
-            date: tx.date,
-            authorized_date: tx.authorized_date ?? null,
-            pending: tx.pending || false,
-            pending_transaction_id: tx.pending_transaction_id ?? null,
-            payment_channel: tx.payment_channel ?? null,
-            personal_finance_primary: tx.personal_finance_category?.primary ?? null,
-            personal_finance_detailed: tx.personal_finance_category?.detailed ?? null,
-            personal_finance_confidence: tx.personal_finance_category?.confidence_level ?? null,
-            transaction_code: tx.transaction_code ?? null,
-            location: tx.location ?? null,
-            counterparties: tx.counterparties ?? [],
-            is_stale_pending_duplicate: false,
-            posted_transaction_id: null,
-            company_id: item.company_id,
-            institution_id: item.institution_id
-          }))
-
-          const { error: txErr } = await supabaseAdmin
-            .from('plaid_transactions')
-            .upsert(dbTxs, { onConflict: 'plaid_transaction_id' })
-
-          if (txErr) {
-            console.error(`Error saving transactions for item ${item.id}:`, txErr)
-            throw txErr
-          } else {
-            transactionCount += dbTxs.length
-            console.log(`Saved ${dbTxs.length} transactions for item ${item.id}`)
-          }
-        }
-
-        // Archived access tokens can stop returning account metadata after a
-        // reconnect. Once current transactions exist, recover unique account
-        // matches from exact transaction overlap (or a one-to-one singleton).
-        const { data: overlapReconciledAccounts, error: overlapReconcileError } = await supabaseAdmin
-          .rpc('reconcile_plaid_history_by_overlap', {
-            p_user_id: item.user_id,
-            p_current_item_id: item.id
-          })
-        if (overlapReconcileError) throw overlapReconcileError
-
-        const { data: duplicateCount, error: duplicateError } = await supabaseAdmin
-          .rpc('reconcile_plaid_transaction_duplicates', { p_user_id: item.user_id })
-        if (duplicateError) throw duplicateError
-
-        const { data: stalePendingCount, error: pendingError } = await supabaseAdmin
-          .rpc('reconcile_plaid_pending_transactions', { p_user_id: item.user_id })
-        if (pendingError) throw pendingError
-
-        // ── C. Update item sync timestamp ───────────────────────────────
-        await supabaseAdmin.from('plaid_items')
-          .update({ last_synced_at: new Date().toISOString(), status: 'active', error_code: null })
-          .eq('id', item.id)
+        // ── B. Apply cursor-based transaction deltas ────────────────────
+        const transactionSync = await requestPlaidTransactionSync(
+          supabaseAdmin,
+          item,
+          plaidSyncConfig
+        )
+        transactionCount += transactionSync.added + transactionSync.modified
 
         syncedCount++
         results.push({
           item_id: item.id,
           institution_name: item.institution_name,
           success: true,
-          transactions_found: allTransactions.length,
-          transactions_saved: allTransactions.length,
-          history_accounts_reconciled: reconciledHistoryAccounts + (overlapReconciledAccounts ?? 0),
-          duplicates_suppressed: duplicateCount ?? 0,
-          stale_pending_suppressed: stalePendingCount ?? 0
+          sync_coalesced: !transactionSync.claimed,
+          transactions_added: transactionSync.added,
+          transactions_modified: transactionSync.modified,
+          transactions_removed: transactionSync.removed,
+          history_accounts_reconciled: reconciledHistoryAccounts
         })
       } catch (err) {
         console.error(`Failed to sync item ${item.id}:`, err)
         const message = err instanceof Error ? err.message : String(err)
+        const errorCode = err instanceof PlaidAPIError ? err.errorCode : 'TRANSACTION_SYNC_FAILED'
+        const requiresReauth = errorCode === 'ITEM_LOGIN_REQUIRED'
         await supabaseAdmin.from('plaid_items')
-          .update({ error_code: 'TRANSACTION_SYNC_FAILED' })
+          .update({
+            status: requiresReauth ? 'requires_reauth' : item.status,
+            error_code: errorCode
+          })
           .eq('id', item.id)
+        if (requiresReauth) {
+          await supabaseAdmin.from('institutions')
+            .update({ is_disconnected: true })
+            .eq('id', item.institution_id)
+        }
         results.push({
           item_id: item.id,
           institution_name: item.institution_name,
           success: false,
-          error_code: 'TRANSACTION_SYNC_FAILED',
+          error_code: errorCode,
           error: message
         })
       }

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import { plaidWebhookURL } from "../_shared/plaid.ts"
 
 serve(async (req) => {
   try {
@@ -40,17 +41,21 @@ serve(async (req) => {
 
     // 4. Check if this is an Update Mode request (has institution_id)
     let accessToken: string | undefined = undefined
+    let plaidItemId: string | undefined = undefined
     if (institution_id) {
         const { data: itemData, error: itemError } = await supabase
             .from('plaid_items')
-            .select('access_token')
+            .select('id,access_token')
             .eq('institution_id', institution_id)
             .single()
             
         if (!itemError && itemData) {
             accessToken = itemData.access_token
+            plaidItemId = itemData.id
         }
     }
+
+    const webhookURL = plaidWebhookURL()
 
     // 5. Call Plaid API to create link token
     const plaidPayload: any = {
@@ -65,14 +70,39 @@ serve(async (req) => {
     if (accessToken) {
       // Update Mode
       plaidPayload.access_token = accessToken
+      // Plaid ignores link-token webhook changes in update mode. Update the
+      // Item explicitly so connections created before Phase 5 also receive it.
+      const webhookResponse = await fetch(`https://${plaidEnv}.plaid.com/item/webhook/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: plaidClientId,
+          secret: plaidSecret,
+          access_token: accessToken,
+          webhook: webhookURL
+        })
+      })
+      const webhookData = await webhookResponse.json()
+      if (!webhookResponse.ok || webhookData.error_code) {
+        throw new Error(webhookData.error_message || webhookData.error_code || 'Could not configure Plaid webhook')
+      }
+      if (plaidItemId) {
+        const { error: webhookStateError } = await supabase.from('plaid_items').update({
+          webhook_url: webhookURL,
+          webhook_configured_at: new Date().toISOString()
+        }).eq('id', plaidItemId)
+        if (webhookStateError) throw webhookStateError
+      }
     } else {
       // Standard Mode
       // Transactions is the core product. Auth is best-effort so credit cards and
       // other non-ACH accounts are not filtered out of Link. Liabilities consent
       // lets us enrich supported credit and loan accounts after linking.
       plaidPayload.products = ['transactions']
+      plaidPayload.transactions = { days_requested: 730 }
       plaidPayload.optional_products = ['auth']
       plaidPayload.additional_consented_products = ['liabilities']
+      plaidPayload.webhook = webhookURL
     }
 
     const plaidRes = await fetch(`https://${plaidEnv}.plaid.com/link/token/create`, {

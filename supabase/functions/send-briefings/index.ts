@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { json } from "../_shared/http.ts";
 import { sendPrivateBriefing } from "../_shared/apns.ts";
+import { evaluateUserAlerts } from "../_shared/alerts.ts";
 import { isImmediateCriticalItem, isWeeklyBriefingItem } from "../_shared/briefing.ts";
 
 type Preference = {
@@ -55,6 +56,19 @@ Deno.serve(async (request) => {
   const prefs = new Map((preferences ?? []).map((value) => [value.user_id, value as Preference]));
   const now = new Date();
   let delivered = 0;
+  let alertEventsCreated = 0;
+
+  // Time-based rules need evaluation even when no Plaid webhook arrives. Keep
+  // failures isolated so an alert problem cannot block briefing delivery.
+  for (const entitlement of entitlements ?? []) {
+    if (entitlement.status === "grace" && entitlement.grace_ends_at && new Date(entitlement.grace_ends_at) < now) continue;
+    try {
+      const result = await evaluateUserAlerts(admin, entitlement.user_id, now);
+      alertEventsCreated += result.created;
+    } catch (error) {
+      console.error("Scheduled alert evaluation failed", entitlement.user_id, error);
+    }
+  }
 
   // Optional immediate alerts are still private: only a generic item count is sent.
   for (const entitlement of entitlements ?? []) {
@@ -108,5 +122,5 @@ Deno.serve(async (request) => {
       is_read: false,
     });
   }
-  return json({ ok: true, delivered });
+  return json({ ok: true, delivered, alert_events_created: alertEventsCreated });
 });

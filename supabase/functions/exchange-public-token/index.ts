@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
+import { plaidWebhookURL } from "../_shared/plaid.ts"
 
 serve(async (req) => {
   try {
@@ -66,6 +67,8 @@ serve(async (req) => {
       plaid_institution_id: institution_id,
       institution_name,
       products: ['transactions', 'auth', 'liabilities', 'balance'],
+      webhook_url: plaidWebhookURL(),
+      webhook_configured_at: new Date().toISOString(),
       // The item becomes active only after the institution cascade is saved and
       // link-plaid-institution attaches it. Cancelled Link flows no longer count
       // as visible connections or get picked up by nightly sync.
