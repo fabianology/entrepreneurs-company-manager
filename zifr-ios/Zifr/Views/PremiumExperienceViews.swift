@@ -1154,7 +1154,7 @@ private struct BriefingResourceSubheading: View {
     }
 }
 
-private struct BriefingPreferencesSheet: View {
+struct BriefingPreferencesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @State private var pushService = PushNotificationService.shared
@@ -1166,6 +1166,7 @@ private struct BriefingPreferencesSheet: View {
     @State private var largeTransactionThreshold = "1000"
     @State private var balanceChangeThreshold = "500"
     @State private var balanceChangePercent = "25"
+    @State private var isLoadingRules = true
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var testMessage: String?
@@ -1179,12 +1180,22 @@ private struct BriefingPreferencesSheet: View {
         NavigationStack {
             Form {
                 Section("Notification delivery") {
-                    LabeledContent("Permission", value: permissionLabel)
+                    LabeledContent("In-app inbox", value: "Available")
+                    Text("Inbox alerts stay inside Miloom and remain available even when iPhone push notifications are off.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    LabeledContent("iPhone push", value: permissionLabel)
+                    LabeledContent("This device", value: registrationLabel)
                     if pushService.authorizationStatus == .denied {
                         Button("Open iPhone Settings") { openNotificationSettings() }
                     } else if pushService.authorizationStatus == .notDetermined {
                         Button("Enable Notifications") {
                             Task { await pushService.enableWeeklyBriefings() }
+                        }
+                    } else if pushService.registrationStatus == .failed || pushService.registrationStatus == .notRegistered {
+                        Button("Retry Device Registration") {
+                            pushService.retryDeviceRegistration()
                         }
                     }
                     Button {
@@ -1199,6 +1210,11 @@ private struct BriefingPreferencesSheet: View {
                         Text(testMessage)
                             .font(.footnote)
                             .foregroundStyle(testMessage.hasPrefix("Test") ? .green : .red)
+                    }
+                    if pushService.registrationStatus == .failed {
+                        Text("This device could not register for push delivery. Check your connection, then retry. Your in-app inbox is still available.")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
                     }
                 }
 
@@ -1261,7 +1277,7 @@ private struct BriefingPreferencesSheet: View {
                             }
                         }
                     }
-                    Text("Alerts are evaluated securely after Plaid sync. Changing a rule does not share additional financial data with Apple.")
+                    Text("Transaction and balance alerts run after each successful Plaid sync and apply to newly received changes. Saving a rule does not start another sync or share additional financial data with Apple.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -1274,7 +1290,7 @@ private struct BriefingPreferencesSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving…" : "Save") { Task { await save() } }
-                        .disabled(isSaving)
+                        .disabled(isSaving || isLoadingRules || alertRules.isEmpty)
                 }
             }
             .onAppear { load() }
@@ -1300,12 +1316,14 @@ private struct BriefingPreferencesSheet: View {
     }
 
     private func refreshAlertRules() async {
+        isLoadingRules = true
+        defer { isLoadingRules = false }
         do {
             let rules = try await DataRepository.shared.fetchAlertRules()
             appState.alertRules = rules
             applyAlertRules(rules)
         } catch {
-            print("Failed to refresh alert rules: \(error)")
+            AppDiagnostics.failure("briefing", "refresh_alert_rules", error: error)
             errorMessage = "Could not load alert rules. Pull down to retry."
         }
     }
@@ -1320,21 +1338,40 @@ private struct BriefingPreferencesSheet: View {
 
     private func save() async {
         errorMessage = nil
-        guard let largeAmount = positiveNumber(largeTransactionThreshold),
-              let balanceAmount = positiveNumber(balanceChangeThreshold),
-              let balancePercent = positiveNumber(balanceChangePercent),
-              balancePercent <= 100 else {
-            errorMessage = "Enter valid positive thresholds. Balance percent must be 100 or less."
-            return
+
+        var largeAmount: Double?
+        if isEnabled(.largeTransaction) {
+            guard let value = positiveNumber(largeTransactionThreshold) else {
+                errorMessage = "Enter a positive minimum amount for large transactions."
+                return
+            }
+            largeAmount = value
+        }
+
+        var balanceAmount: Double?
+        var balancePercent: Double?
+        if isEnabled(.balanceChange) {
+            guard let amount = positiveNumber(balanceChangeThreshold),
+                  let percent = positiveNumber(balanceChangePercent),
+                  percent <= 100 else {
+                errorMessage = "Enter a positive balance amount and a percent from 1 to 100."
+                return
+            }
+            balanceAmount = amount
+            balancePercent = percent
         }
 
         isSaving = true
         let components = Calendar.current.dateComponents([.hour, .minute], from: time)
         let value = String(format: "%02d:%02d:00", components.hour ?? 8, components.minute ?? 0)
-        updateRule(.largeTransaction) { $0.thresholdAmount = largeAmount }
-        updateRule(.balanceChange) {
-            $0.thresholdAmount = balanceAmount
-            $0.thresholdPercent = balancePercent
+        if let largeAmount {
+            updateRule(.largeTransaction) { $0.thresholdAmount = largeAmount }
+        }
+        if let balanceAmount, let balancePercent {
+            updateRule(.balanceChange) {
+                $0.thresholdAmount = balanceAmount
+                $0.thresholdPercent = balancePercent
+            }
         }
         do {
             try await DataRepository.shared.saveBriefingPreferences(
@@ -1366,6 +1403,16 @@ private struct BriefingPreferencesSheet: View {
         case .notDetermined: return "Not set"
         case .ephemeral: return "Temporary"
         @unknown default: return "Unknown"
+        }
+    }
+
+    private var registrationLabel: String {
+        switch pushService.registrationStatus {
+        case .registered: return "Ready"
+        case .registering: return "Registering…"
+        case .notRegistered: return "Needs registration"
+        case .unavailableOnSimulator: return "Physical device only"
+        case .failed: return "Needs attention"
         }
     }
 

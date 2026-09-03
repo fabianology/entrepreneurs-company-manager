@@ -35,17 +35,38 @@ enum PrivateBriefingNotification {
     }
 }
 
+enum PushRegistrationStatus: Equatable {
+    case notRegistered
+    case registering
+    case registered
+    case unavailableOnSimulator
+    case failed
+}
+
 @MainActor
 @Observable
 final class PushNotificationService {
     static let shared = PushNotificationService()
 
     private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    private(set) var registrationStatus: PushRegistrationStatus = .notRegistered
     private(set) var lastError: String?
     private let tokenKey = "miloom.pending-push-token"
     private let registeredTokenKey = "miloom.registered-push-token"
 
-    private init() {}
+    private init() {
+        #if targetEnvironment(simulator)
+        registrationStatus = .unavailableOnSimulator
+        #else
+        if UserDefaults.standard.string(forKey: registeredTokenKey) != nil {
+            registrationStatus = .registered
+        } else if UserDefaults.standard.string(forKey: tokenKey) != nil {
+            registrationStatus = .registering
+        } else {
+            registrationStatus = .notRegistered
+        }
+        #endif
+    }
 
     func refreshAuthorizationStatus() async {
         authorizationStatus = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
@@ -57,7 +78,7 @@ final class PushNotificationService {
             await refreshAuthorizationStatus()
             if granted {
                 AppDiagnostics.event("push", "request_authorization", status: "granted")
-                UIApplication.shared.registerForRemoteNotifications()
+                retryDeviceRegistration()
             } else {
                 AppDiagnostics.event("push", "request_authorization", status: "denied")
             }
@@ -98,7 +119,11 @@ final class PushNotificationService {
     }
 
     func registerPendingTokenIfNeeded() async {
-        guard let token = UserDefaults.standard.string(forKey: tokenKey) else { return }
+        guard let token = UserDefaults.standard.string(forKey: tokenKey) else {
+            refreshRegistrationStatus()
+            return
+        }
+        registrationStatus = .registering
         do {
             #if DEBUG
             let environment = "development"
@@ -108,8 +133,11 @@ final class PushNotificationService {
             try await DataRepository.shared.registerPushToken(token, environment: environment)
             UserDefaults.standard.set(token, forKey: registeredTokenKey)
             UserDefaults.standard.removeObject(forKey: tokenKey)
+            registrationStatus = .registered
+            lastError = nil
             AppDiagnostics.event("push", "register_device_token", status: "success")
         } catch {
+            registrationStatus = .failed
             AppDiagnostics.failure("push", "register_device_token", error: error)
             lastError = error.localizedDescription
         }
@@ -121,6 +149,7 @@ final class PushNotificationService {
             try await DataRepository.shared.unregisterPushToken(token)
             UserDefaults.standard.removeObject(forKey: registeredTokenKey)
             UserDefaults.standard.removeObject(forKey: tokenKey)
+            registrationStatus = .notRegistered
             AppDiagnostics.event("push", "unregister_device_token", status: "success")
         } catch {
             // Signing out must remain available while offline. A stale token that
@@ -131,14 +160,46 @@ final class PushNotificationService {
     }
 
     func registrationFailed(_ error: Error) {
+        #if targetEnvironment(simulator)
+        registrationStatus = .unavailableOnSimulator
+        #else
+        registrationStatus = .failed
+        #endif
         AppDiagnostics.failure("push", "apns_registration", error: error)
         lastError = error.localizedDescription
+    }
+
+    func retryDeviceRegistration() {
+        lastError = nil
+        #if targetEnvironment(simulator)
+        registrationStatus = .unavailableOnSimulator
+        #else
+        registrationStatus = .registering
+        UIApplication.shared.registerForRemoteNotifications()
+        #endif
+    }
+
+    private func refreshRegistrationStatus() {
+        #if targetEnvironment(simulator)
+        registrationStatus = .unavailableOnSimulator
+        #else
+        if UserDefaults.standard.string(forKey: registeredTokenKey) != nil {
+            registrationStatus = .registered
+        } else if UserDefaults.standard.string(forKey: tokenKey) != nil {
+            registrationStatus = .registering
+        } else {
+            registrationStatus = .notRegistered
+        }
+        #endif
     }
 
     nonisolated func receivedDeviceToken(_ data: Data) {
         let token = data.map { String(format: "%02x", $0) }.joined()
         UserDefaults.standard.set(token, forKey: tokenKey)
-        Task { @MainActor in await self.registerPendingTokenIfNeeded() }
+        Task { @MainActor in
+            self.registrationStatus = .registering
+            await self.registerPendingTokenIfNeeded()
+        }
     }
 }
 

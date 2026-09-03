@@ -17,6 +17,7 @@ struct AdminSettingsView: View {
     @State private var showingEditProfile: Bool = false
     @State private var showingPremiumUpgrade: Bool = false
     @State private var showingMessages: Bool = false
+    @State private var showingNotificationPreferences: Bool = false
     @State private var showingLinkedAccounts: Bool = false
     @State private var showingCollaborators: Bool = false
     
@@ -24,6 +25,24 @@ struct AdminSettingsView: View {
         appState.institutions.filter { inst in
             appState.companies.contains { $0.id == inst.companyId }
         }
+    }
+
+    private var notificationPreferencesSummary: String {
+        let weeklyEnabled = appState.userPreferences?.weeklyBriefingEnabled ?? true
+        let immediateEnabled = appState.userPreferences?.criticalAlertsEnabled ?? false
+        guard !appState.alertRules.isEmpty else { return "Loading alert preferences…" }
+        let enabledRuleCount = appState.alertRules.filter(\.enabled).count
+
+        let delivery: String
+        switch (weeklyEnabled, immediateEnabled) {
+        case (true, true): delivery = "Weekly + immediate"
+        case (true, false): delivery = "Weekly push"
+        case (false, true): delivery = "Immediate alerts"
+        case (false, false): delivery = "In-app only"
+        }
+
+        let rules = "\(enabledRuleCount) alert rule\(enabledRuleCount == 1 ? "" : "s")"
+        return "\(delivery) · \(rules)"
     }
 
     var body: some View {
@@ -216,6 +235,38 @@ struct AdminSettingsView: View {
                                     .clipShape(Capsule())
                             }
                             
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .padding(.leading, 8)
+                        }
+                        .padding(16)
+                        .zifrCardBox(cornerRadius: 24)
+                    }
+                    .padding(.horizontal, 20)
+
+                    // Notification Preferences
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingNotificationPreferences = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "bell.badge.fill")
+                                .foregroundStyle(Color.zifrGold)
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 44, height: 44)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("NOTIFICATIONS & ALERTS")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text(notificationPreferencesSummary)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+
+                            Spacer()
+
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(Color.white.opacity(0.4))
@@ -489,6 +540,9 @@ struct AdminSettingsView: View {
                     notificationRouter.enqueue(route)
                 }
             }
+        }
+        .sheet(isPresented: $showingNotificationPreferences) {
+            BriefingPreferencesSheet()
         }
         .sheet(isPresented: $showingLinkedAccounts) {
             LinkedAccountsSheet(vm: vm, appState: appState)

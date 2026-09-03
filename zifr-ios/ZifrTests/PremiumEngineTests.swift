@@ -312,6 +312,18 @@ final class PremiumEngineTests: XCTestCase {
 
         XCTAssertEqual(transactionAlert.route, .transaction(transactionID))
         XCTAssertEqual(briefing.route, .ownerBriefing)
+        let reviewAlert = AppNotification(
+            id: UUID(),
+            userId: owner,
+            notificationType: "portfolio_alert",
+            title: "Review queue",
+            body: "Items need review.",
+            resourceId: nil,
+            resourceType: "transaction_review",
+            isRead: false,
+            createdAt: Date()
+        )
+        XCTAssertEqual(reviewAlert.route, .transactionReview)
         XCTAssertEqual(
             NotificationRoute(pushUserInfo: [
                 "route": "institution",
