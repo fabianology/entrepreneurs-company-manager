@@ -145,7 +145,7 @@ actor GeminiService {
             }
             return nil
         } catch {
-            print("Gemini Categorization Error: \(error)")
+            AppDiagnostics.failure("ai", "categorize_document", error: error)
             return nil
         }
     }

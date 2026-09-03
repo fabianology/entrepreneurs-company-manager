@@ -106,7 +106,7 @@ struct SubscriptionListView: View {
                             await DataRepository.shared.fetchAllData(appState: appState)
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
                         } catch {
-                            print("Failed to sync subscriptions: \(error)")
+                            AppDiagnostics.failure("plaid", "sync_subscriptions", error: error)
                         }
                     }
                 } label: {

@@ -392,7 +392,11 @@ final class AuthViewModel: NSObject {
     // MARK: - Sign in with Apple
     
     func startSignInWithAppleFlow() {
-        let nonce = randomNonceString()
+        guard let nonce = randomNonceString() else {
+            authError = "Could not start Apple sign-in. Please try again."
+            AppDiagnostics.failure("auth", "apple_nonce_generation")
+            return
+        }
         currentNonce = nonce
         let appleIDProvider = ASAuthorizationAppleIDProvider()
         let request = appleIDProvider.createRequest()
@@ -405,12 +409,13 @@ final class AuthViewModel: NSObject {
         self.authorizationController?.performRequests()
     }
     
-    private func randomNonceString(length: Int = 32) -> String {
-        precondition(length > 0)
+    private func randomNonceString(length: Int = 32) -> String? {
+        guard length > 0 else { return nil }
         var randomBytes = [UInt8](repeating: 0, count: length)
         let errorCode = SecRandomCopyBytes(kSecRandomDefault, randomBytes.count, &randomBytes)
         if errorCode != errSecSuccess {
-            fatalError("Unable to generate nonce. SecRandomCopyBytes failed with OSStatus \(errorCode)")
+            AppDiagnostics.failure("auth", "apple_nonce_random_bytes", error: NSError(domain: NSOSStatusErrorDomain, code: Int(errorCode)))
+            return nil
         }
         let charset: [Character] =
             Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
@@ -433,7 +438,9 @@ extension AuthViewModel: ASAuthorizationControllerDelegate {
     func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
         if let appleIDCredential = authorization.credential as? ASAuthorizationAppleIDCredential {
             guard let nonce = currentNonce else {
-                fatalError("Invalid state: A login callback was received, but no login request was sent.")
+                authError = "Apple sign-in could not be verified. Please try again."
+                AppDiagnostics.failure("auth", "apple_nonce_missing")
+                return
             }
             guard let appleIDToken = appleIDCredential.identityToken else {
                 AppDiagnostics.failure("auth", "apple_identity_token_missing")

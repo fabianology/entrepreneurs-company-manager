@@ -287,7 +287,7 @@ struct DocumentListView: View {
                 },
                 onError: { error in
                     isScanning = false
-                    print("Document scan error: \(error.localizedDescription)")
+                    AppDiagnostics.failure("documents", "scan", error: error)
                 }
             )
             .ignoresSafeArea()
@@ -453,7 +453,7 @@ struct DocumentListView: View {
                     let signedUrl = try await DataRepository.shared.getSignedUrl(for: docUrl)
                     await MainActor.run { openURL = IdentifiableURL(url: signedUrl) }
                 } catch {
-                    print("Failed to get signed URL: \(error)")
+                    AppDiagnostics.failure("documents", "signed_url", error: error)
                     // Fallback to try opening as regular URL if signed URL fails
                     if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
                         await MainActor.run { openURL = IdentifiableURL(url: u) }
@@ -511,7 +511,7 @@ struct DocumentListView: View {
                 }
                 
             } catch {
-                print("Failed to process scan: \(error)")
+                AppDiagnostics.failure("documents", "process_scan", error: error)
                 await MainActor.run {
                     isProcessingScan = false
                 }

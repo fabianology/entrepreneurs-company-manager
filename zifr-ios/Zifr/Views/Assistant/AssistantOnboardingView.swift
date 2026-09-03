@@ -743,7 +743,7 @@ struct AssistantOnboardingView: View {
                     self.isConnecting = false
                 }
             } catch {
-                print("Connection failed: \(error)")
+                AppDiagnostics.failure("ai", "live_connection", error: error)
                 await MainActor.run {
                     self.connectionError = error.localizedDescription
                     self.isConnecting = false
@@ -1276,7 +1276,7 @@ struct AssistantOnboardingView: View {
                 }
             }
         } catch {
-            print("REST Turn Error: \(error)")
+            AppDiagnostics.failure("ai", "rest_turn", error: error)
             await MainActor.run {
                 if let pendingIndex = chatMessages.lastIndex(where: { $0.isPending }) {
                     chatMessages.remove(at: pendingIndex)

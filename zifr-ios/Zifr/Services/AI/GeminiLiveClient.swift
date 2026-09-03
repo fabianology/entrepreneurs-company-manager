@@ -32,7 +32,6 @@ class GeminiLiveClient {
     }
     
     private func log(_ message: String) {
-        print(message)
         onLog?(message)
     }
     

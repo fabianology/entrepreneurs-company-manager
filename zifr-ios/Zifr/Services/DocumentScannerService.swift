@@ -61,7 +61,7 @@ class DocumentProcessor {
                     let requestHandler = VNImageRequestHandler(cgImage: cgImage, options: [:])
                     let request = VNRecognizeTextRequest { request, error in
                         if let error = error {
-                            print("OCR Error: \(error)")
+                            AppDiagnostics.failure("documents", "ocr_recognition", error: error)
                             return
                         }
                         
@@ -77,7 +77,7 @@ class DocumentProcessor {
                     do {
                         try requestHandler.perform([request])
                     } catch {
-                        print("Failed to perform OCR: \(error)")
+                        AppDiagnostics.failure("documents", "ocr_request", error: error)
                     }
                 }
                 
@@ -127,7 +127,7 @@ class DocumentProcessor {
             try FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: pdfURL.path)
             return pdfURL
         } catch {
-            print("Failed to generate PDF: \(error)")
+            AppDiagnostics.failure("documents", "generate_pdf", error: error)
             return nil
         }
     }

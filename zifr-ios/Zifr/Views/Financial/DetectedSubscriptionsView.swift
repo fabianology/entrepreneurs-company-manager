@@ -549,7 +549,7 @@ struct DetectedSubscriptionsSheet: View {
                 }
             }
         } catch {
-            print("DetectedSubs addSubscription error: \(error)")
+            AppDiagnostics.failure("subscriptions", "add_detected_subscription", error: error)
             await MainActor.run {
                 appState.error = "Save failed: \(error.localizedDescription)"
             }

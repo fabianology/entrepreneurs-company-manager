@@ -356,7 +356,7 @@ struct EditInstitutionSheet: View {
                                                 } catch {
                                                     isSyncing = false
                                                     syncErrorMsg = error.localizedDescription
-                                                    print("Failed to sync bank data: \(error)")
+                                                    AppDiagnostics.failure("plaid", "sync_institution", error: error)
                                                 }
                                             }
                                         } label: {

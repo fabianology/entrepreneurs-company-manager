@@ -1175,7 +1175,7 @@ struct CollaboratorsSheet: View {
                 self.isLoading = false
             }
         } catch {
-            print("Failed to fetch active shares: \(error)")
+            AppDiagnostics.failure("sharing", "fetch_active_shares", error: error)
             await MainActor.run { self.isLoading = false }
         }
     }
@@ -1188,7 +1188,7 @@ struct CollaboratorsSheet: View {
                 await loadCollaborators()
                 await DataRepository.shared.fetchAllData(appState: appState)
             } catch {
-                print("Failed to revoke share: \(error)")
+                AppDiagnostics.failure("sharing", "revoke_share", error: error)
             }
         }
     }

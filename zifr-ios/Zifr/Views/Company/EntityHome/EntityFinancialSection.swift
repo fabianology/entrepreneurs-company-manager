@@ -872,10 +872,6 @@ struct TransactionFeedView: View {
                 }
             }
             .onAppear {
-                print("DEBUG TransactionFeedView: appState.transactions.count = \(appState.transactions.count)")
-                print("DEBUG resolvedAccountId = \(resolvedAccountId())")
-                print("DEBUG filteredTransactions.count = \(filteredTransactions.count)")
-
                 // Existing rows render immediately. Only auto-sync an empty feed;
                 // users can explicitly refresh a populated account from the toolbar.
                 if !hasSyncedOnAppear && filteredTransactions.isEmpty {

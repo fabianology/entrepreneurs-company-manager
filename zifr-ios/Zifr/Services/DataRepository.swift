@@ -621,27 +621,15 @@ class DataRepository {
     
     // MARK: - Sharing
     func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String, senderDisplayName: String?) async throws {
-        print("🚀 [Sharing] Initiating invitation for \(email) with role: \(role) to resource \(resourceType): \(resourceId)")
+        AppDiagnostics.event("sharing", "invite_user", status: "started")
         
         guard let currentUser = try? await client.auth.session.user else {
-            print("❌ [Sharing] Failed to get current user session.")
+            AppDiagnostics.failure("sharing", "invite_user_session")
             throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not logged in."])
         }
         
-        print("✅ [Sharing] Current user identified: \(currentUser.id)")
-        
-        let invitation = ResourceInvitation(
-            resourceId: resourceId,
-            resourceType: resourceType,
-            email: email,
-            role: role,
-            invitedBy: currentUser.id,
-            senderEmail: currentUser.email,
-            senderDisplayName: senderDisplayName
-        )
-        
         do {
-            print("⏳ [Sharing] Calling secure RPC to process share or invitation...")
+            AppDiagnostics.event("sharing", "share_resource", status: "started")
             
             struct ShareRPCParams: Encodable {
                 let p_email: String
@@ -670,11 +658,11 @@ class DataRepository {
             let response: ShareRPCResponse = try await client.rpc("share_resource", params: params).execute().value
             
             if response.status == "shared_directly" {
-                print("✅ [Sharing] User already has an account. Shared directly to their dashboard. No email needed.")
+                AppDiagnostics.event("sharing", "share_resource", status: "shared_directly")
                 return // Skip email
             }
             
-            print("✅ [Sharing] User not found. Invitation created. Proceeding to send email.")
+            AppDiagnostics.event("sharing", "share_resource", status: "invitation_created")
             
             // Invoke the edge function to send the email
             struct ShareEmailPayload: Encodable {
@@ -691,20 +679,19 @@ class DataRepository {
                 inviterId: currentUser.id
             )
             
-            print("⏳ [Sharing] Invoking 'send-share-email' edge function...")
             if let encodedPayload = try? JSONEncoder().encode(payload) {
                 let options = FunctionInvokeOptions(method: .post, headers: ["Content-Type": "application/json"], body: encodedPayload)
                 do {
                     try await client.functions.invoke("send-share-email", options: options)
-                    print("✅ [Sharing] Successfully invoked edge function.")
+                    AppDiagnostics.event("sharing", "send_invitation_email", status: "requested")
                 } catch {
-                    print("⚠️ [Sharing] Edge function failed (likely unverified Resend domain), but invitation was saved: \(error.localizedDescription)")
+                    AppDiagnostics.failure("sharing", "send_invitation_email", error: error)
                     // We don't throw here so the UI still shows success for the database insertion
                 }
             }
             
         } catch {
-            print("❌ [Sharing] Database RPC or edge function failed: \(error.localizedDescription)")
+            AppDiagnostics.failure("sharing", "share_resource", error: error)
             throw error
         }
     }
@@ -796,7 +783,7 @@ class DataRepository {
             
             return filePath
         } catch {
-            print("Supabase upload to 'CompanyDocuments' failed, trying local fallback: \(error)")
+            AppDiagnostics.failure("documents", "upload_company_document", error: error)
             // Fallback: save to app's local documents directory (just like how the scanner does it!)
             let fileManager = FileManager.default
             guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {

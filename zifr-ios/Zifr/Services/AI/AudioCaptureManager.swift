@@ -30,7 +30,7 @@ class AudioCaptureManager: ObservableObject {
         }
         
         guard granted else {
-            print("Microphone permission denied")
+            AppDiagnostics.event("audio", "microphone_permission", status: "denied")
             permissionDenied = true
             return
         }
@@ -39,7 +39,7 @@ class AudioCaptureManager: ObservableObject {
             try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothA2DP])
             try session.setActive(true)
         } catch {
-            print("Audio session setup error: \(error)")
+            AppDiagnostics.failure("audio", "capture_session_setup", error: error)
             return
         }
         
@@ -48,12 +48,12 @@ class AudioCaptureManager: ObservableObject {
         
         // Gemini Live requires 16kHz PCM16 for input
         guard let outputFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: 1, interleaved: false) else {
-            print("Could not create output format")
+            AppDiagnostics.failure("audio", "capture_output_format")
             return
         }
         
         guard let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-            print("Could not create audio converter")
+            AppDiagnostics.failure("audio", "capture_converter")
             return
         }
         
@@ -107,7 +107,7 @@ class AudioCaptureManager: ObservableObject {
             playerNode.play()
             isRecording = true
         } catch {
-            print("Engine start error: \(error)")
+            AppDiagnostics.failure("audio", "capture_engine_start", error: error)
         }
     }
     

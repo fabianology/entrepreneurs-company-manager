@@ -269,7 +269,7 @@ class SpeechManager: NSObject, AVSpeechSynthesizerDelegate {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {
-            print("Failed to set up audio session for speech: \(error)")
+            AppDiagnostics.failure("audio", "speech_session_setup", error: error)
         }
     }
 

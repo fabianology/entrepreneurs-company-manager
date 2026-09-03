@@ -432,10 +432,9 @@ struct EditCompanySheet: View {
             if let userId = authViewModel.currentUser?.id {
                 vm.addCompany(appState: appState, userId: userId, name: name, structure: structure, colorHex: normalizedHex, logoData: logoData, website: website)
             } else {
-                print("⚠️ [Save] No authenticated user found in AuthViewModel. Falling back to temporary UUID.")
-                // Fallback to avoid breaking local app state if the user is in transition
-                let fallbackId = UUID()
-                vm.addCompany(appState: appState, userId: fallbackId, name: name, structure: structure, colorHex: normalizedHex, logoData: logoData, website: website)
+                AppDiagnostics.failure("company", "create_without_authenticated_user")
+                appState.error = "Your session is no longer available. Please sign in again before creating a company."
+                return false
             }
         }
         return true

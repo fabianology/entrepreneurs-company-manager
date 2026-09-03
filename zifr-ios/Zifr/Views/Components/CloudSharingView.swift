@@ -27,15 +27,15 @@ struct CloudSharingView: UIViewControllerRepresentable {
         }
 
         func cloudSharingController(_ c: UICloudSharingController, failedToSaveShareWithError error: Error) {
-            print("Failed to save share: \(error)")
+            AppDiagnostics.failure("sharing", "cloudkit_save_share", error: error)
         }
 
         func cloudSharingControllerDidSaveShare(_ c: UICloudSharingController) {
-            print("Share saved successfully")
+            AppDiagnostics.event("sharing", "cloudkit_save_share", status: "success")
         }
 
         func cloudSharingControllerDidStopSharing(_ c: UICloudSharingController) {
-            print("Stopped sharing")
+            AppDiagnostics.event("sharing", "cloudkit_stop_share", status: "success")
         }
     }
 }
