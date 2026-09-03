@@ -7,6 +7,7 @@ struct AdminSettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @Environment(AccessController.self) private var accessController
+    @Environment(NotificationRouteCoordinator.self) private var notificationRouter
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
@@ -182,7 +183,7 @@ struct AdminSettingsView: View {
                     }
                     .padding(.horizontal, 20)
                     
-                    // Messages
+                    // Inbox
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showingMessages = true
@@ -194,17 +195,17 @@ struct AdminSettingsView: View {
                                 .frame(width: 44, height: 44)
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("MESSAGES")
+                                Text("INBOX")
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(.white)
-                                Text("Activity and notifications")
+                                Text("Alerts, briefings, and activity")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(Color.white.opacity(0.6))
                             }
                             
                             Spacer()
                             
-                            let unreadCount = appState.activityLogs.filter { !$0.isRead }.count
+                            let unreadCount = appState.unreadInboxCount
                             if unreadCount > 0 {
                                 Text("\(unreadCount)")
                                     .font(.system(size: 12, weight: .bold))
@@ -480,7 +481,14 @@ struct AdminSettingsView: View {
                 .environment(authVM)
         }
         .sheet(isPresented: $showingMessages) {
-            ActivityLogsView(vm: vm)
+            NotificationInboxView(vm: vm) { route in
+                showingMessages = false
+                dismiss()
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    notificationRouter.enqueue(route)
+                }
+            }
         }
         .sheet(isPresented: $showingLinkedAccounts) {
             LinkedAccountsSheet(vm: vm, appState: appState)

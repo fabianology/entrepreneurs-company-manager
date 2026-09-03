@@ -1157,12 +1157,18 @@ private struct BriefingResourceSubheading: View {
 private struct BriefingPreferencesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
+    @State private var pushService = PushNotificationService.shared
     @State private var weekday = 1
     @State private var time = Calendar.current.date(from: DateComponents(hour: 8)) ?? Date()
     @State private var weeklyEnabled = true
     @State private var criticalEnabled = false
+    @State private var alertRules: [AlertRule] = []
+    @State private var largeTransactionThreshold = "1000"
+    @State private var balanceChangeThreshold = "500"
+    @State private var balanceChangePercent = "25"
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var testMessage: String?
 
     private let weekdays = [
         (1, "Monday"), (2, "Tuesday"), (3, "Wednesday"), (4, "Thursday"),
@@ -1172,22 +1178,97 @@ private struct BriefingPreferencesSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Notification delivery") {
+                    LabeledContent("Permission", value: permissionLabel)
+                    if pushService.authorizationStatus == .denied {
+                        Button("Open iPhone Settings") { openNotificationSettings() }
+                    } else if pushService.authorizationStatus == .notDetermined {
+                        Button("Enable Notifications") {
+                            Task { await pushService.enableWeeklyBriefings() }
+                        }
+                    }
+                    Button {
+                        Task { await sendTestNotification() }
+                    } label: {
+                        Label("Send Private Test Notification", systemImage: "bell.badge")
+                    }
+                    Text("Test and lock-screen notifications never include merchant names, balances, account details, credentials, or documents.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    if let testMessage {
+                        Text(testMessage)
+                            .font(.footnote)
+                            .foregroundStyle(testMessage.hasPrefix("Test") ? .green : .red)
+                    }
+                }
+
                 Section("Weekly briefing") {
                     Toggle("Private weekly push", isOn: $weeklyEnabled)
                     Picker("Day", selection: $weekday) {
                         ForEach(weekdays, id: \.0) { Text($0.1).tag($0.0) }
                     }
                     DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
+                    LabeledContent("Last delivered", value: lastDeliveredLabel)
+                    LabeledContent("Next scheduled", value: nextScheduledLabel)
                 }
-                Section("Important changes") {
+
+                Section("Immediate alerts") {
                     Toggle("Immediate high-severity alerts", isOn: $criticalEnabled)
-                    Text("Lock-screen notifications only show the number of items. Names, balances, credentials, and documents stay inside Miloom.")
+                    Text("When enabled, urgent items can send a private push before your weekly briefing.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                Section("Portfolio alert rules") {
+                    ForEach(AlertRuleType.allCases) { ruleType in
+                        Toggle(isOn: enabledBinding(for: ruleType)) {
+                            Label(ruleTitle(ruleType), systemImage: ruleIcon(ruleType))
+                        }
+
+                        if ruleType == .largeTransaction && isEnabled(ruleType) {
+                            HStack {
+                                Text("Minimum amount")
+                                Spacer()
+                                Text("$")
+                                    .foregroundStyle(.secondary)
+                                TextField("1,000", text: $largeTransactionThreshold)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(maxWidth: 100)
+                            }
+                        }
+
+                        if ruleType == .balanceChange && isEnabled(ruleType) {
+                            HStack {
+                                Text("Minimum amount")
+                                Spacer()
+                                Text("$")
+                                    .foregroundStyle(.secondary)
+                                TextField("500", text: $balanceChangeThreshold)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(maxWidth: 100)
+                            }
+                            HStack {
+                                Text("Minimum percent")
+                                Spacer()
+                                TextField("25", text: $balanceChangePercent)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(maxWidth: 80)
+                                Text("%")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    Text("Alerts are evaluated securely after Plaid sync. Changing a rule does not share additional financial data with Apple.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
                 if let errorMessage { Section { Text(errorMessage).foregroundStyle(.red) } }
             }
-            .navigationTitle("Briefing Schedule")
+            .navigationTitle("Automation & Alerts")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -1197,6 +1278,7 @@ private struct BriefingPreferencesSheet: View {
                 }
             }
             .onAppear { load() }
+            .task { await pushService.refreshAuthorizationStatus() }
         }
     }
 
@@ -1210,22 +1292,148 @@ private struct BriefingPreferencesSheet: View {
             formatter.dateFormat = "HH:mm:ss"
             time = formatter.date(from: value) ?? time
         }
+        alertRules = appState.alertRules.isEmpty
+            ? AlertRule.conservativeDefaults(userId: preferences.userId)
+            : appState.alertRules
+        largeTransactionThreshold = amountString(rule(.largeTransaction)?.thresholdAmount ?? 1_000)
+        balanceChangeThreshold = amountString(rule(.balanceChange)?.thresholdAmount ?? 500)
+        balanceChangePercent = amountString(rule(.balanceChange)?.thresholdPercent ?? 25)
     }
 
     private func save() async {
+        errorMessage = nil
+        guard let largeAmount = positiveNumber(largeTransactionThreshold),
+              let balanceAmount = positiveNumber(balanceChangeThreshold),
+              let balancePercent = positiveNumber(balanceChangePercent),
+              balancePercent <= 100 else {
+            errorMessage = "Enter valid positive thresholds. Balance percent must be 100 or less."
+            return
+        }
+
         isSaving = true
         let components = Calendar.current.dateComponents([.hour, .minute], from: time)
         let value = String(format: "%02d:%02d:00", components.hour ?? 8, components.minute ?? 0)
+        updateRule(.largeTransaction) { $0.thresholdAmount = largeAmount }
+        updateRule(.balanceChange) {
+            $0.thresholdAmount = balanceAmount
+            $0.thresholdPercent = balancePercent
+        }
         do {
             try await DataRepository.shared.saveBriefingPreferences(
                 weekday: weekday, time: value, timezone: TimeZone.current.identifier,
                 weeklyEnabled: weeklyEnabled, criticalEnabled: criticalEnabled
             )
+            try await DataRepository.shared.saveAlertRules(alertRules)
+            appState.alertRules = alertRules
+            if var preferences = appState.userPreferences {
+                preferences.briefingWeekday = weekday
+                preferences.briefingTime = value
+                preferences.timezone = TimeZone.current.identifier
+                preferences.weeklyBriefingEnabled = weeklyEnabled
+                preferences.criticalAlertsEnabled = criticalEnabled
+                appState.userPreferences = preferences
+            }
             await MainActor.run { dismiss() }
         } catch {
-            errorMessage = "Could not save your briefing schedule."
+            errorMessage = "Could not save your automation settings. Please try again."
         }
         isSaving = false
+    }
+
+    private var permissionLabel: String {
+        switch pushService.authorizationStatus {
+        case .authorized: return "Allowed"
+        case .provisional: return "Quietly allowed"
+        case .denied: return "Off"
+        case .notDetermined: return "Not set"
+        case .ephemeral: return "Temporary"
+        @unknown default: return "Unknown"
+        }
+    }
+
+    private var lastDeliveredLabel: String {
+        guard let delivered = appState.notifications
+            .filter({ $0.notificationType == "owner_briefing" })
+            .compactMap(\.createdAt)
+            .max() else { return "Not yet" }
+        return delivered.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private var nextScheduledLabel: String {
+        guard weeklyEnabled else { return "Off" }
+        let components = Calendar.current.dateComponents([.hour, .minute], from: time)
+        let value = String(format: "%02d:%02d:00", components.hour ?? 8, components.minute ?? 0)
+        guard let next = AutomationSchedule.nextBriefingDate(
+            weekday: weekday,
+            time: value,
+            timezone: TimeZone.current.identifier
+        ) else { return "Unavailable" }
+        return next.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func sendTestNotification() async {
+        testMessage = nil
+        let scheduled = await pushService.sendPrivateTestNotification()
+        testMessage = scheduled ? "Test notification scheduled." : (pushService.lastError ?? "Could not schedule the test notification.")
+    }
+
+    private func openNotificationSettings() {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    private func rule(_ type: AlertRuleType) -> AlertRule? {
+        alertRules.first { $0.ruleType == type }
+    }
+
+    private func isEnabled(_ type: AlertRuleType) -> Bool {
+        rule(type)?.enabled ?? false
+    }
+
+    private func enabledBinding(for type: AlertRuleType) -> Binding<Bool> {
+        Binding(
+            get: { isEnabled(type) },
+            set: { enabled in updateRule(type) { $0.enabled = enabled } }
+        )
+    }
+
+    private func updateRule(_ type: AlertRuleType, mutation: (inout AlertRule) -> Void) {
+        guard let index = alertRules.firstIndex(where: { $0.ruleType == type }) else { return }
+        mutation(&alertRules[index])
+    }
+
+    private func positiveNumber(_ value: String) -> Double? {
+        let normalized = value.replacingOccurrences(of: ",", with: "")
+        guard let number = Double(normalized), number > 0 else { return nil }
+        return number
+    }
+
+    private func amountString(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(value)
+    }
+
+    private func ruleTitle(_ type: AlertRuleType) -> String {
+        switch type {
+        case .largeTransaction: return "Large transactions"
+        case .possibleDuplicate: return "Possible duplicate charges"
+        case .unusualSpending: return "Unusual spending"
+        case .balanceChange: return "Large balance changes"
+        case .upcomingPayment: return "Upcoming payments"
+        case .expiringItem: return "Expiring cards & documents"
+        case .disconnectedInstitution: return "Disconnected institutions"
+        }
+    }
+
+    private func ruleIcon(_ type: AlertRuleType) -> String {
+        switch type {
+        case .largeTransaction: return "dollarsign.circle"
+        case .possibleDuplicate: return "square.on.square"
+        case .unusualSpending: return "waveform.path.ecg"
+        case .balanceChange: return "chart.line.uptrend.xyaxis"
+        case .upcomingPayment: return "calendar.badge.clock"
+        case .expiringItem: return "exclamationmark.calendar"
+        case .disconnectedInstitution: return "link.badge.plus"
+        }
     }
 }
 

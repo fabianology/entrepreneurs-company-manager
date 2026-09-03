@@ -3,8 +3,28 @@ import Observation
 import UIKit
 import UserNotifications
 
-extension Notification.Name {
-    static let openOwnerBriefing = Notification.Name("OpenOwnerBriefing")
+@MainActor
+@Observable
+final class NotificationRouteCoordinator {
+    static let shared = NotificationRouteCoordinator()
+
+    private(set) var pendingRoute: NotificationRoute?
+
+    private init() {}
+
+    func enqueue(_ route: NotificationRoute) {
+        pendingRoute = route
+    }
+
+    func takePendingRoute() -> NotificationRoute? {
+        defer { pendingRoute = nil }
+        return pendingRoute
+    }
+
+    func clear() {
+        pendingRoute = nil
+    }
+
 }
 
 enum PrivateBriefingNotification {
@@ -35,6 +55,36 @@ final class PushNotificationService {
             if granted { UIApplication.shared.registerForRemoteNotifications() }
         } catch {
             lastError = error.localizedDescription
+        }
+    }
+
+    func sendPrivateTestNotification() async -> Bool {
+        lastError = nil
+        if authorizationStatus == .notDetermined {
+            await enableWeeklyBriefings()
+        } else {
+            await refreshAuthorizationStatus()
+        }
+        guard authorizationStatus == .authorized || authorizationStatus == .provisional else {
+            lastError = "Notifications are disabled for Miloom."
+            return false
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Miloom"
+        content.body = "Your private notifications are working."
+        content.sound = .default
+        do {
+            let request = UNNotificationRequest(
+                identifier: "miloom-private-test-\(UUID().uuidString)",
+                content: content,
+                trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+            )
+            try await UNUserNotificationCenter.current().add(request)
+            return true
+        } catch {
+            lastError = error.localizedDescription
+            return false
         }
     }
 
@@ -86,9 +136,12 @@ final class MiloomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let route = response.notification.request.content.userInfo["route"] as? String
-        if route == "owner_briefing" {
-            NotificationCenter.default.post(name: .openOwnerBriefing, object: nil)
+        if let route = NotificationRoute(
+            pushUserInfo: response.notification.request.content.userInfo
+        ) {
+            Task { @MainActor in
+                NotificationRouteCoordinator.shared.enqueue(route)
+            }
         }
         completionHandler()
     }

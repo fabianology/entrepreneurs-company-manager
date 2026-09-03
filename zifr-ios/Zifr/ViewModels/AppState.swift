@@ -16,10 +16,12 @@ final class AppState {
     var activityLogs: [ActivityLog] = []
     var notifications: [AppNotification] = []
     var userPreferences: UserPreferences? = nil
+    var alertRules: [AlertRule] = []
     var plaidItems: [PlaidItemSummary] = []
     var entitlementSnapshot: AccessSnapshot = .free
     var resourceConnections: [ResourceConnection] = []
     var obligations: [PortfolioObligation] = []
+    var hasLoadedPortfolio: Bool = false
     
     var isLoading: Bool = false
     var error: String? = nil
@@ -83,5 +85,13 @@ final class AppState {
 
     var unreadBriefingCount: Int {
         openObligations.filter { $0.severity != .info }.count
+    }
+
+    var unreadNotificationCount: Int {
+        notifications.filter { !$0.isRead }.count
+    }
+
+    var unreadInboxCount: Int {
+        unreadNotificationCount + activityLogs.filter { !$0.isRead }.count
     }
 }

@@ -385,3 +385,347 @@ struct MessageRowView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
+
+private enum InboxSection: String, CaseIterable, Identifiable {
+    case alerts = "Alerts"
+    case activity = "Activity"
+
+    var id: String { rawValue }
+}
+
+struct NotificationInboxView: View {
+    @Bindable var vm: AppViewModel
+    let onOpenRoute: (NotificationRoute) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    @State private var section: InboxSection = .alerts
+    @State private var errorMessage: String?
+
+    private var unreadCount: Int {
+        switch section {
+        case .alerts: appState.unreadNotificationCount
+        case .activity: appState.activityLogs.filter { !$0.isRead }.count
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.zifrCard.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                header
+
+                Picker("Inbox section", selection: $section) {
+                    ForEach(InboxSection.allCases) { item in
+                        Text(item.rawValue).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+
+                Group {
+                    switch section {
+                    case .alerts: alertList
+                    case .activity: activityList
+                    }
+                }
+            }
+        }
+        .task {
+            try? await DataRepository.shared.refreshNotifications(appState: appState)
+        }
+        .alert("Inbox Error", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "The inbox could not be updated.")
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.9))
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.black.opacity(0.70)))
+                    .background(.regularMaterial, in: Circle())
+                    .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
+            }
+
+            Spacer()
+
+            VStack(spacing: 3) {
+                Text("INBOX")
+                    .font(.system(size: 10, weight: .black))
+                    .tracking(2)
+                    .foregroundStyle(Color.white.opacity(0.65))
+                Text(unreadCount == 1 ? "1 UNREAD" : "\(unreadCount) UNREAD")
+                    .font(.system(size: 8, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Color.zifrGold)
+            }
+
+            Spacer()
+
+            Menu {
+                Button {
+                    Task { await markAllRead() }
+                } label: {
+                    Label("Mark All as Read", systemImage: "envelope.open")
+                }
+                .disabled(unreadCount == 0)
+
+                if section == .alerts {
+                    Button {
+                        Task {
+                            do {
+                                try await DataRepository.shared.refreshNotifications(appState: appState)
+                            } catch {
+                                errorMessage = error.localizedDescription
+                            }
+                        }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.9))
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.black.opacity(0.70)))
+                    .background(.regularMaterial, in: Circle())
+                    .overlay(Circle().stroke(.vaultOutline, lineWidth: 1.5))
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+
+    @ViewBuilder
+    private var alertList: some View {
+        if appState.notifications.isEmpty {
+            emptyState(icon: "bell.slash", message: "No alerts yet")
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(appState.notifications) { notification in
+                        notificationRow(notification)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .padding(.bottom, 32)
+            }
+            .refreshable {
+                try? await DataRepository.shared.refreshNotifications(appState: appState)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var activityList: some View {
+        if appState.activityLogs.isEmpty {
+            emptyState(icon: "clock.arrow.circlepath", message: "No activity yet")
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(appState.activityLogs) { log in
+                        MessageRowView(log: log, vm: vm)
+                            .contextMenu {
+                                Button {
+                                    Task { await toggleActivityRead(log) }
+                                } label: {
+                                    Label(log.isRead ? "Mark Unread" : "Mark Read",
+                                          systemImage: log.isRead ? "envelope.badge" : "envelope.open")
+                                }
+                            }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .padding(.bottom, 32)
+            }
+        }
+    }
+
+    private func notificationRow(_ notification: AppNotification) -> some View {
+        Button {
+            Task { await open(notification) }
+        } label: {
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(notificationTint(notification).opacity(0.16))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: notificationIcon(notification))
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(notificationTint(notification))
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 7) {
+                        Text(notification.title)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.leading)
+                        if !notification.isRead {
+                            Circle().fill(Color.zifrGold).frame(width: 6, height: 6)
+                        }
+                        Spacer(minLength: 4)
+                        Text(relativeDate(notification.createdAt))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.35))
+                    }
+
+                    Text(notification.body)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.white.opacity(notification.isRead ? 0.55 : 0.78))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .multilineTextAlignment(.leading)
+
+                    if notification.route != nil {
+                        Label("Open", systemImage: "arrow.up.right")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(Color.zifrGold)
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color.black.opacity(0.70))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(.vaultOutline, lineWidth: 1.25)
+            )
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                Task { await setNotification(notification, read: !notification.isRead) }
+            } label: {
+                Label(notification.isRead ? "Mark Unread" : "Mark Read",
+                      systemImage: notification.isRead ? "envelope.badge" : "envelope.open")
+            }
+        }
+    }
+
+    private func emptyState(icon: String, message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: icon)
+                .font(.system(size: 46, weight: .light))
+                .foregroundStyle(Color.zifrGold.opacity(0.7))
+            Text(message)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @MainActor
+    private func open(_ notification: AppNotification) async {
+        if !notification.isRead {
+            await setNotification(notification, read: true)
+        }
+        guard let route = notification.route else { return }
+        onOpenRoute(route)
+        dismiss()
+    }
+
+    @MainActor
+    private func setNotification(_ notification: AppNotification, read: Bool) async {
+        guard let index = appState.notifications.firstIndex(where: { $0.id == notification.id }) else { return }
+        let original = appState.notifications[index].isRead
+        appState.notifications[index].isRead = read
+        do {
+            try await DataRepository.shared.markNotificationRead(notification.id, isRead: read)
+        } catch {
+            appState.notifications[index].isRead = original
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func toggleActivityRead(_ log: ActivityLog) async {
+        guard let index = appState.activityLogs.firstIndex(where: { $0.id == log.id }) else { return }
+        let original = appState.activityLogs[index].isRead
+        appState.activityLogs[index].isRead.toggle()
+        do {
+            if original {
+                try await DataRepository.shared.markActivityLogUnread(log.id)
+            } else {
+                try await DataRepository.shared.markActivityLogRead(log.id)
+            }
+        } catch {
+            appState.activityLogs[index].isRead = original
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func markAllRead() async {
+        do {
+            switch section {
+            case .alerts:
+                let originals = appState.notifications
+                for index in appState.notifications.indices { appState.notifications[index].isRead = true }
+                do {
+                    try await DataRepository.shared.markAllNotificationsRead()
+                } catch {
+                    appState.notifications = originals
+                    throw error
+                }
+            case .activity:
+                let originals = appState.activityLogs
+                for index in appState.activityLogs.indices { appState.activityLogs[index].isRead = true }
+                do {
+                    try await DataRepository.shared.markAllActivityLogsRead()
+                } catch {
+                    appState.activityLogs = originals
+                    throw error
+                }
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func notificationIcon(_ notification: AppNotification) -> String {
+        if notification.notificationType == "owner_briefing" { return "list.bullet.clipboard" }
+        switch notification.resourceType?.lowercased() {
+        case "transaction": return "creditcard.and.123"
+        case "institution": return "building.columns"
+        case "subscription": return "arrow.triangle.2.circlepath"
+        case "loan": return "dollarsign.circle"
+        case "card": return "creditcard"
+        case "document": return "doc.text"
+        default: return "bell.fill"
+        }
+    }
+
+    private func notificationTint(_ notification: AppNotification) -> Color {
+        switch notification.resourceType?.lowercased() {
+        case "institution", "transaction": return Color(hex: "#1A9CA6")
+        case "subscription": return Color(hex: "#4A8FD8")
+        default: return Color.zifrGold
+        }
+    }
+
+    private func relativeDate(_ date: Date?) -> String {
+        guard let date else { return "" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}

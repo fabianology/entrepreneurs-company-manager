@@ -57,20 +57,24 @@ The first authenticated smoke sync exposed a production-only seed mismatch: omit
 
 Post-fix production verification refreshed all four linked institutions owned by the test user, initialized nine account balance baselines, recorded zero active Plaid Item errors, produced zero duplicate alerts, and logged zero evaluator failures. No alert events were expected from the current data and conservative enabled rules.
 
-## 5.3 Notification inbox and deep links
+## 5.3 Notification inbox and deep links — complete
 
-- Add a typed notification route shared by push payloads and `app_notifications`.
-- Route to Owner Briefing, institution actions, a transaction, or the transaction review queue.
-- Add an in-app inbox with unread count, mark-read, and mark-all-read actions.
-- Defer a route until authentication and portfolio loading are complete.
-- Keep sensitive merchant, institution, balance, account, and document details out of push payloads.
+- [x] Add a typed notification route shared by push payloads and `app_notifications`.
+- [x] Route to Owner Briefing, institution actions, a transaction, or the transaction review queue.
+- [x] Add an in-app inbox with unread count, mark-read, and mark-all-read actions.
+- [x] Defer a route until authentication and portfolio loading are complete.
+- [x] Keep sensitive merchant, institution, balance, account, and document details out of push payloads.
+
+The dashboard now exposes a badged notification bell, while Account & Settings opens the combined Alerts/Activity inbox. Alert taps mark the item read and open the typed destination; stale institution references fail safely. Push routes remain queued across cold launch or biometric lock until authentication and the portfolio load are complete. The iPhone 17 Pro simulator suite passed all 48 tests after implementation.
 
 ## 5.4 Preferences and weekly summary
 
-- Extend Briefing Schedule into an Automation & Alerts screen.
-- Add per-alert switches and configurable large-transaction/balance thresholds.
-- Show notification permission status and a direct Settings recovery action when permission is denied.
-- Add a last-delivered/next-scheduled summary and a private test-notification action.
+- [x] Extend Briefing Schedule into an Automation & Alerts screen.
+- [x] Add per-alert switches and configurable large-transaction/balance thresholds.
+- [x] Show notification permission status and a direct Settings recovery action when permission is denied.
+- [x] Add a last-delivered/next-scheduled summary and a private test-notification action.
+
+The automation sheet now reads and writes the production `alert_rules` contract, preserves the conservative defaults, validates configurable thresholds, and explains what is evaluated after Plaid sync. Weekly timing shows the latest recorded briefing and calculates the next occurrence in the device timezone. Notification status is visible, denied users can jump directly to iOS Settings, and the local test notification uses deliberately generic private copy.
 
 ## 5.5 Validation and release readiness
 

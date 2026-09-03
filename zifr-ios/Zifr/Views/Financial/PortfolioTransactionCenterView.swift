@@ -593,6 +593,8 @@ private extension String {
 
 struct PortfolioTransactionCenterView: View {
     @Bindable var vm: AppViewModel
+    var initialTransactionID: UUID? = nil
+    var initiallyShowsReviewQueue: Bool = false
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
@@ -614,6 +616,7 @@ struct PortfolioTransactionCenterView: View {
     @State private var isPreparing = true
     @State private var analysisRevision = UUID()
     @State private var selectedTransaction: ResolvedTransaction?
+    @State private var didApplyInitialRoute = false
 
     private var filteredRecords: [ResolvedTransaction] {
         allRecords.filter { record in
@@ -1511,6 +1514,13 @@ struct PortfolioTransactionCenterView: View {
         allRecords = analysis.records
         detectedSubscriptions = analysis.detectedSubscriptions
         analyzedDuplicateAlerts = analysis.duplicateAlerts
+        if !didApplyInitialRoute {
+            didApplyInitialRoute = true
+            showNeedsReviewOnly = initiallyShowsReviewQueue
+            if let initialTransactionID {
+                selectedTransaction = analysis.records.first { $0.id == initialTransactionID }
+            }
+        }
         isPreparing = false
     }
 

@@ -32,6 +32,7 @@ struct ZifrApp: App {
     @State private var appState = AppState()
     @State private var onboardingState = OnboardingStateManager()
     @State private var accessController = AccessController()
+    @State private var notificationRouter = NotificationRouteCoordinator.shared
     @Environment(\.scenePhase) var scenePhase
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
     @State private var backgroundDate: Date? = nil
@@ -58,6 +59,7 @@ struct ZifrApp: App {
             .environment(appState)
             .environment(onboardingState)
             .environment(accessController)
+            .environment(notificationRouter)
             .task {
                 StoreService.shared.startListening(accessController: accessController)
                 await authViewModel.checkSession()
@@ -85,6 +87,7 @@ struct ZifrApp: App {
                         Task {
                             await accessController.refresh()
                             appState.entitlementSnapshot = accessController.snapshot
+                            try? await DataRepository.shared.refreshNotifications(appState: appState)
                         }
                     }
                     if let bgDate = backgroundDate {
@@ -102,6 +105,14 @@ struct ZifrApp: App {
             }
             .onChange(of: accessController.snapshot) { _, snapshot in
                 appState.entitlementSnapshot = snapshot
+            }
+            .onChange(of: authViewModel.isAuthenticated) { wasAuthenticated, isAuthenticated in
+                if wasAuthenticated && !isAuthenticated {
+                    appState.hasLoadedPortfolio = false
+                    if authViewModel.currentUser == nil {
+                        notificationRouter.clear()
+                    }
+                }
             }
             .onOpenURL { url in
                 Task {

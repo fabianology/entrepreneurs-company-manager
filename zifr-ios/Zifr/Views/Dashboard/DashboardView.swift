@@ -4,6 +4,7 @@ struct DashboardView: View {
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(AccessController.self) private var accessController
+    @Environment(NotificationRouteCoordinator.self) private var notificationRouter
     private var companies: [Company] { appState.companies.sorted { $0.lastViewed > $1.lastViewed } }
     private var subscriptions: [Subscription] { appState.subscriptions }
     private var cards: [FinancialCard] { appState.cards }
@@ -29,6 +30,10 @@ struct DashboardView: View {
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
     @State private var dashboardMode: DashboardDisplayMode = .portfolio
+    @State private var showNotificationInbox = false
+    @State private var showTransactionCenter = false
+    @State private var initialTransactionID: UUID?
+    @State private var initiallyShowsTransactionReview = false
     
     private var currentUserId: UUID? { authViewModel.currentUser?.id }
     
@@ -279,6 +284,23 @@ struct DashboardView: View {
             .sheet(item: $selectedDocument) { doc in
                 EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
             }
+            .sheet(isPresented: $showNotificationInbox) {
+                NotificationInboxView(vm: vm) { route in
+                    showNotificationInbox = false
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(250))
+                        notificationRouter.enqueue(route)
+                    }
+                }
+            }
+            .sheet(isPresented: $showTransactionCenter) {
+                PortfolioTransactionCenterView(
+                    vm: vm,
+                    initialTransactionID: initialTransactionID,
+                    initiallyShowsReviewQueue: initiallyShowsTransactionReview
+                )
+                .environment(appState)
+            }
             // Tutorial navigation coordinator
             .onChange(of: onboardingState.currentStep) { _, step in
                 switch step {
@@ -327,12 +349,19 @@ struct DashboardView: View {
                     break
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .openOwnerBriefing)) { _ in
-                if accessController.isPro {
-                    withAnimation(.easeInOut(duration: 0.22)) { dashboardMode = .briefing }
-                }
+            .onChange(of: notificationRouter.pendingRoute) { _, _ in
+                openPendingNotificationRouteIfReady()
             }
-            .onAppear { checkDowngradeSelection() }
+            .onChange(of: appState.hasLoadedPortfolio) { _, _ in
+                openPendingNotificationRouteIfReady()
+            }
+            .onChange(of: showNotificationInbox) { _, isPresented in
+                if !isPresented { openPendingNotificationRouteIfReady() }
+            }
+            .onAppear {
+                checkDowngradeSelection()
+                openPendingNotificationRouteIfReady()
+            }
             .onChange(of: appState.companies.count) { _, _ in checkDowngradeSelection() }
             .onChange(of: accessController.snapshot.status) { _, _ in checkDowngradeSelection() }
             }
@@ -698,6 +727,37 @@ struct DashboardView: View {
         }
     }
 
+    private func openPendingNotificationRouteIfReady() {
+        guard authViewModel.isAuthenticated,
+              appState.hasLoadedPortfolio,
+              !showNotificationInbox,
+              let route = notificationRouter.takePendingRoute() else { return }
+        openNotificationRoute(route)
+    }
+
+    private func openNotificationRoute(_ route: NotificationRoute) {
+        switch route {
+        case .ownerBriefing:
+            selectDashboardMode(.briefing)
+        case .institution(let institutionID):
+            guard let institution = appState.institutions.first(where: { $0.id == institutionID }) else {
+                appState.error = "This institution is no longer available."
+                return
+            }
+            selectedInstitution = institution
+        case .transaction(let transactionID):
+            initialTransactionID = transactionID
+            initiallyShowsTransactionReview = false
+            showTransactionCenter = true
+        case .transactionReview:
+            initialTransactionID = nil
+            initiallyShowsTransactionReview = true
+            showTransactionCenter = true
+        case .resource(let kind, let resourceID):
+            openHealthResource(kind, resourceID)
+        }
+    }
+
     private func openSharedItem(_ share: SharedItem) {
         // Load the full object from DataRepository and set it to the appropriate selected state
         let lowercasedType = share.type.lowercased()
@@ -763,13 +823,47 @@ struct DashboardView: View {
     }
 
     private var headerSection: some View {
-        GeometryReader { geometry in
-            Image("miloom_text_embossed")
-                .resizable()
-                .scaledToFit()
-                .frame(width: geometry.size.width * 0.35)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+        ZStack {
+            GeometryReader { geometry in
+                Image("miloom_text_embossed")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: geometry.size.width * 0.35)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showNotificationInbox = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: appState.unreadNotificationCount > 0 ? "bell.fill" : "bell")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.82))
+                            .frame(width: 40, height: 40)
+                            .background(Color.black.opacity(0.32), in: Circle())
+
+                        if appState.unreadNotificationCount > 0 {
+                            Text(appState.unreadNotificationCount > 99 ? "99+" : "\(appState.unreadNotificationCount)")
+                                .font(.system(size: 8, weight: .black))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .frame(minWidth: 17, minHeight: 17)
+                                .background(Color.red, in: Capsule())
+                                .offset(x: 3, y: -2)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Notification inbox")
+                .accessibilityValue(appState.unreadNotificationCount == 0
+                    ? "No unread alerts"
+                    : "\(appState.unreadNotificationCount) unread alerts")
+                .padding(.trailing, 20)
+            }
         }
         .frame(height: 52)
     }

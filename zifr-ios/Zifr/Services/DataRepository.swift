@@ -121,6 +121,13 @@ class DataRepository {
         async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
+        async let fAlertRules: [AlertRule] = measure("alert_rules") {
+            (try? await client
+                .from("alert_rules")
+                .select("user_id,rule_type,enabled,threshold_amount,threshold_percent,lookback_days,lead_days,created_at,updated_at")
+                .execute()
+                .value) ?? []
+        }
         async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") {
             (try? await client
                 .from("plaid_items")
@@ -151,6 +158,7 @@ class DataRepository {
         let fetchedActivityLogs = await fActivity
         let fetchedNotifications = await fNotifications
         let fetchedPreferences = await fPrefs
+        let fetchedAlertRules = await fAlertRules
         let fetchedConnections = await fConnections
         let initiallyFetchedObligations = await fObligations
         let obligationRefreshSucceeded = await fObligationRefresh
@@ -187,6 +195,7 @@ class DataRepository {
         appState.activityLogs = fetchedActivityLogs
         appState.notifications = fetchedNotifications
         appState.userPreferences = fetchedPreferences.first
+        appState.alertRules = fetchedAlertRules
         appState.transactions = transactions
         appState.transactionOverrides = transactionOverrides
         appState.resourceConnections = fetchedConnections
@@ -207,6 +216,8 @@ class DataRepository {
             let fileURL = docsDir.appendingPathComponent("tx_count.txt")
             try? "\(transactions.count)".write(to: fileURL, atomically: true, encoding: .utf8)
         }
+
+        appState.hasLoadedPortfolio = true
 
     }
 
@@ -343,6 +354,41 @@ class DataRepository {
             criticalAlertsEnabled: criticalEnabled
         )
         try await client.from("user_preferences").upsert(payload, onConflict: "user_id").execute()
+    }
+
+    func saveAlertRules(_ rules: [AlertRule]) async throws {
+        struct Payload: Encodable {
+            let userId: UUID
+            let ruleType: AlertRuleType
+            let enabled: Bool
+            let thresholdAmount: Double?
+            let thresholdPercent: Double?
+            let lookbackDays: Int?
+            let leadDays: Int?
+
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+                case ruleType = "rule_type"
+                case enabled
+                case thresholdAmount = "threshold_amount"
+                case thresholdPercent = "threshold_percent"
+                case lookbackDays = "lookback_days"
+                case leadDays = "lead_days"
+            }
+        }
+
+        let payloads = rules.map {
+            Payload(
+                userId: $0.userId,
+                ruleType: $0.ruleType,
+                enabled: $0.enabled,
+                thresholdAmount: $0.thresholdAmount,
+                thresholdPercent: $0.thresholdPercent,
+                lookbackDays: $0.lookbackDays,
+                leadDays: $0.leadDays
+            )
+        }
+        try await client.from("alert_rules").upsert(payloads, onConflict: "user_id,rule_type").execute()
     }
     
     // MARK: - Companies
@@ -652,6 +698,35 @@ class DataRepository {
     func markAllActivityLogsRead() async throws {
         guard let userId = try? await client.auth.session.user.id else { return }
         try await client.from("activity_logs").update(["is_read": true]).eq("user_id", value: userId).execute()
+    }
+
+    // MARK: - Notification Inbox
+    func fetchNotifications() async throws -> [AppNotification] {
+        try await client.from("app_notifications")
+            .select()
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    @MainActor
+    func refreshNotifications(appState: AppState) async throws {
+        appState.notifications = try await fetchNotifications()
+    }
+
+    func markNotificationRead(_ notificationId: UUID, isRead: Bool = true) async throws {
+        try await client.from("app_notifications")
+            .update(["is_read": isRead])
+            .eq("id", value: notificationId)
+            .execute()
+    }
+
+    func markAllNotificationsRead() async throws {
+        guard let userId = try? await client.auth.session.user.id else { return }
+        try await client.from("app_notifications")
+            .update(["is_read": true])
+            .eq("user_id", value: userId)
+            .execute()
     }
     
     func deleteActivityLog(_ logId: UUID) async throws {

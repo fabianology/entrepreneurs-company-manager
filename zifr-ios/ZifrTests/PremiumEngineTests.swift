@@ -233,6 +233,67 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertFalse(body.contains("document"))
     }
 
+    func testNotificationRoutesResolveTypedDestinations() {
+        let transactionID = UUID()
+        let institutionID = UUID()
+        let owner = UUID()
+        let transactionAlert = AppNotification(
+            id: UUID(),
+            userId: owner,
+            notificationType: "portfolio_alert",
+            title: "Review transaction",
+            body: "An item needs review.",
+            resourceId: transactionID,
+            resourceType: "transaction",
+            isRead: false,
+            createdAt: Date()
+        )
+        let briefing = AppNotification(
+            id: UUID(),
+            userId: owner,
+            notificationType: "owner_briefing",
+            title: "Briefing",
+            body: "Items need attention.",
+            resourceId: nil,
+            resourceType: nil,
+            isRead: false,
+            createdAt: Date()
+        )
+
+        XCTAssertEqual(transactionAlert.route, .transaction(transactionID))
+        XCTAssertEqual(briefing.route, .ownerBriefing)
+        XCTAssertEqual(
+            NotificationRoute(pushUserInfo: [
+                "route": "institution",
+                "resource_id": institutionID.uuidString,
+            ]),
+            .institution(institutionID)
+        )
+        XCTAssertEqual(
+            NotificationRoute(pushUserInfo: ["route": "transaction_review"]),
+            .transactionReview
+        )
+    }
+
+    func testInboxUnreadCountIncludesAlertsAndActivity() {
+        let owner = UUID()
+        let state = AppState()
+        state.notifications = [AppNotification(
+            id: UUID(), userId: owner, notificationType: "portfolio_alert",
+            title: "Alert", body: "Review in Miloom.", resourceId: nil,
+            resourceType: nil, isRead: false, createdAt: Date()
+        )]
+        state.activityLogs = [ActivityLog(
+            userId: owner,
+            actorEmail: "owner@example.com",
+            actionType: "updated_company",
+            message: "A company was updated."
+        )]
+
+        XCTAssertEqual(state.unreadNotificationCount, 1)
+        XCTAssertEqual(state.unreadInboxCount, 2)
+    }
+
     func testDeferredAgeBucketsUseExactElapsedDays() {
         let day: TimeInterval = 86_400
         let now = Date(timeIntervalSince1970: 100 * day)
@@ -1138,6 +1199,27 @@ final class PremiumEngineTests: XCTestCase {
 
         XCTAssertEqual(state.companies.first(where: { $0.id == readOnly.id })?.name, "Read Only")
         XCTAssertNotNil(state.error)
+    }
+
+    func testAutomationScheduleUsesMiloomMondayBasedWeekday() {
+        let formatter = ISO8601DateFormatter()
+        let sunday = formatter.date(from: "2026-08-30T12:00:00Z")!
+        let next = AutomationSchedule.nextBriefingDate(
+            weekday: 1,
+            time: "08:30:00",
+            timezone: "UTC",
+            after: sunday
+        )
+
+        XCTAssertEqual(formatter.string(from: next!), "2026-08-31T08:30:00Z")
+    }
+
+    func testAlertRuleDefaultsRemainConservative() {
+        let rules = AlertRule.conservativeDefaults(userId: UUID())
+        XCTAssertEqual(rules.count, 7)
+        XCTAssertFalse(rules.first { $0.ruleType == .unusualSpending }?.enabled ?? true)
+        XCTAssertFalse(rules.first { $0.ruleType == .balanceChange }?.enabled ?? true)
+        XCTAssertEqual(rules.first { $0.ruleType == .largeTransaction }?.thresholdAmount, 1_000)
     }
 
     private func makeObligation(
