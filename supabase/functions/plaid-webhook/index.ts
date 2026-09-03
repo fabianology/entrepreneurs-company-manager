@@ -5,8 +5,8 @@ import {
   PlaidAPIError,
   plaidConfigFromEnvironment,
   requestPlaidTransactionSync,
-  verifyPlaidWebhook,
 } from "../_shared/plaid.ts";
+import { verifyPlaidWebhook } from "../_shared/plaid_webhook_verification.ts";
 
 const transactionWebhookCodes = new Set([
   "SYNC_UPDATES_AVAILABLE",

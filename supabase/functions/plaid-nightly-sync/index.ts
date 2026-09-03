@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3"
 import {
   PlaidAPIError,
+  forEachPlaidItemIndependently,
   plaidConfigFromEnvironment,
   plaidRequest as plaidAPIRequest,
   plaidWebhookURL,
@@ -253,14 +254,13 @@ serve(async (req) => {
     let transactionCount = 0
     const results: any[] = []
 
-    for (const item of (plaidItems || [])) {
+    await forEachPlaidItemIndependently(plaidItems || [], async (item) => {
       const institution: any = Array.isArray(item.institutions)
         ? item.institutions[0]
         : item.institutions
-      if (!institution) continue
+      if (!institution) return
 
-      try {
-        // Backfill the webhook on Items linked before event-driven sync was
+      // Backfill the webhook on Items linked before event-driven sync was
         // introduced. The stored URL avoids an extra Plaid call thereafter.
         if (item.webhook_url !== webhookURL) {
           await plaidAPIRequest(plaidSyncConfig, '/item/webhook/update', {
@@ -519,7 +519,7 @@ serve(async (req) => {
         transactionCount += transactionSync.added + transactionSync.modified
 
         syncedCount++
-        results.push({
+      results.push({
           item_id: item.id,
           institution_name: item.institution_name,
           success: true,
@@ -528,32 +528,31 @@ serve(async (req) => {
           transactions_modified: transactionSync.modified,
           transactions_removed: transactionSync.removed,
           history_accounts_reconciled: reconciledHistoryAccounts
+      })
+    }, async (item, err) => {
+      console.error(`Failed to sync item ${item.id}:`, err)
+      const message = err instanceof Error ? err.message : String(err)
+      const errorCode = err instanceof PlaidAPIError ? err.errorCode : 'TRANSACTION_SYNC_FAILED'
+      const requiresReauth = errorCode === 'ITEM_LOGIN_REQUIRED'
+      await supabaseAdmin.from('plaid_items')
+        .update({
+          status: requiresReauth ? 'requires_reauth' : item.status,
+          error_code: errorCode
         })
-      } catch (err) {
-        console.error(`Failed to sync item ${item.id}:`, err)
-        const message = err instanceof Error ? err.message : String(err)
-        const errorCode = err instanceof PlaidAPIError ? err.errorCode : 'TRANSACTION_SYNC_FAILED'
-        const requiresReauth = errorCode === 'ITEM_LOGIN_REQUIRED'
-        await supabaseAdmin.from('plaid_items')
-          .update({
-            status: requiresReauth ? 'requires_reauth' : item.status,
-            error_code: errorCode
-          })
-          .eq('id', item.id)
-        if (requiresReauth) {
-          await supabaseAdmin.from('institutions')
-            .update({ is_disconnected: true })
-            .eq('id', item.institution_id)
-        }
-        results.push({
-          item_id: item.id,
-          institution_name: item.institution_name,
-          success: false,
-          error_code: errorCode,
-          error: message
-        })
+        .eq('id', item.id)
+      if (requiresReauth) {
+        await supabaseAdmin.from('institutions')
+          .update({ is_disconnected: true })
+          .eq('id', item.institution_id)
       }
-    }
+      results.push({
+        item_id: item.id,
+        institution_name: item.institution_name,
+        success: false,
+        error_code: errorCode,
+        error: message
+      })
+    })
 
     return new Response(JSON.stringify({
       success: true,

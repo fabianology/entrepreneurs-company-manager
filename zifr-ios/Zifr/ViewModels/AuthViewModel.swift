@@ -127,6 +127,7 @@ final class AuthViewModel: NSObject {
 
     func signOut() async {
         do {
+            await PushNotificationService.shared.unregisterCurrentDevice()
             try await SupabaseService.shared.client.auth.signOut()
             await MainActor.run {
                 self.session = nil

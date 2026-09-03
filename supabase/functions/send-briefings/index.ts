@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { json } from "../_shared/http.ts";
-import { sendPrivateBriefing } from "../_shared/apns.ts";
+import { APNSDeliveryError, sendPrivateBriefing } from "../_shared/apns.ts";
 import { evaluateUserAlerts } from "../_shared/alerts.ts";
 import { isImmediateCriticalItem, isWeeklyBriefingItem } from "../_shared/briefing.ts";
 
@@ -12,6 +12,33 @@ type Preference = {
   weekly_briefing_enabled?: boolean;
   critical_alerts_enabled?: boolean;
 };
+
+type PushToken = {
+  user_id: string;
+  token: string;
+  environment: "development" | "production";
+};
+
+async function deliverPrivatePushes(
+  admin: any,
+  tokens: PushToken[],
+  itemCount: number,
+  immediate = false,
+): Promise<boolean> {
+  const results = await Promise.allSettled(tokens.map((token) =>
+    sendPrivateBriefing(token.token, itemCount, token.environment, immediate)
+  ));
+  await Promise.all(results.map(async (result, index) => {
+    if (result.status !== "rejected" ||
+      !(result.reason instanceof APNSDeliveryError) ||
+      !result.reason.shouldPruneToken) return;
+    await admin.from("device_push_tokens")
+      .delete()
+      .eq("user_id", tokens[index].user_id)
+      .eq("token", tokens[index].token);
+  }));
+  return results.some((result) => result.status === "fulfilled");
+}
 
 function localSchedule(now: Date, preference?: Preference) {
   const timezone = preference?.timezone || "UTC";
@@ -85,9 +112,7 @@ Deno.serve(async (request) => {
     }
     if (newlyClaimed > 0) {
       const userTokens = (tokens ?? []).filter((token) => token.user_id === entitlement.user_id);
-      await Promise.allSettled(userTokens.map((token) =>
-        sendPrivateBriefing(token.token, newlyClaimed, token.environment, true)
-      ));
+      await deliverPrivatePushes(admin, userTokens as PushToken[], newlyClaimed, true);
     }
   }
 
@@ -109,10 +134,7 @@ Deno.serve(async (request) => {
     if (claimError) continue; // already delivered, or another worker won the claim
 
     const userTokens = (tokens ?? []).filter((token) => token.user_id === entitlement.user_id);
-    const results = await Promise.allSettled(userTokens.map((token) =>
-      sendPrivateBriefing(token.token, active.length, token.environment)
-    ));
-    if (results.some((result) => result.status === "fulfilled")) delivered += 1;
+    if (await deliverPrivatePushes(admin, userTokens as PushToken[], active.length)) delivered += 1;
 
     await admin.from("app_notifications").insert({
       user_id: entitlement.user_id,

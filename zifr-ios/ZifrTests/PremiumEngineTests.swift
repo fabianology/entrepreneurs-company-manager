@@ -231,6 +231,21 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertFalse(body.contains("Chase"))
         XCTAssertFalse(body.contains("$"))
         XCTAssertFalse(body.contains("document"))
+        XCTAssertEqual(PrivateBriefingNotification.testBody, "Your private notifications are working.")
+        XCTAssertFalse(PrivateBriefingNotification.testBody.contains("$"))
+    }
+
+    @MainActor
+    func testNotificationRouteCoordinatorDefersAndConsumesExactlyOnce() {
+        let coordinator = NotificationRouteCoordinator.shared
+        coordinator.clear()
+        let route = NotificationRoute.transaction(UUID())
+
+        coordinator.enqueue(route)
+
+        XCTAssertEqual(coordinator.pendingRoute, route)
+        XCTAssertEqual(coordinator.takePendingRoute(), route)
+        XCTAssertNil(coordinator.takePendingRoute())
     }
 
     func testNotificationRoutesResolveTypedDestinations() {

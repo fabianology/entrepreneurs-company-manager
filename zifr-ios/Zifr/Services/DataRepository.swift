@@ -98,6 +98,28 @@ class DataRepository {
         }
     }
 
+    private func safeFetchAlertRules() async -> [AlertRule] {
+        do { return try await fetchAlertRules() }
+        catch {
+            print("Failed to fetch alert rules: \(error)")
+            return []
+        }
+    }
+
+    func fetchAlertRules() async throws -> [AlertRule] {
+        let rules: [AlertRule] = try await client
+            .from("alert_rules")
+            .select("user_id,rule_type,enabled,threshold_amount,threshold_percent,lookback_days,lead_days,created_at,updated_at")
+            .execute()
+            .value
+        if !rules.isEmpty { return rules }
+
+        let userId = try await client.auth.session.user.id
+        let defaults = AlertRule.conservativeDefaults(userId: userId)
+        try await saveAlertRules(defaults)
+        return defaults
+    }
+
     @MainActor
     func fetchAllData(appState: AppState) async {
         if appState.isLoading { return }
@@ -121,13 +143,7 @@ class DataRepository {
         async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
-        async let fAlertRules: [AlertRule] = measure("alert_rules") {
-            (try? await client
-                .from("alert_rules")
-                .select("user_id,rule_type,enabled,threshold_amount,threshold_percent,lookback_days,lead_days,created_at,updated_at")
-                .execute()
-                .value) ?? []
-        }
+        async let fAlertRules: [AlertRule] = measure("alert_rules") { await safeFetchAlertRules() }
         async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") {
             (try? await client
                 .from("plaid_items")
@@ -309,6 +325,15 @@ class DataRepository {
         }
         try await client.from("device_push_tokens")
             .upsert(PushToken(userId: userId, token: token, environment: environment), onConflict: "user_id,token")
+            .execute()
+    }
+
+    func unregisterPushToken(_ token: String) async throws {
+        guard let userId = try? await client.auth.session.user.id else { return }
+        try await client.from("device_push_tokens")
+            .delete()
+            .eq("user_id", value: userId)
+            .eq("token", value: token)
             .execute()
     }
 

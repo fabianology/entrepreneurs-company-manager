@@ -28,6 +28,8 @@ final class NotificationRouteCoordinator {
 }
 
 enum PrivateBriefingNotification {
+    static let testBody = "Your private notifications are working."
+
     static func body(itemCount: Int) -> String {
         "Miloom: \(itemCount) \(itemCount == 1 ? "item needs" : "items need") your attention this week."
     }
@@ -41,6 +43,7 @@ final class PushNotificationService {
     private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
     private(set) var lastError: String?
     private let tokenKey = "miloom.pending-push-token"
+    private let registeredTokenKey = "miloom.registered-push-token"
 
     private init() {}
 
@@ -72,7 +75,7 @@ final class PushNotificationService {
 
         let content = UNMutableNotificationContent()
         content.title = "Miloom"
-        content.body = "Your private notifications are working."
+        content.body = PrivateBriefingNotification.testBody
         content.sound = .default
         do {
             let request = UNNotificationRequest(
@@ -97,10 +100,28 @@ final class PushNotificationService {
             let environment = "production"
             #endif
             try await DataRepository.shared.registerPushToken(token, environment: environment)
+            UserDefaults.standard.set(token, forKey: registeredTokenKey)
             UserDefaults.standard.removeObject(forKey: tokenKey)
         } catch {
             lastError = error.localizedDescription
         }
+    }
+
+    func unregisterCurrentDevice() async {
+        guard let token = UserDefaults.standard.string(forKey: registeredTokenKey) else { return }
+        do {
+            try await DataRepository.shared.unregisterPushToken(token)
+            UserDefaults.standard.removeObject(forKey: registeredTokenKey)
+            UserDefaults.standard.removeObject(forKey: tokenKey)
+        } catch {
+            // Signing out must remain available while offline. A stale token that
+            // Apple later rejects is removed by the server delivery worker.
+            lastError = error.localizedDescription
+        }
+    }
+
+    func registrationFailed(_ error: Error) {
+        lastError = error.localizedDescription
     }
 
     nonisolated func receivedDeviceToken(_ data: Data) {
@@ -116,11 +137,21 @@ final class MiloomAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificati
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        application.registerForRemoteNotifications()
         return true
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         PushNotificationService.shared.receivedDeviceToken(deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        Task { @MainActor in
+            PushNotificationService.shared.registrationFailed(error)
+        }
     }
 
     func userNotificationCenter(

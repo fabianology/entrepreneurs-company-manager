@@ -78,11 +78,18 @@ The automation sheet now reads and writes the production `alert_rules` contract,
 
 ## 5.5 Validation and release readiness
 
-- Test webhook replay, out-of-order delivery, throttling, expired Plaid credentials, and one-bank failure isolation.
-- Verify notification routing from terminated, backgrounded, and foreground app states.
-- Verify all lock-screen copy remains private.
-- Verify development and production APNs environments and device-token lifecycle.
-- Run the iPhone 17 Pro simulator suite and a signed physical-device smoke test.
+- [x] Test webhook replay, out-of-order delivery, throttling, expired Plaid credentials, and one-bank failure isolation.
+- [x] Verify notification routing by tapping a push from terminated, backgrounded, and foreground app states. Foreground, background, and terminated presentation pass on the iPhone 17 Pro simulator; taps defer at the signed-out boundary and open the queued Transactions destination after authentication.
+- [x] Verify all lock-screen copy remains private.
+- [x] Verify development and production APNs environments and harden the device-token lifecycle.
+- [x] Run the iPhone 17 Pro simulator suite and produce a signed App Store Connect export.
+- [ ] Run the signed FX physical-device smoke test. FX was offline during this pass.
+
+Release-readiness results: 21 backend tests and 51 iPhone 17 Pro tests passed with zero failures. The backend suite now exercises lease coalescing, a follow-up request received during cursor sync, pagination mutation restart, rate limiting, expired credentials, and continued processing after both an Item failure and a failure-reporting error. The app requests an APNs token on every launch, unregisters the current device during sign-out, reports registration failures, and the delivery worker removes only permanently invalid tokens while retaining temporary failures.
+
+The App Store Connect export succeeded locally. Its final signature uses the Cloud Managed Apple Distribution certificate, the production APNs environment, `get-task-allow=false`, and the App Store provisioning profile. The updated `plaid-webhook`, `plaid-nightly-sync`, and `send-briefings` functions were deployed and confirmed active; unauthenticated smoke requests reached the runtime and were correctly rejected with HTTP 401.
+
+Interactive simulator inspection found and fixed a preferences timing issue: if the sheet appeared before `user_preferences`, the alert list could remain empty and render every switch off. Alert rules now load and, when truly absent, seed independently through the production repository path. A normally signed iPhone 17 Pro simulator build confirmed all seven production rules render correctly: five conservative categories enabled, unusual spending and balance changes disabled, and the $1,000 large-transaction threshold visible.
 
 ## Completion criteria
 

@@ -1,6 +1,22 @@
 import { importPKCS8, SignJWT } from "npm:jose@5.9.6";
+import { shouldPrunePushToken } from "./apns_policy.ts";
 
 let cachedToken: { value: string; createdAt: number } | undefined;
+
+export class APNSDeliveryError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly reason: string | undefined,
+    message: string,
+  ) {
+    super(message);
+    this.name = "APNSDeliveryError";
+  }
+
+  get shouldPruneToken(): boolean {
+    return shouldPrunePushToken(this.status, this.reason);
+  }
+}
 
 async function providerToken(): Promise<string> {
   if (cachedToken && Date.now() - cachedToken.createdAt < 45 * 60_000) return cachedToken.value;
@@ -45,5 +61,18 @@ export async function sendPrivateBriefing(
       route: "owner_briefing",
     }),
   });
-  if (!response.ok) throw new Error(`APNs ${response.status}: ${await response.text()}`);
+  if (!response.ok) {
+    const responseBody = await response.text();
+    let reason: string | undefined;
+    try {
+      reason = JSON.parse(responseBody)?.reason;
+    } catch {
+      reason = undefined;
+    }
+    throw new APNSDeliveryError(
+      response.status,
+      reason,
+      `APNs ${response.status}: ${reason ?? responseBody}`,
+    );
+  }
 }

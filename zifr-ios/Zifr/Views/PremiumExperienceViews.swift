@@ -1278,23 +1278,41 @@ private struct BriefingPreferencesSheet: View {
                 }
             }
             .onAppear { load() }
-            .task { await pushService.refreshAuthorizationStatus() }
+            .task {
+                await pushService.refreshAuthorizationStatus()
+                await refreshAlertRules()
+            }
         }
     }
 
     private func load() {
-        guard let preferences = appState.userPreferences else { return }
-        weekday = preferences.briefingWeekday ?? 1
-        weeklyEnabled = preferences.weeklyBriefingEnabled ?? true
-        criticalEnabled = preferences.criticalAlertsEnabled ?? false
-        if let value = preferences.briefingTime {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm:ss"
-            time = formatter.date(from: value) ?? time
+        if let preferences = appState.userPreferences {
+            weekday = preferences.briefingWeekday ?? 1
+            weeklyEnabled = preferences.weeklyBriefingEnabled ?? true
+            criticalEnabled = preferences.criticalAlertsEnabled ?? false
+            if let value = preferences.briefingTime {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm:ss"
+                time = formatter.date(from: value) ?? time
+            }
         }
-        alertRules = appState.alertRules.isEmpty
-            ? AlertRule.conservativeDefaults(userId: preferences.userId)
-            : appState.alertRules
+        applyAlertRules(appState.alertRules)
+    }
+
+    private func refreshAlertRules() async {
+        do {
+            let rules = try await DataRepository.shared.fetchAlertRules()
+            appState.alertRules = rules
+            applyAlertRules(rules)
+        } catch {
+            print("Failed to refresh alert rules: \(error)")
+            errorMessage = "Could not load alert rules. Pull down to retry."
+        }
+    }
+
+    private func applyAlertRules(_ rules: [AlertRule]) {
+        guard !rules.isEmpty else { return }
+        alertRules = rules
         largeTransactionThreshold = amountString(rule(.largeTransaction)?.thresholdAmount ?? 1_000)
         balanceChangeThreshold = amountString(rule(.balanceChange)?.thresholdAmount ?? 500)
         balanceChangePercent = amountString(rule(.balanceChange)?.thresholdPercent ?? 25)
@@ -1431,7 +1449,7 @@ private struct BriefingPreferencesSheet: View {
         case .unusualSpending: return "waveform.path.ecg"
         case .balanceChange: return "chart.line.uptrend.xyaxis"
         case .upcomingPayment: return "calendar.badge.clock"
-        case .expiringItem: return "exclamationmark.calendar"
+        case .expiringItem: return "calendar.badge.exclamationmark"
         case .disconnectedInstitution: return "link.badge.plus"
         }
     }
