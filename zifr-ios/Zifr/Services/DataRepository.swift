@@ -7,6 +7,10 @@ class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
     private static let transactionPageSize = 1_000
+    private static let companyRetryDelays: [Duration] = [
+        .milliseconds(250),
+        .milliseconds(750)
+    ]
 
     // Keep this projection compatible with the production transaction schema.
     // `merchant_website` is optional enrichment and has not been deployed to every
@@ -14,17 +18,26 @@ class DataRepository {
     private static let transactionColumns = "id,user_id,company_id,institution_id,plaid_transaction_id,account_id,canonical_account_id,amount,currency,date,authorized_date,name,merchant_name,merchant_website,merchant_logo_url,payment_channel,personal_finance_primary,personal_finance_detailed,personal_finance_confidence,category,pending"
 
     private func fetchCompanies() async -> Result<[Company], Error> {
-        do {
-            let companies: [Company] = try await client
-                .from("companies")
-                .select()
-                .execute()
-                .value
-            return .success(companies)
-        } catch {
-            print("Failed to fetch companies: \(error)")
-            return .failure(error)
+        var lastError: Error?
+
+        for attempt in 0...Self.companyRetryDelays.count {
+            do {
+                let companies: [Company] = try await client
+                    .from("companies")
+                    .select()
+                    .execute()
+                    .value
+                return .success(companies)
+            } catch {
+                lastError = error
+                guard attempt < Self.companyRetryDelays.count else { break }
+                try? await Task.sleep(for: Self.companyRetryDelays[attempt])
+            }
         }
+
+        let error = lastError ?? CancellationError()
+        print("Failed to fetch companies after bounded retry: \(error)")
+        return .failure(error)
     }
 
     private func refreshMyObligations() async -> Bool {
@@ -129,8 +142,14 @@ class DataRepository {
         // Companies drive the first dashboard paint. Publish them immediately rather
         // than holding them until every secondary portfolio request has completed.
         let fetchedCompaniesResult = await measure("companies") { await fetchCompanies() }
-        if case .success(let fetchedCompanies) = fetchedCompaniesResult {
+        switch fetchedCompaniesResult {
+        case .success(let fetchedCompanies):
             appState.companies = fetchedCompanies
+            appState.portfolioLoadIssue = nil
+        case .failure:
+            // Preserve any already-rendered companies. A transient refresh failure
+            // must never replace known-good portfolio data with an empty dashboard.
+            appState.portfolioLoadIssue = "Companies could not be refreshed. Pull down to try again."
         }
 
         async let fSubscriptions: [Subscription] = measure("subscriptions") { (try? await client.from("subscriptions").select().execute().value) ?? [] }
@@ -961,6 +980,7 @@ struct Transaction: Identifiable, Codable, Equatable {
 
 final class SecurityService {
     static let shared = SecurityService()
+    static let lockedValueLabel = "Locked on this device"
     
     private let keyTag = "com.zifr.encryptionKey"
     private var symmetricKey: SymmetricKey?
@@ -1002,37 +1022,51 @@ final class SecurityService {
     }
     
     func encrypt(_ string: String?) -> String? {
-        guard let string = string, !string.isEmpty, let key = symmetricKey else { return string }
-        
-        // Don't double encrypt
-        if string.starts(with: "enc:") { return string }
-        
-        do {
-            let data = Data(string.utf8)
-            let sealedBox = try AES.GCM.seal(data, using: key)
-            if let combined = sealedBox.combined {
-                return "enc:" + combined.base64EncodedString()
-            }
-        } catch {
-            print("Encryption error: \(error)")
-        }
-        return string
+        Self.encryptValue(string, using: symmetricKey)
     }
-    
+
     func decrypt(_ string: String?) -> String? {
-        guard let string = string, string.starts(with: "enc:") else { return string }
-        guard let key = symmetricKey else { return nil }
-        
+        let value = Self.decryptValue(string, using: symmetricKey)
+        if Self.isLockedValue(value) {
+            // Do not print the payload or crypto error. Returning the original
+            // encrypted value preserves it through an unchanged edit/save.
+            print("🔐 [SecurityService] Protected value unavailable on this device")
+        }
+        return value
+    }
+
+    static func isLockedValue(_ string: String?) -> Bool {
+        string?.hasPrefix("enc:") == true
+    }
+
+    static func editableValue(_ string: String?) -> String {
+        isLockedValue(string) ? "" : (string ?? "")
+    }
+
+    static func encryptValue(_ string: String?, using key: SymmetricKey?) -> String? {
+        guard let string, !string.isEmpty, let key else { return string }
+        guard !isLockedValue(string) else { return string }
+
+        do {
+            let sealedBox = try AES.GCM.seal(Data(string.utf8), using: key)
+            guard let combined = sealedBox.combined else { return string }
+            return "enc:" + combined.base64EncodedString()
+        } catch {
+            return string
+        }
+    }
+
+    static func decryptValue(_ string: String?, using key: SymmetricKey?) -> String? {
+        guard let string, isLockedValue(string), let key else { return string }
         let base64 = String(string.dropFirst(4))
         guard let combined = Data(base64Encoded: base64) else { return string }
-        
+
         do {
             let sealedBox = try AES.GCM.SealedBox(combined: combined)
             let decryptedData = try AES.GCM.open(sealedBox, using: key)
-            return String(data: decryptedData, encoding: .utf8)
+            return String(data: decryptedData, encoding: .utf8) ?? string
         } catch {
-            print("Decryption error: \(error)")
-            return nil
+            return string
         }
     }
 }

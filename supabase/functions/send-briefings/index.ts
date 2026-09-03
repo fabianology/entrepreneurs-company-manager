@@ -66,12 +66,21 @@ Deno.serve(async (request) => {
   }
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const { error: insightRefreshError } = await admin.rpc("refresh_miloom_subscription_insights", { p_user_id: null });
-  if (insightRefreshError) console.error("Subscription insight refresh failed", insightRefreshError);
+  const payload = await request.json().catch(() => ({}));
+  const dryRun = payload?.dry_run === true;
 
-  const { error: refreshError } = await admin.rpc("refresh_miloom_obligations", { p_user_id: null });
-  if (refreshError) return json({ error: refreshError.message }, 500);
-  await admin.rpc("maintain_miloom_downgrades");
+  // A dry run intentionally skips every RPC and table write. The authenticated
+  // Owner Briefing refresh is verified separately, while this path validates
+  // the worker's deployed secrets and read contracts without creating claims,
+  // notifications, alert events, or APNs deliveries.
+  if (!dryRun) {
+    const { error: insightRefreshError } = await admin.rpc("refresh_miloom_subscription_insights", { p_user_id: null });
+    if (insightRefreshError) console.error("Subscription insight refresh failed", insightRefreshError);
+
+    const { error: refreshError } = await admin.rpc("refresh_miloom_obligations", { p_user_id: null });
+    if (refreshError) return json({ error: refreshError.message }, 500);
+    await admin.rpc("maintain_miloom_downgrades");
+  }
 
   const [{ data: entitlements }, { data: preferences }, { data: tokens }, { data: obligations }] = await Promise.all([
     admin.from("user_entitlements").select("user_id,status,grace_ends_at").eq("tier", "pro").in("status", ["trial", "active", "grace"]),
@@ -82,6 +91,18 @@ Deno.serve(async (request) => {
 
   const prefs = new Map((preferences ?? []).map((value) => [value.user_id, value as Preference]));
   const now = new Date();
+
+  if (dryRun) {
+    return json({
+      ok: true,
+      dry_run: true,
+      eligible_users: entitlements?.length ?? 0,
+      configured_preferences: preferences?.length ?? 0,
+      registered_devices: tokens?.length ?? 0,
+      active_obligations: obligations?.length ?? 0,
+    });
+  }
+
   let delivered = 0;
   let alertEventsCreated = 0;
 

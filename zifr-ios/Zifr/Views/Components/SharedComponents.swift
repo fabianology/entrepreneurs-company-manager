@@ -87,6 +87,8 @@ struct CopyableField: View {
     @State private var copied = false
     @State private var revealed = false
 
+    private var isLocked: Bool { SecurityService.isLockedValue(value) }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
@@ -95,7 +97,7 @@ struct CopyableField: View {
                     .foregroundStyle(copied ? accentColor : Color.white.opacity(0.35))
                     .animation(.easeInOut(duration: 0.2), value: copied)
 
-                if isPassword {
+                if isPassword && !isLocked {
                     Button {
                         revealed.toggle()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -108,7 +110,7 @@ struct CopyableField: View {
             }
 
             Button {
-                guard !value.isEmpty else { return }
+                guard !value.isEmpty, !isLocked else { return }
                 UIPasteboard.general.string = value
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 if isPassword {
@@ -136,10 +138,12 @@ struct CopyableField: View {
                         .stroke(Color.white.opacity(0.04), lineWidth: 1)
                 )
             }
+            .disabled(isLocked)
         }
     }
 
     private var displayValue: String {
+        if isLocked { return SecurityService.lockedValueLabel }
         if value.isEmpty { return "—" }
         if isPassword && !revealed { return "••••••••" }
         return value
@@ -399,9 +403,10 @@ struct ProContextMenuModifier: ViewModifier {
     let last4: String?
     
     func body(content: Content) -> some View {
+        let availablePassword = SecurityService.isLockedValue(password) ? nil : password
         content
             .contextMenu {
-                if let pwd = password, !pwd.isEmpty {
+                if let pwd = availablePassword, !pwd.isEmpty {
                     Button {
                         UIPasteboard.general.string = pwd
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -427,10 +432,10 @@ struct ProContextMenuModifier: ViewModifier {
                     }
                 }
                 
-                if (loginId != nil && !loginId!.isEmpty) || (password != nil && !password!.isEmpty) {
+                if (loginId != nil && !loginId!.isEmpty) || (availablePassword != nil && !availablePassword!.isEmpty) {
                     let shareText = [
                         (loginId != nil && !loginId!.isEmpty) ? "Login: \(loginId!)" : nil,
-                        (password != nil && !password!.isEmpty) ? "Password: \(password!)" : nil
+                        (availablePassword != nil && !availablePassword!.isEmpty) ? "Password: \(availablePassword!)" : nil
                     ].compactMap { $0 }.joined(separator: "\n")
                     
                     ShareLink(item: shareText) {

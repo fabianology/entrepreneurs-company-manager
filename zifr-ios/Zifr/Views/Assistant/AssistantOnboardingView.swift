@@ -986,7 +986,13 @@ struct AssistantOnboardingView: View {
                 }
             }
             
-            if let val = valueToRead, !val.isEmpty {
+            if let val = valueToRead, SecurityService.isLockedValue(val) {
+                sendToolResponse(
+                    for: firstCall,
+                    success: false,
+                    customPayload: ["error": AnyCodable("That protected value is locked on this device. Open the item to replace or clear it.")]
+                )
+            } else if let val = valueToRead, !val.isEmpty {
                 sendToolResponse(for: firstCall, success: true, customPayload: ["status": AnyCodable("handed_off_to_local_system_and_waiting_for_assistant_to_finish")])
                 
                 // Store it. The onChange(of: captureManager.isAssistantSpeaking) will trigger it.

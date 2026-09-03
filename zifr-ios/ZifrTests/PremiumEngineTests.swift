@@ -1,7 +1,42 @@
 import XCTest
+import CryptoKit
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testProtectedValueRoundTripWithCurrentKey() throws {
+        let key = SymmetricKey(size: .bits256)
+        let encrypted = try XCTUnwrap(SecurityService.encryptValue("secret", using: key))
+
+        XCTAssertTrue(SecurityService.isLockedValue(encrypted))
+        XCTAssertEqual(SecurityService.decryptValue(encrypted, using: key), "secret")
+    }
+
+    func testLegacyPlaintextRemainsAvailable() {
+        let key = SymmetricKey(size: .bits256)
+        XCTAssertEqual(SecurityService.decryptValue("legacy", using: key), "legacy")
+        XCTAssertFalse(SecurityService.isLockedValue("legacy"))
+    }
+
+    func testCorruptedProtectedValueRemainsLockedAndPreserved() {
+        let corrupted = "enc:not-valid-base64"
+        let result = SecurityService.decryptValue(corrupted, using: SymmetricKey(size: .bits256))
+
+        XCTAssertEqual(result, corrupted)
+        XCTAssertTrue(SecurityService.isLockedValue(result))
+        XCTAssertEqual(SecurityService.editableValue(result), "")
+    }
+
+    func testProtectedValueFromUnavailableKeyRemainsLockedAndPreserved() throws {
+        let originalKey = SymmetricKey(size: .bits256)
+        let replacementKey = SymmetricKey(size: .bits256)
+        let encrypted = try XCTUnwrap(SecurityService.encryptValue("secret", using: originalKey))
+        let result = SecurityService.decryptValue(encrypted, using: replacementKey)
+
+        XCTAssertEqual(result, encrypted)
+        XCTAssertTrue(SecurityService.isLockedValue(result))
+        XCTAssertEqual(SecurityService.encryptValue(result, using: replacementKey), encrypted)
+    }
+
     func testPlaidConnectionHealthDetectsReconnectAndStaleItems() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let reconnect = PlaidItemSummary(

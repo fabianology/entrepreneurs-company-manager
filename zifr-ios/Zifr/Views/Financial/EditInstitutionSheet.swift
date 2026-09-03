@@ -206,7 +206,7 @@ struct EditInstitutionSheet: View {
                                             ZifrField(
                                                 label: "PASSWORD",
                                                 placeholder: "••••••••",
-                                                text: Binding(get: { institution.password ?? "" }, set: { institution.password = $0 }),
+                                                text: Binding(get: { SecurityService.editableValue(institution.password) }, set: { institution.password = $0 }),
                                                 isSecure: !showPassword,
                                                 textContentType: .password
                                             )
@@ -222,6 +222,15 @@ struct EditInstitutionSheet: View {
                                                     .padding()
                                             }
                                             .padding(.bottom, 2)
+                                        }
+                                        if SecurityService.isLockedValue(institution.password) {
+                                            HStack {
+                                                Label("Password locked; replace it or preserve it unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
+                                                Spacer()
+                                                Button("Clear", role: .destructive) { institution.password = nil }
+                                            }
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(Color.orange.opacity(0.8))
                                         }
                                     }
                                     

@@ -87,9 +87,9 @@ struct InstitutionAccountHUD: View {
 
                             ZifrField(
                                 label: "ACCOUNT NUMBER",
-                                placeholder: "e.g. 1234567890",
+                                placeholder: SecurityService.isLockedValue(draft.accountNumber) ? SecurityService.lockedValueLabel : "e.g. 1234567890",
                                 text: Binding(
-                                    get: { draft.accountNumber ?? "" },
+                                    get: { SecurityService.editableValue(draft.accountNumber) },
                                     set: { newValue in
                                         draft.accountNumber = newValue
                                         let filtered = newValue.filter { $0.isNumber }
@@ -105,9 +105,9 @@ struct InstitutionAccountHUD: View {
 
                             ZifrField(
                                 label: "ROUTING NUMBER",
-                                placeholder: "e.g. 021000021",
+                                placeholder: SecurityService.isLockedValue(draft.routingNumber) ? SecurityService.lockedValueLabel : "e.g. 021000021",
                                 text: Binding(
-                                    get: { draft.routingNumber ?? "" },
+                                    get: { SecurityService.editableValue(draft.routingNumber) },
                                     set: { draft.routingNumber = $0 }
                                 ),
                                 keyboardType: .numberPad
@@ -116,13 +116,27 @@ struct InstitutionAccountHUD: View {
                             if !(draft.wireRoutingNumber ?? "").isEmpty {
                                 ZifrField(
                                     label: "WIRE ROUTING NUMBER",
-                                    placeholder: "Provided when different from ACH",
+                                    placeholder: SecurityService.isLockedValue(draft.wireRoutingNumber) ? SecurityService.lockedValueLabel : "Provided when different from ACH",
                                     text: Binding(
-                                        get: { draft.wireRoutingNumber ?? "" },
+                                        get: { SecurityService.editableValue(draft.wireRoutingNumber) },
                                         set: { draft.wireRoutingNumber = $0 }
                                     ),
                                     keyboardType: .numberPad
                                 )
+                            }
+
+                            if [draft.accountNumber, draft.routingNumber, draft.wireRoutingNumber].contains(where: SecurityService.isLockedValue) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Label("Some bank details are locked. Replace individual values or preserve them unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
+                                    Button("Clear All Locked Bank Details", role: .destructive) {
+                                        if SecurityService.isLockedValue(draft.accountNumber) { draft.accountNumber = nil }
+                                        if SecurityService.isLockedValue(draft.routingNumber) { draft.routingNumber = nil }
+                                        if SecurityService.isLockedValue(draft.wireRoutingNumber) { draft.wireRoutingNumber = nil }
+                                    }
+                                }
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.orange.opacity(0.8))
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
 
                             if draft.isTokenizedAccountNumber == true {

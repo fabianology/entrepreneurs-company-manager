@@ -423,19 +423,21 @@ struct EntityFinancialSection: View {
                             innerRows: {
                                 let fullAccNum = acc.accountNumber ?? ""
                                 let routingNum = acc.routingNumber ?? ""
+                                let accountLocked = SecurityService.isLockedValue(fullAccNum)
+                                let routingLocked = SecurityService.isLockedValue(routingNum)
                                 
                                 DashboardInnerRow(
                                     icon: nil,
                                     label: "Account Number",
-                                    value: fullAccNum.isEmpty ? "•••• •••• \(acc.last4.isEmpty ? "0000" : acc.last4)" : fullAccNum,
-                                    copyValue: fullAccNum.isEmpty ? "12345678\(acc.last4.isEmpty ? "0000" : acc.last4)" : fullAccNum
+                                    value: accountLocked ? SecurityService.lockedValueLabel : (fullAccNum.isEmpty ? "•••• •••• \(acc.last4.isEmpty ? "0000" : acc.last4)" : fullAccNum),
+                                    copyValue: accountLocked ? nil : (fullAccNum.isEmpty ? nil : fullAccNum)
                                 )
                                 
                                 DashboardInnerRow(
                                     icon: nil,
                                     label: "Routing Number",
-                                    value: routingNum.isEmpty ? "021000021" : routingNum,
-                                    copyValue: routingNum.isEmpty ? "021000021" : routingNum
+                                    value: routingLocked ? SecurityService.lockedValueLabel : (routingNum.isEmpty ? "—" : routingNum),
+                                    copyValue: routingLocked || routingNum.isEmpty ? nil : routingNum
                                 )
                             },
                             actionButtons: {

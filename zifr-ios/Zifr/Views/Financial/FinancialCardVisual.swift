@@ -653,6 +653,7 @@ struct BackFieldView: View {
     @State private var isPasswordRevealed = false
     @State private var synthesizer = AVSpeechSynthesizer()
     @State private var isSpeaking = false
+    private var isLocked: Bool { SecurityService.isLockedValue(value) }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -662,7 +663,7 @@ struct BackFieldView: View {
                 .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
             
             HStack(spacing: 4) {
-                Text(isSecure && !isPasswordRevealed ? "••••••••" : value)
+                Text(isLocked ? SecurityService.lockedValueLabel : (isSecure && !isPasswordRevealed ? "••••••••" : value))
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(primaryColor)
                     .lineLimit(1)
@@ -670,7 +671,7 @@ struct BackFieldView: View {
                 
                 Spacer()
                 
-                if isSecure {
+                if isSecure && !isLocked {
                     Button {
                         isPasswordRevealed.toggle()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -712,6 +713,7 @@ struct BackFieldView: View {
                 }
                 
                 Button {
+                    guard !isLocked else { return }
                     UIPasteboard.general.string = value
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation { isCopied = true }
@@ -724,6 +726,7 @@ struct BackFieldView: View {
                         .foregroundStyle(isCopied ? Color.green : primaryColor.opacity(0.5))
                 }
                 .buttonStyle(.plain)
+                .disabled(isLocked)
             }
         }
         .padding(.horizontal, 10)

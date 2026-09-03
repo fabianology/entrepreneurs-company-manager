@@ -158,6 +158,7 @@ begin
 end;
 $$;
 
+revoke all on function public.miloom_next_subscription_renewal(text, text, date) from public, anon, authenticated;
 revoke all on function public.refresh_miloom_subscription_insights(uuid) from public;
 grant execute on function public.refresh_miloom_subscription_insights(uuid) to service_role;
 revoke all on function public.refresh_my_miloom_obligations() from public;

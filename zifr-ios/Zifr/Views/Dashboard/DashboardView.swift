@@ -73,6 +73,31 @@ struct DashboardView: View {
                         .padding(.bottom, 10)
 
                     List {
+                        if let loadIssue = appState.portfolioLoadIssue {
+                            Button {
+                                Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                                        .foregroundStyle(Color.zifrGold)
+                                    Text(loadIssue)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.78))
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 4)
+                                    Text("RETRY")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.zifrGold)
+                                }
+                                .padding(12)
+                                .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
+                        }
+
                         if dashboardMode == .briefing {
                             OwnerHealthBriefingDashboard(
                                 vm: vm,

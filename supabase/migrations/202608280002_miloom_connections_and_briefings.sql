@@ -205,7 +205,6 @@ declare table_name text;
 begin
     foreach table_name in array array['subscriptions','institutions','financial_cards','loans','company_documents'] loop
         execute format('drop trigger if exists enforce_miloom_resource_write on public.%I', table_name);
-        execute format('create trigger enforce_miloom_resource_write before insert or update on public.%I for each row execute function public.enforce_miloom_resource_write()', table_name);
     end loop;
 end;
 $$;
@@ -226,9 +225,6 @@ end;
 $$;
 
 drop trigger if exists enforce_miloom_company_update on public.companies;
-create trigger enforce_miloom_company_update
-before update on public.companies
-for each row execute function public.enforce_miloom_company_update();
 
 create or replace function public.select_miloom_free_resources(p_company_id uuid, p_plaid_item_id uuid default null)
 returns void
@@ -262,42 +258,13 @@ security definer
 set search_path = public
 as $$
 begin
-    -- Preserve records and transactions, but remove billable tokens beyond the selected Free Item.
-    update public.plaid_items p
-       set status = 'suspended', access_token = '', updated_at = now()
-      from public.user_entitlements e
-     where p.user_id = e.user_id
-       and public.miloom_effective_tier(e.user_id) = 'free'
-       and e.status in ('expired', 'revoked')
-       and p.status = 'active'
-       and p.id::text <> coalesce(
-           e.selected_free_plaid_item_id,
-           (select p2.id::text from public.plaid_items p2 where p2.user_id = e.user_id and p2.status = 'active' order by p2.created_at limit 1)
-       );
-
-    update public.resource_shares rs
-       set suspended_at = coalesce(rs.suspended_at, now())
-      from public.companies c, public.user_entitlements e
-     where rs.resource_type = 'company' and rs.resource_id = c.id
-       and c.user_id = e.user_id
-       and public.miloom_effective_tier(e.user_id) = 'free'
-       and e.status in ('expired', 'revoked');
-
-    update public.resource_shares rs
-       set suspended_at = null
-      from public.companies c, public.user_entitlements e
-     where rs.resource_type = 'company' and rs.resource_id = c.id
-       and c.user_id = e.user_id
-       and public.miloom_effective_tier(e.user_id) = 'pro';
+    -- Intentionally non-mutating during Phase 6 recovery. Destructive
+    -- downgrade enforcement requires a separate reviewed rollout.
+    return;
 end;
 $$;
 
 drop policy if exists "Miloom suspended shares are unavailable" on public.resource_shares;
-create policy "Miloom suspended shares are unavailable"
-on public.resource_shares as restrictive for select
-using (suspended_at is null);
-
-grant execute on function public.select_miloom_free_resources(uuid, uuid) to authenticated;
 
 create or replace function public.refresh_miloom_obligations(p_user_id uuid default null)
 returns void
@@ -474,9 +441,6 @@ end;
 $$;
 
 drop trigger if exists enforce_miloom_plaid_item_limit on public.plaid_items;
-create trigger enforce_miloom_plaid_item_limit
-before insert or update of status on public.plaid_items
-for each row execute function public.enforce_miloom_plaid_item_limit();
 
 -- Limit unique active guest emails across the portfolio, if the external invitation table exists.
 create or replace function public.enforce_miloom_guest_limit()
@@ -504,7 +468,6 @@ do $$
 begin
     if to_regclass('public.resource_invitations') is not null then
         execute 'drop trigger if exists enforce_miloom_guest_limit on public.resource_invitations';
-        execute 'create trigger enforce_miloom_guest_limit before insert on public.resource_invitations for each row execute function public.enforce_miloom_guest_limit()';
     end if;
 end;
 $$;
@@ -557,10 +520,29 @@ end;
 $$;
 
 drop trigger if exists enforce_miloom_direct_share_limit on public.resource_shares;
-create trigger enforce_miloom_direct_share_limit
-before insert on public.resource_shares
-for each row execute function public.enforce_miloom_direct_share_limit();
 
+-- Delivery claims are server-only. The app reads and updates obligations but
+-- never reads delivery history directly.
+revoke all on table public.briefing_deliveries from anon, authenticated;
+revoke all on table public.critical_alert_deliveries from anon, authenticated;
+grant all on table public.briefing_deliveries to service_role;
+grant all on table public.critical_alert_deliveries to service_role;
+
+-- Security-definer helpers and enforcement functions must not inherit the
+-- default PUBLIC execute privilege.
+revoke all on function public.refresh_miloom_connections(uuid) from public, anon, authenticated;
+revoke all on function public.miloom_free_company(uuid) from public, anon, authenticated;
+revoke all on function public.enforce_miloom_resource_write() from public, anon, authenticated;
+revoke all on function public.enforce_miloom_company_update() from public, anon, authenticated;
+revoke all on function public.select_miloom_free_resources(uuid, uuid) from public, anon;
+revoke all on function public.maintain_miloom_downgrades() from public, anon, authenticated;
+revoke all on function public.refresh_miloom_obligations(uuid) from public, anon, authenticated;
+revoke all on function public.enforce_miloom_plaid_item_limit() from public, anon, authenticated;
+revoke all on function public.enforce_miloom_guest_limit() from public, anon, authenticated;
+revoke all on function public.miloom_resource_owner(text, uuid) from public, anon, authenticated;
+revoke all on function public.enforce_miloom_direct_share_limit() from public, anon, authenticated;
+
+grant execute on function public.select_miloom_free_resources(uuid, uuid) to authenticated;
 grant execute on function public.refresh_miloom_connections(uuid) to service_role;
 grant execute on function public.refresh_miloom_obligations(uuid) to service_role;
 grant execute on function public.maintain_miloom_downgrades() to service_role;

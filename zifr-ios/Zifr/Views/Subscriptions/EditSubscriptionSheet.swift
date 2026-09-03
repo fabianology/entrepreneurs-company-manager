@@ -335,7 +335,7 @@ struct EditSubscriptionSheet: View {
                                             ZifrField(
                                                 label: "PASSWORD",
                                                 placeholder: "••••••••",
-                                                text: Binding(get: { sub.password ?? "" }, set: { sub.password = $0 }),
+                                                text: Binding(get: { SecurityService.editableValue(sub.password) }, set: { sub.password = $0 }),
                                                 isSecure: !showPassword,
                                                 textContentType: .password
                                             )
@@ -351,6 +351,15 @@ struct EditSubscriptionSheet: View {
                                                     .padding()
                                             }
                                             .padding(.bottom, 2)
+                                        }
+                                        if SecurityService.isLockedValue(sub.password) {
+                                            HStack {
+                                                Label("Password locked; replace it or preserve it unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
+                                                Spacer()
+                                                Button("Clear", role: .destructive) { sub.password = nil }
+                                            }
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(Color.orange.opacity(0.8))
                                         }
                                     }
                                     

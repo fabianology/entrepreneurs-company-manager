@@ -324,7 +324,7 @@ struct GlobalSearchView: View {
                     }
                     
                     if let pwd = result.password, !pwd.isEmpty {
-                        Text("PASSWORD: ••••••••")
+                        Text(SecurityService.isLockedValue(pwd) ? "PASSWORD: LOCKED ON THIS DEVICE" : "PASSWORD: ••••••••")
                             .font(.system(size: 11, weight: .semibold))
                             .tracking(0.3)
                             .foregroundStyle(Color.white.opacity(0.4))
@@ -361,7 +361,7 @@ struct GlobalSearchView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            if let pwd = result.password, !pwd.isEmpty {
+            if let pwd = result.password, !pwd.isEmpty, !SecurityService.isLockedValue(pwd) {
                 Button {
                     UIPasteboard.general.string = pwd
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -387,10 +387,11 @@ struct GlobalSearchView: View {
                 }
             }
             
-            if (result.loginId != nil && !result.loginId!.isEmpty) || (result.password != nil && !result.password!.isEmpty) {
+            let availablePassword = SecurityService.isLockedValue(result.password) ? nil : result.password
+            if (result.loginId != nil && !result.loginId!.isEmpty) || (availablePassword != nil && !availablePassword!.isEmpty) {
                 let shareText = [
                     (result.loginId != nil && !result.loginId!.isEmpty) ? "Login: \(result.loginId!)" : nil,
-                    (result.password != nil && !result.password!.isEmpty) ? "Password: \(result.password!)" : nil
+                    (availablePassword != nil && !availablePassword!.isEmpty) ? "Password: \(availablePassword!)" : nil
                 ].compactMap { $0 }.joined(separator: "\n")
                 
                 ShareLink(item: shareText) {

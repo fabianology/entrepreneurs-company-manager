@@ -24,6 +24,7 @@ final class AppState {
     var hasLoadedPortfolio: Bool = false
     
     var isLoading: Bool = false
+    var portfolioLoadIssue: String? = nil
     var error: String? = nil
     
     // Local Overrides: resourceId -> companyId

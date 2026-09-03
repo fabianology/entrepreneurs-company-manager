@@ -185,6 +185,11 @@ begin
     end if;
 
     select * into v_entitlement from public.user_entitlements where user_id = v_user;
+    if not found then
+        -- Preserve the existing StoreKit fallback until this account has been
+        -- initialized by a verified purchase or restore operation.
+        raise exception using errcode = 'P0001', message = 'MILOOM_ENTITLEMENT_NOT_INITIALIZED';
+    end if;
     select * into v_usage
       from public.usage_buckets
      where user_id = v_user
@@ -271,9 +276,8 @@ end;
 $$;
 
 drop trigger if exists enforce_miloom_company_limit on public.companies;
-create trigger enforce_miloom_company_limit
-before insert on public.companies
-for each row execute function public.enforce_miloom_company_limit();
+-- Phase 6 recovery installs the contract without activating monetization
+-- enforcement against existing production users.
 
 create or replace function public.enforce_miloom_document_limit()
 returns trigger
@@ -294,9 +298,40 @@ end;
 $$;
 
 drop trigger if exists enforce_miloom_document_limit on public.company_documents;
-create trigger enforce_miloom_document_limit
-before insert or update of url on public.company_documents
-for each row execute function public.enforce_miloom_document_limit();
+-- Activation remains a separate, explicitly reviewed product rollout.
+
+-- New functions are executable by PUBLIC by default. Keep helper and trigger
+-- functions private, and expose only the two authenticated app RPCs.
+revoke all on function public.miloom_effective_tier(uuid) from public, anon, authenticated;
+revoke all on function public.get_miloom_access_snapshot() from public, anon;
+revoke all on function public.consume_miloom_usage(text, integer) from public, anon;
+revoke all on function public.enforce_miloom_company_limit() from public, anon, authenticated;
+revoke all on function public.enforce_miloom_document_limit() from public, anon, authenticated;
 
 grant execute on function public.get_miloom_access_snapshot() to authenticated;
 grant execute on function public.consume_miloom_usage(text, integer) to authenticated;
+
+-- Do not depend on project-wide default grants. RLS still scopes every
+-- authenticated operation to the current owner.
+revoke all on table public.user_entitlements from anon, authenticated;
+revoke all on table public.usage_buckets from anon, authenticated;
+revoke all on table public.resource_connections from anon, authenticated;
+revoke all on table public.obligations from anon, authenticated;
+revoke all on table public.device_push_tokens from anon, authenticated;
+revoke all on table public.product_events from anon, authenticated;
+
+grant select on table public.user_entitlements to authenticated;
+grant select on table public.usage_buckets to authenticated;
+grant select, insert, update, delete on table public.resource_connections to authenticated;
+grant select, update on table public.obligations to authenticated;
+grant select, insert, update, delete on table public.device_push_tokens to authenticated;
+grant insert on table public.product_events to authenticated;
+grant usage, select on sequence public.product_events_id_seq to authenticated;
+
+grant all on table public.user_entitlements to service_role;
+grant all on table public.usage_buckets to service_role;
+grant all on table public.resource_connections to service_role;
+grant all on table public.obligations to service_role;
+grant all on table public.device_push_tokens to service_role;
+grant all on table public.product_events to service_role;
+grant all on sequence public.product_events_id_seq to service_role;

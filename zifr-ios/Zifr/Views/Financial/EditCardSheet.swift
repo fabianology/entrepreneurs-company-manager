@@ -70,14 +70,14 @@ struct EditCardSheet: View {
     }
     
     struct Snapshot: Equatable {
-        var name, last4, network, type, autopay, cardHolder, cardHolderType, expiry, notes: String
+        var name, login, password, last4, network, type, autopay, cardHolder, cardHolderType, expiry, notes: String
         var balance, limit, moPayment, apr, promoApr: Double
         var promoEnds: Date
     }
     @State private var snapshot: Snapshot?
 
     private var currentSnapshot: Snapshot {
-        Snapshot(name: card.name ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
+        Snapshot(name: card.name ?? "", login: card.login ?? "", password: card.password ?? "", last4: card.last4 ?? "", network: card.network ?? "", type: card.type ?? "", autopay: card.autopay, cardHolder: card.cardHolder ?? "", cardHolderType: card.cardHolderType ?? "", expiry: card.expiry ?? "", notes: card.notes ?? "", balance: card.balance, limit: card.limit, moPayment: card.moPayment, apr: card.apr, promoApr: card.promoApr, promoEnds: card.promoEnds ?? Date())
     }
 
     private var isDirty: Bool {
@@ -335,6 +335,35 @@ struct EditCardSheet: View {
                 cardPicker(label: "NETWORK", sel: Binding(get: { card.network }, set: { card.network = $0 }), opts: FinancialCard.networks)
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    @ViewBuilder private var credentialRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                ZifrField(
+                    label: "LOGIN ID",
+                    placeholder: "username or email",
+                    text: Binding(get: { card.login ?? "" }, set: { card.login = $0 }),
+                    textContentType: .username
+                )
+                ZifrField(
+                    label: "PASSWORD",
+                    placeholder: SecurityService.isLockedValue(card.password) ? SecurityService.lockedValueLabel : "••••••••",
+                    text: Binding(get: { SecurityService.editableValue(card.password) }, set: { card.password = $0 }),
+                    isSecure: true,
+                    textContentType: .password
+                )
+            }
+            if SecurityService.isLockedValue(card.password) {
+                HStack {
+                    Label("Password locked; replace it or preserve it unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
+                    Spacer()
+                    Button("Clear", role: .destructive) { card.password = nil }
+                }
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Color.orange.opacity(0.8))
+            }
         }
     }
 
@@ -602,6 +631,7 @@ struct EditCardSheet: View {
                         ZifrSheetCard(title: "CARD DETAILS", icon: "creditcard") {
                             VStack(spacing: 16) {
                                 row1
+                                credentialRow
                                 row2
                                 if card.type.lowercased() != "debit" {
                                     row3
@@ -828,6 +858,8 @@ struct EditCardSheet: View {
                             vm.deleteCard(card, appState: appState) 
                         } else if let snap = snapshot {
                             card.name = snap.name
+                            card.login = snap.login
+                            card.password = snap.password
                             card.last4 = snap.last4
                             card.network = snap.network
                             card.type = snap.type

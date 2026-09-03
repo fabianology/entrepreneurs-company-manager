@@ -669,13 +669,14 @@ struct PremiumSubscriptionCard: View {
 
     private func copyableCredential(id: String, label: String, value: String, field: String, isPassword: Bool = false) -> some View {
         let isCopied = copiedField == field
+        let isLocked = SecurityService.isLockedValue(value)
         return VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 5) {
                 Text(isCopied ? "Copied ✓" : label)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(isCopied ? Color.orange : Color.white.opacity(0.5))
                     .textCase(.uppercase)
-                if isPassword {
+                if isPassword && !isLocked {
                     Button {
                         passwordRevealed.toggle()
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -688,7 +689,7 @@ struct PremiumSubscriptionCard: View {
             }
 
             Button {
-                guard !value.isEmpty else { return }
+                guard !value.isEmpty, !isLocked else { return }
                 UIPasteboard.general.string = value
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation { copiedField = field }
@@ -697,7 +698,7 @@ struct PremiumSubscriptionCard: View {
                 }
             } label: {
                 HStack {
-                    Text(isPassword && !passwordRevealed ? "••••••••" : (value.isEmpty ? "—" : value))
+                    Text(isLocked ? SecurityService.lockedValueLabel : (isPassword && !passwordRevealed ? "••••••••" : (value.isEmpty ? "—" : value)))
                         .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(value.isEmpty ? Color.white.opacity(0.3) : .white)
                         .lineLimit(1)
@@ -710,6 +711,7 @@ struct PremiumSubscriptionCard: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
             }
             .buttonStyle(PremiumButtonStyle())
+            .disabled(isLocked)
         }
     }
 
