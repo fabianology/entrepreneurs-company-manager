@@ -39,7 +39,7 @@ recording the final verification gate.
 
 ## 8.3 Production handoff
 
-- [ ] Deploy the exact-minute `send-briefings` worker fix before relying on a
+- [x] Deploy the exact-minute `send-briefings` worker fix before relying on a
   custom weekly briefing time.
 - [ ] Retest one live briefing or transaction-review Inbox route after backend
   deployment.
@@ -62,3 +62,9 @@ recording the final verification gate.
    remove the test document.
 7. Sign out and sign back in; confirm companies, notification preferences, and
    financial data reload without showing another user's data.
+
+### Deployment evidence
+
+- The linked Miloom Supabase project's `send-briefings` Edge Function is active
+  at version 6 with the exact-minute delivery-window implementation. Deployment
+  only uploaded the function; it did not invoke the worker or create alerts.

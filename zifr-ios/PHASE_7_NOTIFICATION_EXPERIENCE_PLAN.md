@@ -80,8 +80,8 @@ Phase 7 makes notification controls easy to find, explains the difference betwee
   with push permission allowed and device registration reported as Ready.
 - Production checks remaining: Supabase scheduler delivery for owner briefings
   and transaction-review alerts, plus foreground/background/tap routing from a
-  real backend push payload. The scheduler must be redeployed with the
-  exact-minute delivery-window fix before the live briefing check.
+  real backend push payload. The exact-minute scheduler fix is deployed; the
+  live briefing check remains pending.
 
 ## Completion criteria
 
