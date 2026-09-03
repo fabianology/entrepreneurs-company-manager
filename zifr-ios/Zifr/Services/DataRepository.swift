@@ -36,16 +36,17 @@ class DataRepository {
         }
 
         let error = lastError ?? CancellationError()
-        print("Failed to fetch companies after bounded retry: \(error)")
+        AppDiagnostics.failure("data", "fetch_companies", error: error)
         return .failure(error)
     }
 
     private func refreshMyObligations() async -> Bool {
         do {
             try await client.rpc("refresh_my_miloom_obligations").execute()
+            AppDiagnostics.event("briefing", "refresh_obligations", status: "success")
             return true
         } catch {
-            print("Failed to refresh owner briefing obligations: \(error)")
+            AppDiagnostics.failure("briefing", "refresh_obligations", error: error)
             return false
         }
     }
@@ -83,14 +84,7 @@ class DataRepository {
             return try await fetchTransactions()
         }
         catch { 
-            print("Failed to fetch transactions! Error details: \(String(describing: error))")
-            if let decodingError = error as? DecodingError {
-                print("Decoding error: \(decodingError)")
-            }
-            if let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let fileURL = docsDir.appendingPathComponent("tx_error.txt")
-                try? "\(error)".write(to: fileURL, atomically: true, encoding: .utf8)
-            }
+            AppDiagnostics.failure("plaid", "fetch_transactions", error: error)
             return [] 
         }
     }
@@ -106,7 +100,7 @@ class DataRepository {
     private func safeFetchShares() async -> [ResourceShare] {
         do { return try await client.from("resource_shares").select().execute().value }
         catch {
-            print("Failed to fetch resource shares! (Table may not exist yet): \(error)")
+            AppDiagnostics.failure("data", "fetch_resource_shares", error: error)
             return []
         }
     }
@@ -114,7 +108,7 @@ class DataRepository {
     private func safeFetchAlertRules() async -> [AlertRule] {
         do { return try await fetchAlertRules() }
         catch {
-            print("Failed to fetch alert rules: \(error)")
+            AppDiagnostics.failure("briefing", "fetch_alert_rules", error: error)
             return []
         }
     }
@@ -1030,7 +1024,7 @@ final class SecurityService {
         if Self.isLockedValue(value) {
             // Do not print the payload or crypto error. Returning the original
             // encrypted value preserves it through an unchanged edit/save.
-            print("🔐 [SecurityService] Protected value unavailable on this device")
+            AppDiagnostics.event("encryption", "decrypt_protected_value", status: "locked")
         }
         return value
     }
@@ -1077,7 +1071,7 @@ extension DataRepository {
         let result = try await operation()
         let end = Date()
         let time = end.timeIntervalSince(start)
-        print("⏱️ [DataRepository] \(name) took \(time) seconds")
+        AppDiagnostics.duration("data", name, seconds: time)
         
         return result
     }

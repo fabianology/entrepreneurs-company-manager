@@ -124,7 +124,7 @@ struct PlaidLinkButton: View {
                                 onSuccess(success.metadata.institution.name, result.accounts, result.item_id) 
                             }
                         } catch {
-                            print("Plaid Exchange Error:", error)
+                            AppDiagnostics.failure("plaid", "exchange_public_token", error: error)
                             await MainActor.run { 
                                 self.isExchangingToken = false
                                 errorMessage = error.localizedDescription 

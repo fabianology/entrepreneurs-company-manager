@@ -40,7 +40,7 @@ final class AuthViewModel: NSObject {
                 return UUID(uuidString: sid)
             }
         } catch {
-            print("Error decoding JWT payload: \(error)")
+            AppDiagnostics.failure("auth", "decode_session_claims", error: error)
         }
         return nil
     }
@@ -138,7 +138,7 @@ final class AuthViewModel: NSObject {
                 UserDefaults.standard.removeObject(forKey: "onboardingStep")
             }
         } catch {
-            print("Error signing out: \(error.localizedDescription)")
+            AppDiagnostics.failure("auth", "sign_out", error: error)
         }
     }
     
@@ -197,7 +197,7 @@ final class AuthViewModel: NSObject {
                 self.activeSessions = finalSessions
             }
         } catch {
-            print("Failed to fetch active sessions: \(error)")
+            AppDiagnostics.failure("auth", "fetch_active_sessions", error: error)
         }
     }
     
@@ -209,7 +209,7 @@ final class AuthViewModel: NSObject {
             try await SupabaseService.shared.client.rpc("revoke_session", params: RevokeParams(session_id: id)).execute()
             await fetchActiveSessions()
         } catch {
-            print("Failed to revoke session: \(error)")
+            AppDiagnostics.failure("auth", "revoke_session", error: error)
         }
     }
     
@@ -317,7 +317,7 @@ final class AuthViewModel: NSObject {
     func startSignInWithGoogleFlow() {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootViewController = windowScene.windows.first?.rootViewController else {
-            print("Could not find root view controller")
+            AppDiagnostics.failure("auth", "google_presentation_context")
             return
         }
         
@@ -348,7 +348,7 @@ final class AuthViewModel: NSObject {
                     self.authError = error.localizedDescription
                     self.isLoading = false
                 }
-                print("Google Sign In error: \(error)")
+                AppDiagnostics.failure("auth", "google_sign_in", error: error)
             }
         }
     }
@@ -436,11 +436,11 @@ extension AuthViewModel: ASAuthorizationControllerDelegate {
                 fatalError("Invalid state: A login callback was received, but no login request was sent.")
             }
             guard let appleIDToken = appleIDCredential.identityToken else {
-                print("Unable to fetch identity token")
+                AppDiagnostics.failure("auth", "apple_identity_token_missing")
                 return
             }
             guard let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
-                print("Unable to serialize token string from data: \(appleIDToken.debugDescription)")
+                AppDiagnostics.failure("auth", "apple_identity_token_decode")
                 return
             }
             
@@ -461,14 +461,14 @@ extension AuthViewModel: ASAuthorizationControllerDelegate {
                         self.authError = error.localizedDescription
                         self.isLoading = false
                     }
-                    print("Supabase auth error: \(error)")
+                    AppDiagnostics.failure("auth", "apple_supabase_sign_in", error: error)
                 }
             }
         }
     }
 
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
-        print("Sign in with Apple errored: \(error.localizedDescription)")
+        AppDiagnostics.failure("auth", "apple_authorization", error: error)
     }
 }
 

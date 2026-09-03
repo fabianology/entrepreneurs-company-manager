@@ -26,13 +26,18 @@ class PlaidService {
         do {
             let response: Response = try await client.functions
                 .invoke("create-link-token", options: options)
+            AppDiagnostics.event("plaid", "create_link_token", status: "success")
             return response.link_token
         } catch let FunctionsError.httpError(code, data) {
+            AppDiagnostics.failure("plaid", "create_link_token", error: NSError(domain: "PlaidHTTP", code: code))
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let errorMsg = json["error"] as? String {
                 throw NSError(domain: "PlaidService", code: code, userInfo: [NSLocalizedDescriptionKey: errorMsg])
             }
             throw FunctionsError.httpError(code: code, data: data)
+        } catch {
+            AppDiagnostics.failure("plaid", "create_link_token", error: error)
+            throw error
         }
     }
     
@@ -65,14 +70,20 @@ class PlaidService {
             body: payload
         )
         do {
-            return try await client.functions
+            let response: ExchangeResponse = try await client.functions
                 .invoke("exchange-public-token", options: options)
+            AppDiagnostics.event("plaid", "exchange_public_token", status: "success")
+            return response
         } catch let FunctionsError.httpError(code, data) {
+            AppDiagnostics.failure("plaid", "exchange_public_token", error: NSError(domain: "PlaidHTTP", code: code))
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let errorMsg = json["error"] as? String {
                 throw NSError(domain: "PlaidService", code: code, userInfo: [NSLocalizedDescriptionKey: errorMsg])
             }
             throw FunctionsError.httpError(code: code, data: data)
+        } catch {
+            AppDiagnostics.failure("plaid", "exchange_public_token", error: error)
+            throw error
         }
     }
     
@@ -127,12 +138,17 @@ class PlaidService {
                     userInfo: [NSLocalizedDescriptionKey: "\(bank) could not refresh all transactions. Other connected banks were updated."]
                 )
             }
+            AppDiagnostics.event("plaid", "sync_transactions", status: "success")
         } catch let FunctionsError.httpError(code, data) {
+            AppDiagnostics.failure("plaid", "sync_transactions", error: NSError(domain: "PlaidHTTP", code: code))
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let errorMsg = json["error"] as? String {
                 throw NSError(domain: "PlaidService", code: code, userInfo: [NSLocalizedDescriptionKey: errorMsg])
             }
             throw FunctionsError.httpError(code: code, data: data)
+        } catch {
+            AppDiagnostics.failure("plaid", "sync_transactions", error: error)
+            throw error
         }
     }
     

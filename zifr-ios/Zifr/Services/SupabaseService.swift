@@ -1,6 +1,25 @@
 import Foundation
+import OSLog
 import Supabase
 import UIKit
+
+enum AppDiagnostics {
+    private static let logger = Logger(subsystem: "com.miloom.app", category: "reliability")
+
+    static func event(_ area: String, _ operation: String, status: String) {
+        logger.info("area=\(area, privacy: .public) operation=\(operation, privacy: .public) status=\(status, privacy: .public)")
+    }
+
+    static func failure(_ area: String, _ operation: String, error: Error? = nil) {
+        let code = (error as NSError?)?.code ?? 0
+        logger.error("area=\(area, privacy: .public) operation=\(operation, privacy: .public) status=failure code=\(code, privacy: .public)")
+    }
+
+    static func duration(_ area: String, _ operation: String, seconds: TimeInterval) {
+        let milliseconds = Int((seconds * 1_000).rounded())
+        logger.info("area=\(area, privacy: .public) operation=\(operation, privacy: .public) status=complete duration_ms=\(milliseconds, privacy: .public)")
+    }
+}
 
 
 class SupabaseService {

@@ -55,8 +55,14 @@ final class PushNotificationService {
         do {
             let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
             await refreshAuthorizationStatus()
-            if granted { UIApplication.shared.registerForRemoteNotifications() }
+            if granted {
+                AppDiagnostics.event("push", "request_authorization", status: "granted")
+                UIApplication.shared.registerForRemoteNotifications()
+            } else {
+                AppDiagnostics.event("push", "request_authorization", status: "denied")
+            }
         } catch {
+            AppDiagnostics.failure("push", "request_authorization", error: error)
             lastError = error.localizedDescription
         }
     }
@@ -102,7 +108,9 @@ final class PushNotificationService {
             try await DataRepository.shared.registerPushToken(token, environment: environment)
             UserDefaults.standard.set(token, forKey: registeredTokenKey)
             UserDefaults.standard.removeObject(forKey: tokenKey)
+            AppDiagnostics.event("push", "register_device_token", status: "success")
         } catch {
+            AppDiagnostics.failure("push", "register_device_token", error: error)
             lastError = error.localizedDescription
         }
     }
@@ -113,14 +121,17 @@ final class PushNotificationService {
             try await DataRepository.shared.unregisterPushToken(token)
             UserDefaults.standard.removeObject(forKey: registeredTokenKey)
             UserDefaults.standard.removeObject(forKey: tokenKey)
+            AppDiagnostics.event("push", "unregister_device_token", status: "success")
         } catch {
             // Signing out must remain available while offline. A stale token that
             // Apple later rejects is removed by the server delivery worker.
+            AppDiagnostics.failure("push", "unregister_device_token", error: error)
             lastError = error.localizedDescription
         }
     }
 
     func registrationFailed(_ error: Error) {
+        AppDiagnostics.failure("push", "apns_registration", error: error)
         lastError = error.localizedDescription
     }
 

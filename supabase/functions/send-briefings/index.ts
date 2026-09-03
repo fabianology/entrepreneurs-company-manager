@@ -19,6 +19,16 @@ type PushToken = {
   environment: "development" | "production";
 };
 
+function logFailure(operation: string, error: unknown) {
+  const candidate = error as { code?: string | number; status?: number } | null;
+  console.error(JSON.stringify({
+    area: "briefing",
+    operation,
+    status: "failure",
+    code: candidate?.code ?? candidate?.status ?? 0,
+  }));
+}
+
 async function deliverPrivatePushes(
   admin: any,
   tokens: PushToken[],
@@ -75,7 +85,7 @@ Deno.serve(async (request) => {
   // notifications, alert events, or APNs deliveries.
   if (!dryRun) {
     const { error: insightRefreshError } = await admin.rpc("refresh_miloom_subscription_insights", { p_user_id: null });
-    if (insightRefreshError) console.error("Subscription insight refresh failed", insightRefreshError);
+    if (insightRefreshError) logFailure("refresh_subscription_insights", insightRefreshError);
 
     const { error: refreshError } = await admin.rpc("refresh_miloom_obligations", { p_user_id: null });
     if (refreshError) return json({ error: refreshError.message }, 500);
@@ -114,7 +124,7 @@ Deno.serve(async (request) => {
       const result = await evaluateUserAlerts(admin, entitlement.user_id, now);
       alertEventsCreated += result.created;
     } catch (error) {
-      console.error("Scheduled alert evaluation failed", entitlement.user_id, error);
+      logFailure("evaluate_scheduled_alerts", error);
     }
   }
 

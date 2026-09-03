@@ -33,7 +33,7 @@ Phase 6 closes verified production-contract gaps, makes encrypted-record failure
 - [x] Restore remote-only migration files locally and reconcile the nine verified, already-present production versions in migration history.
 - [x] Apply and record the five genuinely missing foundation versions.
 - [x] Verify authenticated Owner Briefing refresh, access snapshot, and push-token registration with a rollback-only production smoke test.
-- [x] Add and deploy a no-write `send-briefings` dry-run path; production version 4 is active.
+- [x] Add and deploy a no-write `send-briefings` dry-run path; production version 5 is active with privacy-safe diagnostics.
 - [ ] Invoke the deployed `send-briefings` dry run from the scheduler/secret holder and retain the aggregate-only result.
 
 ### Rehearsal evidence
@@ -50,7 +50,7 @@ Phase 6 closes verified production-contract gaps, makes encrypted-record failure
 - An authenticated production smoke test refreshed Owner Briefing obligations,
   confirmed the expected StoreKit fallback, and exercised push-token
   insert/read/delete access inside a rolled-back transaction.
-- `send-briefings` version 4 is deployed with a `dry_run` request mode that
+- `send-briefings` version 5 is deployed with a `dry_run` request mode that
   validates its secrets and read contracts without performing RPC or table
   writes and without contacting APNs. Invocation remains pending because the
   cron secret is intentionally not stored in the repository or local shell.
@@ -103,9 +103,22 @@ Phase 6 closes verified production-contract gaps, makes encrypted-record failure
 
 ## 6.4 Observability and release validation
 
-- [ ] Add structured, privacy-safe diagnostics for auth, sync, briefing, push, and decryption failures.
+- [x] Add structured, privacy-safe diagnostics for auth, sync, briefing, push, and decryption failures.
 - [x] Add contract smoke tests that fail when required production tables/RPCs are absent.
-- [ ] Run backend tests, the iPhone 17 Pro suite, signed archive/export, and the FX physical-device smoke test. (Contract rehearsal and iPhone 17 Pro tests pass; archive/export and final FX smoke remain.)
+- [x] Run backend tests, the iPhone 17 Pro suite, signed archive/export, and the FX physical-device smoke test.
+
+### Release-validation evidence
+
+- The production-shaped PostgreSQL contract rehearsal passed twice and its
+  disposable database was removed afterward.
+- The iPhone 17 Pro iOS 26.4 test suite passes.
+- A signed Release archive and development IPA export completed with team
+  `WYYJ6FGYRP` and bundle identifier `com.vibing.miloom`.
+- The archived app installed and launched successfully on the paired FX iPhone;
+  the Miloom process remained running after launch.
+- Diagnostics use OSLog-style structured fields and numeric error codes only;
+  they do not record emails, user/resource identifiers, tokens, ciphertext,
+  merchant details, account details, or credential values.
 
 ## Completion criteria
 

@@ -116,21 +116,17 @@ struct ZifrApp: App {
             }
             .onOpenURL { url in
                 Task {
-                    do {
-                        // Check if it's a Plaid OAuth redirect
-                        if url.absoluteString.starts(with: "https://miloom.com/oauth") {
-                            NotificationCenter.default.post(name: Notification.Name("PlaidOAuthRedirect"), object: url)
-                            return
+                    // Check if it's a Plaid OAuth redirect
+                    if url.absoluteString.starts(with: "https://miloom.com/oauth") {
+                        NotificationCenter.default.post(name: Notification.Name("PlaidOAuthRedirect"), object: url)
+                        return
+                    }
+
+                    SupabaseService.shared.client.handle(url)
+                    if url.absoluteString.contains("reset-password") {
+                        await MainActor.run {
+                            authViewModel.isRecoveringPassword = true
                         }
-                        
-                        try await SupabaseService.shared.client.handle(url)
-                        if url.absoluteString.contains("reset-password") {
-                            await MainActor.run {
-                                authViewModel.isRecoveringPassword = true
-                            }
-                        }
-                    } catch {
-                        print("Failed to handle deep link: \(error)")
                     }
                 }
             }
