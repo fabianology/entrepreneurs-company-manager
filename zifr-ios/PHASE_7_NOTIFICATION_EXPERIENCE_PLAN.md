@@ -62,8 +62,8 @@ Phase 7 makes notification controls easy to find, explains the difference betwee
 ## 7.4 End-to-end validation
 
 - [x] Exercise a private test notification on simulator and physical device where supported.
-- [x] Verify in-app inbox routing for briefings and transaction review alerts.
-- [ ] Run the iPhone 17 Pro suite and a signed physical-device smoke test.
+- [ ] Verify in-app inbox routing for briefings and transaction review alerts.
+- [x] Run the iPhone 17 Pro suite and a signed physical-device smoke test.
 - [x] Record remaining production scheduler or APNs checks explicitly.
 
 ### 7.4 validation evidence
@@ -76,10 +76,12 @@ Phase 7 makes notification controls easy to find, explains the difference betwee
   transaction, and transaction-review destinations; seeded backend rows are
   still needed for a live tap-through check.
 - The iPhone 17 Pro XCTest suite passed. A signed physical-device smoke test is
-  not available in this environment and remains an explicit release check.
+  now passes: the private test notification appeared on the signed iPhone,
+  with push permission allowed and device registration reported as Ready.
 - Production checks remaining: Supabase scheduler delivery for owner briefings
-  and transaction-review alerts, APNs token registration on a signed device, and
-  foreground/background/tap routing from a real push payload.
+  and transaction-review alerts, plus foreground/background/tap routing from a
+  real backend push payload. The scheduler must be redeployed with the
+  exact-minute delivery-window fix before the live briefing check.
 
 ## Completion criteria
 

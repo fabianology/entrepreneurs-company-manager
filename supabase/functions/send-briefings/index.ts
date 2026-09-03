@@ -2,7 +2,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { json } from "../_shared/http.ts";
 import { APNSDeliveryError, sendPrivateBriefing } from "../_shared/apns.ts";
 import { evaluateUserAlerts } from "../_shared/alerts.ts";
-import { isImmediateCriticalItem, isWeeklyBriefingItem } from "../_shared/briefing.ts";
+import {
+  isImmediateCriticalItem,
+  isWeeklyBriefingDue,
+  isWeeklyBriefingItem,
+} from "../_shared/briefing.ts";
 
 type Preference = {
   user_id: string;
@@ -59,13 +63,21 @@ function localSchedule(now: Date, preference?: Preference) {
   }).formatToParts(now);
   const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   const weekday = ({ Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 } as Record<string, number>)[value("weekday")];
+  const [rawHour, rawMinute] = (preference?.briefing_time || "08:00").split(":");
+  const parsedHour = Number(rawHour);
+  const parsedMinute = Number(rawMinute);
   return {
     weekday,
     hour: Number(value("hour")),
     minute: Number(value("minute")),
     date: `${value("year")}-${value("month")}-${value("day")}`,
     targetWeekday: preference?.briefing_weekday ?? 1,
-    targetHour: Number((preference?.briefing_time || "08:00").slice(0, 2)),
+    targetHour: Number.isInteger(parsedHour) && parsedHour >= 0 && parsedHour <= 23
+      ? parsedHour
+      : 8,
+    targetMinute: Number.isInteger(parsedMinute) && parsedMinute >= 0 && parsedMinute <= 59
+      ? parsedMinute
+      : 0,
   };
 }
 
@@ -152,7 +164,7 @@ Deno.serve(async (request) => {
     const preference = prefs.get(entitlement.user_id);
     if (preference?.weekly_briefing_enabled === false) continue;
     const schedule = localSchedule(now, preference);
-    if (schedule.weekday !== schedule.targetWeekday || schedule.hour !== schedule.targetHour || schedule.minute >= 15) continue;
+    if (!isWeeklyBriefingDue(schedule)) continue;
 
     const active = (obligations ?? []).filter((item) => isWeeklyBriefingItem(item, entitlement.user_id, now));
     if (!active.length) continue;

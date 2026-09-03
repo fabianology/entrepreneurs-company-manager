@@ -1226,6 +1226,9 @@ struct BriefingPreferencesSheet: View {
                     DatePicker("Time", selection: $time, displayedComponents: .hourAndMinute)
                     LabeledContent("Last delivered", value: lastDeliveredLabel)
                     LabeledContent("Next scheduled", value: nextScheduledLabel)
+                    Text("For a same-day test, choose a time at least 15 minutes ahead. Briefings are delivered within 15 minutes of the selected time.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Immediate alerts") {

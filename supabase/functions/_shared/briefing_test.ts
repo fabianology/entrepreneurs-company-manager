@@ -1,6 +1,7 @@
 import {
   type BriefingObligation,
   isImmediateCriticalItem,
+  isWeeklyBriefingDue,
   isWeeklyBriefingItem,
 } from "./briefing.ts";
 
@@ -101,5 +102,35 @@ Deno.test("immediate critical alerts never include deferred items", () => {
     ),
     false,
     "deferred urgent item",
+  );
+});
+
+Deno.test("weekly briefing honors the selected minute for a 15-minute worker window", () => {
+  assertEqual(
+    isWeeklyBriefingDue({
+      weekday: 4, hour: 10, minute: 15,
+      targetWeekday: 4, targetHour: 10, targetMinute: 6,
+    }),
+    true,
+    "nine minutes after the selected time",
+  );
+  assertEqual(
+    isWeeklyBriefingDue({
+      weekday: 4, hour: 10, minute: 21,
+      targetWeekday: 4, targetHour: 10, targetMinute: 6,
+    }),
+    false,
+    "fifteen minutes after the selected time",
+  );
+});
+
+Deno.test("weekly briefing window carries across midnight", () => {
+  assertEqual(
+    isWeeklyBriefingDue({
+      weekday: 5, hour: 0, minute: 5,
+      targetWeekday: 4, targetHour: 23, targetMinute: 58,
+    }),
+    true,
+    "seven minutes after Thursday 23:58",
   );
 });
