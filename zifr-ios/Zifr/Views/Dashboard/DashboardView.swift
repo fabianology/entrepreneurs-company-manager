@@ -251,7 +251,13 @@ struct DashboardView: View {
                 }
             }
             .navigationDestination(for: Company.self) { company in
-                CompanyDetailView(company: company, vm: vm)
+                CompanyDetailView(
+                    company: company,
+                    vm: vm,
+                    onShowAllEntities: {
+                        selectDashboardMode(.portfolio)
+                    }
+                )
             }
             .navigationDestination(for: AppViewModel.AppRoute.self) { route in
                 if route == .adminSettings {
@@ -470,35 +476,39 @@ struct DashboardView: View {
                         }
                     )
 
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        showAssistant = true
-                    } label: {
-                        ZStack {
-                            bottomControlGlass(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color(hex: "#918457"),
-                                                    Color(hex: "#918457").opacity(0.3)
-                                                ],
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            ),
-                                            lineWidth: 1.5
-                                        )
-                                )
-                                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                    if dashboardMode == .briefing {
+                        Menu {
+                            if !companies.isEmpty {
+                                Section("Jump to Entity") {
+                                    ForEach(companies) { company in
+                                        Button {
+                                            openEntity(company)
+                                        } label: {
+                                            Text(company.name)
+                                        }
+                                    }
+                                }
+                            }
 
-                            Image(systemName: "apple.intelligence")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.85))
+                            Button {
+                                selectDashboardMode(.portfolio)
+                            } label: {
+                                Label("All Entities", systemImage: "square.grid.2x2")
+                            }
+                        } label: {
+                            dashboardBottomIcon("circle.grid.3x3.fill")
                         }
-                        .frame(width: 44, height: 44)
+                        .accessibilityLabel("Jump to Entity")
+                    } else {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showAssistant = true
+                        } label: {
+                            dashboardBottomIcon("apple.intelligence")
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("AI Assistant")
                     }
-                    .buttonStyle(.plain)
 
                     plusCommandMenu
                         .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
@@ -644,6 +654,40 @@ struct DashboardView: View {
                     shape.fill(Color.zifrTabBarFill.opacity(0.35))
                 )
         }
+    }
+
+    private func dashboardBottomIcon(_ systemName: String) -> some View {
+        ZStack {
+            bottomControlGlass(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    private func openEntity(_ company: Company) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        vm.selectedCompany = company
+        vm.activeTab = .financial
+        vm.touchCompany(company, appState: appState)
+        vm.path.append(company)
     }
 
     @ViewBuilder

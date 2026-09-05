@@ -338,35 +338,6 @@ struct EditCardSheet: View {
         }
     }
 
-    @ViewBuilder private var credentialRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                ZifrField(
-                    label: "LOGIN ID",
-                    placeholder: "username or email",
-                    text: Binding(get: { card.login ?? "" }, set: { card.login = $0 }),
-                    textContentType: .username
-                )
-                ZifrField(
-                    label: "PASSWORD",
-                    placeholder: SecurityService.isLockedValue(card.password) ? SecurityService.lockedValueLabel : "••••••••",
-                    text: Binding(get: { SecurityService.editableValue(card.password) }, set: { card.password = $0 }),
-                    isSecure: true,
-                    textContentType: .password
-                )
-            }
-            if SecurityService.isLockedValue(card.password) {
-                HStack {
-                    Label("Password locked; replace it or preserve it unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
-                    Spacer()
-                    Button("Clear", role: .destructive) { card.password = nil }
-                }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.orange.opacity(0.8))
-            }
-        }
-    }
-
     @ViewBuilder private var row3: some View {
         GeometryReader { geo in
             HStack(spacing: 12) {
@@ -631,7 +602,6 @@ struct EditCardSheet: View {
                         ZifrSheetCard(title: "CARD DETAILS", icon: "creditcard") {
                             VStack(spacing: 16) {
                                 row1
-                                credentialRow
                                 row2
                                 if card.type.lowercased() != "debit" {
                                     row3

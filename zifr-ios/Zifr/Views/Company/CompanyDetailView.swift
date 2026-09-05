@@ -3,6 +3,7 @@ import SwiftUI
 struct CompanyDetailView: View {
     @State var company: Company
     @Bindable var vm: AppViewModel
+    let onShowAllEntities: () -> Void
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @Environment(OnboardingStateManager.self) private var onboardingState
@@ -592,6 +593,7 @@ struct CompanyDetailView: View {
             }
             Button {
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                onShowAllEntities()
                 dismiss()
             } label: {
                 Label("All Entities", systemImage: "square.grid.2x2")
