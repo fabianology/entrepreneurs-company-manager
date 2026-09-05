@@ -159,6 +159,12 @@ struct PlaidItemSummary: Identifiable, Codable, Hashable {
         status == "requires_reauth" || errorCode == "ITEM_LOGIN_REQUIRED"
     }
 
+    /// A server-side Plaid Item that is attached to a visible institution.
+    /// Reconnect/error states remain visible so the owner can repair or unlink them.
+    var representsLinkedInstitution: Bool {
+        institutionId != nil && !["archived", "deleted", "pending_link"].contains(status.lowercased())
+    }
+
     func isStale(referenceDate: Date = Date()) -> Bool {
         guard status == "active", let lastSyncedAt else { return status == "active" }
         return referenceDate.timeIntervalSince(lastSyncedAt) > 48 * 60 * 60

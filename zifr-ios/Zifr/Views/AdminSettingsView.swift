@@ -22,8 +22,14 @@ struct AdminSettingsView: View {
     @State private var showingCollaborators: Bool = false
     
     private var activeInstitutions: [Institution] {
-        appState.institutions.filter { inst in
-            appState.companies.contains { $0.id == inst.companyId }
+        let linkedInstitutionIds = Set(
+            appState.plaidItems
+                .filter(\.representsLinkedInstitution)
+                .compactMap(\.institutionId)
+        )
+        return appState.institutions.filter { inst in
+            linkedInstitutionIds.contains(inst.id)
+                && appState.companies.contains { $0.id == inst.companyId }
         }
     }
 
@@ -688,10 +694,18 @@ func parseUserAgent(_ userAgent: String?) -> (name: String, icon: String) {
 
 struct LinkedAccountRow: View {
     let inst: Institution
+    let plaidItem: PlaidItemSummary
     @Bindable var vm: AppViewModel
     let appState: AppState
+    let onUnlinked: (String) -> Void
     @State private var showingUnlinkAlert = false
     @State private var isExpanded = false
+    @State private var isUnlinking = false
+    @State private var unlinkError: String?
+
+    private var hasConnectionIssue: Bool {
+        inst.isDisconnected || plaidItem.status != "active" || plaidItem.errorCode?.isEmpty == false
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -728,11 +742,11 @@ struct LinkedAccountRow: View {
                     
                     HStack(spacing: 6) {
                         Circle()
-                            .fill(inst.isDisconnected ? Color.red : Color.green)
+                            .fill(hasConnectionIssue ? Color.red : Color.green)
                             .frame(width: 6, height: 6)
-                        Text(inst.isDisconnected ? "Connection issue" : "Connected")
+                        Text(hasConnectionIssue ? "Connection issue" : "Connected via Plaid")
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(inst.isDisconnected ? .red : .green)
+                            .foregroundStyle(hasConnectionIssue ? .red : .green)
                     }
                 }
                 
@@ -743,15 +757,24 @@ struct LinkedAccountRow: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         showingUnlinkAlert = true
                     } label: {
-                        Text("Unlink")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.red.opacity(0.1))
-                            .clipShape(Capsule())
+                        Group {
+                            if isUnlinking {
+                                ProgressView()
+                                    .tint(.red)
+                            } else {
+                                Text("Unlink")
+                                    .font(.system(size: 12, weight: .bold))
+                            }
+                        }
+                        .foregroundStyle(.red)
+                        .frame(minWidth: 50)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .disabled(isUnlinking)
                     
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .bold))
@@ -823,7 +846,7 @@ struct LinkedAccountRow: View {
             }
             
             // Connection Fix Banner
-            if inst.isDisconnected {
+            if hasConnectionIssue {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Action Required")
@@ -860,10 +883,33 @@ struct LinkedAccountRow: View {
         .alert("Unlink Connection?", isPresented: $showingUnlinkAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Unlink", role: .destructive) {
-                vm.deleteInstitution(inst, appState: appState)
+                isUnlinking = true
+                Task {
+                    do {
+                        try await vm.deleteInstitutionConfirmed(inst, appState: appState)
+                        await MainActor.run {
+                            isUnlinking = false
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            onUnlinked(inst.name)
+                        }
+                    } catch {
+                        await MainActor.run {
+                            isUnlinking = false
+                            unlinkError = error.localizedDescription
+                        }
+                    }
+                }
             }
         } message: {
             Text("This will permanently remove the Plaid connection for \(inst.name) and erase all linked card and bank account data.")
+        }
+        .alert("Could Not Unlink", isPresented: Binding(
+            get: { unlinkError != nil },
+            set: { if !$0 { unlinkError = nil } }
+        )) {
+            Button("OK", role: .cancel) { unlinkError = nil }
+        } message: {
+            Text(unlinkError ?? "The Plaid connection was not removed. Please try again.")
         }
     }
     
@@ -880,11 +926,30 @@ struct LinkedAccountsSheet: View {
     @Bindable var vm: AppViewModel
     let appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @State private var unlinkConfirmation: String?
     
     private var activeInstitutions: [Institution] {
-        appState.institutions.filter { inst in
-            appState.companies.contains { $0.id == inst.companyId }
+        let linkedInstitutionIds = Set(
+            appState.plaidItems
+                .filter(\.representsLinkedInstitution)
+                .compactMap(\.institutionId)
+        )
+        return appState.institutions.filter { inst in
+            linkedInstitutionIds.contains(inst.id)
+                && appState.companies.contains { $0.id == inst.companyId }
         }
+    }
+
+    private func plaidItem(for institution: Institution) -> PlaidItemSummary? {
+        appState.plaidItems
+            .filter { $0.representsLinkedInstitution && $0.institutionId == institution.id }
+            .sorted {
+                if ($0.status == "active") != ($1.status == "active") {
+                    return $0.status == "active"
+                }
+                return ($0.createdAt ?? .distantPast) > ($1.createdAt ?? .distantPast)
+            }
+            .first
     }
     
     var body: some View {
@@ -918,13 +983,29 @@ struct LinkedAccountsSheet: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
                 .padding(.bottom, 16)
+
+                if let unlinkConfirmation {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("\(unlinkConfirmation) was removed from Plaid and deleted from the server.")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color.green.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 4)
+                }
                 
                 if activeInstitutions.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "building.columns")
                             .font(.system(size: 48, weight: .light))
                             .foregroundStyle(Color.white.opacity(0.3))
-                        Text("No linked accounts yet")
+                        Text("No Plaid-linked accounts")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
@@ -933,7 +1014,15 @@ struct LinkedAccountsSheet: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(activeInstitutions) { inst in
-                                LinkedAccountRow(inst: inst, vm: vm, appState: appState)
+                                if let item = plaidItem(for: inst) {
+                                    LinkedAccountRow(
+                                        inst: inst,
+                                        plaidItem: item,
+                                        vm: vm,
+                                        appState: appState,
+                                        onUnlinked: { unlinkConfirmation = $0 }
+                                    )
+                                }
                             }
                         }
                         .padding(.horizontal, 20)

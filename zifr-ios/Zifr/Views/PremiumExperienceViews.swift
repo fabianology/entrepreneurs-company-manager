@@ -1225,6 +1225,7 @@ struct BriefingPreferencesSheet: View {
 
                 Section("Weekly briefing") {
                     Toggle("Private weekly push", isOn: $weeklyEnabled)
+                        .tint(.zifrBlue)
                     Picker("Day", selection: $weekday) {
                         ForEach(weekdays, id: \.0) { Text($0.1).tag($0.0) }
                     }
@@ -1238,6 +1239,7 @@ struct BriefingPreferencesSheet: View {
 
                 Section("Immediate alerts") {
                     Toggle("Immediate high-severity alerts", isOn: $criticalEnabled)
+                        .tint(.zifrBlue)
                     Text("When enabled, urgent items can send a private push before your weekly briefing.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -1248,6 +1250,7 @@ struct BriefingPreferencesSheet: View {
                         Toggle(isOn: enabledBinding(for: ruleType)) {
                             Label(ruleTitle(ruleType), systemImage: ruleIcon(ruleType))
                         }
+                        .tint(.zifrBlue)
 
                         if ruleType == .largeTransaction && isEnabled(ruleType) {
                             HStack {

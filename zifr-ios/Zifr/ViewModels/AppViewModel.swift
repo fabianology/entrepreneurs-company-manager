@@ -224,24 +224,43 @@ final class AppViewModel {
     }
 
     func deleteInstitution(_ inst: Institution, appState: AppState) {
-        let original = appState.institutions
-        let instName = inst.name
-        let instCompanyId = inst.companyId
-        
-        for acc in inst.accounts { cleanUpCustomPaymentMethod(name: acc.name.isEmpty ? acc.type : acc.name) }
-        
-        for c in appState.cards where c.companyId == instCompanyId && c.institutionName == instName {
-            deleteCard(c, appState: appState)
-        }
-        
-        for l in appState.loans where l.companyId == instCompanyId && l.lender == instName {
-            deleteLoan(l, appState: appState)
-        }
-        
-        appState.institutions.removeAll { $0.id == inst.id }
         Task {
-            do { try await DataRepository.shared.deleteInstitution(inst.id) }
-            catch { await MainActor.run { appState.institutions = original; appState.error = "Failed to delete bank." } }
+            do {
+                try await deleteInstitutionConfirmed(inst, appState: appState)
+            } catch {
+                await MainActor.run {
+                    appState.error = "The bank could not be deleted from the server. Please try again."
+                }
+            }
+        }
+    }
+
+    /// Removes the remote Plaid Item and its server-side institution data before
+    /// changing local state, so a disappearing row is a confirmed deletion.
+    @MainActor
+    func deleteInstitutionConfirmed(_ inst: Institution, appState: AppState) async throws {
+        guard canEdit(companyId: inst.companyId, appState: appState) else {
+            throw NSError(
+                domain: "AppViewModel",
+                code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "You do not have permission to unlink this account."]
+            )
+        }
+
+        try await DataRepository.shared.deleteInstitution(inst.id)
+
+        appState.institutions.removeAll { $0.id == inst.id }
+        appState.cards.removeAll {
+            $0.companyId == inst.companyId
+                && inst.name.caseInsensitiveCompare($0.institutionName ?? "") == .orderedSame
+        }
+        appState.loans.removeAll {
+            $0.companyId == inst.companyId
+                && inst.name.caseInsensitiveCompare($0.lender ?? "") == .orderedSame
+        }
+        appState.plaidItems.removeAll { $0.institutionId == inst.id }
+        for account in inst.accounts {
+            cleanUpCustomPaymentMethod(name: account.name.isEmpty ? account.type : account.name)
         }
     }
     

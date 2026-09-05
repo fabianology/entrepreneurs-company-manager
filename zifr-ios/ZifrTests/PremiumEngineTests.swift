@@ -66,6 +66,36 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertTrue(stale.isStale(referenceDate: now))
     }
 
+    func testOnlyAttachedServerPlaidItemsRepresentLinkedInstitutions() {
+        let institutionId = UUID()
+        let companyId = UUID()
+        let active = PlaidItemSummary(
+            id: UUID(), companyId: companyId, institutionId: institutionId,
+            institutionName: "Example Bank", status: "active", errorCode: nil,
+            lastSyncedAt: nil, createdAt: nil
+        )
+        let reconnect = PlaidItemSummary(
+            id: UUID(), companyId: companyId, institutionId: institutionId,
+            institutionName: "Example Bank", status: "requires_reauth",
+            errorCode: "ITEM_LOGIN_REQUIRED", lastSyncedAt: nil, createdAt: nil
+        )
+        let archived = PlaidItemSummary(
+            id: UUID(), companyId: companyId, institutionId: institutionId,
+            institutionName: "Example Bank", status: "archived", errorCode: nil,
+            lastSyncedAt: nil, createdAt: nil
+        )
+        let pending = PlaidItemSummary(
+            id: UUID(), companyId: companyId, institutionId: nil,
+            institutionName: "Example Bank", status: "pending_link", errorCode: nil,
+            lastSyncedAt: nil, createdAt: nil
+        )
+
+        XCTAssertTrue(active.representsLinkedInstitution)
+        XCTAssertTrue(reconnect.representsLinkedInstitution)
+        XCTAssertFalse(archived.representsLinkedInstitution)
+        XCTAssertFalse(pending.representsLinkedInstitution)
+    }
+
     func testTransactionDecodesWithoutOptionalMerchantWebsiteColumn() throws {
         let owner = UUID()
         let transactionId = UUID()

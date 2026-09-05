@@ -539,19 +539,40 @@ class DataRepository {
         return decrypted
     }
     func deleteInstitution(_ id: UUID) async throws {
-        // Optional Plaid backend cleanup
         struct Request: Encodable { let institution_id: UUID }
-        if let payload = try? JSONEncoder().encode(Request(institution_id: id)) {
-            let options = FunctionInvokeOptions(
-                method: .post,
-                headers: ["Content-Type": "application/json"],
-                body: payload
-            )
-            _ = try? await client.functions.invoke("remove-plaid-item", options: options)
+        struct Response: Decodable {
+            let success: Bool
+            let institution_deleted: Bool
+            let remaining_items: Int
         }
-        
-        // Delete from institutions table
-        try await client.from("institutions").delete().eq("id", value: id).execute()
+
+        let session = try await client.auth.session
+        let payload = try JSONEncoder().encode(Request(institution_id: id))
+        let options = FunctionInvokeOptions(
+            method: .post,
+            headers: [
+                "Content-Type": "application/json",
+                "Authorization": "Bearer \(session.accessToken)"
+            ],
+            body: payload
+        )
+
+        do {
+            let response: Response = try await client.functions.invoke("remove-plaid-item", options: options)
+            guard response.success, response.institution_deleted, response.remaining_items == 0 else {
+                throw NSError(
+                    domain: "DataRepository",
+                    code: 500,
+                    userInfo: [NSLocalizedDescriptionKey: "The server could not confirm that the Plaid connection was removed."]
+                )
+            }
+        } catch let FunctionsError.httpError(code, data) {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = json["error"] as? String {
+                throw NSError(domain: "PlaidRemoval", code: code, userInfo: [NSLocalizedDescriptionKey: message])
+            }
+            throw FunctionsError.httpError(code: code, data: data)
+        }
     }
     
     // MARK: - Loans
