@@ -18,6 +18,12 @@ export type WeeklyBriefingSchedule = {
   targetMinute: number;
 };
 
+export type BriefingEntitlement = {
+  status: string;
+  trial_ends_at?: string | null;
+  grace_ends_at?: string | null;
+};
+
 const MINUTES_PER_DAY = 24 * 60;
 const MINUTES_PER_WEEK = 7 * MINUTES_PER_DAY;
 
@@ -59,6 +65,21 @@ function validDate(value?: string | null): Date | null {
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function isBriefingEntitlementActive(
+  entitlement: BriefingEntitlement,
+  now: Date,
+): boolean {
+  if (entitlement.status === "trial") {
+    const trialEndsAt = validDate(entitlement.trial_ends_at);
+    return trialEndsAt !== null && trialEndsAt >= now;
+  }
+  if (entitlement.status === "grace") {
+    const graceEndsAt = validDate(entitlement.grace_ends_at);
+    return graceEndsAt !== null && graceEndsAt >= now;
+  }
+  return entitlement.status === "active";
 }
 
 export function isImmediateCriticalItem(

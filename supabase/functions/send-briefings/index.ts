@@ -3,6 +3,7 @@ import { json } from "../_shared/http.ts";
 import { APNSDeliveryError, sendPrivateBriefing } from "../_shared/apns.ts";
 import { evaluateUserAlerts } from "../_shared/alerts.ts";
 import {
+  isBriefingEntitlementActive,
   isImmediateCriticalItem,
   isWeeklyBriefingDue,
   isWeeklyBriefingItem,
@@ -105,7 +106,7 @@ Deno.serve(async (request) => {
   }
 
   const [{ data: entitlements }, { data: preferences }, { data: tokens }, { data: obligations }] = await Promise.all([
-    admin.from("user_entitlements").select("user_id,status,grace_ends_at").eq("tier", "pro").in("status", ["trial", "active", "grace"]),
+    admin.from("user_entitlements").select("user_id,status,trial_ends_at,grace_ends_at").eq("tier", "pro").in("status", ["trial", "active", "grace"]),
     admin.from("user_preferences").select("user_id,briefing_weekday,briefing_time,timezone,weekly_briefing_enabled,critical_alerts_enabled"),
     admin.from("device_push_tokens").select("user_id,token,environment"),
     admin.from("obligations").select("owner_user_id,id,due_at,severity,state,deferred_at,snoozed_until").in("state", ["open", "snoozed"]),
@@ -131,7 +132,7 @@ Deno.serve(async (request) => {
   // Time-based rules need evaluation even when no Plaid webhook arrives. Keep
   // failures isolated so an alert problem cannot block briefing delivery.
   for (const entitlement of entitlements ?? []) {
-    if (entitlement.status === "grace" && entitlement.grace_ends_at && new Date(entitlement.grace_ends_at) < now) continue;
+    if (!isBriefingEntitlementActive(entitlement, now)) continue;
     try {
       const result = await evaluateUserAlerts(admin, entitlement.user_id, now);
       alertEventsCreated += result.created;
@@ -142,7 +143,7 @@ Deno.serve(async (request) => {
 
   // Optional immediate alerts are still private: only a generic item count is sent.
   for (const entitlement of entitlements ?? []) {
-    if (entitlement.status === "grace" && entitlement.grace_ends_at && new Date(entitlement.grace_ends_at) < now) continue;
+    if (!isBriefingEntitlementActive(entitlement, now)) continue;
     const preference = prefs.get(entitlement.user_id);
     if (!preference || preference.critical_alerts_enabled !== true) continue;
     const urgent = (obligations ?? []).filter((item) => isImmediateCriticalItem(item, entitlement.user_id));
@@ -160,7 +161,7 @@ Deno.serve(async (request) => {
   }
 
   for (const entitlement of entitlements ?? []) {
-    if (entitlement.status === "grace" && entitlement.grace_ends_at && new Date(entitlement.grace_ends_at) < now) continue;
+    if (!isBriefingEntitlementActive(entitlement, now)) continue;
     const preference = prefs.get(entitlement.user_id);
     if (preference?.weekly_briefing_enabled === false) continue;
     const schedule = localSchedule(now, preference);

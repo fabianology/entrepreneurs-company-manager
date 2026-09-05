@@ -1159,7 +1159,12 @@ struct BriefingPreferencesSheet: View {
     @Environment(AppState.self) private var appState
     @State private var pushService = PushNotificationService.shared
     @State private var weekday = 1
-    @State private var time = Calendar.current.date(from: DateComponents(hour: 8)) ?? Date()
+    @State private var time = Calendar.current.date(
+        bySettingHour: 8,
+        minute: 0,
+        second: 0,
+        of: Date()
+    ) ?? Date()
     @State private var weeklyEnabled = true
     @State private var criticalEnabled = false
     @State private var alertRules: [AlertRule] = []
@@ -1310,9 +1315,16 @@ struct BriefingPreferencesSheet: View {
             weeklyEnabled = preferences.weeklyBriefingEnabled ?? true
             criticalEnabled = preferences.criticalAlertsEnabled ?? false
             if let value = preferences.briefingTime {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "HH:mm:ss"
-                time = formatter.date(from: value) ?? time
+                let components = value.split(separator: ":").compactMap { Int($0) }
+                if components.count >= 2,
+                   let sameDayTime = Calendar.current.date(
+                       bySettingHour: components[0],
+                       minute: components[1],
+                       second: 0,
+                       of: Date()
+                   ) {
+                    time = sameDayTime
+                }
             }
         }
         applyAlertRules(appState.alertRules)

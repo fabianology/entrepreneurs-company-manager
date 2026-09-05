@@ -1,5 +1,6 @@
 import {
   type BriefingObligation,
+  isBriefingEntitlementActive,
   isImmediateCriticalItem,
   isWeeklyBriefingDue,
   isWeeklyBriefingItem,
@@ -20,6 +21,25 @@ function obligation(overrides: Partial<BriefingObligation> = {}): BriefingObliga
 function assertEqual(actual: boolean, expected: boolean, message: string) {
   if (actual !== expected) throw new Error(`${message}: expected ${expected}, received ${actual}`);
 }
+
+Deno.test("briefing entitlement rejects expired temporary trials", () => {
+  assertEqual(
+    isBriefingEntitlementActive({
+      status: "trial",
+      trial_ends_at: "2027-05-05T11:59:59.000Z",
+    }, now),
+    false,
+    "expired trial",
+  );
+  assertEqual(
+    isBriefingEntitlementActive({
+      status: "trial",
+      trial_ends_at: "2027-05-12T12:00:00.000Z",
+    }, now),
+    true,
+    "current trial",
+  );
+});
 
 Deno.test("weekly briefing includes open items due within 30 days", () => {
   assertEqual(

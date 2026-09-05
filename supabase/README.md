@@ -12,7 +12,7 @@ Before deployment, configure these function secrets:
 - `APPLE_ENVIRONMENT` (`Sandbox` or `Production`)
 - `APPLE_ROOT_CA_B64` (comma-separated DER certificates encoded as base64)
 - `APNS_TEAM_ID`, `APNS_KEY_ID`, and `APNS_PRIVATE_KEY`
-- `CRON_SECRET` (use it as the `x-cron-secret` header on the hourly job)
+- `CRON_SECRET` (use it as the `x-cron-secret` header on the 15-minute job)
 - `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV`
 - `PLAID_WEBHOOK_URL` (recommended; defaults to
   `$SUPABASE_URL/functions/v1/plaid-webhook`)
@@ -63,3 +63,36 @@ supabase functions deploy send-briefings --no-verify-jwt
 `x-cron-secret` header. Alert evaluation can create private in-app records, but
 does not send alert-event push notifications. Weekly and critical briefing push
 delivery remains independently opt-in.
+
+### Owner Briefing scheduler
+
+The production project uses a Supabase Cron job named
+`send-briefings-every-15-minutes` with schedule `*/15 * * * *`. Store the same
+random value in both places:
+
+1. Edge Function secret `CRON_SECRET`.
+2. Vault secret `briefing_cron_secret`.
+
+Keep the value out of the cron command. Configure the job as a SQL snippet that
+reads the decrypted value from Vault at execution time:
+
+```sql
+select net.http_post(
+  url := 'https://xxqdytdbpiqjilhutvhz.supabase.co/functions/v1/send-briefings',
+  headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'x-cron-secret', (
+      select decrypted_secret
+      from vault.decrypted_secrets
+      where name = 'briefing_cron_secret'
+      limit 1
+    )
+  ),
+  body := '{}'::jsonb,
+  timeout_milliseconds := 60000
+);
+```
+
+The job must be active and show a successful run before weekly delivery is
+considered configured. A successful local test notification does not validate
+this path because that notification never passes through Supabase or APNs.
