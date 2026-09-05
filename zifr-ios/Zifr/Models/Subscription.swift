@@ -9,6 +9,7 @@ struct SubService: Codable, Identifiable, Hashable {
     var paymentMethodId: UUID? = nil
     var cost: Double = 0
     var billingCycle: BillingCycle = .monthly
+    var renewsOn: Date? = nil
     var purpose: String = ""
     var autoPay: AutoPay = .auto
     var status: ServiceStatus = .active
@@ -16,6 +17,173 @@ struct SubService: Codable, Identifiable, Hashable {
     enum BillingCycle: String, Codable, CaseIterable { case monthly = "Monthly"; case yearly = "Yearly" }
     enum AutoPay: String, Codable, CaseIterable { case auto = "Auto"; case manual = "Manual" }
     enum ServiceStatus: String, Codable, CaseIterable { case active = "Active"; case cancelled = "Cancelled"; case pending = "Pending"; case paused = "Paused" }
+}
+
+enum SubscriptionRenewalScheduler {
+    enum Cycle: Equatable {
+        case monthly
+        case yearly
+    }
+
+    static func nextDueDate(
+        from renewalDate: Date,
+        cycle: Cycle,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date {
+        let today = calendar.startOfDay(for: now)
+        let components = calendar.dateComponents([.year, .month, .day], from: renewalDate)
+        let month = components.month ?? calendar.component(.month, from: now)
+        let anchorDay = components.day ?? calendar.component(.day, from: now)
+        var year = components.year ?? calendar.component(.year, from: now)
+
+        switch cycle {
+        case .monthly:
+            var candidateMonth = month
+            var candidate = date(year: year, month: candidateMonth, day: anchorDay, calendar: calendar)
+            while candidate < today {
+                candidateMonth += 1
+                if candidateMonth > 12 {
+                    candidateMonth = 1
+                    year += 1
+                }
+                candidate = date(year: year, month: candidateMonth, day: anchorDay, calendar: calendar)
+            }
+            return candidate
+        case .yearly:
+            var candidate = date(year: year, month: month, day: anchorDay, calendar: calendar)
+            while candidate < today {
+                year += 1
+                candidate = date(year: year, month: month, day: anchorDay, calendar: calendar)
+            }
+            return candidate
+        }
+    }
+
+    static func nextDueDate(
+        monthlyDay: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> Date {
+        let components = calendar.dateComponents([.year, .month], from: now)
+        let source = date(
+            year: components.year ?? calendar.component(.year, from: now),
+            month: components.month ?? calendar.component(.month, from: now),
+            day: monthlyDay,
+            calendar: calendar
+        )
+        return nextDueDate(from: source, cycle: .monthly, now: now, calendar: calendar)
+    }
+
+    static func normalized(_ subscription: Subscription, now: Date = Date(), calendar: Calendar = .current) -> Subscription {
+        guard subscription.status == "Active" else { return subscription }
+
+        var updated = subscription
+        var didChange = false
+        let cycle: Cycle = subscription.billingCycle == "Yearly" ? .yearly : .monthly
+
+        if let sourceDate = subscription.nextRenewalAt ?? legacyDate(
+            subscription.nextRenewal,
+            cycle: cycle,
+            now: now,
+            calendar: calendar
+        ) {
+            let nextDue = nextDueDate(from: sourceDate, cycle: cycle, now: now, calendar: calendar)
+            if updated.nextRenewalAt != nextDue {
+                updated.nextRenewalAt = nextDue
+                didChange = true
+            }
+
+            let displayValue: String
+            switch cycle {
+            case .monthly:
+                displayValue = "\(calendar.component(.day, from: nextDue))"
+            case .yearly:
+                displayValue = yearlyDisplayDate(nextDue, calendar: calendar)
+            }
+            if updated.nextRenewal != displayValue {
+                updated.nextRenewal = displayValue
+                didChange = true
+            }
+        }
+
+        let normalizedServices = subscription.subServices.map { service -> SubService in
+            guard service.status == .active, let renewsOn = service.renewsOn else { return service }
+            var updatedService = service
+            updatedService.renewsOn = nextDueDate(
+                from: renewsOn,
+                cycle: service.billingCycle == .yearly ? .yearly : .monthly,
+                now: now,
+                calendar: calendar
+            )
+            return updatedService
+        }
+        if normalizedServices != subscription.subServices {
+            updated.subServices = normalizedServices
+            didChange = true
+        }
+
+        if didChange { updated.lastUpdated = now }
+        return updated
+    }
+
+    static func yearlyDisplayDate(_ date: Date, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+
+    private static func legacyDate(
+        _ value: String?,
+        cycle: Cycle,
+        now: Date,
+        calendar: Calendar
+    ) -> Date? {
+        guard let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+
+        if cycle == .monthly, let day = Int(trimmed), (1...31).contains(day) {
+            return nextDueDate(monthlyDay: day, now: now, calendar: calendar)
+        }
+
+        for formatter in legacyDateFormatters {
+            if let parsed = formatter.date(from: trimmed) {
+                let parsedComponents = calendar.dateComponents([.month, .day], from: parsed)
+                guard let month = parsedComponents.month, let day = parsedComponents.day else { continue }
+                let year = calendar.component(.year, from: now)
+                return date(year: year, month: month, day: day, calendar: calendar)
+            }
+        }
+        return nil
+    }
+
+    private static func date(year: Int, month: Int, day: Int, calendar: Calendar) -> Date {
+        var firstOfMonth = DateComponents()
+        firstOfMonth.year = year
+        firstOfMonth.month = month
+        firstOfMonth.day = 1
+        let monthDate = calendar.date(from: firstOfMonth) ?? Date()
+        let lastDay = calendar.range(of: .day, in: .month, for: monthDate)?.count ?? day
+
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = min(day, lastDay)
+        return calendar.startOfDay(for: calendar.date(from: components) ?? Date())
+    }
+
+    private static let legacyDateFormatters: [DateFormatter] = [
+        "yyyy-MM-dd", "MM/dd/yyyy", "MMM d, yyyy", "MMM dd, yyyy", "MM-dd-yyyy", "MMM d", "MMM dd"
+    ].map { format in
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = format
+        return formatter
+    }
 }
 
 struct LinkedEmail: Codable, Identifiable, Hashable {

@@ -166,22 +166,30 @@ struct AddSubscriptionWizard: View {
     private var dayBinding: Binding<Int> {
         Binding(
             get: { Int(sub.nextRenewal ?? "") ?? 1 },
-            set: { sub.nextRenewal = "\($0)" }
+            set: {
+                sub.nextRenewal = "\($0)"
+                sub.nextRenewalAt = SubscriptionRenewalScheduler.nextDueDate(monthlyDay: $0)
+            }
         )
     }
 
     private var renewalDateBinding: Binding<Date> {
         let df = DateFormatter()
-        df.dateFormat = "MMM d"
+        df.dateFormat = "MMM d, yyyy"
         return Binding(
             get: {
+                if let nextRenewalAt = sub.nextRenewalAt { return nextRenewalAt }
                 let parsed = df.date(from: sub.nextRenewal ?? "") ?? Date()
                 let currentYear = Calendar.current.component(.year, from: Date())
                 var comps = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: parsed)
                 comps.year = currentYear
                 return Calendar.current.date(from: comps) ?? Date()
             },
-            set: { sub.nextRenewal = df.string(from: $0) }
+            set: {
+                let nextDue = SubscriptionRenewalScheduler.nextDueDate(from: $0, cycle: .yearly)
+                sub.nextRenewalAt = nextDue
+                sub.nextRenewal = SubscriptionRenewalScheduler.yearlyDisplayDate(nextDue)
+            }
         )
     }
     
@@ -407,7 +415,21 @@ struct AddSubscriptionWizard: View {
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.45))
                         
-                        CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: $sub.billingCycle)
+                        CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
+                            get: { sub.billingCycle },
+                            set: { newCycle in
+                                guard newCycle != sub.billingCycle else { return }
+                                sub.billingCycle = newCycle
+                                if newCycle == "Monthly" {
+                                    sub.nextRenewal = "1"
+                                    sub.nextRenewalAt = SubscriptionRenewalScheduler.nextDueDate(monthlyDay: 1)
+                                } else {
+                                    let nextDue = SubscriptionRenewalScheduler.nextDueDate(from: Date(), cycle: .yearly)
+                                    sub.nextRenewalAt = nextDue
+                                    sub.nextRenewal = SubscriptionRenewalScheduler.yearlyDisplayDate(nextDue)
+                                }
+                            }
+                        ))
                     }
                     
                     PremiumRow {

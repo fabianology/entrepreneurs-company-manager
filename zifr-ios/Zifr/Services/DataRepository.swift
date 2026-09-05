@@ -201,6 +201,11 @@ class DataRepository {
         let transactionOverrides = await fTransactionOverrides
         
         let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
+        let normalizedSubscriptions = secureSubs.map { SubscriptionRenewalScheduler.normalized($0) }
+        let subscriptionsNeedingRenewalUpdate = zip(secureSubs, normalizedSubscriptions).compactMap { pair in
+            let (original, normalized) = pair
+            return original == normalized ? nil : normalized
+        }
         let secureInst = fetchedInstitutions.map { decryptInstitutionSecrets($0) }
         let secureCards = fetchedCards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
         
@@ -214,7 +219,7 @@ class DataRepository {
         let session = try? await client.auth.session
         let currentUserId = session?.user.id
         
-        appState.subscriptions = secureSubs
+        appState.subscriptions = normalizedSubscriptions
         appState.institutions = secureInst
         appState.cards = secureCards
         appState.loans = combinedLoans
@@ -229,6 +234,12 @@ class DataRepository {
         appState.transactionOverrides = transactionOverrides
         appState.resourceConnections = fetchedConnections
         appState.obligations = fetchedObligations
+
+        // Keep next-due dates current in Supabase. A failed background write does
+        // not block the portfolio from showing the correctly calculated date.
+        for subscription in subscriptionsNeedingRenewalUpdate {
+            try? await updateSubscription(subscription)
+        }
 
         if let currentUserId {
             let generatedConnections = PortfolioConnectionEngine.buildConnections(appState: appState, ownerUserId: currentUserId)

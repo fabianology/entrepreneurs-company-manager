@@ -91,7 +91,7 @@ final class AppViewModel {
 
     func saveSub(_ sub: Subscription, appState: AppState) {
         guard canEdit(companyId: sub.companyId, appState: appState) else { return }
-        var mutableSub = sub
+        var mutableSub = SubscriptionRenewalScheduler.normalized(sub)
         mutableSub.lastUpdated = Date()
         if let idx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) {
             let original = appState.subscriptions[idx]

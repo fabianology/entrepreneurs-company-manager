@@ -294,7 +294,7 @@ serve(async (req) => {
             error_code: balanceData.error_code,
             error: balanceData.error_message ?? 'Plaid balance request failed'
           })
-          continue
+          return
         }
 
         // Liabilities enrich supported card records. Auth numbers are imported

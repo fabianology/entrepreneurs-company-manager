@@ -95,23 +95,31 @@ struct EditSubscriptionSheet: View {
     private var dayBinding: Binding<Int> {
         Binding(
             get: { Int(sub.nextRenewal ?? "") ?? 1 },
-            set: { sub.nextRenewal = "\($0)" }
+            set: {
+                sub.nextRenewal = "\($0)"
+                sub.nextRenewalAt = SubscriptionRenewalScheduler.nextDueDate(monthlyDay: $0)
+            }
         )
     }
 
     // Binding: Date ↔ "MMM d" string stored in nextRenewal (yearly)
     private var renewalDateBinding: Binding<Date> {
         let df = DateFormatter()
-        df.dateFormat = "MMM d"
+        df.dateFormat = "MMM d, yyyy"
         return Binding(
             get: {
+                if let nextRenewalAt = sub.nextRenewalAt { return nextRenewalAt }
                 let parsed = df.date(from: sub.nextRenewal ?? "") ?? Date()
                 let currentYear = Calendar.current.component(.year, from: Date())
                 var comps = Calendar.current.dateComponents([.month, .day, .hour, .minute], from: parsed)
                 comps.year = currentYear
                 return Calendar.current.date(from: comps) ?? Date()
             },
-            set: { sub.nextRenewal = df.string(from: $0) }
+            set: {
+                let nextDue = SubscriptionRenewalScheduler.nextDueDate(from: $0, cycle: .yearly)
+                sub.nextRenewalAt = nextDue
+                sub.nextRenewal = SubscriptionRenewalScheduler.yearlyDisplayDate(nextDue)
+            }
         )
     }
 
@@ -208,10 +216,11 @@ struct EditSubscriptionSheet: View {
                     if newCycle != sub.billingCycle {
                         if newCycle == "Monthly" {
                             sub.nextRenewal = "1"
+                            sub.nextRenewalAt = SubscriptionRenewalScheduler.nextDueDate(monthlyDay: 1)
                         } else {
-                            let df = DateFormatter()
-                            df.dateFormat = "MMM d"
-                            sub.nextRenewal = df.string(from: Date())
+                            let nextDue = SubscriptionRenewalScheduler.nextDueDate(from: Date(), cycle: .yearly)
+                            sub.nextRenewalAt = nextDue
+                            sub.nextRenewal = SubscriptionRenewalScheduler.yearlyDisplayDate(nextDue)
                         }
                     }
                     sub.billingCycle = newCycle
@@ -815,9 +824,22 @@ struct SubServiceHUD: View {
                draft.paymentMethod != initial.paymentMethod ||
                draft.cost != initial.cost ||
                draft.billingCycle != initial.billingCycle ||
+               draft.renewsOn != initial.renewsOn ||
                draft.autoPay != initial.autoPay ||
                draft.status != initial.status ||
                draft.purpose != initial.purpose
+    }
+
+    private var renewsOnBinding: Binding<Date> {
+        Binding(
+            get: { draft.renewsOn ?? Date() },
+            set: {
+                draft.renewsOn = SubscriptionRenewalScheduler.nextDueDate(
+                    from: $0,
+                    cycle: draft.billingCycle == .yearly ? .yearly : .monthly
+                )
+            }
+        )
     }
 
 
@@ -896,12 +918,41 @@ struct SubServiceHUD: View {
                                         .foregroundStyle(Color.white.opacity(0.45))
                                     CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: Binding(
                                         get: { draft.billingCycle == .monthly ? "Monthly" : "Yearly" },
-                                        set: { draft.billingCycle = $0 == "Monthly" ? .monthly : .yearly }
+                                        set: {
+                                            draft.billingCycle = $0 == "Monthly" ? .monthly : .yearly
+                                            if let renewsOn = draft.renewsOn {
+                                                draft.renewsOn = SubscriptionRenewalScheduler.nextDueDate(
+                                                    from: renewsOn,
+                                                    cycle: draft.billingCycle == .yearly ? .yearly : .monthly
+                                                )
+                                            }
+                                        }
                                     ))
                                 }
                             }
 
-                            // Row 3: Auto Pay + Status
+                            // Row 3: Renewal date
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("RENEWS ON")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                                DatePicker(
+                                    "Renews on",
+                                    selection: renewsOnBinding,
+                                    displayedComponents: .date
+                                )
+                                .labelsHidden()
+                                .datePickerStyle(.compact)
+                                .tint(.zifrBlue)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .frame(height: 44)
+                                .background(Color(hex: "#2C2C2E"))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                            }
+
+                            // Row 4: Auto Pay + Status
                             HStack(spacing: 12) {
                                 // Auto Pay card
                                 VStack(alignment: .leading, spacing: 4) {
@@ -957,7 +1008,7 @@ struct SubServiceHUD: View {
                                 }
                             }
 
-                            // Row 4: Purpose (full width)
+                            // Row 5: Purpose (full width)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("PURPOSE")
                                     .font(.system(size: 12, weight: .regular))
