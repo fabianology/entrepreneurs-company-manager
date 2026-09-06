@@ -712,7 +712,7 @@ struct TransactionFeedView: View {
     private var detectedSubscriptions: [DetectedSubscription] {
         let target = resolvedAccountId()
         return SubscriptionDetector.detect(
-            transactions: filteredTransactions,
+            transactions: appState.transactionsForAnalysis.filter { resolvedAccountIds().contains($0.accountId) },
             existingSubscriptions: appState.subscriptions,
             filterAccountId: target,
             companyId: resolvedCompanyId

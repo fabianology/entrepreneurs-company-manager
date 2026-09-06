@@ -678,7 +678,7 @@ enum OwnerHealthEngine {
             return nil
         }
         let recurringSuggestions = scopedCompanies.flatMap { company in
-            let companyTransactions = appState.transactions.filter { transactionCompanyID($0) == company.id }
+            let companyTransactions = appState.transactionsForAnalysis.filter { transactionCompanyID($0) == company.id }
             let companySubscriptions = subscriptions.filter { $0.companyId == company.id }
             return SubscriptionDetector.detect(
                 transactions: companyTransactions,

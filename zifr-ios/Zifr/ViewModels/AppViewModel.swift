@@ -565,7 +565,7 @@ final class AppViewModel {
         }
         
 
-        let detectedSubs = SubscriptionDetector.detect(transactions: appState.transactions, existingSubscriptions: appState.subscriptions)
+        let detectedSubs = SubscriptionDetector.detect(transactions: appState.transactionsForAnalysis, existingSubscriptions: appState.subscriptions)
         if !detectedSubs.isEmpty {
             minifiedData += "\nDetected Anomalies (Unracked Subscriptions in Transactions):\n"
             minifiedData += detectedSubs.map { "- \($0.name): $\($0.amount)/\($0.frequency) (charged \($0.occurrences)x)" }.joined(separator: "\n")

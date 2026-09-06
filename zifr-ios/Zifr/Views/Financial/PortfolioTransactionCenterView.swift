@@ -1,9 +1,11 @@
 import SwiftUI
+import Charts
 
 enum TransactionFlowFilter: String, CaseIterable, Identifiable {
     case all = "All"
     case moneyOut = "Money Out"
     case moneyIn = "Money In"
+    case ignored = "Ignored"
 
     var id: String { rawValue }
 }
@@ -14,6 +16,32 @@ enum TransactionPostingFilter: String, CaseIterable, Identifiable {
     case pending = "Pending"
 
     var id: String { rawValue }
+}
+
+enum CashFlowWindow: String, CaseIterable, Identifiable {
+    case thirtyDays = "30D"
+    case sixtyDays = "60D"
+    case ninetyDays = "90D"
+    case oneYear = "1Y"
+
+    var id: String { rawValue }
+
+    var dayCount: Int {
+        switch self {
+        case .thirtyDays: return 30
+        case .sixtyDays: return 60
+        case .ninetyDays: return 90
+        case .oneYear: return 365
+        }
+    }
+
+    var title: String {
+        self == .oneYear ? "LAST 12 MONTHS" : "LAST \(dayCount) DAYS"
+    }
+
+    var previousPeriodTitle: String {
+        self == .oneYear ? "the previous year" : "the previous \(dayCount) days"
+    }
 }
 
 struct ResolvedTransaction: Identifiable, Equatable {
@@ -70,9 +98,11 @@ struct CashFlowExpenseConcentration: Equatable {
 struct CashFlowInsightSnapshot: Equatable {
     let current: CashFlowPeriodSummary
     let previous: CashFlowPeriodSummary
-    let topExpenseCategory: CashFlowExpenseConcentration?
+    let expenseCategories: [CashFlowExpenseConcentration]
+    let expenseRecords: [ResolvedTransaction]
     let largestExpense: ResolvedTransaction?
 
+    var topExpenseCategory: CashFlowExpenseConcentration? { expenseCategories.first }
     var netChange: Double { current.net - previous.net }
     var hasCurrentActivity: Bool { current.transactionCount > 0 }
 }
@@ -86,14 +116,15 @@ enum CashFlowInsightEngine {
 
     static func analyze(
         records: [ResolvedTransaction],
+        window: CashFlowWindow = .thirtyDays,
         anchorDate: Date = Date(),
         calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> CashFlowInsightSnapshot {
         let calendar = calendar
         let anchor = calendar.startOfDay(for: anchorDate)
-        let currentStart = calendar.date(byAdding: .day, value: -29, to: anchor)!
-        let previousEnd = calendar.date(byAdding: .day, value: -30, to: anchor)!
-        let previousStart = calendar.date(byAdding: .day, value: -59, to: anchor)!
+        let currentStart = calendar.date(byAdding: .day, value: -(window.dayCount - 1), to: anchor)!
+        let previousEnd = calendar.date(byAdding: .day, value: -window.dayCount, to: anchor)!
+        let previousStart = calendar.date(byAdding: .day, value: -(window.dayCount * 2 - 1), to: anchor)!
 
         let posted = records.compactMap { record -> (ResolvedTransaction, Date)? in
             guard record.transaction.pending != true,
@@ -113,7 +144,7 @@ enum CashFlowInsightEngine {
             TransactionIntelligence.effectiveFlow(for: $0) == .expense
                 && abs($0.transaction.amount ?? 0) > 0.005
         }
-        let topCategory = expenseConcentration(
+        let categories = expenseConcentration(
             from: currentExpenses,
             totalExpense: currentSummary.moneyOut
         )
@@ -124,7 +155,8 @@ enum CashFlowInsightEngine {
         return CashFlowInsightSnapshot(
             current: currentSummary,
             previous: previousSummary,
-            topExpenseCategory: topCategory,
+            expenseCategories: categories,
+            expenseRecords: currentExpenses,
             largestExpense: largestExpense
         )
     }
@@ -144,7 +176,7 @@ enum CashFlowInsightEngine {
             case .income, .refund:
                 moneyIn += amount
                 transactionCount += 1
-            case .transfer:
+            case .transfer, .ignored:
                 break
             }
         }
@@ -159,8 +191,8 @@ enum CashFlowInsightEngine {
     private static func expenseConcentration(
         from records: [ResolvedTransaction],
         totalExpense: Double
-    ) -> CashFlowExpenseConcentration? {
-        guard totalExpense > 0 else { return nil }
+    ) -> [CashFlowExpenseConcentration] {
+        guard totalExpense > 0 else { return [] }
         var buckets: [String: CategoryBucket] = [:]
 
         for record in records {
@@ -173,17 +205,18 @@ enum CashFlowInsightEngine {
             buckets[key] = bucket
         }
 
-        guard let winner = buckets.sorted(by: {
+        return buckets.sorted(by: {
             if $0.value.amount == $1.value.amount { return $0.key < $1.key }
             return $0.value.amount > $1.value.amount
-        }).first else { return nil }
-        return CashFlowExpenseConcentration(
-            key: winner.key,
-            label: winner.value.label,
-            amount: winner.value.amount,
-            transactionCount: winner.value.transactionCount,
-            share: winner.value.amount / totalExpense
-        )
+        }).map { key, bucket in
+            CashFlowExpenseConcentration(
+                key: key,
+                label: bucket.label,
+                amount: bucket.amount,
+                transactionCount: bucket.transactionCount,
+                share: bucket.amount / totalExpense
+            )
+        }
     }
 
     private static func parseDate(_ value: String, calendar: Calendar) -> Date? {
@@ -431,7 +464,8 @@ enum TransactionIntelligence {
     }
 
     static func enrichedTransactions(from records: [ResolvedTransaction]) -> [Transaction] {
-        records.map { record in
+        records.compactMap { record in
+            guard record.override?.flowOverride != .ignored else { return nil }
             var transaction = record.transaction
             if transaction.companyId == nil {
                 transaction.companyId = record.companyId
@@ -453,6 +487,8 @@ enum TransactionIntelligence {
                 transaction.amount = -abs(transaction.amount ?? 0)
             case .transfer:
                 transaction.category = ["Transfer"]
+            case .ignored:
+                return nil
             case nil:
                 break
             }
@@ -514,10 +550,14 @@ enum TransactionIntelligence {
         if let flowOverride = record.override?.flowOverride {
             return flowOverride
         }
-        if isFinancialMovement(record.transaction) {
+        return automaticFlow(for: record.transaction)
+    }
+
+    static func automaticFlow(for transaction: Transaction) -> TransactionFlowOverride {
+        if isFinancialMovement(transaction) {
             return .transfer
         }
-        return (record.transaction.amount ?? 0) < 0 ? .income : .expense
+        return (transaction.amount ?? 0) < 0 ? .income : .expense
     }
 
     static func summary(for records: [ResolvedTransaction]) -> TransactionPortfolioSummary {
@@ -528,6 +568,7 @@ enum TransactionIntelligence {
 
         for record in records {
             let transaction = record.transaction
+            guard effectiveFlow(for: record) != .ignored else { continue }
             if transaction.pending == true {
                 pendingCount += 1
                 continue
@@ -543,7 +584,7 @@ enum TransactionIntelligence {
                 moneyOut += abs(amount)
             case .income, .refund:
                 moneyIn += abs(amount)
-            case .transfer:
+            case .transfer, .ignored:
                 break
             }
         }
@@ -601,11 +642,13 @@ struct PortfolioTransactionCenterView: View {
     @State private var searchText = ""
     @State private var flowFilter: TransactionFlowFilter = .all
     @State private var postingFilter: TransactionPostingFilter = .all
+    @State private var cashFlowWindow: CashFlowWindow = .thirtyDays
     @State private var selectedCompanyId: UUID?
     @State private var selectedAccountId: String?
     @State private var isSyncing = false
     @State private var syncError: String?
     @State private var showDuplicateReview = false
+    @State private var showSpendingCategories = false
     @State private var showNeedsReviewOnly = false
     @State private var dismissedDuplicateIds: Set<String> = []
     @State private var assigningTransactionId: UUID?
@@ -622,6 +665,7 @@ struct PortfolioTransactionCenterView: View {
         allRecords.filter { record in
             let transaction = record.transaction
             guard TransactionIntelligence.matchesSearch(record, query: searchText) else { return false }
+            if showNeedsReviewOnly && TransactionIntelligence.effectiveFlow(for: record) == .ignored { return false }
             if showNeedsReviewOnly && record.companyId != nil && !record.accountId.isEmpty { return false }
             if let selectedCompanyId, record.companyId != selectedCompanyId { return false }
             if let selectedAccountId, record.accountId != selectedAccountId { return false }
@@ -638,6 +682,7 @@ struct PortfolioTransactionCenterView: View {
             case .all: return true
             case .moneyOut: return effectiveFlow == .expense
             case .moneyIn: return effectiveFlow == .income || effectiveFlow == .refund
+            case .ignored: return effectiveFlow == .ignored
             }
         }
     }
@@ -646,10 +691,6 @@ struct PortfolioTransactionCenterView: View {
         Dictionary(grouping: filteredRecords, by: { $0.transaction.date })
             .map { (date: $0.key, records: $0.value) }
             .sorted { $0.date > $1.date }
-    }
-
-    private var summary: TransactionPortfolioSummary {
-        TransactionIntelligence.summary(for: filteredRecords)
     }
 
     private var cashFlowScopeRecords: [ResolvedTransaction] {
@@ -661,7 +702,7 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private var cashFlowInsights: CashFlowInsightSnapshot {
-        CashFlowInsightEngine.analyze(records: cashFlowScopeRecords)
+        CashFlowInsightEngine.analyze(records: cashFlowScopeRecords, window: cashFlowWindow)
     }
 
     private var duplicateAlerts: [DuplicateChargeAlert] {
@@ -675,7 +716,10 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private var needsReviewRecords: [ResolvedTransaction] {
-        allRecords.filter { $0.companyId == nil || $0.accountId.isEmpty }
+        allRecords.filter {
+            TransactionIntelligence.effectiveFlow(for: $0) != .ignored
+                && ($0.companyId == nil || $0.accountId.isEmpty)
+        }
     }
 
     private var accountOptions: [(id: String, label: String)] {
@@ -708,9 +752,36 @@ struct PortfolioTransactionCenterView: View {
         return hasher.finalize()
     }
 
+    private var flowFilterSelection: Binding<String> {
+        Binding(
+            get: { flowFilter.rawValue },
+            set: {
+                flowFilter = TransactionFlowFilter(rawValue: $0) ?? .all
+                if flowFilter == .ignored { showNeedsReviewOnly = false }
+            }
+        )
+    }
+
+    private var postingFilterSelection: Binding<String> {
+        Binding(
+            get: { postingFilter.rawValue },
+            set: { postingFilter = TransactionPostingFilter(rawValue: $0) ?? .all }
+        )
+    }
+
+    private var cashFlowWindowSelection: Binding<String> {
+        Binding(
+            get: { cashFlowWindow.rawValue },
+            set: { cashFlowWindow = CashFlowWindow(rawValue: $0) ?? .thirtyDays }
+        )
+    }
+
     var body: some View {
         transactionNavigation
             .presentationDetents([.fraction(0.92), .large])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(24)
+            .presentationBackground(Color(hex: "#1C1C1E"))
             .task(id: analysisInputSignature) {
                 await rebuildAnalysis(showLoading: allRecords.isEmpty)
             }
@@ -721,7 +792,16 @@ struct PortfolioTransactionCenterView: View {
             transactionContent
             .navigationTitle("Transactions")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar { transactionToolbar }
+            .sheet(isPresented: $showSpendingCategories) {
+                SpendingCategorySheet(
+                    insights: cashFlowInsights,
+                    window: cashFlowWindow,
+                    onSave: { draft, record in try await saveOverride(draft, for: record) },
+                    onReset: { record in try await resetOverride(for: record) }
+                )
+            }
             .sheet(isPresented: $showDuplicateReview) {
                 DuplicateChargeReviewSheet(
                     alerts: duplicateAlerts,
@@ -748,7 +828,7 @@ struct PortfolioTransactionCenterView: View {
     @ViewBuilder
     private var transactionContent: some View {
         ZStack {
-            Color.zifrBG.ignoresSafeArea()
+            Color(hex: "#1C1C1E").ignoresSafeArea()
 
             if isPreparing {
                 loadingState("Preparing transactions…")
@@ -765,9 +845,8 @@ struct PortfolioTransactionCenterView: View {
     private var transactionList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                summaryCard
-                searchAndFilters
                 cashFlowInsightsCard
+                searchAndFilters
                 reviewQueueCard
 
                 if !detectedSubscriptions.isEmpty {
@@ -810,141 +889,81 @@ struct PortfolioTransactionCenterView: View {
             }
             .disabled(isSyncing)
         }
+        ToolbarItem(placement: .principal) {
+            Text("Transactions")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+        }
         ToolbarItem(placement: .topBarTrailing) {
             Button("Done") { dismiss() }
                 .fontWeight(.semibold)
         }
     }
 
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("ALL ACCOUNTS")
-                        .font(.system(size: 11, weight: .black))
-                        .tracking(1.6)
-                        .foregroundStyle(Color.zifrGold)
-                    Text("\(filteredRecords.count) transaction\(filteredRecords.count == 1 ? "" : "s")")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.55))
-                }
-                Spacer()
+    private var cashFlowInsightsCard: some View {
+        let insights = cashFlowInsights
+        return ZifrSheetCard(
+            title: "CASH-FLOW INSIGHTS",
+            icon: "waveform.path.ecg",
+            subtitle: cashFlowWindow.title,
+            trailing: {
                 if let syncError {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
                         .accessibilityLabel(syncError)
                 }
-            }
+            },
+            content: {
+                VStack(alignment: .leading, spacing: 14) {
+                    CustomSegmentedControl(
+                        options: CashFlowWindow.allCases.map(\.rawValue),
+                        selection: cashFlowWindowSelection
+                    )
 
-            HStack(spacing: 10) {
-                summaryMetric(title: "SPENT", value: formatCurrency(summary.moneyOut), color: .white)
-                summaryMetric(title: "RECEIVED", value: formatCurrency(summary.moneyIn), color: Color.zifrGreen)
-                summaryMetric(title: "PENDING", value: "\(summary.pendingCount)", color: .orange)
-            }
+                    if insights.hasCurrentActivity {
+                        cashFlowNetSummary(insights)
+                        spendingByCategory(insights)
 
-            if summary.financialMovementCount > 0 {
-                Label(
-                    "Excludes \(summary.financialMovementCount) posted transfers and payments",
-                    systemImage: "arrow.left.arrow.right"
-                )
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.42))
-            }
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.055))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.zifrGold.opacity(0.3), lineWidth: 1))
-    }
-
-    private func summaryMetric(title: String, value: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.42))
-            Text(value)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var cashFlowInsightsCard: some View {
-        let insights = cashFlowInsights
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Label("CASH-FLOW INSIGHTS", systemImage: "waveform.path.ecg")
-                    .font(.system(size: 11, weight: .black))
-                    .tracking(1.2)
-                    .foregroundStyle(Color.zifrGold)
-                Spacer()
-                Text("LAST 30 DAYS")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.38))
-            }
-
-            if insights.hasCurrentActivity {
-                cashFlowNetSummary(insights)
-
-                VStack(spacing: 0) {
-                    if let category = insights.topExpenseCategory {
-                        Button {
-                            applyExpenseCategory(category)
-                        } label: {
-                            insightActionRow(
-                                icon: "chart.pie.fill",
-                                title: category.label,
-                                subtitle: "Top spend · \(formatCurrency(category.amount)) · \(percent(category.share)) of outflow",
-                                trailing: "View"
-                            )
+                        VStack(spacing: 0) {
+                            if let largestExpense = insights.largestExpense {
+                                Button {
+                                    selectedTransaction = largestExpense
+                                } label: {
+                                    insightActionRow(
+                                        icon: "arrow.up.right.circle.fill",
+                                        title: TransactionIntelligence.displayName(for: largestExpense),
+                                        subtitle: "Largest outflow · \(formattedInsightDate(largestExpense.transaction.date))",
+                                        trailing: formatCurrency(abs(largestExpense.transaction.amount ?? 0))
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityHint("Opens this transaction for review")
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Filters the transaction list to this spending category")
-                    }
-
-                    if insights.topExpenseCategory != nil, insights.largestExpense != nil {
-                        Divider().overlay(Color.white.opacity(0.07)).padding(.leading, 43)
-                    }
-
-                    if let largestExpense = insights.largestExpense {
-                        Button {
-                            selectedTransaction = largestExpense
-                        } label: {
-                            insightActionRow(
-                                icon: "arrow.up.right.circle.fill",
-                                title: TransactionIntelligence.displayName(for: largestExpense),
-                                subtitle: "Largest outflow · \(formattedInsightDate(largestExpense.transaction.date))",
-                                trailing: formatCurrency(abs(largestExpense.transaction.amount ?? 0))
-                            )
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                        )
+                    } else {
+                        HStack(spacing: 12) {
+                            Image(systemName: "calendar.badge.exclamationmark")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.35))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("No recent cash-flow activity")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Sync Plaid or choose another company or account to analyze the selected period.")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.45))
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Opens this transaction for review")
-                    }
-                }
-                .background(Color.white.opacity(0.035))
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-            } else {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.35))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("No recent cash-flow activity")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.white)
-                        Text("Sync Plaid or choose another company or account to analyze the last 30 days.")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.45))
                     }
                 }
             }
-        }
-        .padding(15)
-        .background(Color.white.opacity(0.045))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.zifrGold.opacity(0.2), lineWidth: 1))
+        )
     }
 
     private func cashFlowNetSummary(_ insights: CashFlowInsightSnapshot) -> some View {
@@ -982,8 +1001,12 @@ struct PortfolioTransactionCenterView: View {
             .foregroundStyle(cashFlowComparisonColor(insights))
         }
         .padding(14)
-        .background(netCashFlowColor(insights.current.net).opacity(0.08))
+        .background(Color(hex: "#2C2C2E"))
         .clipShape(RoundedRectangle(cornerRadius: 15))
+        .overlay(
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(netCashFlowColor(insights.current.net).opacity(0.2), lineWidth: 1)
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(cashFlowAccessibilityLabel(insights))
     }
@@ -1022,23 +1045,39 @@ struct PortfolioTransactionCenterView: View {
         .contentShape(Rectangle())
     }
 
-    private func applyExpenseCategory(_ category: CashFlowExpenseConcentration) {
-        searchText = category.label
-        flowFilter = .moneyOut
-        postingFilter = .posted
-        showNeedsReviewOnly = false
+    private func spendingByCategory(_ insights: CashFlowInsightSnapshot) -> some View {
+        Button {
+            showSpendingCategories = true
+        } label: {
+            insightActionRow(
+                icon: "chart.pie.fill",
+                title: "Spending by Category",
+                subtitle: insights.expenseCategories.isEmpty
+                    ? "No spending in this period"
+                    : "Explore \(insights.expenseCategories.count) categories",
+                trailing: "View"
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Opens a pie chart with transactions by category")
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
     }
 
     private func cashFlowComparisonText(_ insights: CashFlowInsightSnapshot) -> String {
         guard insights.previous.transactionCount > 0 else {
-            return "No prior 30-day activity to compare"
+            return "No activity in \(cashFlowWindow.previousPeriodTitle) to compare"
         }
         let direction = insights.netChange >= 0 ? "better" : "lower"
-        return "\(formatCurrency(abs(insights.netChange))) \(direction) than the previous 30 days"
+        return "\(formatCurrency(abs(insights.netChange))) \(direction) than \(cashFlowWindow.previousPeriodTitle)"
     }
 
     private func cashFlowAccessibilityLabel(_ insights: CashFlowInsightSnapshot) -> String {
-        "Last 30 days. Net cash flow \(signedCurrency(insights.current.net)). "
+        "\(cashFlowWindow.title.capitalized). Net cash flow \(signedCurrency(insights.current.net)). "
             + "Income \(formatCurrency(insights.current.moneyIn)). "
             + "Outflow \(formatCurrency(insights.current.moneyOut)). "
             + cashFlowComparisonText(insights)
@@ -1064,10 +1103,6 @@ struct PortfolioTransactionCenterView: View {
         if value > 0.005 { return "+\(formatCurrency(value))" }
         if value < -0.005 { return "−\(formatCurrency(abs(value)))" }
         return formatCurrency(0)
-    }
-
-    private func percent(_ value: Double) -> String {
-        "\(Int((value * 100).rounded()))%"
     }
 
     private func formattedInsightDate(_ value: String) -> String {
@@ -1099,8 +1134,12 @@ struct PortfolioTransactionCenterView: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
-            .background(Color.white.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 13))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -1126,19 +1165,15 @@ struct PortfolioTransactionCenterView: View {
                 }
             }
 
-            Picker("Flow", selection: $flowFilter) {
-                ForEach(TransactionFlowFilter.allCases) { filter in
-                    Text(filter.rawValue).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
+            CustomSegmentedControl(
+                options: TransactionFlowFilter.allCases.map(\.rawValue),
+                selection: flowFilterSelection
+            )
 
-            Picker("Posting status", selection: $postingFilter) {
-                ForEach(TransactionPostingFilter.allCases) { filter in
-                    Text(filter.rawValue).tag(filter)
-                }
-            }
-            .pickerStyle(.segmented)
+            CustomSegmentedControl(
+                options: TransactionPostingFilter.allCases.map(\.rawValue),
+                selection: postingFilterSelection
+            )
 
             if showNeedsReviewOnly {
                 Button {
@@ -1165,62 +1200,53 @@ struct PortfolioTransactionCenterView: View {
     @ViewBuilder
     private var reviewQueueCard: some View {
         if !duplicateAlerts.isEmpty || !needsReviewRecords.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Label("REVIEW QUEUE", systemImage: "checklist")
-                        .font(.system(size: 11, weight: .black))
-                        .tracking(1.2)
-                        .foregroundStyle(.orange)
-                    Spacer()
-                    Text("No data is changed automatically")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.38))
-                }
-
-                if !duplicateAlerts.isEmpty {
-                    Button {
-                        showDuplicateReview = true
-                    } label: {
-                        reviewQueueRow(
-                            icon: "rectangle.on.rectangle.badge.exclamationmark",
-                            title: "\(duplicateAlerts.count) possible duplicate\(duplicateAlerts.count == 1 ? "" : "s")",
-                            subtitle: "Review nearly identical charges within three days",
-                            color: .orange
-                        )
+            ZifrSheetCard(
+                title: "REVIEW QUEUE",
+                icon: "checklist",
+                subtitle: "No data is changed automatically"
+            ) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if !duplicateAlerts.isEmpty {
+                        Button {
+                            showDuplicateReview = true
+                        } label: {
+                            reviewQueueRow(
+                                icon: "rectangle.on.rectangle.badge.exclamationmark",
+                                title: "\(duplicateAlerts.count) possible duplicate\(duplicateAlerts.count == 1 ? "" : "s")",
+                                subtitle: "Review nearly identical charges within three days",
+                                color: .orange
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
 
-                if !needsReviewRecords.isEmpty {
-                    Button {
-                        showNeedsReviewOnly = true
-                        selectedCompanyId = nil
-                        selectedAccountId = nil
-                        postingFilter = .all
-                        flowFilter = .all
-                        searchText = ""
-                    } label: {
-                        reviewQueueRow(
-                            icon: "building.2.crop.circle",
-                            title: "\(needsReviewRecords.count) unassigned transaction\(needsReviewRecords.count == 1 ? "" : "s")",
-                            subtitle: "Plaid account or company context needs review",
-                            color: Color.zifrGold
-                        )
+                    if !needsReviewRecords.isEmpty {
+                        Button {
+                            showNeedsReviewOnly = true
+                            selectedCompanyId = nil
+                            selectedAccountId = nil
+                            postingFilter = .all
+                            flowFilter = .all
+                            searchText = ""
+                        } label: {
+                            reviewQueueRow(
+                                icon: "building.2.crop.circle",
+                                title: "\(needsReviewRecords.count) unassigned transaction\(needsReviewRecords.count == 1 ? "" : "s")",
+                                subtitle: "Plaid account or company context needs review",
+                                color: Color.zifrGold
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
 
-                if let assignmentError {
-                    Label(assignmentError, systemImage: "exclamationmark.triangle.fill")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let assignmentError {
+                        Label(assignmentError, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
-            .padding(14)
-            .background(Color.white.opacity(0.045))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.orange.opacity(0.2), lineWidth: 1))
         }
     }
 
@@ -1245,6 +1271,13 @@ struct PortfolioTransactionCenterView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.3))
         }
+        .padding(12)
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
     }
 
     private func filterMenu<Content: View>(
@@ -1255,18 +1288,23 @@ struct PortfolioTransactionCenterView: View {
         Menu(content: content) {
             HStack(spacing: 7) {
                 Image(systemName: icon)
+                    .foregroundStyle(Color(hex: "#C1AA78"))
                 Text(title)
                     .lineLimit(1)
+                    .foregroundStyle(.white)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.45))
             }
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.white)
             .padding(.horizontal, 12)
             .frame(height: 36)
-            .background(Color.white.opacity(0.065))
-            .clipShape(Capsule())
-            .overlay(Capsule().stroke(Color.white.opacity(0.08), lineWidth: 1))
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
         }
     }
 
@@ -1286,8 +1324,23 @@ struct PortfolioTransactionCenterView: View {
                     }
                 }
             }
-            .background(Color.white.opacity(0.045))
+            .background(Color.black.opacity(0.70))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457").opacity(0.7),
+                                Color(hex: "#918457").opacity(0.2)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            )
         }
     }
 
@@ -1324,7 +1377,10 @@ struct PortfolioTransactionCenterView: View {
                             Text("· Possible duplicate")
                                 .foregroundStyle(.orange)
                         }
-                        if record.override != nil {
+                        if record.override?.flowOverride == .ignored {
+                            Text("· Ignored")
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        } else if record.override != nil {
                             Text("· Reviewed")
                                 .foregroundStyle(Color.zifrGold)
                         }
@@ -1588,6 +1644,7 @@ struct PortfolioTransactionCenterView: View {
         case .income: return "arrow.down.left"
         case .refund: return "arrow.uturn.left"
         case .transfer: return "arrow.left.arrow.right"
+        case .ignored: return "eye.slash"
         case .expense: break
         }
         let category = [
@@ -1605,6 +1662,7 @@ struct PortfolioTransactionCenterView: View {
         switch TransactionIntelligence.effectiveFlow(for: record) {
         case .income, .refund: return Color.zifrGreen
         case .transfer: return Color.zifrGold
+        case .ignored: return .gray
         case .expense: return Color(hex: "#1A7077")
         }
     }
@@ -1632,7 +1690,7 @@ struct PortfolioTransactionCenterView: View {
             return "+\(absolute)"
         case .expense:
             return "−\(absolute)"
-        case .transfer:
+        case .transfer, .ignored:
             return amount < 0 ? "+\(absolute)" : "−\(absolute)"
         }
     }
@@ -1641,6 +1699,7 @@ struct PortfolioTransactionCenterView: View {
         switch TransactionIntelligence.effectiveFlow(for: record) {
         case .income, .refund: return Color.zifrGreen
         case .transfer: return Color.zifrGold
+        case .ignored: return .gray
         case .expense: return .white
         }
     }
@@ -1667,6 +1726,217 @@ struct TransactionOverrideDraft: Equatable {
             && categoryDetailed == nil
             && flowOverride == nil
             && note == nil
+    }
+}
+
+private struct SpendingCategorySheet: View {
+    let insights: CashFlowInsightSnapshot
+    let window: CashFlowWindow
+    let onSave: (TransactionOverrideDraft, ResolvedTransaction) async throws -> Void
+    let onReset: (ResolvedTransaction) async throws -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedCategoryKey: String?
+    @State private var selectedAngle: Double?
+    @State private var selectedTransaction: ResolvedTransaction?
+
+    private let palette = [
+        "#C1AA78", "#73AFA6", "#879DCB", "#CE927B", "#AA91BB", "#A9B879",
+        "#D1BC92", "#6C9BB0", "#B98192", "#8AA28A", "#AA947F"
+    ]
+
+    private var selectedCategory: CashFlowExpenseConcentration? {
+        insights.expenseCategories.first { $0.key == selectedCategoryKey }
+            ?? insights.expenseCategories.first
+    }
+
+    private var categoryTransactions: [ResolvedTransaction] {
+        guard let selectedCategory else { return [] }
+        return insights.expenseRecords.filter {
+            let key = (TransactionIntelligence.categoryPrimary(for: $0)?.nonEmpty ?? "OTHER").uppercased()
+            return key == selectedCategory.key
+        }.sorted {
+            if $0.transaction.date == $1.transaction.date { return $0.id.uuidString < $1.id.uuidString }
+            return $0.transaction.date > $1.transaction.date
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    ZifrSheetCard(title: "SPENDING BY CATEGORY", icon: "chart.pie.fill", subtitle: window.title) {
+                        VStack(spacing: 16) {
+                            Text(formatCurrency(insights.current.moneyOut))
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+
+                            if insights.expenseCategories.isEmpty {
+                                Text("No spending in this period")
+                                    .foregroundStyle(.secondary)
+                                    .padding(.vertical, 30)
+                            } else {
+                                categoryPie
+                                Text("Tap a slice or category to see its transactions")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.55))
+                                categoryPicker
+                            }
+
+                            Text("Posted spending only · Excludes transfers and payments")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.42))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+
+                    if let category = selectedCategory {
+                        ZifrSheetCard(
+                            title: category.label.uppercased(),
+                            icon: "list.bullet",
+                            subtitle: "\(category.transactionCount) transactions · \(formatCurrency(category.amount))"
+                        ) {
+                            LazyVStack(spacing: 8) {
+                                ForEach(categoryTransactions) { record in
+                                    Button {
+                                        selectedTransaction = record
+                                    } label: {
+                                        categoryTransactionRow(record)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle("Spending by Category")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Spending by Category")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .sheet(item: $selectedTransaction) { record in
+                TransactionDetailSheet(
+                    record: record,
+                    onSave: { draft in try await onSave(draft, record) },
+                    onReset: { try await onReset(record) }
+                )
+            }
+        }
+        .tint(Color(hex: "#C1AA78"))
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#1C1C1E"))
+    }
+
+    private var categoryPie: some View {
+        Chart(insights.expenseCategories, id: \.key) { category in
+            SectorMark(
+                angle: .value("Spending", category.amount),
+                outerRadius: .ratio(selectedCategory?.key == category.key ? 1 : 0.92),
+                angularInset: 2
+            )
+            .foregroundStyle(categoryColor(category))
+            .opacity(selectedCategory?.key == category.key ? 1 : 0.65)
+            .accessibilityLabel(category.label)
+            .accessibilityValue("\(formatCurrency(category.amount)), \(Int((category.share * 100).rounded())) percent of spending")
+        }
+        .chartLegend(.hidden)
+        .chartAngleSelection(value: $selectedAngle)
+        .frame(height: 235)
+        .onChange(of: selectedAngle) { _, value in
+            guard let value else { return }
+            var runningTotal = 0.0
+            for category in insights.expenseCategories {
+                runningTotal += category.amount
+                if value <= runningTotal {
+                    selectedCategoryKey = category.key
+                    break
+                }
+            }
+        }
+    }
+
+    private var categoryPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(insights.expenseCategories, id: \.key) { category in
+                    Button {
+                        selectedCategoryKey = category.key
+                        selectedAngle = nil
+                    } label: {
+                        HStack(spacing: 7) {
+                            Circle().fill(categoryColor(category)).frame(width: 8, height: 8)
+                            Text(category.label)
+                            Text("\(Int((category.share * 100).rounded()))%")
+                                .foregroundStyle(Color.white.opacity(0.55))
+                        }
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .background(Color(hex: "#2C2C2E"))
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(
+                            selectedCategory?.key == category.key ? categoryColor(category) : Color.clear,
+                            lineWidth: 1.5
+                        ))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selectedCategory?.key == category.key ? [.isSelected] : [])
+                    .accessibilityHint("Shows transactions in this category below the chart")
+                }
+            }
+            .padding(2)
+        }
+    }
+
+    private func categoryColor(_ category: CashFlowExpenseConcentration) -> Color {
+        let index = insights.expenseCategories.firstIndex { $0.key == category.key } ?? 0
+        return Color(hex: palette[index % palette.count])
+    }
+
+    private func formatCurrency(_ amount: Double) -> String {
+        amount.formatted(.currency(code: "USD"))
+    }
+
+    private func categoryTransactionRow(_ record: ResolvedTransaction) -> some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(TransactionIntelligence.displayName(for: record))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("\(record.transaction.date) · \(record.companyName)")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Text(record.accountName)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            Spacer(minLength: 8)
+            Text(formatCurrency(abs(record.transaction.amount ?? 0)))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.4))
+        }
+        .padding(12)
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
     }
 }
 
@@ -1748,7 +2018,7 @@ private struct TransactionDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.zifrBG.ignoresSafeArea()
+                Color(hex: "#1C1C1E").ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 16) {
                         transactionHero
@@ -1774,10 +2044,16 @@ private struct TransactionDetailSheet: View {
             }
             .navigationTitle("Transaction Details")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
                         .disabled(isSaving)
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("Transaction Details")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -1806,6 +2082,9 @@ private struct TransactionDetailSheet: View {
             }
         }
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#1C1C1E"))
     }
 
     private var transactionHero: some View {
@@ -1837,9 +2116,20 @@ private struct TransactionDetailSheet: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
         .padding(.horizontal, 16)
-        .background(Color.white.opacity(0.055))
+        .background(Color.black.opacity(0.70))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
         .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.zifrGold.opacity(0.28), lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
 
     @ViewBuilder
@@ -1854,7 +2144,7 @@ private struct TransactionDetailSheet: View {
                 }
             }
             .frame(width: 54, height: 54)
-            .background(Color.white.opacity(0.08))
+            .background(Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 14))
         } else {
             merchantFallback
@@ -1905,8 +2195,20 @@ private struct TransactionDetailSheet: View {
             }
         }
         .padding(16)
-        .background(Color.white.opacity(0.045))
+        .background(Color.black.opacity(0.70))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
 
     private var correctionForm: some View {
@@ -1919,8 +2221,8 @@ private struct TransactionDetailSheet: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 13)
                 .frame(height: 44)
-                .background(Color.white.opacity(0.065))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
             fieldLabel("PRIMARY CATEGORY")
             Menu {
@@ -1944,8 +2246,8 @@ private struct TransactionDetailSheet: View {
                 }
                 .padding(.horizontal, 13)
                 .frame(height: 44)
-                .background(Color.white.opacity(0.065))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
             fieldLabel("DETAILED CATEGORY")
@@ -1954,8 +2256,8 @@ private struct TransactionDetailSheet: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 13)
                 .frame(height: 44)
-                .background(Color.white.opacity(0.065))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
             fieldLabel("CASH-FLOW TYPE")
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
@@ -1965,13 +2267,20 @@ private struct TransactionDetailSheet: View {
                 }
             }
 
+            if flowSelection == TransactionFlowOverride.ignored.rawValue {
+                Text("Excluded from cash flow, spending categories, and recurring-charge suggestions. This transaction stays in your history. Your card's reported balance is unchanged. Choose Automatic to include it again.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             fieldLabel("NOTE")
             TextField("Optional note", text: $note, axis: .vertical)
                 .lineLimit(2...5)
                 .foregroundStyle(.white)
                 .padding(13)
-                .background(Color.white.opacity(0.065))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
             if let saveError {
                 Label(saveError, systemImage: "exclamationmark.triangle.fill")
@@ -1986,8 +2295,20 @@ private struct TransactionDetailSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
-        .background(Color.white.opacity(0.045))
+        .background(Color.black.opacity(0.70))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
         .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
 
     private func sectionTitle(_ title: String, icon: String) -> some View {
@@ -2031,10 +2352,10 @@ private struct TransactionDetailSheet: View {
                 Text(label)
             }
             .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(flowSelection == value ? Color.zifrBG : .white)
+            .foregroundStyle(flowSelection == value ? Color(hex: "#121212") : .white)
             .frame(maxWidth: .infinity)
             .frame(height: 36)
-            .background(flowSelection == value ? Color.zifrGold : Color.white.opacity(0.065))
+            .background(flowSelection == value ? Color(hex: "#C1AA78") : Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 11))
         }
         .buttonStyle(.plain)
@@ -2042,11 +2363,12 @@ private struct TransactionDetailSheet: View {
 
     private var selectedFlow: TransactionFlowOverride {
         TransactionFlowOverride(rawValue: flowSelection)
-            ?? TransactionIntelligence.effectiveFlow(for: record)
+            ?? TransactionIntelligence.automaticFlow(for: record.transaction)
     }
 
     private var flowLabel: String {
-        flowSelection == "automatic" ? "\(selectedFlow.label) · Automatic" : selectedFlow.label
+        if selectedFlow == .ignored { return "Ignored" }
+        return flowSelection == "automatic" ? "\(selectedFlow.label) · Automatic" : selectedFlow.label
     }
 
     private var flowIcon: String { icon(for: selectedFlow) }
@@ -2056,6 +2378,7 @@ private struct TransactionDetailSheet: View {
         case .expense: return .white
         case .income, .refund: return Color.zifrGreen
         case .transfer: return Color.zifrGold
+        case .ignored: return .gray
         }
     }
 
@@ -2065,6 +2388,7 @@ private struct TransactionDetailSheet: View {
         case .income: return "arrow.down.left"
         case .transfer: return "arrow.left.arrow.right"
         case .refund: return "arrow.uturn.left"
+        case .ignored: return "eye.slash"
         }
     }
 
@@ -2140,7 +2464,7 @@ private struct DuplicateChargeReviewSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.zifrBG.ignoresSafeArea()
+                Color(hex: "#1C1C1E").ignoresSafeArea()
 
                 if remainingAlerts.isEmpty {
                     VStack(spacing: 14) {
@@ -2182,7 +2506,13 @@ private struct DuplicateChargeReviewSheet: View {
             }
             .navigationTitle("Duplicate Review")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Duplicate Review")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
@@ -2190,6 +2520,9 @@ private struct DuplicateChargeReviewSheet: View {
             }
         }
         .presentationDetents([.fraction(0.86), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#1C1C1E"))
     }
 
     private func duplicateCard(_ alert: DuplicateChargeAlert) -> some View {
@@ -2247,7 +2580,7 @@ private struct DuplicateChargeReviewSheet: View {
                     }
                 }
             }
-            .background(Color.black.opacity(0.18))
+            .background(Color(hex: "#2C2C2E"))
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             HStack {
@@ -2270,14 +2603,25 @@ private struct DuplicateChargeReviewSheet: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .frame(height: 34)
-                .background(Color.white.opacity(0.08))
+                .background(Color(hex: "#2C2C2E"))
                 .clipShape(Capsule())
             }
         }
         .padding(14)
-        .background(Color.white.opacity(0.05))
+        .background(Color.black.opacity(0.70))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 17))
         .clipShape(RoundedRectangle(cornerRadius: 17))
-        .overlay(RoundedRectangle(cornerRadius: 17).stroke(Color.orange.opacity(0.24), lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 17)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
     }
 
     private func formattedDate(_ value: String) -> String {

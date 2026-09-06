@@ -12,6 +12,11 @@ final class AppState {
     var documents: [CompanyDocument] = []
     var transactions: [Transaction] = []
     var transactionOverrides: [TransactionOverride] = []
+
+    var transactionsForAnalysis: [Transaction] {
+        let ignoredIDs = Set(transactionOverrides.filter { $0.flowOverride == .ignored }.map(\.transactionId))
+        return transactions.filter { !ignoredIDs.contains($0.id) }
+    }
     var resourceShares: [ResourceShare] = []
     var activityLogs: [ActivityLog] = []
     var notifications: [AppNotification] = []

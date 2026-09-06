@@ -817,6 +817,52 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(enriched.first(where: { $0.id == correctedTransfer.id })?.category, ["Transfer"])
     }
 
+    func testIgnoredTransactionsAreExcludedAndCanBeRestored() throws {
+        let owner = UUID(), company = UUID()
+        let transaction = makeTransaction(
+            owner: owner, company: company, name: "Family purchase", amount: 500, date: "2027-08-20"
+        )
+        var correction = TransactionOverride(userId: owner, transactionId: transaction.id)
+        correction.flowOverride = .ignored
+        correction.note = "Purchase for Mom"
+        let persisted = try JSONDecoder().decode(
+            TransactionOverride.self, from: JSONEncoder().encode(correction)
+        )
+        XCTAssertEqual(persisted, correction)
+
+        let state = AppState()
+        state.transactions = [transaction]
+        state.transactionOverrides = [persisted]
+        XCTAssertTrue(state.transactionsForAnalysis.isEmpty)
+        XCTAssertEqual(state.transactions, [transaction])
+
+        let records = TransactionIntelligence.resolveAll(
+            [transaction], companies: [], institutions: [], cards: [], overrides: [persisted]
+        )
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(TransactionIntelligence.effectiveFlow(for: records[0]), .ignored)
+        XCTAssertEqual(TransactionIntelligence.automaticFlow(for: transaction), .expense)
+        XCTAssertTrue(TransactionIntelligence.enrichedTransactions(from: records).isEmpty)
+        XCTAssertTrue(DuplicateChargeDetector.detect(records: records + records).isEmpty)
+        let summary = TransactionIntelligence.summary(for: records)
+        XCTAssertEqual(summary.moneyOut, 0)
+        XCTAssertEqual(summary.moneyIn, 0)
+        let insights = CashFlowInsightEngine.analyze(records: records, anchorDate: utcDate("2027-08-30"))
+        XCTAssertFalse(insights.hasCurrentActivity)
+        XCTAssertTrue(insights.expenseCategories.isEmpty)
+        XCTAssertTrue(insights.expenseRecords.isEmpty)
+        XCTAssertNil(insights.largestExpense)
+
+        correction.flowOverride = nil
+        state.transactionOverrides = [correction]
+        XCTAssertEqual(state.transactionsForAnalysis, [transaction])
+        let restored = TransactionIntelligence.resolveAll(
+            [transaction], companies: [], institutions: [], cards: [], overrides: [correction]
+        )
+        XCTAssertEqual(TransactionIntelligence.summary(for: restored).moneyOut, 500)
+        XCTAssertEqual(restored[0].override?.note, "Purchase for Mom")
+    }
+
     func testCashFlowInsightsCompareRollingThirtyDayPeriodsAndExcludeNoise() {
         let owner = UUID(), companyId = UUID()
         let currentExpense = makeTransaction(
@@ -856,6 +902,9 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(insights.previous.moneyIn, 100)
         XCTAssertEqual(insights.previous.net, -100)
         XCTAssertEqual(insights.netChange, 400)
+        XCTAssertEqual(insights.expenseCategories.reduce(0) { $0 + $1.amount }, 100)
+        XCTAssertEqual(insights.expenseCategories.reduce(0) { $0 + $1.transactionCount }, 1)
+        XCTAssertEqual(insights.expenseRecords.map(\.id), [currentExpense.id])
     }
 
     func testCashFlowInsightsUseCorrectedCategoriesAndFindLargestExpense() {
@@ -892,6 +941,17 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(insights.topExpenseCategory?.amount, 100)
         XCTAssertEqual(insights.topExpenseCategory?.transactionCount, 2)
         XCTAssertEqual(insights.topExpenseCategory?.share ?? 0, 100.0 / 180.0, accuracy: 0.0001)
+        XCTAssertEqual(insights.expenseCategories.map(\.key), ["FOOD_AND_DRINK", "GENERAL_SERVICES"])
+        XCTAssertEqual(insights.expenseCategories.map(\.amount), [100, 80])
+        XCTAssertEqual(insights.expenseCategories.reduce(0) { $0 + $1.amount }, insights.current.moneyOut)
+        XCTAssertEqual(insights.expenseCategories.reduce(0) { $0 + $1.share }, 1, accuracy: 0.0001)
+        for category in insights.expenseCategories {
+            let transactions = insights.expenseRecords.filter {
+                TransactionIntelligence.categoryPrimary(for: $0) == category.key
+            }
+            XCTAssertEqual(transactions.count, category.transactionCount)
+            XCTAssertEqual(transactions.reduce(0) { $0 + abs($1.transaction.amount ?? 0) }, category.amount)
+        }
         XCTAssertEqual(TransactionIntelligence.displayName(for: insights.largestExpense!), "Software")
     }
 
@@ -913,6 +973,8 @@ final class PremiumEngineTests: XCTestCase {
         )
 
         XCTAssertFalse(insights.hasCurrentActivity)
+        XCTAssertTrue(insights.expenseCategories.isEmpty)
+        XCTAssertTrue(insights.expenseRecords.isEmpty)
         XCTAssertNil(insights.topExpenseCategory)
         XCTAssertNil(insights.largestExpense)
     }

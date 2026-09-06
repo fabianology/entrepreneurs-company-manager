@@ -472,160 +472,173 @@ struct ShareEntitySheet: View {
     
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.zifrBG.ignoresSafeArea()
-                    .onTapGesture {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    }
-                
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header info
-                        VStack(spacing: 16) {
+            ScrollView {
+                VStack(spacing: 20) {
+                    ZifrSheetCard(title: "SHARE RESOURCE", icon: iconForResourceType(resourceType)) {
+                        HStack(spacing: 14) {
                             ZStack {
-                                Circle()
-                                    .fill(Color(hex: "#4f46e5").opacity(0.2))
-                                    .frame(width: 80, height: 80)
-                                
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Color(hex: "#2C2C2E"))
+
                                 Image(systemName: iconForResourceType(resourceType))
-                                    .font(.system(size: 32, weight: .bold))
-                                    .foregroundStyle(Color(hex: "#4f46e5"))
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundStyle(Color(hex: "#C1AA78"))
                             }
-                            
-                            VStack(spacing: 4) {
-                                Text("Share \(resourceTitle)")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
+                            .frame(width: 52, height: 52)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                            )
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(resourceTitle)
+                                    .font(.system(size: 17, weight: .bold))
                                     .foregroundStyle(.white)
-                                
-                                Text("Invite collaborators to access this resource.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.white.opacity(0.6))
-                                    .multilineTextAlignment(.center)
+                                    .lineLimit(2)
+
+                                Text("Invite a collaborator to access this resource.")
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.48))
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
+
+                            Spacer(minLength: 0)
                         }
-                        .padding(.top, 24)
-                        
-                        VStack(spacing: 20) {
-                            // Email Field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Collaborator Email")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.white.opacity(0.6))
-                                    .textCase(.uppercase)
-                                
-                                HStack {
-                                    Image(systemName: "envelope.fill")
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    TextField("Enter email address", text: $email)
-                                        .keyboardType(.emailAddress)
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        .foregroundStyle(.white)
-                                }
-                                .padding(16)
-                                .background(Color(hex: "#1A1A1C"))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                )
-                            }
-                            
-                            // Send As Field
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Send As (Optional)")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.white.opacity(0.6))
-                                    .textCase(.uppercase)
-                                
-                                HStack {
-                                    Image(systemName: "person.text.rectangle")
-                                        .foregroundStyle(Color.white.opacity(0.5))
-                                    TextField("e.g. Kris from Miloom", text: $senderDisplayName)
-                                        .textInputAutocapitalization(.words)
-                                        .foregroundStyle(.white)
-                                }
-                                .padding(16)
-                                .background(Color(hex: "#1A1A1C"))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                                )
-                            }
-                            
-                            // Role Picker
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Permission Level")
-                                    .font(.caption)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(Color.white.opacity(0.6))
-                                    .textCase(.uppercase)
-                                
-                                Picker("Role", selection: $role) {
-                                    ForEach(roles, id: \.self) { role in
-                                        Text(role).tag(role)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                                .colorScheme(.dark)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        
-                        // Error/Success Messages
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.footnote)
-                                .foregroundStyle(.red)
-                                .padding(.horizontal)
-                        }
-                        if let success = successMessage {
-                            Text(success)
-                                .font(.footnote)
-                                .foregroundStyle(.green)
-                                .padding(.horizontal)
-                        }
-                        
-                        Spacer(minLength: 40)
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
+                    ZifrSheetCard(title: "INVITE COLLABORATOR", icon: "envelope.badge") {
+                        VStack(spacing: 14) {
+                            ZifrField(
+                                label: "COLLABORATOR EMAIL",
+                                placeholder: "name@example.com",
+                                text: $email,
+                                keyboardType: .emailAddress,
+                                textContentType: .emailAddress
+                            )
+
+                            ZifrField(
+                                label: "SEND AS (OPTIONAL)",
+                                placeholder: "e.g. Kris from Miloom",
+                                text: $senderDisplayName,
+                                textContentType: .name
+                            )
+                        }
+                    }
+
+                    ZifrSheetCard(title: "ACCESS LEVEL", icon: "person.badge.key") {
+                        VStack(alignment: .leading, spacing: 12) {
+                            CustomSegmentedControl(options: roles, selection: $role)
+
+                            HStack(alignment: .top, spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color(hex: "#C1AA78").opacity(0.8))
+                                    .padding(.top, 1)
+
+                                Text(roleDescription)
+                                    .font(.system(size: 11, weight: .regular))
+                                    .foregroundStyle(Color.white.opacity(0.48))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    if let error = errorMessage {
+                        shareStatusBanner(
+                            message: error,
+                            systemImage: "exclamationmark.triangle.fill",
+                            color: .red
+                        )
+                    }
+
+                    if let success = successMessage {
+                        shareStatusBanner(
+                            message: success,
+                            systemImage: "checkmark.circle.fill",
+                            color: .green
+                        )
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
             }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Color(hex: "#1C1C1E").ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .principal) {
+                    Text("Share \(resourceTitle)")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                        .lineLimit(1)
+                }
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundStyle(Color.white.opacity(0.6))
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button {
                         sendInvite()
                     } label: {
                         if isSending {
                             ProgressView()
-                                .tint(.zifrGreen)
+                                .tint(.green)
                         } else {
                             Text("Send")
-                                .fontWeight(.bold)
-                                .foregroundStyle(email.isEmpty ? Color.white.opacity(0.3) : .zifrGreen)
+                                .fontWeight(.semibold)
                         }
                     }
-                    .disabled(email.isEmpty || isSending)
+                    .tint(canSend && !isSending ? .green : nil)
+                    .disabled(!canSend || isSending)
                 }
             }
         }
         .sheet(isPresented: $showingPremiumUpgrade) {
             PremiumUpgradeView(gate: accessController.pendingGate)
         }
+    }
+
+    private var canSend: Bool {
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var roleDescription: String {
+        switch role {
+        case "Admin":
+            return "Can view, edit, share, and manage collaborator access."
+        case "Editor":
+            return "Can view and edit this resource, but cannot manage access."
+        default:
+            return "Can view this resource without making changes."
+        }
+    }
+
+    private func shareStatusBanner(message: String, systemImage: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(color)
+
+            Text(message)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(color.opacity(0.35), lineWidth: 1)
+        )
     }
     
     private func sendInvite() {

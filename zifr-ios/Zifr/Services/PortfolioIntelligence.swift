@@ -233,7 +233,7 @@ enum PortfolioObligationEngine {
             }
         }
 
-        let recurringTransactions = appState.transactions.map { transaction -> Transaction in
+        let recurringTransactions = appState.transactionsForAnalysis.map { transaction -> Transaction in
             guard transaction.companyId == nil else { return transaction }
             var enriched = transaction
             let card = appState.cards.first { $0.plaidAccountId == transaction.accountId }

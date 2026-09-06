@@ -946,7 +946,7 @@ struct AssistantOnboardingView: View {
                 }
             }
             
-            let detectedSubs = SubscriptionDetector.detect(transactions: appState.transactions, existingSubscriptions: appState.subscriptions, filterAccountId: targetAccountId)
+            let detectedSubs = SubscriptionDetector.detect(transactions: appState.transactionsForAnalysis, existingSubscriptions: appState.subscriptions, filterAccountId: targetAccountId)
             
             let resultStr = detectedSubs.isEmpty ? "No new un-tracked subscriptions found." : "Found the following un-tracked subscriptions: " + detectedSubs.map { "\($0.name) ($\($0.amount)/\($0.frequency))" }.joined(separator: ", ")
             

@@ -859,6 +859,7 @@ enum TransactionFlowOverride: String, Codable, CaseIterable, Identifiable, Hasha
     case income
     case transfer
     case refund
+    case ignored
 
     var id: String { rawValue }
 
@@ -868,6 +869,7 @@ enum TransactionFlowOverride: String, Codable, CaseIterable, Identifiable, Hasha
         case .income: return "Income"
         case .transfer: return "Transfer"
         case .refund: return "Refund"
+        case .ignored: return "Ignore"
         }
     }
 }
