@@ -10,6 +10,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
     var subtitle: String? = nil
     var badgeCount: Int? = nil
     var cornerRadius: CGFloat = 24
+    var showsBorder: Bool = true
     var headerLeadingPadding: CGFloat = 20
     var headerTrailingPadding: CGFloat = 20
     var contentHorizontalPadding: CGFloat = 20
@@ -25,6 +26,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
         subtitle: String? = nil,
         badgeCount: Int? = nil,
         cornerRadius: CGFloat = 24,
+        showsBorder: Bool = true,
         contentHorizontalPadding: CGFloat = 20,
         contentTopPadding: CGFloat = 16,
         contentBottomPadding: CGFloat = 20,
@@ -37,6 +39,7 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
         self.subtitle = subtitle
         self.badgeCount = badgeCount
         self.cornerRadius = cornerRadius
+        self.showsBorder = showsBorder
         self.contentHorizontalPadding = contentHorizontalPadding
         self.contentTopPadding = contentTopPadding
         self.contentBottomPadding = contentBottomPadding
@@ -89,20 +92,22 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
         )
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
+        .overlay {
+            if showsBorder {
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            }
+        }
     }
 }
 
@@ -114,6 +119,7 @@ extension ZifrSheetCard where Trailing == EmptyView {
         subtitle: String? = nil,
         badgeCount: Int? = nil,
         cornerRadius: CGFloat = 24,
+        showsBorder: Bool = true,
         contentHorizontalPadding: CGFloat = 20,
         contentTopPadding: CGFloat = 16,
         contentBottomPadding: CGFloat = 20,
@@ -125,6 +131,7 @@ extension ZifrSheetCard where Trailing == EmptyView {
         self.subtitle = subtitle
         self.badgeCount = badgeCount
         self.cornerRadius = cornerRadius
+        self.showsBorder = showsBorder
         self.contentHorizontalPadding = contentHorizontalPadding
         self.contentTopPadding = contentTopPadding
         self.contentBottomPadding = contentBottomPadding

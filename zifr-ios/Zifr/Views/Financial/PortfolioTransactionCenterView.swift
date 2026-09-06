@@ -899,10 +899,11 @@ struct PortfolioTransactionCenterView: View {
             title: "CASH-FLOW INSIGHTS",
             icon: "waveform.path.ecg",
             subtitle: cashFlowWindow.title,
+            showsBorder: false,
             contentHorizontalPadding: 20,
-            contentTopPadding: 20,
-            contentBottomPadding: 24,
-            contentSpacing: 18,
+            contentTopPadding: 18,
+            contentBottomPadding: 18,
+            contentSpacing: 16,
             trailing: {
                 if let syncError {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -911,7 +912,7 @@ struct PortfolioTransactionCenterView: View {
                 }
             },
             content: {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 16) {
                     cashFlowWindowPicker
 
                     if insights.hasCurrentActivity {
@@ -993,17 +994,25 @@ struct PortfolioTransactionCenterView: View {
             )
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.white)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .padding(.horizontal, 12)
-            .background(Color.white.opacity(0.045))
-            .clipShape(RoundedRectangle(cornerRadius: 11))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
         }
         .padding(18)
         .background(Color(hex: "#2C2C2E"))
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .overlay(
             RoundedRectangle(cornerRadius: 15)
-                .stroke(netCashFlowColor(insights.current.net).opacity(0.2), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(cashFlowAccessibilityLabel(insights))
@@ -1100,7 +1109,7 @@ struct PortfolioTransactionCenterView: View {
             HStack(spacing: 14) {
                 Image(systemName: "chart.pie.fill")
                     .font(.system(size: 23, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.zifrGold)
                     .frame(width: 30, height: 36)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Spending by Category")
@@ -1114,8 +1123,8 @@ struct PortfolioTransactionCenterView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
-                Text("View")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 16)
