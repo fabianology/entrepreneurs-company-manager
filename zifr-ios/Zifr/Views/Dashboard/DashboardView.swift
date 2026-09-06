@@ -443,6 +443,7 @@ struct DashboardView: View {
                             Spacer(minLength: 0)
                         }
                         .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
                         .frame(height: 44)
                         .background(bottomControlGlass(Capsule()))
                         .overlay(
@@ -460,6 +461,7 @@ struct DashboardView: View {
                                 )
                         )
                         .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .background(
