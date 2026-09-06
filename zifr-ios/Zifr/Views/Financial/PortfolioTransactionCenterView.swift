@@ -769,13 +769,6 @@ struct PortfolioTransactionCenterView: View {
         )
     }
 
-    private var cashFlowWindowSelection: Binding<String> {
-        Binding(
-            get: { cashFlowWindow.rawValue },
-            set: { cashFlowWindow = CashFlowWindow(rawValue: $0) ?? .thirtyDays }
-        )
-    }
-
     var body: some View {
         transactionNavigation
             .presentationDetents([.fraction(0.92), .large])
@@ -906,6 +899,10 @@ struct PortfolioTransactionCenterView: View {
             title: "CASH-FLOW INSIGHTS",
             icon: "waveform.path.ecg",
             subtitle: cashFlowWindow.title,
+            contentHorizontalPadding: 20,
+            contentTopPadding: 20,
+            contentBottomPadding: 24,
+            contentSpacing: 18,
             trailing: {
                 if let syncError {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -914,11 +911,8 @@ struct PortfolioTransactionCenterView: View {
                 }
             },
             content: {
-                VStack(alignment: .leading, spacing: 14) {
-                    CustomSegmentedControl(
-                        options: CashFlowWindow.allCases.map(\.rawValue),
-                        selection: cashFlowWindowSelection
-                    )
+                VStack(alignment: .leading, spacing: 18) {
+                    cashFlowWindowPicker
 
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
@@ -967,40 +961,44 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private func cashFlowNetSummary(_ insights: CashFlowInsightSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("NET CASH FLOW")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.42))
-                    Text(signedCurrency(insights.current.net))
-                        .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(netCashFlowColor(insights.current.net))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 3) {
-                    Text("IN")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.42))
-                    Text(formatCurrency(insights.current.moneyIn))
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.green)
-                    Text("OUT  \(formatCurrency(insights.current.moneyOut))")
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.white.opacity(0.55))
-                }
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("NET CASH FLOW")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.6)
+                    .foregroundStyle(Color.white.opacity(0.52))
+                Text(signedCurrency(insights.current.net))
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(netCashFlowColor(insights.current.net))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+
+            HStack(spacing: 12) {
+                cashFlowMetric(
+                    title: "MONEY IN",
+                    value: formatCurrency(insights.current.moneyIn),
+                    color: Color.zifrBG
+                )
+                cashFlowMetric(
+                    title: "MONEY OUT",
+                    value: formatCurrency(insights.current.moneyOut),
+                    color: .white
+                )
             }
 
             Label(
                 cashFlowComparisonText(insights),
                 systemImage: cashFlowComparisonIcon(insights)
             )
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(cashFlowComparisonColor(insights))
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 12)
+            .background(Color.white.opacity(0.045))
+            .clipShape(RoundedRectangle(cornerRadius: 11))
         }
-        .padding(14)
+        .padding(18)
         .background(Color(hex: "#2C2C2E"))
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .overlay(
@@ -1011,6 +1009,55 @@ struct PortfolioTransactionCenterView: View {
         .accessibilityLabel(cashFlowAccessibilityLabel(insights))
     }
 
+    private var cashFlowWindowPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(CashFlowWindow.allCases) { window in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        cashFlowWindow = window
+                    }
+                } label: {
+                    Text(window.rawValue)
+                        .font(.system(size: 14, weight: cashFlowWindow == window ? .semibold : .medium))
+                        .foregroundStyle(cashFlowWindow == window ? Color(hex: "#121212") : Color.white.opacity(0.7))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            cashFlowWindow == window
+                                ? Color(hex: "#C1AA78")
+                                : Color.clear
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(cashFlowWindow == window ? .isSelected : [])
+            }
+        }
+        .padding(2)
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 11))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Cash-flow time period")
+    }
+
+    private func cashFlowMetric(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.5)
+                .foregroundStyle(Color.white.opacity(0.52))
+            Text(value)
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(Color.black.opacity(0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     private func insightActionRow(
         icon: String,
         title: String,
@@ -1019,29 +1066,30 @@ struct PortfolioTransactionCenterView: View {
     ) -> some View {
         HStack(spacing: 11) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .bold))
+                .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Color.zifrGold)
-                .frame(width: 31, height: 31)
+                .frame(width: 34, height: 34)
                 .background(Color.zifrGold.opacity(0.12))
                 .clipShape(Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.43))
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
             Text(trailing)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.zifrGold)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .frame(minHeight: 60)
         .contentShape(Rectangle())
     }
 
@@ -1049,23 +1097,36 @@ struct PortfolioTransactionCenterView: View {
         Button {
             showSpendingCategories = true
         } label: {
-            insightActionRow(
-                icon: "chart.pie.fill",
-                title: "Spending by Category",
-                subtitle: insights.expenseCategories.isEmpty
-                    ? "No spending in this period"
-                    : "Explore \(insights.expenseCategories.count) categories",
-                trailing: "View"
-            )
+            HStack(spacing: 14) {
+                Image(systemName: "chart.pie.fill")
+                    .font(.system(size: 23, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 36)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Spending by Category")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(insights.expenseCategories.isEmpty
+                        ? "No spending in this period"
+                        : "Explore \(insights.expenseCategories.count) categories")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.75))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Text("View")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(minHeight: 64)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens a pie chart with transactions by category")
-        .background(Color(hex: "#2C2C2E"))
+        .background(Color.zifrBG)
         .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
     }
 
     private func cashFlowComparisonText(_ insights: CashFlowInsightSnapshot) -> String {
@@ -1088,13 +1149,8 @@ struct PortfolioTransactionCenterView: View {
         return insights.netChange >= 0 ? "arrow.up.right" : "arrow.down.right"
     }
 
-    private func cashFlowComparisonColor(_ insights: CashFlowInsightSnapshot) -> Color {
-        guard insights.previous.transactionCount > 0 else { return Color.white.opacity(0.42) }
-        return insights.netChange >= 0 ? .green : .orange
-    }
-
     private func netCashFlowColor(_ value: Double) -> Color {
-        if value > 0.005 { return .green }
+        if value > 0.005 { return Color.zifrBG }
         if value < -0.005 { return .orange }
         return .white
     }
@@ -1747,66 +1803,36 @@ private struct SpendingCategorySheet: View {
 
     private var selectedCategory: CashFlowExpenseConcentration? {
         insights.expenseCategories.first { $0.key == selectedCategoryKey }
-            ?? insights.expenseCategories.first
     }
 
     private var categoryTransactions: [ResolvedTransaction] {
-        guard let selectedCategory else { return [] }
-        return insights.expenseRecords.filter {
+        let records = insights.expenseRecords.filter {
+            guard let selectedCategory else { return true }
             let key = (TransactionIntelligence.categoryPrimary(for: $0)?.nonEmpty ?? "OTHER").uppercased()
             return key == selectedCategory.key
-        }.sorted {
+        }
+        return records.sorted {
             if $0.transaction.date == $1.transaction.date { return $0.id.uuidString < $1.id.uuidString }
             return $0.transaction.date > $1.transaction.date
         }
+    }
+
+    private var selectedAmount: Double {
+        selectedCategory?.amount ?? insights.current.moneyOut
+    }
+
+    private var selectedTitle: String {
+        selectedCategory?.label ?? "All Spending"
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    ZifrSheetCard(title: "SPENDING BY CATEGORY", icon: "chart.pie.fill", subtitle: window.title) {
-                        VStack(spacing: 16) {
-                            Text(formatCurrency(insights.current.moneyOut))
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
+                    spendingSummary
 
-                            if insights.expenseCategories.isEmpty {
-                                Text("No spending in this period")
-                                    .foregroundStyle(.secondary)
-                                    .padding(.vertical, 30)
-                            } else {
-                                categoryPie
-                                Text("Tap a slice or category to see its transactions")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.55))
-                                categoryPicker
-                            }
-
-                            Text("Posted spending only · Excludes transfers and payments")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.42))
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-
-                    if let category = selectedCategory {
-                        ZifrSheetCard(
-                            title: category.label.uppercased(),
-                            icon: "list.bullet",
-                            subtitle: "\(category.transactionCount) transactions · \(formatCurrency(category.amount))"
-                        ) {
-                            LazyVStack(spacing: 8) {
-                                ForEach(categoryTransactions) { record in
-                                    Button {
-                                        selectedTransaction = record
-                                    } label: {
-                                        categoryTransactionRow(record)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
+                    if !insights.expenseCategories.isEmpty {
+                        spendingTransactions
                     }
                 }
                 .padding(20)
@@ -1841,15 +1867,94 @@ private struct SpendingCategorySheet: View {
         .presentationBackground(Color(hex: "#1C1C1E"))
     }
 
+    private var spendingSummary: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text("SPENDING BY CATEGORY")
+                    .font(.system(size: 12, weight: .black))
+                    .tracking(1.5)
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+                Text(window.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Divider().overlay(Color.white.opacity(0.08))
+
+            VStack(spacing: 16) {
+                Text(formatCurrency(selectedAmount))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white)
+
+                if insights.expenseCategories.isEmpty {
+                    Text("No spending in this period")
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 30)
+                } else {
+                    categoryPie
+                    categoryPicker
+                }
+
+                Text("Posted spending only · Excludes transfers and payments")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.42))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 20)
+        }
+        .background(Color.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 24))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+    }
+
+    private var spendingTransactions: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(selectedTitle.uppercased())
+                    .font(.system(size: 12, weight: .black))
+                    .tracking(1.5)
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+                Spacer(minLength: 0)
+                Text("\(categoryTransactions.count) transactions · \(formatCurrency(selectedAmount))")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+
+            Divider().overlay(Color.white.opacity(0.08))
+
+            LazyVStack(spacing: 8) {
+                ForEach(categoryTransactions) { record in
+                    Button {
+                        selectedTransaction = record
+                    } label: {
+                        categoryTransactionRow(record)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(16)
+        }
+        .background(Color.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 24))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+    }
+
     private var categoryPie: some View {
         Chart(insights.expenseCategories, id: \.key) { category in
             SectorMark(
                 angle: .value("Spending", category.amount),
-                outerRadius: .ratio(selectedCategory?.key == category.key ? 1 : 0.92),
+                outerRadius: .ratio(selectedCategory == nil || selectedCategory?.key == category.key ? 1 : 0.92),
                 angularInset: 2
             )
             .foregroundStyle(categoryColor(category))
-            .opacity(selectedCategory?.key == category.key ? 1 : 0.65)
+            .opacity(selectedCategory == nil || selectedCategory?.key == category.key ? 1 : 0.65)
             .accessibilityLabel(category.label)
             .accessibilityValue("\(formatCurrency(category.amount)), \(Int((category.share * 100).rounded())) percent of spending")
         }
@@ -1870,37 +1975,44 @@ private struct SpendingCategorySheet: View {
     }
 
     private var categoryPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(insights.expenseCategories, id: \.key) { category in
-                    Button {
-                        selectedCategoryKey = category.key
-                        selectedAngle = nil
-                    } label: {
-                        HStack(spacing: 7) {
-                            Circle().fill(categoryColor(category)).frame(width: 8, height: 8)
-                            Text(category.label)
-                            Text("\(Int((category.share * 100).rounded()))%")
-                                .foregroundStyle(Color.white.opacity(0.55))
-                        }
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 44)
-                        .background(Color(hex: "#2C2C2E"))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(
-                            selectedCategory?.key == category.key ? categoryColor(category) : Color.clear,
-                            lineWidth: 1.5
-                        ))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selectedCategory?.key == category.key ? [.isSelected] : [])
-                    .accessibilityHint("Shows transactions in this category below the chart")
-                }
+        Picker(selection: Binding(
+            get: { selectedCategoryKey ?? "" },
+            set: {
+                selectedCategoryKey = $0.isEmpty ? nil : $0
+                selectedAngle = nil
             }
-            .padding(2)
+        )) {
+            Text("All Categories").tag("")
+            ForEach(insights.expenseCategories, id: \.key) { category in
+                Text("\(category.label) · \(formatCurrency(category.amount))").tag(category.key)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+                Text(selectedTitle)
+                    .foregroundStyle(.white)
+                Spacer(minLength: 0)
+                Text(selectedCategory.map { "\(Int(($0.share * 100).rounded()))%" } ?? "All")
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.45))
+            }
+            .font(.system(size: 13, weight: .semibold))
         }
+        .pickerStyle(.menu)
+        .tint(Color(hex: "#C1AA78"))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .frame(height: 44)
+        .background(Color(hex: "#2C2C2E"))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+        .accessibilityHint("Shows transactions for the selected category below the chart")
     }
 
     private func categoryColor(_ category: CashFlowExpenseConcentration) -> Color {
