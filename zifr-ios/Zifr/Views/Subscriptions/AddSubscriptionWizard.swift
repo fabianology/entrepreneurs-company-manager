@@ -173,6 +173,13 @@ struct AddSubscriptionWizard: View {
         )
     }
 
+    private var serviceTypeBinding: Binding<String> {
+        Binding(
+            get: { sub.serviceType.rawValue },
+            set: { sub.serviceType = RecurringServiceType(rawValue: $0) ?? .automatic }
+        )
+    }
+
     private var renewalDateBinding: Binding<Date> {
         let df = DateFormatter()
         df.dateFormat = "MMM d, yyyy"
@@ -376,14 +383,21 @@ struct AddSubscriptionWizard: View {
     private var stepTwoBilling: some View {
         if currentStep == 2 {
             VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("PRICING MODEL")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.45))
-                    
-                    CustomSegmentedControl(options: ["paid", "free"], selection: $sub.pricingModel)
+                HStack(alignment: .top, spacing: 12) {
+                    CompactPickerField(
+                        title: "PRICING",
+                        options: ["paid", "free"],
+                        selection: $sub.pricingModel
+                    )
+
+                    CompactPickerField(
+                        title: "SERVICE TYPE",
+                        options: RecurringServiceType.allCases.map(\.rawValue),
+                        selection: serviceTypeBinding,
+                        displayName: serviceTypePickerTitle
+                    )
                 }
-                
+
                 if sub.pricingModel == "paid" {
                     PremiumRow {
                         PremiumDoubleField(label: "COST", placeholder: "0.00", currency: sub.currency, value: $sub.cost)
@@ -721,6 +735,10 @@ struct AddSubscriptionWizard: View {
             }
         }
         return paymentMethod
+    }
+
+    private func serviceTypePickerTitle(_ value: String) -> String {
+        value == RecurringServiceType.subscription.rawValue ? "Subs" : value.capitalized
     }
 }
 

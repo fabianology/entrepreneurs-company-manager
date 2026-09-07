@@ -671,6 +671,62 @@ struct CustomSegmentedControl: View {
     }
 }
 
+struct CompactPickerField: View {
+    let title: String
+    let options: [String]
+    @Binding var selection: String
+    var displayName: (String) -> String = { $0.capitalized }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.45))
+
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button {
+                        selection = option
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        if selection == option {
+                            Label(displayName(option), systemImage: "checkmark")
+                        } else {
+                            Text(displayName(option))
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Text(displayName(selection))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 4)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(title), \(displayName(selection))")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct PremiumInputField: View {
     let label: String
     let placeholder: String

@@ -19,6 +19,82 @@ struct SubService: Codable, Identifiable, Hashable {
     enum ServiceStatus: String, Codable, CaseIterable { case active = "Active"; case cancelled = "Cancelled"; case pending = "Pending"; case paused = "Paused" }
 }
 
+enum RecurringServiceType: String, Codable, CaseIterable, Identifiable {
+    case automatic
+    case bill
+    case subscription
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+
+/// Classifies recurring services without sending financial data to an AI model.
+/// A saved manual choice always wins; this classifier is only used for Automatic.
+enum RecurringServiceClassifier {
+    static func classify(
+        name: String,
+        website: String? = nil,
+        categories: [String]? = nil
+    ) -> RecurringServiceType {
+        let merchantText = normalized([name, website ?? ""].joined(separator: " "))
+        let categoryText = normalized((categories ?? []).joined(separator: " "))
+
+        if containsAny(categoryText, terms: billCategoryTerms)
+            || containsAny(merchantText, terms: billMerchantTerms) {
+            return .bill
+        }
+
+        if containsAny(categoryText, terms: subscriptionCategoryTerms)
+            || containsAny(merchantText, terms: subscriptionMerchantTerms) {
+            return .subscription
+        }
+
+        // The Services area historically represented subscriptions. Keeping that
+        // as the fallback avoids unexpectedly moving uncategorized existing data.
+        return .subscription
+    }
+
+    private static let billCategoryTerms = [
+        "utility", "utilities", "telecommunication", "telecommunications",
+        "cable", "internet", "rent", "mortgage", "insurance"
+    ]
+
+    private static let billMerchantTerms = [
+        "at&t", "att", "verizon", "t-mobile", "tmobile", "xfinity", "comcast",
+        "spectrum", "cox", "frontier", "electric", "electricity", "energy",
+        "water", "utility", "utilities", "insurance", "mortgage", "rent",
+        "wireless", "internet", "phone", "google cloud", "amazon web services", "aws"
+    ]
+
+    private static let subscriptionCategoryTerms = [
+        "subscription", "subscriptions", "software", "digital", "streaming",
+        "entertainment", "membership", "memberships"
+    ]
+
+    private static let subscriptionMerchantTerms = [
+        "google", "google one", "youtube", "netflix", "spotify", "adobe",
+        "microsoft 365", "office 365", "icloud", "dropbox", "notion", "slack",
+        "shopify", "canva", "hulu", "disney", "max", "peloton", "gym", "membership"
+    ]
+
+    private static func normalized(_ value: String) -> String {
+        value
+            .lowercased()
+            .replacingOccurrences(of: #"[^a-z0-9&]+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func containsAny(_ value: String, terms: [String]) -> Bool {
+        let words = Set(value.split(separator: " ").map(String.init))
+        return terms.contains { term in
+            let normalizedTerm = normalized(term)
+            return normalizedTerm.contains(" ") || normalizedTerm.contains("&")
+                ? value.contains(normalizedTerm)
+                : words.contains(normalizedTerm)
+        }
+    }
+}
+
 enum SubscriptionRenewalScheduler {
     enum Cycle: Equatable {
         case monthly
@@ -222,6 +298,7 @@ struct Subscription: Identifiable, Codable, Hashable {
     var recoveryMethod: String?
     var notes: String?
     var pricingModel: String
+    var serviceType: RecurringServiceType
     var lastUpdated: Date
     var showSubServicesTab: Bool
     var showLinkedEmailsTab: Bool
@@ -252,6 +329,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.recoveryMethod = try container.decodeIfPresent(String.self, forKey: .recoveryMethod)
         self.notes = try container.decodeIfPresent(String.self, forKey: .notes)
         self.pricingModel = try container.decodeIfPresent(String.self, forKey: .pricingModel) ?? "Flat"
+        self.serviceType = try container.decodeIfPresent(RecurringServiceType.self, forKey: .serviceType) ?? .automatic
         
         // Handle Date decoding flexibly (string or native Date)
         if let dateStr = try container.decodeIfPresent(String.self, forKey: .lastUpdated) {
@@ -296,6 +374,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         case recoveryMethod = "recovery_method"
         case notes
         case pricingModel = "pricing_model"
+        case serviceType = "service_type"
         case lastUpdated = "last_updated"
         case showSubServicesTab = "show_sub_services_tab"
         case showLinkedEmailsTab = "show_linked_emails_tab"
@@ -326,6 +405,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         recoveryMethod: String? = nil,
         notes: String? = nil,
         pricingModel: String = "paid",
+        serviceType: RecurringServiceType = .automatic,
         lastUpdated: Date = Date(),
         showSubServicesTab: Bool = true,
         showLinkedEmailsTab: Bool = true,
@@ -354,6 +434,7 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.recoveryMethod = recoveryMethod
         self.notes = notes
         self.pricingModel = pricingModel
+        self.serviceType = serviceType
         self.lastUpdated = lastUpdated
         self.showSubServicesTab = showSubServicesTab
         self.showLinkedEmailsTab = showLinkedEmailsTab
@@ -373,6 +454,12 @@ struct Subscription: Identifiable, Codable, Hashable {
 
     var isFree: Bool { pricingModel == "free" }
     var isAutoRenew: Bool { renew == "Auto" }
+
+    var resolvedServiceType: RecurringServiceType {
+        serviceType == .automatic
+            ? RecurringServiceClassifier.classify(name: name, website: website)
+            : serviceType
+    }
 
     var monthlyTotal: Double {
         let base = billingCycle == "Monthly" ? cost : 0

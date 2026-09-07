@@ -533,6 +533,11 @@ struct DetectedSubscriptionsSheet: View {
             status: "Active",
             website: importDefaults.website,
             pricingModel: "paid",
+            serviceType: RecurringServiceClassifier.classify(
+                name: det.name,
+                website: importDefaults.website,
+                categories: det.category
+            ),
             plaidStreamId: "detected_\(det.merchantKey)",
             plaidAccountId: det.accountId
         )

@@ -42,7 +42,7 @@ struct EditSubscriptionSheet: View {
     // Removed user preference for form density
 
     struct Snapshot: Equatable {
-        var name, website, pricingModel, status, billingCycle, nextRenewal, paymentMethod, renew, loginId, password, twoFactorAuth, recoveryMethod, notes: String
+        var name, website, pricingModel, serviceType, status, billingCycle, nextRenewal, paymentMethod, renew, loginId, password, twoFactorAuth, recoveryMethod, notes: String
         var cost: Double
         var showSubServicesTab: Bool
         var showLinkedEmailsTab: Bool
@@ -52,7 +52,7 @@ struct EditSubscriptionSheet: View {
 
     private var currentSnapshot: Snapshot {
         Snapshot(
-            name: sub.name, website: sub.website ?? "", pricingModel: sub.pricingModel ?? "", status: sub.status ?? "",
+            name: sub.name, website: sub.website ?? "", pricingModel: sub.pricingModel ?? "", serviceType: sub.serviceType.rawValue, status: sub.status ?? "",
             billingCycle: sub.billingCycle ?? "", nextRenewal: sub.nextRenewal ?? "", paymentMethod: sub.paymentMethod ?? "",
             renew: sub.renew, loginId: sub.loginId ?? "", password: sub.password ?? "",
             twoFactorAuth: sub.twoFactorAuth ?? "", recoveryMethod: sub.recoveryMethod ?? "", notes: sub.notes ?? "",
@@ -76,6 +76,17 @@ struct EditSubscriptionSheet: View {
             get: { sub.renew == "Auto" },
             set: { sub.renew = $0 ? "Auto" : "Manual" }
         )
+    }
+
+    private var serviceTypeBinding: Binding<String> {
+        Binding(
+            get: { sub.serviceType.rawValue },
+            set: { sub.serviceType = RecurringServiceType(rawValue: $0) ?? .automatic }
+        )
+    }
+
+    private func serviceTypePickerTitle(_ value: String) -> String {
+        value == RecurringServiceType.subscription.rawValue ? "Subs" : value.capitalized
     }
 
     private let twoFAOptions = ["None", "Authenticator", "SMS", "Email", "Hardware Key", "Backup Codes"]
@@ -307,11 +318,20 @@ struct EditSubscriptionSheet: View {
                         // MARK: – Identity & Service Details Card
                         ZifrSheetCard(title: "SERVICE DETAILS", icon: "lock.shield") {
                             VStack(spacing: 16) {
-                                CustomSegmentedControl(
-                                    options: ["paid", "free"],
-                                    selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 })
-                                )
-                                .padding(.bottom, 2)
+                                HStack(alignment: .top, spacing: 12) {
+                                    CompactPickerField(
+                                        title: "PRICING",
+                                        options: ["paid", "free"],
+                                        selection: Binding(get: { sub.pricingModel }, set: { sub.pricingModel = $0 })
+                                    )
+
+                                    CompactPickerField(
+                                        title: "SERVICE TYPE",
+                                        options: RecurringServiceType.allCases.map(\.rawValue),
+                                        selection: serviceTypeBinding,
+                                        displayName: serviceTypePickerTitle
+                                    )
+                                }
 
                                 HStack(spacing: 12) {
                                     ZifrField(

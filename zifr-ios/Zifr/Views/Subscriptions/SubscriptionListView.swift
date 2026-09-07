@@ -16,8 +16,18 @@ struct SubscriptionListView: View {
     @State private var shareResourceId: UUID = UUID()
     @State private var shareResourceType: String = "all_subscriptions"
     @State private var shareResourceTitle: String = "All Subscriptions"
+    @State private var selectedServiceFilter = "All"
 
-
+    private var filteredSubscriptions: [Subscription] {
+        switch selectedServiceFilter {
+        case "Bills":
+            return subscriptions.filter { $0.resolvedServiceType == .bill }
+        case "Subscriptions":
+            return subscriptions.filter { $0.resolvedServiceType == .subscription }
+        default:
+            return subscriptions
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -32,7 +42,8 @@ struct SubscriptionListView: View {
                         }
                     } else {
                         StackedSubscriptionDeckView(
-                            subscriptions: subscriptions,
+                            subscriptions: filteredSubscriptions,
+                            allSubscriptions: subscriptions,
                             institutions: institutions,
                             cards: cards,
                             onEdit: { editingSub = $0 },
@@ -44,6 +55,7 @@ struct SubscriptionListView: View {
                             onSave: { modifiedSub in
                                 vm.saveSub(modifiedSub, appState: appState)
                             },
+                            selectedServiceFilter: $selectedServiceFilter,
                             hideActionBar: hideActionBar
                         )
                     }
@@ -79,7 +91,7 @@ struct SubscriptionListView: View {
                 Image(systemName: "square.3.layers.3d")
                     .font(.system(size: 15, weight: .bold))
                     .foregroundStyle(Color(hex: "#A2A2A2"))
-                Text("Subscriptions")
+                Text("Services")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color(hex: "#A2A2A2"))
             }
@@ -92,10 +104,10 @@ struct SubscriptionListView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     shareResourceId = company.id
                     shareResourceType = "all_subscriptions"
-                    shareResourceTitle = "All Subscriptions"
+                    shareResourceTitle = "All Services"
                     showShareSheet = true
                 } label: {
-                    Label("All Subscriptions", systemImage: "folder.badge.person.crop")
+                    Label("All Services", systemImage: "folder.badge.person.crop")
                 }
                 
                 Button {
@@ -114,7 +126,7 @@ struct SubscriptionListView: View {
                 }
                 
                 if !subscriptions.isEmpty {
-                    Section("Subscriptions") {
+                    Section("Services") {
                         ForEach(subscriptions) { sub in
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -164,6 +176,7 @@ struct SubscriptionListView: View {
     private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
         guard let id = id else { return }
         if let s = subscriptions.first(where: { $0.id == id }) {
+            selectedServiceFilter = "All"
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) {
                     proxy.scrollTo(s.id, anchor: .center)
@@ -252,13 +265,79 @@ private struct CardHeightKey: PreferenceKey {
 // MARK: - Stacked Subscription Deck View
 struct StackedSubscriptionDeckView: View {
     let subscriptions: [Subscription]
+    let allSubscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
     let onEdit: (Subscription) -> Void
     let onBankTapped: (UUID) -> Void
     let onSave: (Subscription) -> Void
+    @Binding var selectedServiceFilter: String
     var hideActionBar: Bool = false
-    
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                Spacer().frame(height: hideActionBar ? 82 : 70) // 20pt gap below action bar (50->70) or slider tabs (62->82)
+
+                CustomSegmentedControl(
+                    options: ["All", "Bills", "Subscriptions"],
+                    selection: $selectedServiceFilter
+                )
+                .padding(.horizontal, 20)
+                .padding(.bottom, 18)
+
+                if subscriptions.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: selectedServiceFilter == "Bills" ? "doc.text.fill" : "repeat.circle.fill")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                        Text("No \(selectedServiceFilter.lowercased()) yet")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                        Text("Services classified as \(selectedServiceFilter.lowercased()) will appear here.")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.5))
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 32)
+                    .padding(.top, 72)
+                } else {
+                    StackedServiceSection(
+                        title: "",
+                        systemImage: "",
+                        services: subscriptions,
+                        allSubscriptions: allSubscriptions,
+                        institutions: institutions,
+                        cards: cards,
+                        onEdit: onEdit,
+                        onBankTapped: onBankTapped,
+                        onSave: onSave,
+                        isFirstSection: true,
+                        showsHeader: false,
+                        bottomPadding: 0
+                    )
+                }
+            }
+            .padding(.bottom, 120)
+        }
+    }
+}
+
+private struct StackedServiceSection: View {
+    let title: String
+    let systemImage: String
+    let services: [Subscription]
+    let allSubscriptions: [Subscription]
+    let institutions: [Institution]
+    let cards: [FinancialCard]
+    let onEdit: (Subscription) -> Void
+    let onBankTapped: (UUID) -> Void
+    let onSave: (Subscription) -> Void
+    let isFirstSection: Bool
+    var showsHeader: Bool = true
+    var bottomPadding: CGFloat = 28
+
     @Environment(OnboardingStateManager.self) private var onboardingState
 
     @State private var revealLevels: [UUID: CardRevealLevel] = [:]
@@ -272,109 +351,120 @@ struct StackedSubscriptionDeckView: View {
     private let maximumDragPreview: CGFloat = 28
 
     private func level(for sub: Subscription, index: Int) -> CardRevealLevel {
-        if let lvl = revealLevels[sub.id] { return lvl }
-        // Default initial state (Pic 1): Last card in stack is .full, preceding cards are .headerOnly
-        return index == subscriptions.count - 1 ? .full : .headerOnly
+        if let level = revealLevels[sub.id] { return level }
+        return index == services.count - 1 ? .full : .headerOnly
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 0) {
-                Spacer().frame(height: hideActionBar ? 82 : 70) // 20pt gap below action bar (50->70) or slider tabs (62->82)
+        VStack(spacing: 12) {
+            if showsHeader {
+                HStack(spacing: 8) {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
 
-                ZStack(alignment: .top) {
-                    ForEach(Array(subscriptions.enumerated()), id: \.element.id) { index, sub in
-                        let currentLevel = level(for: sub, index: index)
-                        let yOffset = calculateYOffset(forIndex: index)
-                        let extendsUnderNextCard = currentLevel != .full && index < subscriptions.count - 1
-                        let showsBottomCorners = currentLevel == .full || !extendsUnderNextCard
-                        let cardShape = UnevenRoundedRectangle(
-                            topLeadingRadius: 24,
-                            bottomLeadingRadius: showsBottomCorners ? 24 : 0,
-                            bottomTrailingRadius: showsBottomCorners ? 24 : 0,
-                            topTrailingRadius: 24
-                        )
+                    Text(title.uppercased())
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(2)
+                        .foregroundStyle(Color(hex: "#C1AA78"))
 
-                        PremiumSubscriptionCard(
-                            sub: sub,
-                            allSubscriptions: subscriptions,
-                            institutions: institutions,
-                            cards: cards,
-                            onEdit: { onEdit(sub) },
-                            onBankTapped: onBankTapped,
-                            onSave: onSave,
-                            revealLevel: currentLevel,
-                            isExplicitlyFull: currentLevel == .full,
-                            extendsUnderNextCard: extendsUnderNextCard,
-                            onExpand: {
-                                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                                    expandOnly(sub)
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                }
-                            },
-                            onCollapse: {
-                                withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
-                                    revealLevels[sub.id] = .headerOnly
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                }
-                            },
-                            onDragChanged: { value in
-                                handleDragChange(value: value, index: index, sub: sub)
-                            },
-                            onDragEnded: { value in
-                                handleDragEnd(value: value, index: index, sub: sub)
-                            }
-                        )
-                        .frame(maxWidth: .infinity)
-                        // Keep the deck's explicit container height from being
-                        // proposed back into the card and creating a growth loop.
-                        .fixedSize(horizontal: false, vertical: true)
-                        .clipShape(cardShape)
-                        .overlay(
-                            cardShape
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: "#918457"),
-                                            currentLevel == .full ? Color(hex: "#918457").opacity(0.3) : Color.clear
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(key: CardHeightKey.self, value: [sub.id: geo.size.height])
-                            }
-                        )
-                        .onPreferenceChange(CardHeightKey.self) { heights in
-                            for (id, h) in heights {
-                                if cardHeights[id] != h {
-                                    cardHeights[id] = h
-                                }
-                            }
-                        }
-                        .offset(y: yOffset)
-                        .zIndex(Double(index))
-                        .id(sub.id)
-                        .spotlightTarget(isActive: onboardingState.isSpotlightingReview && index == 0)
-                    }
+                    Spacer()
+
+                    Text("\(services.count) \(services.count == 1 ? "service" : "services")")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.45))
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: totalStackHeight, alignment: .top)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 120)
+                .padding(.horizontal, 2)
             }
+
+            ZStack(alignment: .top) {
+                ForEach(Array(services.enumerated()), id: \.element.id) { index, sub in
+                    let currentLevel = level(for: sub, index: index)
+                    let yOffset = calculateYOffset(forIndex: index)
+                    let extendsUnderNextCard = currentLevel != .full && index < services.count - 1
+                    let showsBottomCorners = currentLevel == .full || !extendsUnderNextCard
+                    let cardShape = UnevenRoundedRectangle(
+                        topLeadingRadius: 24,
+                        bottomLeadingRadius: showsBottomCorners ? 24 : 0,
+                        bottomTrailingRadius: showsBottomCorners ? 24 : 0,
+                        topTrailingRadius: 24
+                    )
+
+                    PremiumSubscriptionCard(
+                        sub: sub,
+                        allSubscriptions: allSubscriptions,
+                        institutions: institutions,
+                        cards: cards,
+                        onEdit: { onEdit(sub) },
+                        onBankTapped: onBankTapped,
+                        onSave: onSave,
+                        revealLevel: currentLevel,
+                        isExplicitlyFull: currentLevel == .full,
+                        extendsUnderNextCard: extendsUnderNextCard,
+                        onExpand: {
+                            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                                expandOnly(sub)
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }
+                        },
+                        onCollapse: {
+                            withAnimation(.spring(response: 0.36, dampingFraction: 0.86)) {
+                                revealLevels[sub.id] = .headerOnly
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            }
+                        },
+                        onDragChanged: { value in
+                            handleDragChange(value: value, index: index, sub: sub)
+                        },
+                        onDragEnded: { value in
+                            handleDragEnd(value: value, index: index, sub: sub)
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .clipShape(cardShape)
+                    .overlay(
+                        cardShape
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#918457"),
+                                        currentLevel == .full ? Color(hex: "#918457").opacity(0.3) : Color.clear
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: CardHeightKey.self, value: [sub.id: geo.size.height])
+                        }
+                    )
+                    .onPreferenceChange(CardHeightKey.self) { heights in
+                        for (id, height) in heights where cardHeights[id] != height {
+                            cardHeights[id] = height
+                        }
+                    }
+                    .offset(y: yOffset)
+                    .zIndex(Double(index))
+                    .id(sub.id)
+                    .spotlightTarget(isActive: onboardingState.isSpotlightingReview && isFirstSection && index == 0)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: totalStackHeight, alignment: .top)
         }
+        .padding(.horizontal, 20)
+        .padding(.bottom, bottomPadding)
     }
 
     private func calculateYOffset(forIndex index: Int) -> CGFloat {
         var offset: CGFloat = 0
         for i in 0..<index {
-            let sub = subscriptions[i]
+            let sub = services[i]
             let lvl = level(for: sub, index: i)
             switch lvl {
             case .headerOnly, .statusRevealed:
@@ -386,7 +476,7 @@ struct StackedSubscriptionDeckView: View {
 
         // Apply live drag offset to cards below the dragged card
         if let dragId = draggingCardId,
-           let dragIndex = subscriptions.firstIndex(where: { $0.id == dragId }) {
+           let dragIndex = services.firstIndex(where: { $0.id == dragId }) {
             if index > dragIndex {
                 // Cards below follow the drag (clamped to positive for pull-down)
                 offset += max(0, dragOffset)
@@ -400,9 +490,9 @@ struct StackedSubscriptionDeckView: View {
     }
 
     private var totalStackHeight: CGFloat {
-        guard !subscriptions.isEmpty else { return 0 }
-        let lastIndex = subscriptions.count - 1
-        let lastSub = subscriptions[lastIndex]
+        guard !services.isEmpty else { return 0 }
+        let lastIndex = services.count - 1
+        let lastSub = services[lastIndex]
         let lastLvl = level(for: lastSub, index: lastIndex)
 
         let lastHeight: CGFloat
@@ -452,7 +542,7 @@ struct StackedSubscriptionDeckView: View {
             } else if dy < 0 && (dy < -dragCommitDistance || projectedDy < -projectedDragCommitDistance) {
                 // ── Pulling UP on this card → collapse the card ABOVE (index - 1) ──
                 if index > 0 {
-                    let aboveSub = subscriptions[index - 1]
+                    let aboveSub = services[index - 1]
                     let aboveLvl = level(for: aboveSub, index: index - 1)
                     if aboveLvl == .full {
                         revealLevels[aboveSub.id] = .headerOnly
@@ -476,7 +566,7 @@ struct StackedSubscriptionDeckView: View {
     /// card, including the bottom card that starts open by default.
     private func expandOnly(_ sub: Subscription) {
         revealLevels = Dictionary(
-            uniqueKeysWithValues: subscriptions.map { ($0.id, CardRevealLevel.headerOnly) }
+            uniqueKeysWithValues: services.map { ($0.id, CardRevealLevel.headerOnly) }
         )
         revealLevels[sub.id] = .full
     }

@@ -3,6 +3,51 @@ import CryptoKit
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testRecurringServiceClassifierDistinguishesBillsAndSubscriptions() {
+        XCTAssertEqual(
+            RecurringServiceClassifier.classify(name: "AT&T Wireless"),
+            .bill
+        )
+        XCTAssertEqual(
+            RecurringServiceClassifier.classify(name: "Google One"),
+            .subscription
+        )
+        XCTAssertEqual(
+            RecurringServiceClassifier.classify(name: "City Services", categories: ["Utilities"]),
+            .bill
+        )
+        XCTAssertEqual(
+            RecurringServiceClassifier.classify(name: "Acme", categories: ["Software"]),
+            .subscription
+        )
+    }
+
+    func testManualRecurringServiceTypeOverridesAutomaticClassification() {
+        var service = Subscription(userId: UUID(), companyId: UUID(), name: "AT&T Wireless")
+        XCTAssertEqual(service.resolvedServiceType, .bill)
+
+        service.serviceType = .subscription
+        XCTAssertEqual(service.resolvedServiceType, .subscription)
+    }
+
+    func testRecurringServiceTypePersistsThroughSubscriptionCoding() throws {
+        let service = Subscription(
+            userId: UUID(),
+            companyId: UUID(),
+            name: "City Electric",
+            serviceType: .bill
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(service)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(payload["service_type"] as? String, "bill")
+
+        let decoded = try JSONDecoder().decode(Subscription.self, from: data)
+        XCTAssertEqual(decoded.serviceType, .bill)
+    }
+
     func testProtectedValueRoundTripWithCurrentKey() throws {
         let key = SymmetricKey(size: .bits256)
         let encrypted = try XCTUnwrap(SecurityService.encryptValue("secret", using: key))
