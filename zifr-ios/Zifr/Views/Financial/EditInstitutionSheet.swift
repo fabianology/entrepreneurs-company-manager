@@ -224,13 +224,10 @@ struct EditInstitutionSheet: View {
                                             .padding(.bottom, 2)
                                         }
                                         if SecurityService.isLockedValue(institution.password) {
-                                            HStack {
-                                                Label("Password locked; replace it or preserve it unchanged.", systemImage: "lock.trianglebadge.exclamationmark")
-                                                Spacer()
-                                                Button("Clear", role: .destructive) { institution.password = nil }
-                                            }
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundStyle(Color.orange.opacity(0.8))
+                                            Image(systemName: "lock.trianglebadge.exclamationmark")
+                                                .font(.system(size: 14, weight: .semibold))
+                                                .foregroundStyle(Color.gray)
+                                                .accessibilityLabel("Password locked on this device")
                                         }
                                     }
                                     
