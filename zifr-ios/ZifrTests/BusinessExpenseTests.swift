@@ -27,4 +27,34 @@ final class BusinessExpenseTests: XCTestCase {
         review.missing = ["Receipt or missing-receipt explanation"]
         XCTAssertFalse(review.isReady); XCTAssertTrue(BusinessExpenseFilter.confirmed.includes(review)); XCTAssertTrue(BusinessExpenseFilter.exported.includes(review))
     }
+    func testVaultReceiptUsesPurchaseDateAndExpenseCategoryWithSourceSearch() {
+        let owner = UUID(), business = UUID(), personal = UUID()
+        let receipt = CompanyDocument(userId: owner, companyId: business, name: "scan.pdf", type: "Receipts", uploadDate: "2026-09-07")
+        let source = BusinessExpenseSource(merchant: "Design Software", date: "2025-12-20", amount: 100, currency: "USD", sourceAccountId: "personal-card", canonicalAccountId: nil, sourceCompanyId: personal, accountName: "Personal Visa", institutionName: "QA Bank")
+        let review = BusinessExpenseReview(id: UUID(), transactionId: UUID(), decision: "confirmed", sourceState: "active", source: source, revision: 1, updatedAt: "2026-09-07", allocation: BusinessExpenseAllocation(companyId: business, businessBasisPoints: 6000, category: "Software"), suggestions: [], documents: [BusinessExpenseDocument(id: receipt.id, name: receipt.name, path: "private/scan.pdf")], missing: [], exportedRevision: nil)
+        let item = ReceiptVaultItem.items(documents: [receipt], reviews: [review])[0]
+        XCTAssertEqual(item.year, "2025")
+        XCTAssertEqual(item.month, "2025-12")
+        XCTAssertEqual(item.category, "Software")
+        XCTAssertEqual(item.document.companyId, business)
+        XCTAssertEqual(item.review?.source.sourceCompanyId, personal)
+        XCTAssertEqual(item.review?.businessAmount, 60)
+        XCTAssertTrue(item.matches("personal visa"))
+        XCTAssertTrue(item.matches(" SOFTWARE "))
+        XCTAssertFalse(item.matches("Travel"))
+    }
+
+    func testVaultKeepsStandaloneAndUndatedReceiptsWithoutInventingClassification() {
+        let owner = UUID(), company = UUID()
+        let old = CompanyDocument(userId: owner, companyId: company, type: "Receipt", uploadDate: "2024-01-01")
+        let recent = CompanyDocument(userId: owner, companyId: company, type: "Receipts", uploadDate: "2026-09-07T12:00:00Z")
+        let undated = CompanyDocument(userId: owner, companyId: company, type: "Receipts")
+        let other = CompanyDocument(userId: owner, companyId: company, type: "Taxes")
+        let items = ReceiptVaultItem.items(documents: [undated, old, other, recent], reviews: [])
+        XCTAssertEqual(items.map(\.id), [recent.id, old.id, undated.id])
+        XCTAssertEqual(items.first?.month, "2026-09")
+        XCTAssertEqual(items.last?.month, "Undated")
+        XCTAssertTrue(items.allSatisfy { $0.review == nil && $0.category == "Uncategorized" })
+    }
+
 }

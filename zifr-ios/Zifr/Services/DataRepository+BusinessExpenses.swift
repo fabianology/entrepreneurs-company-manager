@@ -13,12 +13,16 @@ extension DataRepository {
         async let jobs: [BusinessExpenseJob] = expenseClient.from("business_expense_jobs").select().eq("user_id", value: owner).order("created_at", ascending: false).limit(1).execute().value
         async let taxObligations: [PortfolioObligation] = expenseClient.from("obligations").select().eq("owner_user_id", value: owner).eq("kind", value: "business_expense_review").execute().value
         async let accounts: [BusinessExpenseAccount] = expenseClient.from("plaid_accounts").select("account_id,canonical_account_id,persistent_account_id,name").eq("user_id", value: owner).eq("status", value: "active").execute().value
-        let fetched = try await (reviews, settings, profiles, jobs, taxObligations, accounts)
+        async let receipts: [CompanyDocument] = expenseClient.from("company_documents").select().eq("user_id", value: owner).eq("visibility", value: "owner_private").execute().value
+        let fetched = try await (reviews, settings, profiles, jobs, taxObligations, accounts, receipts)
         guard (try? await expenseClient.auth.session.user.id) == owner else { return }
         appState.businessExpenseReviews = fetched.0
         appState.businessExpenseSettings = fetched.1.first ?? BusinessExpenseSettings()
         appState.businessExpenseProfiles = fetched.2
         appState.businessExpenseAccounts = fetched.5
+        // Refresh the same Vault records after upload, unlink, or Entity reassignment.
+        appState.documents.removeAll { $0.userId == owner && $0.visibility == "owner_private" }
+        appState.documents.append(contentsOf: fetched.6)
         appState.businessExpenseJob = fetched.3.first
         appState.obligations.removeAll { $0.kind == "business_expense_review" }
         appState.obligations.append(contentsOf: fetched.4)

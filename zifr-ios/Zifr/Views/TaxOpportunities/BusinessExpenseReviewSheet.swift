@@ -108,6 +108,10 @@ struct BusinessExpenseReviewSheet: View {
                         Button("Retry receipt upload") { uploadReceipt() }.disabled(model.isBusy)
                     }
                     TextField("If no receipt is available, explain why", text: $exception, axis: .vertical).lineLimit(2...4)
+                    if let allocation = review?.allocation,
+                       let entity = state.companies.first(where: { $0.id == allocation.companyId }) {
+                        Text("Saved in \(entity.name) → Vault → Receipts. The original payment source stays linked.").font(.caption).foregroundStyle(.secondary)
+                    }
                     Text("Receipts are private to you. An exception is disclosed in the accountant export.").font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Bookkeeping review") {

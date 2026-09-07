@@ -219,3 +219,52 @@ struct BusinessExpenseAccount: Codable {
     }
     var exclusionKey: String { persistentAccountId.map { "persistent:" + $0 } ?? canonicalAccountId ?? accountId }
 }
+
+// A receipt is one Vault document, enriched by its existing expense review.
+struct ReceiptVaultItem: Identifiable {
+    let document: CompanyDocument
+    let review: BusinessExpenseReview?
+    var id: UUID { document.id }
+    var merchant: String { review?.source.merchant ?? document.name }
+    var category: String {
+        let value = review?.allocation?.category.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return value.isEmpty ? "Uncategorized" : value
+    }
+    var date: String { review?.source.date ?? document.uploadDate ?? "" }
+    var month: String {
+        let prefix = String(date.prefix(10))
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard prefix.count == 10, formatter.date(from: prefix) != nil else { return "Undated" }
+        return String(prefix.prefix(7))
+    }
+    var year: String { month == "Undated" ? "Undated" : String(month.prefix(4)) }
+    var monthLabel: String {
+        guard month != "Undated" else { return "Undated" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let value = formatter.date(from: month + "-01") else { return month }
+        formatter.locale = .current
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: value)
+    }
+    func matches(_ query: String) -> Bool {
+        let text = [merchant, document.name, category, document.notes ?? "", review?.source.accountName ?? "", review?.source.institutionName ?? "", review?.allocation?.purpose ?? "", date].joined(separator: " ")
+        return query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || text.localizedCaseInsensitiveContains(query.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+    static func items(documents: [CompanyDocument], reviews: [BusinessExpenseReview]) -> [ReceiptVaultItem] {
+        let links = reviews.reduce(into: [UUID: BusinessExpenseReview]()) { result, review in
+            for document in review.documents { result[document.id] = review }
+        }
+        return documents.filter { CompanyDocument.normalizeType($0.type) == "Receipts" }
+            .map { ReceiptVaultItem(document: $0, review: links[$0.id]) }
+            .sorted { lhs, rhs in
+                if lhs.month == "Undated" && rhs.month != "Undated" { return false }
+                if rhs.month == "Undated" && lhs.month != "Undated" { return true }
+                if lhs.date != rhs.date { return lhs.date > rhs.date }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+    }
+}

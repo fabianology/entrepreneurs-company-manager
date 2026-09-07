@@ -222,6 +222,8 @@ struct TaxScreeningSetupSheet: View {
             } message: { Text("This removes review records, linked private receipts, and server export snapshots. Previously downloaded files cannot be recalled.") }
             .onAppear {
                 settings = state.businessExpenseSettings
+                // Preselect screening only for first-time setup; preserve saved choices.
+                if settings.revision == 0 { settings.enabled = true }
                 profiles = state.companies.filter { $0.userId == auth.currentUser?.id && OwnerBriefingScope.business.includes($0) }.map { company in
                     state.businessExpenseProfiles.first { $0.companyId == company.id } ?? BusinessExpenseProfile(companyId: company.id, activity: company.companyDescription ?? "")
                 }

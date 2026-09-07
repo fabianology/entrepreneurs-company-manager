@@ -18,6 +18,11 @@ struct DocumentListView: View {
     @State private var documentToDelete: CompanyDocument? = nil
     @State private var openURL: IdentifiableURL? = nil
     @State private var selectedType: String = "All"
+    @State private var receiptQuery = ""
+    @State private var receiptYear = "All years"
+    @State private var receiptCategory = "All categories"
+    @State private var receiptReview: BusinessExpenseReview?
+    @State private var receiptOpenError = false
     @State private var isScanning = false
     @State private var isProcessingScan = false
     @State private var showShareSheet = false
@@ -63,7 +68,9 @@ struct DocumentListView: View {
                     Spacer().frame(height: documentRowsTopInset)
 
                     Group {
-                        if documents.isEmpty {
+                        if selectedType == "Receipts" {
+                            receiptList
+                        } else if documents.isEmpty {
                             emptyState
                         } else {
                             if selectedType == "All" {
@@ -72,7 +79,7 @@ struct DocumentListView: View {
                                         if let docs = grouped[type], !docs.isEmpty {
                                             ForEach(docs) { doc in
                                                 DocumentRow(doc: doc) {
-                                                    editingDoc = doc
+                                                    selectDocument(doc)
                                                 } onOpen: {
                                                     openDocument(doc)
                                                 } onShare: {
@@ -106,7 +113,7 @@ struct DocumentListView: View {
                                     VStack(spacing: 10) {
                                         ForEach(docs) { doc in
                                             DocumentRow(doc: doc) {
-                                                editingDoc = doc
+                                                selectDocument(doc)
                                             } onOpen: {
                                                 openDocument(doc)
                                             } onShare: {
@@ -128,6 +135,12 @@ struct DocumentListView: View {
                 }
             }
             .scrollIndicators(.hidden)
+            .mask(alignment: .top) {
+                VStack(spacing: 0) {
+                    if selectedType == "Receipts" { Color.clear.frame(height: documentRowsTopInset) }
+                    Rectangle()
+                }
+            }
 
             // Fixed Header with Tabs (anchored, does not move when scrolling)
             VStack(spacing: 0) {
@@ -261,6 +274,13 @@ struct DocumentListView: View {
                 }
             }
         }
+        .task { await TaxOpportunitiesViewModel().refresh(appState) }
+        .sheet(item: $receiptReview) { review in
+            BusinessExpenseReviewSheet(initialReview: review)
+        }
+        .alert("Could not open receipt", isPresented: $receiptOpenError) {
+            Button("OK", role: .cancel) {}
+        } message: { Text("Please try again. The private file could not be loaded.") }
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
@@ -327,6 +347,67 @@ struct DocumentListView: View {
         }
     }
     
+    private var receiptItems: [ReceiptVaultItem] {
+        ReceiptVaultItem.items(documents: documents, reviews: appState.businessExpenseReviews)
+    }
+
+    private var filteredReceipts: [ReceiptVaultItem] {
+        receiptItems.filter {
+            (receiptYear == "All years" || $0.year == receiptYear) &&
+            (receiptCategory == "All categories" || $0.category == receiptCategory) && $0.matches(receiptQuery)
+        }
+    }
+
+    private var receiptList: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Receipts for \(company.name)").font(.headline).foregroundStyle(.white)
+            Text("Business receipts are filed with the assigned Entity. The original payment source stays linked.")
+                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Image(systemName: "magnifyingglass")
+                TextField("Search merchant, category, or account", text: $receiptQuery)
+                    .font(.subheadline).autocorrectionDisabled()
+            }
+            .padding(12).background(Color.white.opacity(0.06)).clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack {
+                Picker("Year", selection: $receiptYear) {
+                    Text("All years").tag("All years")
+                    ForEach(Array(Set(receiptItems.map(\.year))).sorted(by: >), id: \.self) { Text($0).tag($0) }
+                }
+                Picker("Expense category", selection: $receiptCategory) {
+                    Text("All categories").tag("All categories")
+                    ForEach(Array(Set(receiptItems.map(\.category))).sorted(), id: \.self) { Text($0).tag($0) }
+                }
+                Spacer(minLength: 0)
+            }.pickerStyle(.menu).tint(.zifrGold)
+            Text("\(filteredReceipts.count) receipt\(filteredReceipts.count == 1 ? "" : "s")")
+                .font(.caption).foregroundStyle(.secondary)
+            if let error = appState.businessExpenseLoadError {
+                Text("Receipt context could not refresh: \(error)").font(.caption).foregroundStyle(.orange)
+                Button("Retry") { Task { await TaxOpportunitiesViewModel().refresh(appState) } }
+            }
+            if filteredReceipts.isEmpty {
+                Text(receiptItems.isEmpty ? "Upload a photo or PDF from an expense review to file it here automatically. Existing Vault receipts also appear here." : "No receipts match these filters.")
+                    .font(.subheadline).foregroundStyle(.secondary).padding(.vertical, 20)
+            }
+            let months = filteredReceipts.reduce(into: [String]()) { result, item in
+                if !result.contains(item.month) { result.append(item.month) }
+            }
+            ForEach(months, id: \.self) { month in
+                let items = filteredReceipts.filter { $0.month == month }
+                Text(items.first?.monthLabel ?? month).font(.subheadline.bold()).foregroundStyle(.secondary)
+                    .padding(.top, 6)
+                ForEach(items) { item in
+                    ReceiptVaultCard(item: item, sourceEntity: appState.companies.first { $0.id == item.review?.source.sourceCompanyId }?.name,
+                                     onOpen: { openDocument(item.document) }, onReview: {
+                        if let review = item.review { receiptReview = review } else { editingDoc = item.document }
+                    })
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+    }
+
     private var documentActionBar: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -439,6 +520,12 @@ struct DocumentListView: View {
         .spotlightTarget(isActive: onboardingState.isSpotlightingNotes)
     }
 
+    private func selectDocument(_ doc: CompanyDocument) {
+        if doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
+            receiptReview = review
+        } else { editingDoc = doc }
+    }
+
     private func openDocument(_ doc: CompanyDocument) {
         guard let docUrl = doc.url, !docUrl.isEmpty else { return }
         
@@ -454,6 +541,10 @@ struct DocumentListView: View {
                     await MainActor.run { openURL = IdentifiableURL(url: signedUrl) }
                 } catch {
                     AppDiagnostics.failure("documents", "signed_url", error: error)
+                    if doc.visibility == "owner_private" {
+                        receiptOpenError = true
+                        return
+                    }
                     // Fallback to try opening as regular URL if signed URL fails
                     if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
                         await MainActor.run { openURL = IdentifiableURL(url: u) }
@@ -1414,5 +1505,58 @@ struct CategoryGridCard: View {
             )
             .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
         }
+    }
+}
+
+private struct ReceiptVaultCard: View {
+    let item: ReceiptVaultItem
+    let sourceEntity: String?
+    let onOpen: () -> Void
+    let onReview: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: item.document.url?.lowercased().hasSuffix(".pdf") == true ? "doc.richtext" : "photo")
+                    .font(.title3).foregroundStyle(Color.zifrGold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.merchant.isEmpty ? "Receipt" : item.merchant).font(.subheadline.bold())
+                    Text(item.document.name).font(.caption).foregroundStyle(.secondary)
+                    Text("\(item.category) · \(item.date.isEmpty ? "Date unavailable" : (item.review == nil ? "Added " : "") + String(item.date.prefix(10)))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                if item.document.visibility == "owner_private" {
+                    Image(systemName: "lock.fill").font(.caption).foregroundStyle(Color.zifrGold).accessibilityLabel("Private receipt")
+                }
+            }
+            if let review = item.review {
+                Text("Paid from \([sourceEntity, review.source.institutionName, review.source.accountName].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))")
+                    .font(.caption).foregroundStyle(.secondary)
+                HStack(alignment: .top) {
+                    Text("Purchase \(BusinessExpensePolicy.money(review.source.amount, currency: review.source.currency))")
+                    Spacer()
+                    if let allocation = review.allocation {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Business \(BusinessExpensePolicy.money(review.businessAmount, currency: review.source.currency))")
+                            Text("\(NSDecimalNumber(value: allocation.businessBasisPoints).dividing(by: 100).stringValue)% business use")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }.font(.caption)
+                Text(review.statusLabel).font(.caption).foregroundStyle(Color.zifrGold)
+            } else {
+                Text("Not linked to an expense review").font(.caption).foregroundStyle(.secondary)
+            }
+            HStack(spacing: 16) {
+                Button(action: onOpen) { Label("Open receipt", systemImage: "paperclip") }
+                    .disabled(item.document.url?.isEmpty != false)
+                Spacer(minLength: 0)
+                Button(item.review == nil ? "Details" : "Expense review", action: onReview)
+            }.font(.caption.bold()).buttonStyle(.plain).foregroundStyle(Color.zifrGold)
+        }
+        .padding(14).background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.zifrGold.opacity(0.4), lineWidth: 1))
     }
 }
