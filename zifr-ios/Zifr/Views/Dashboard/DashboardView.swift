@@ -29,7 +29,7 @@ struct DashboardView: View {
     @State private var showPremiumUpgrade = false
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
-    @State private var dashboardMode: DashboardDisplayMode = .portfolio
+    @State private var showBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
     @State private var taxReviewCompany: Company?
@@ -69,10 +69,6 @@ struct DashboardView: View {
                         .padding(.top, 3)
                         .padding(.bottom, 7)
 
-                    DashboardModePicker(selection: dashboardMode, onSelect: selectDashboardMode)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 10)
-
                     List {
                         if let loadIssue = appState.portfolioLoadIssue {
                             Button {
@@ -99,91 +95,79 @@ struct DashboardView: View {
                             .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
                         }
 
-                        if dashboardMode == .briefing {
-                            OwnerHealthBriefingDashboard(
-                                vm: vm,
-                                onOpenResource: openBriefingResource,
-                                onOpenHealthResource: openHealthResource,
-                                onExploreConnections: { showConnectionGraph = true }
-                            )
+                        ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
+                            let row = companyCardRow(for: company)
+                            let isLast = index == filteredCompanies.count - 1
+                            let hasPlaceholder = companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
+                            row
+                                .background(tutorialFrameCapture(index: index))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
-                        } else {
-                            ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
-                                let row = companyCardRow(for: company)
-                                let isLast = index == filteredCompanies.count - 1
-                                let hasPlaceholder = companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
-                                row
-                                    .background(tutorialFrameCapture(index: index))
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
-                                    .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? 120 : 16, trailing: 20))
-                            }
+                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? 120 : 16, trailing: 20))
+                        }
 
-                            // Add company button / empty state placeholder under the dummy company
-                            Group {
-                                if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
-                                    // Un-blurred only while the tutorial is actively running.
-                                    if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
-                                        // Tutorial in progress: show demo card fully visible
-                                        CompanyCardView(
-                                            company: dummyCompany,
-                                            institutionsCount: 2,
-                                            subscriptionsCount: 4,
-                                            docsCount: 3,
-                                            onEdit: {}
-                                        )
-                                        .allowsHitTesting(false)
-                                        .padding(.top, 4)
-                                        .background(
-                                            GeometryReader { geo in
-                                                Color.clear.onAppear {
-                                                    tutorialEntityFrame = geo.frame(in: .named("dashboard"))
-                                                }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
-                                                    tutorialEntityFrame = f
-                                                }
-                                            }
-                                        )
-                                    } else {
-                                        // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                            requestAddCompany()
-                                        } label: {
-                                            ZStack {
-                                                CompanyCardView(
-                                                    company: dummyCompany,
-                                                    institutionsCount: 0,
-                                                    subscriptionsCount: 0,
-                                                    docsCount: 0,
-                                                    onEdit: {}
-                                                )
-                                                .allowsHitTesting(false)
-                                                .blur(radius: 3)
-                                                .opacity(0.8)
-
-                                                VStack(spacing: 16) {
-                                                    Image(systemName: "plus.app.fill")
-                                                        .font(.system(size: 28))
-                                                        .foregroundStyle(.white)
-                                                    Text("ADD YOUR COMPANY OR ENTITY")
-                                                        .font(.system(size: 11, weight: .black))
-                                                        .textCase(.uppercase)
-                                                        .tracking(2)
-                                                        .foregroundStyle(.white)
-                                                }
+                        // Add company button / empty state placeholder under the dummy company
+                        Group {
+                            if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
+                                // Un-blurred only while the tutorial is actively running.
+                                if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
+                                    // Tutorial in progress: show demo card fully visible
+                                    CompanyCardView(
+                                        company: dummyCompany,
+                                        institutionsCount: 2,
+                                        subscriptionsCount: 4,
+                                        docsCount: 3,
+                                        onEdit: {}
+                                    )
+                                    .allowsHitTesting(false)
+                                    .padding(.top, 4)
+                                    .background(
+                                        GeometryReader { geo in
+                                            Color.clear.onAppear {
+                                                tutorialEntityFrame = geo.frame(in: .named("dashboard"))
+                                            }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
+                                                tutorialEntityFrame = f
                                             }
                                         }
-                                        .padding(.top, 4)
-                                        .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
+                                    )
+                                } else {
+                                    // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        requestAddCompany()
+                                    } label: {
+                                        ZStack {
+                                            CompanyCardView(
+                                                company: dummyCompany,
+                                                institutionsCount: 0,
+                                                subscriptionsCount: 0,
+                                                docsCount: 0,
+                                                onEdit: {}
+                                            )
+                                            .allowsHitTesting(false)
+                                            .blur(radius: 3)
+                                            .opacity(0.8)
+
+                                            VStack(spacing: 16) {
+                                                Image(systemName: "plus.app.fill")
+                                                    .font(.system(size: 28))
+                                                    .foregroundStyle(.white)
+                                                Text("ADD YOUR COMPANY OR ENTITY")
+                                                    .font(.system(size: 11, weight: .black))
+                                                    .textCase(.uppercase)
+                                                    .tracking(2)
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
                                     }
+                                    .padding(.top, 4)
+                                    .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
                                 }
                             }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
                         }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
                     }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -255,9 +239,7 @@ struct DashboardView: View {
                 CompanyDetailView(
                     company: company,
                     vm: vm,
-                    onShowAllEntities: {
-                        selectDashboardMode(.portfolio)
-                    }
+                    onShowAllEntities: { showBriefing = false }
                 )
             }
             .navigationDestination(for: AppViewModel.AppRoute.self) { route in
@@ -290,6 +272,48 @@ struct DashboardView: View {
                     vm: vm, companies: companies, subscriptions: subscriptions,
                     cards: cards, institutions: institutions, loans: loans, documents: documents
                 )
+            }
+            .sheet(isPresented: $showBriefing) {
+                NavigationStack {
+                    ZStack {
+                        Color(hex: "#1C1C1E").ignoresSafeArea()
+                        ScrollView {
+                            OwnerHealthBriefingDashboard(
+                                vm: vm,
+                                onOpenResource: { obligation in
+                                    dismissBriefing {
+                                        openBriefingResource(obligation)
+                                    }
+                                },
+                                onOpenHealthResource: { kind, resourceID in
+                                    dismissBriefing {
+                                        openHealthResource(kind, resourceID)
+                                    }
+                                },
+                                onExploreConnections: {
+                                    dismissBriefing {
+                                        showConnectionGraph = true
+                                    }
+                                }
+                            )
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                        }
+                        .scrollIndicators(.hidden)
+                    }
+                    .navigationTitle("Briefing")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { showBriefing = false }
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.miloomGold)
+                        }
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(hex: "#1C1C1E"))
             }
             .fullScreenCover(isPresented: $showAssistant) {
                 AssistantOnboardingView(vm: vm)
@@ -480,39 +504,14 @@ struct DashboardView: View {
                         }
                     )
 
-                    if dashboardMode == .briefing {
-                        Menu {
-                            if !companies.isEmpty {
-                                Section("Jump to Entity") {
-                                    ForEach(companies) { company in
-                                        Button {
-                                            openEntity(company)
-                                        } label: {
-                                            Text(company.name)
-                                        }
-                                    }
-                                }
-                            }
-
-                            Button {
-                                selectDashboardMode(.portfolio)
-                            } label: {
-                                Label("All Entities", systemImage: "square.grid.2x2")
-                            }
-                        } label: {
-                            dashboardBottomIcon("circle.grid.3x3.fill")
-                        }
-                        .accessibilityLabel("Jump to Entity")
-                    } else {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            showAssistant = true
-                        } label: {
-                            dashboardBottomIcon("apple.intelligence")
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("AI Assistant")
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        presentBriefing()
+                    } label: {
+                        dashboardBriefingIcon
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open Briefing")
 
                     plusCommandMenu
                         .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
@@ -660,7 +659,7 @@ struct DashboardView: View {
         }
     }
 
-    private func dashboardBottomIcon(_ systemName: String) -> some View {
+    private var dashboardBriefingIcon: some View {
         ZStack {
             bottomControlGlass(Circle())
                 .overlay(
@@ -679,19 +678,16 @@ struct DashboardView: View {
                 )
                 .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
 
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .bold))
+            Image(systemName: "list.clipboard.fill")
+                .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(Color.white.opacity(0.85))
+
+            Image(systemName: "sparkles")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(Color.miloomGold)
+                .offset(x: 10, y: -10)
         }
         .frame(width: 44, height: 44)
-    }
-
-    private func openEntity(_ company: Company) {
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        vm.selectedCompany = company
-        vm.activeTab = .financial
-        vm.touchCompany(company, appState: appState)
-        vm.path.append(company)
     }
 
     @ViewBuilder
@@ -753,22 +749,22 @@ struct DashboardView: View {
         }
     }
 
-    private func selectDashboardMode(_ mode: DashboardDisplayMode) {
-        guard mode != dashboardMode else { return }
-        if mode == .briefing {
-            guard accessController.request(
-                .ownerBriefing,
-                source: "dashboard_briefing_picker",
-                appState: appState,
-                userId: currentUserId
-            ) else {
-                showPremiumUpgrade = true
-                return
-            }
+    private func presentBriefing(source: String = "dashboard_briefing_button") {
+        guard accessController.request(
+            .ownerBriefing,
+            source: source,
+            appState: appState,
+            userId: currentUserId
+        ) else {
+            showPremiumUpgrade = true
+            return
         }
-        withAnimation(.easeInOut(duration: 0.22)) {
-            dashboardMode = mode
-        }
+        showBriefing = true
+    }
+
+    private func dismissBriefing(then action: @escaping () -> Void) {
+        showBriefing = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: action)
     }
 
     private func checkDowngradeSelection() {
@@ -815,7 +811,7 @@ struct DashboardView: View {
     private func openNotificationRoute(_ route: NotificationRoute) {
         switch route {
         case .ownerBriefing:
-            selectDashboardMode(.briefing)
+            presentBriefing(source: "notification_owner_briefing")
         case .institution(let institutionID):
             guard let institution = appState.institutions.first(where: { $0.id == institutionID }) else {
                 appState.error = "This institution is no longer available."

@@ -15,6 +15,7 @@
 		0E12DFAB3B1D3B37EB2CE881 /* EditCardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721AAFA5C0FA7BE0DD68 /* EditCardSheet.swift */; };
 		0E12DFAC3B1D3B37EB2CE882 /* CardScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80C5721BAFA5C0FA7BE0DD69 /* CardScannerView.swift */; };
 		0FCDDFBF48121C0333B66A5B /* EditInstitutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDBCB5764099D4AE9682B4E0 /* EditInstitutionSheet.swift */; };
+		1007F42E153C554AA4B2F44D /* ExecutiveBriefingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 191DECF218E82F764C689CC4 /* ExecutiveBriefingModels.swift */; };
 		11C307B50284B8741303CEFA /* LoanPaymentsLedgerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */; };
 		1220409E829B6826E5F98B62 /* make_symbol.py in Resources */ = {isa = PBXBuildFile; fileRef = 2F29D9FCB918B70318DBED51 /* make_symbol.py */; };
 		1236B3FD91C4A1A1168A6272 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 2B6CE6B7CD844A5737460A2C /* Supabase */; };
@@ -37,6 +38,8 @@
 		371AC08147C6E7EC3920E8DB /* ZifrApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 413C5A710215BBAF96C2E51F /* ZifrApp.swift */; };
 		37B0F281A99CE1B9EE9F767B /* EntityFinancialSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = EADD3910E456306839C231FF /* EntityFinancialSection.swift */; };
 		3AF0A84AEBE96A22545D0039 /* CloudSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F3768F1DD23EBF603D6EDDB /* CloudSharingView.swift */; };
+		3D8AB0A62301BB4198596D60 /* ExecutiveBriefingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDB4BB7189F8A3FC5B7A8837 /* ExecutiveBriefingViews.swift */; };
+		404ADBE780A93BBCD99794FB /* ExecutiveBriefingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */; };
 		406D74E6936B09401F18B8A8 /* patch_svg2.py in Resources */ = {isa = PBXBuildFile; fileRef = AF3E68AC8EB242191A2179B1 /* patch_svg2.py */; };
 		40C9CCA521F7F73BCCBDB876 /* InstitutionCardsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 246C3FC623F0712EFC4736F7 /* InstitutionCardsSection.swift */; };
 		46CFAE72D8A339D9D82C3BFC /* FinancialView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41C9EDA3C03BC51214E35D5 /* FinancialView.swift */; };
@@ -156,6 +159,8 @@
 		0FF914A66D8DE13EC1D9C345 /* AppNotification.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppNotification.swift; sourceTree = "<group>"; };
 		108E19EBAB1C1F8C3F00871A /* BusinessExpenseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BusinessExpenseTests.swift; path = ZifrTests/BusinessExpenseTests.swift; sourceTree = "<group>"; };
 		186B017061EAE6E89C627CA7 /* EditCompanySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditCompanySheet.swift; sourceTree = "<group>"; };
+		191DECF218E82F764C689CC4 /* ExecutiveBriefingModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExecutiveBriefingModels.swift; sourceTree = "<group>"; };
+		19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExecutiveBriefingTests.swift; sourceTree = "<group>"; };
 		1AB753353782471740FACBA9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		1E20490F5C478CA100E7C911 /* BusinessExpenseExportSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BusinessExpenseExportSheet.swift; path = Zifr/Views/TaxOpportunities/BusinessExpenseExportSheet.swift; sourceTree = "<group>"; };
 		206BF5A20D625639D22919AC /* LoanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoanCardView.swift; sourceTree = "<group>"; };
@@ -230,6 +235,7 @@
 		AF3E68AC8EB242191A2179B1 /* patch_svg2.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch_svg2.py; sourceTree = "<group>"; };
 		BB13F6178324168ED9317DB1 /* Subscription.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Subscription.swift; sourceTree = "<group>"; };
 		BC2C6A27EBAFE36D6EFF4E74 /* BusinessExpenseModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = BusinessExpenseModels.swift; path = Zifr/Models/BusinessExpenseModels.swift; sourceTree = "<group>"; };
+		BDB4BB7189F8A3FC5B7A8837 /* ExecutiveBriefingViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExecutiveBriefingViews.swift; sourceTree = "<group>"; };
 		BDBCB5764099D4AE9682B4E0 /* EditInstitutionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditInstitutionSheet.swift; sourceTree = "<group>"; };
 		BF75CE575DD3FC8735C66778 /* PortfolioIntelligence.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PortfolioIntelligence.swift; sourceTree = "<group>"; };
 		C022DD3ABEFB2F9B7AD38355 /* ActivityLogsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActivityLogsView.swift; sourceTree = "<group>"; };
@@ -295,6 +301,7 @@
 			isa = PBXGroup;
 			children = (
 				51478D5FCEE3293BF6A573BB /* PremiumEngineTests.swift */,
+				19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */,
 			);
 			name = ZifrTests;
 			path = ZifrTests;
@@ -532,6 +539,7 @@
 				28D9F06A2E48FFCC1958B7B9 /* Onboarding */,
 				C0DEC0DEC0DEC0DEC0DEC001 /* ConnectionGraphView.swift */,
 				3234AD54EF6A07C77B998252 /* PremiumExperienceViews.swift */,
+				BDB4BB7189F8A3FC5B7A8837 /* ExecutiveBriefingViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -603,6 +611,7 @@
 				82874C2FA810A11EFA0AFE8B /* ActivityLog.swift */,
 				0FF914A66D8DE13EC1D9C345 /* AppNotification.swift */,
 				DF70FB9809DC283BDC256668 /* PremiumModels.swift */,
+				191DECF218E82F764C689CC4 /* ExecutiveBriefingModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -717,6 +726,7 @@
 			files = (
 				CB35D73769E288AA746CA7E7 /* PremiumEngineTests.swift in Sources */,
 				88974DA6FB57F4806E327280 /* BusinessExpenseTests.swift in Sources */,
+				404ADBE780A93BBCD99794FB /* ExecutiveBriefingTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -831,6 +841,8 @@
 				509026E0E03B193BC4E7272D /* BusinessExpenseExportSheet.swift in Sources */,
 				EA30389A27584D174BEB02CD /* BusinessExpenseReviewSheet.swift in Sources */,
 				186520E8A2402EB4F87DD603 /* TaxOpportunitiesView.swift in Sources */,
+				1007F42E153C554AA4B2F44D /* ExecutiveBriefingModels.swift in Sources */,
+				3D8AB0A62301BB4198596D60 /* ExecutiveBriefingViews.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

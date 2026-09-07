@@ -552,9 +552,10 @@ enum OwnerHealthEngine {
         appState: AppState,
         scope: OwnerBriefingScope,
         now: Date = Date(),
-        ignoredDataIssueIDs: Set<String> = []
+        ignoredDataIssueIDs: Set<String> = [],
+        companyID selectedCompanyID: UUID? = nil
     ) -> OwnerHealthSnapshot {
-        let scopedCompanies = appState.companies.filter(scope.includes)
+        let scopedCompanies = appState.companies.filter { scope.includes($0) && (selectedCompanyID == nil || $0.id == selectedCompanyID) }
         let scopedCompanyIDs = Set(scopedCompanies.map(\.id))
         let companiesByID = Dictionary(uniqueKeysWithValues: appState.companies.map { ($0.id, $0) })
 
@@ -572,8 +573,8 @@ enum OwnerHealthEngine {
         let loans = appState.loans.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
         let documents = appState.documents.filter { isInScope(resourceID: $0.id, companyID: $0.companyId) }
         let scopedObligations = appState.openObligations.filter { obligation in
-            guard let companyID = obligation.companyId else { return scope == .business }
-            return scopedCompanyIDs.contains(companyID)
+            guard let obligationCompanyID = ExecutiveBriefingSnapshot.companyID(for: obligation, in: appState) else { return scope == .business && selectedCompanyID == nil }
+            return scopedCompanyIDs.contains(obligationCompanyID)
         }
 
         func categoryObligations(in category: BriefingResourceCategory) -> [PortfolioObligation] {

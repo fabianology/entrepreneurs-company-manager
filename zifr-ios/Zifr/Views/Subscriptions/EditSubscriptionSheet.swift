@@ -579,6 +579,7 @@ struct EditSubscriptionSheet: View {
             .navigationDestination(isPresented: $showPaymentPicker) {
                 PaymentMethodPickerView(
                     currentMethod: sub.paymentMethod ?? "",
+                    currentMethodId: sub.paymentMethodId,
                     companyId: sub.companyId,
                     institutions: institutions,
                     cards: cards,
@@ -697,32 +698,14 @@ struct EditSubscriptionSheet: View {
     }
 
     private var paymentMethodWithInstitution: String {
-        guard let paymentMethod = sub.paymentMethod, !paymentMethod.isEmpty else { return "" }
-        let normalizedMethod = paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 1. Search in cards
-        for c in appState.cards {
-            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
-                if !instName.isEmpty {
-                    return "\(instName) · \(paymentMethod)"
-                }
-            }
-        }
-        
-        // 2. Search in institutions accounts
-        for inst in appState.institutions {
-            for acc in inst.accounts {
-                let accName = acc.name.isEmpty ? acc.type : acc.name
-                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                    let instName = inst.name.isEmpty ? "" : inst.name
-                    if !instName.isEmpty {
-                        return "\(instName) · \(paymentMethod)"
-                    }
-                }
-            }
-        }
-        return paymentMethod
+        guard let source = PaymentSourceResolver.display(
+            paymentMethod: sub.paymentMethod,
+            paymentMethodId: sub.paymentMethodId,
+            plaidAccountId: sub.plaidAccountId,
+            institutions: appState.institutions,
+            cards: appState.cards
+        ) else { return "" }
+        return "\(source.bank) · \(source.account)"
     }
 }
 
@@ -886,7 +869,7 @@ struct SubServiceHUD: View {
                                         showPaymentPicker = true
                                     } label: {
                                         HStack {
-                                            Text(draft.paymentMethod.isEmpty ? "N/A" : paymentMethodWithInstitution(for: draft.paymentMethod))
+                                            Text(draft.paymentMethod.isEmpty ? "N/A" : paymentMethodWithInstitution(for: draft))
                                                 .font(.system(size: 14, weight: .bold))
                                                 .foregroundStyle(draft.paymentMethod.isEmpty ? Color.white.opacity(0.4) : .white)
                                                 .lineLimit(1)
@@ -1094,6 +1077,7 @@ struct SubServiceHUD: View {
             .sheet(isPresented: $showPaymentPicker) {
                 PaymentMethodPickerView(
                     currentMethod: draft.paymentMethod,
+                    currentMethodId: draft.paymentMethodId,
                     companyId: companyId,
                     institutions: institutions,
                     cards: cards,
@@ -1109,33 +1093,15 @@ struct SubServiceHUD: View {
         }
     }
 
-    private func paymentMethodWithInstitution(for method: String) -> String {
-        guard !method.isEmpty else { return "" }
-        let normalizedMethod = method.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 1. Search in cards
-        for c in cards {
-            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
-                if !instName.isEmpty {
-                    return "\(instName) · \(method)"
-                }
-            }
-        }
-        
-        // 2. Search in institutions accounts
-        for inst in institutions {
-            for acc in inst.accounts {
-                let accName = acc.name.isEmpty ? acc.type : acc.name
-                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                    let instName = inst.name.isEmpty ? "" : inst.name
-                    if !instName.isEmpty {
-                        return "\(instName) · \(method)"
-                    }
-                }
-            }
-        }
-        return method
+    private func paymentMethodWithInstitution(for service: SubService) -> String {
+        guard let source = PaymentSourceResolver.display(
+            paymentMethod: service.paymentMethod,
+            paymentMethodId: service.paymentMethodId,
+            plaidAccountId: nil,
+            institutions: institutions,
+            cards: cards
+        ) else { return service.paymentMethod }
+        return "\(source.bank) · \(source.account)"
     }
 }
 
@@ -1582,7 +1548,7 @@ struct LinkedEmailHUD: View {
 
 struct PaymentMethodPickerView: View {
     let currentMethod: String
-    let currentMethodId: UUID? = nil
+    let currentMethodId: UUID?
     let companyId: UUID
     let institutions: [Institution]
     let cards: [FinancialCard]
@@ -1606,6 +1572,7 @@ struct PaymentMethodPickerView: View {
 
     struct AccountDisplay: Identifiable {
         let id = UUID()
+        let institutionId: UUID
         let instName: String
         let companyId: UUID
         let account: InstitutionAccount
@@ -1625,7 +1592,14 @@ struct PaymentMethodPickerView: View {
 
     var accountDisplays: [AccountDisplay] {
         effectiveInstitutions.flatMap { inst in
-            inst.accounts.map { AccountDisplay(instName: inst.name, companyId: inst.companyId, account: $0) }
+            inst.accounts.map {
+                AccountDisplay(
+                    institutionId: inst.id,
+                    instName: inst.name,
+                    companyId: inst.companyId,
+                    account: $0
+                )
+            }
         }
     }
 
@@ -1844,7 +1818,10 @@ struct PaymentMethodPickerView: View {
                         let acc = display.account
                         let name = acc.name.isEmpty ? acc.type : acc.name
                         Button {
-                            selectStandard(id: UUID(uuidString: acc.id), name: name)
+                            // Plaid account IDs are opaque strings, not UUIDs. Store
+                            // the owning institution UUID so this selection survives
+                            // syncs and cannot fall back to a same-named account.
+                            selectStandard(id: display.institutionId, name: name)
                         } label: {
                             HStack(spacing: 12) {
                                 ZStack {
@@ -1879,7 +1856,7 @@ struct PaymentMethodPickerView: View {
                                 Spacer()
                                 
                                 VStack(alignment: .trailing, spacing: 4) {
-                                    if currentMethod == name {
+                                    if currentMethodId == display.institutionId && currentMethod == name {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(Color.zifrGreen)
@@ -1946,7 +1923,7 @@ struct PaymentMethodPickerView: View {
                                 Spacer()
                                 
                                 VStack(alignment: .trailing, spacing: 4) {
-                                    if currentMethod == card.name {
+                                    if currentMethodId == card.id || (currentMethodId == nil && currentMethod == card.name) {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundStyle(Color.zifrGreen)

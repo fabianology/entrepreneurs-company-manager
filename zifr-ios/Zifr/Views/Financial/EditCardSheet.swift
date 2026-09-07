@@ -870,6 +870,7 @@ struct EditCardSheet: View {
                 NavigationStack {
                     PaymentMethodPickerView(
                         currentMethod: card.paidFrom ?? "",
+                        currentMethodId: nil,
                         companyId: card.companyId,
                         institutions: institutions,
                         cards: cards

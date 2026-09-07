@@ -509,6 +509,7 @@ struct AddSubscriptionWizard: View {
                         NavigationLink {
                             PaymentMethodPickerView(
                                 currentMethod: sub.paymentMethod ?? "",
+                                currentMethodId: sub.paymentMethodId,
                                 companyId: sub.companyId,
                                 institutions: institutions,
                                 cards: cards,
@@ -709,32 +710,14 @@ struct AddSubscriptionWizard: View {
     }
 
     private var paymentMethodWithInstitution: String {
-        guard let paymentMethod = sub.paymentMethod, !paymentMethod.isEmpty else { return "" }
-        let normalizedMethod = paymentMethod.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 1. Search in cards
-        for c in appState.cards {
-            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
-                if !instName.isEmpty {
-                    return "\(instName) · \(paymentMethod)"
-                }
-            }
-        }
-        
-        // 2. Search in institutions accounts
-        for inst in appState.institutions {
-            for acc in inst.accounts {
-                let accName = acc.name.isEmpty ? acc.type : acc.name
-                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                    let instName = inst.name.isEmpty ? "" : inst.name
-                    if !instName.isEmpty {
-                        return "\(instName) · \(paymentMethod)"
-                    }
-                }
-            }
-        }
-        return paymentMethod
+        guard let source = PaymentSourceResolver.display(
+            paymentMethod: sub.paymentMethod,
+            paymentMethodId: sub.paymentMethodId,
+            plaidAccountId: sub.plaidAccountId,
+            institutions: appState.institutions,
+            cards: appState.cards
+        ) else { return "" }
+        return "\(source.bank) · \(source.account)"
     }
 
     private func serviceTypePickerTitle(_ value: String) -> String {

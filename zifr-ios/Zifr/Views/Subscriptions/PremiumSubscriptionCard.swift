@@ -116,24 +116,13 @@ struct PremiumSubscriptionCard: View {
     }
     
     var bankAccountTuple: (bank: String, account: String, type: String, modelId: UUID?)? {
-        if (sub.paymentMethod ?? "").isEmpty && sub.paymentMethodId == nil { return nil }
-        
-        if let card = cards.first(where: { sub.paymentMethodId == $0.id || (sub.paymentMethodId == nil && $0.name == sub.paymentMethod) }) {
-            let inst = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
-            let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4 ?? "")"
-            return (inst, "\(card.name)\(suffix)", card.type, card.id)
-        }
-        
-        for inst in institutions {
-            if let acc = inst.accounts.first(where: { sub.paymentMethodId == UUID(uuidString: $0.id) || (sub.paymentMethodId == nil && ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod) }) {
-                let instName = inst.name.isEmpty ? "Paid From" : inst.name
-                let accName = acc.name.isEmpty ? acc.type : acc.name
-                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
-                return (instName, "\(accName)\(suffix)", acc.type, inst.id)
-            }
-        }
-        
-        return ("Paid From", sub.paymentMethod ?? "", "", nil)
+        PaymentSourceResolver.display(
+            paymentMethod: sub.paymentMethod,
+            paymentMethodId: sub.paymentMethodId,
+            plaidAccountId: sub.plaidAccountId,
+            institutions: institutions,
+            cards: cards
+        )
     }
 
     var body: some View {
@@ -398,7 +387,7 @@ struct PremiumSubscriptionCard: View {
                                                 .tracking(0.5)
                                                 .layoutPriority(1)
                                             
-                                            Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss.paymentMethod))
+                                            Text(ss.paymentMethod.isEmpty ? "No Card" : paymentMethodWithInstitution(for: ss))
                                                 .font(.system(size: 13, weight: .medium))
                                                 .foregroundStyle(Color.white.opacity(0.6))
                                                 .lineLimit(1)
@@ -770,33 +759,15 @@ struct PremiumSubscriptionCard: View {
         }
     }
 
-    private func paymentMethodWithInstitution(for method: String) -> String {
-        guard !method.isEmpty else { return "" }
-        let normalizedMethod = method.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // 1. Search in cards
-        for c in cards {
-            if c.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                let instName = (c.institutionName ?? "").isEmpty ? "" : c.institutionName!
-                if !instName.isEmpty {
-                    return "\(instName) · \(method)"
-                }
-            }
-        }
-        
-        // 2. Search in institutions accounts
-        for inst in institutions {
-            for acc in inst.accounts {
-                let accName = acc.name.isEmpty ? acc.type : acc.name
-                if accName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) == normalizedMethod {
-                    let instName = inst.name.isEmpty ? "" : inst.name
-                    if !instName.isEmpty {
-                        return "\(instName) · \(method)"
-                    }
-                }
-            }
-        }
-        return method
+    private func paymentMethodWithInstitution(for service: SubService) -> String {
+        guard let source = PaymentSourceResolver.display(
+            paymentMethod: service.paymentMethod,
+            paymentMethodId: service.paymentMethodId,
+            plaidAccountId: nil,
+            institutions: institutions,
+            cards: cards
+        ) else { return service.paymentMethod }
+        return "\(source.bank) · \(source.account)"
     }
 }
 

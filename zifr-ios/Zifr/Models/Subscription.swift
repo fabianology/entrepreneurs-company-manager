@@ -95,6 +95,125 @@ enum RecurringServiceClassifier {
     }
 }
 
+/// Resolves a subscription's payment source using its durable identifiers before
+/// falling back to the older, ambiguous display-name field.
+enum PaymentSourceResolver {
+    static func card(
+        paymentMethod: String?,
+        paymentMethodId: UUID?,
+        plaidAccountId: String?,
+        cards: [FinancialCard]
+    ) -> FinancialCard? {
+        if let paymentMethodId, let card = cards.first(where: { $0.id == paymentMethodId }) {
+            return card
+        }
+        if let plaidAccountId = nonEmpty(plaidAccountId),
+           let card = cards.first(where: { $0.plaidAccountId == plaidAccountId }) {
+            return card
+        }
+        guard paymentMethodId == nil,
+              nonEmpty(plaidAccountId) == nil,
+              let paymentMethod = normalized(paymentMethod)
+        else { return nil }
+        return cards.first { normalized($0.name) == paymentMethod }
+    }
+
+    static func account(
+        paymentMethod: String?,
+        paymentMethodId: UUID?,
+        plaidAccountId: String?,
+        institutions: [Institution]
+    ) -> (institution: Institution, account: InstitutionAccount)? {
+        let preferredName = normalized(paymentMethod)
+
+        // Manual account selections store the owning institution's UUID. This
+        // works for Plaid account IDs too, which are opaque strings rather than UUIDs.
+        if let paymentMethodId,
+           let institution = institutions.first(where: { $0.id == paymentMethodId }) {
+            if let preferredName,
+               let account = institution.accounts.first(where: { normalized(accountName($0)) == preferredName }) {
+                return (institution, account)
+            }
+            if let plaidAccountId = nonEmpty(plaidAccountId),
+               let account = institution.accounts.first(where: { matches($0, plaidAccountId) }) {
+                return (institution, account)
+            }
+            if institution.accounts.count == 1, let account = institution.accounts.first {
+                return (institution, account)
+            }
+        }
+
+        if let plaidAccountId = nonEmpty(plaidAccountId) {
+            for institution in institutions {
+                if let account = institution.accounts.first(where: { matches($0, plaidAccountId) }) {
+                    return (institution, account)
+                }
+            }
+        }
+
+        // Older records had only a payment label. Retain this fallback for them,
+        // but never let it override a known account or institution identifier.
+        guard paymentMethodId == nil,
+              nonEmpty(plaidAccountId) == nil,
+              let preferredName
+        else { return nil }
+        for institution in institutions {
+            if let account = institution.accounts.first(where: { normalized(accountName($0)) == preferredName }) {
+                return (institution, account)
+            }
+        }
+        return nil
+    }
+
+    static func display(
+        paymentMethod: String?,
+        paymentMethodId: UUID?,
+        plaidAccountId: String?,
+        institutions: [Institution],
+        cards: [FinancialCard]
+    ) -> (bank: String, account: String, type: String, modelId: UUID?)? {
+        if let card = card(
+            paymentMethod: paymentMethod,
+            paymentMethodId: paymentMethodId,
+            plaidAccountId: plaidAccountId,
+            cards: cards
+        ) {
+            let bank = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
+            let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4!)"
+            return (bank, "\(card.name)\(suffix)", card.type, card.id)
+        }
+        if let source = account(
+            paymentMethod: paymentMethod,
+            paymentMethodId: paymentMethodId,
+            plaidAccountId: plaidAccountId,
+            institutions: institutions
+        ) {
+            let bank = source.institution.name.isEmpty ? "Paid From" : source.institution.name
+            let suffix = source.account.last4.isEmpty ? "" : " ••••\(source.account.last4)"
+            return (bank, "\(accountName(source.account))\(suffix)", source.account.type, source.institution.id)
+        }
+        guard let paymentMethod = nonEmpty(paymentMethod) else { return nil }
+        return ("Paid From", paymentMethod, "", nil)
+    }
+
+    private static func matches(_ account: InstitutionAccount, _ plaidAccountId: String) -> Bool {
+        account.id == plaidAccountId || account.plaidAccountId == plaidAccountId
+    }
+
+    private static func accountName(_ account: InstitutionAccount) -> String {
+        account.name.isEmpty ? account.type : account.name
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        nonEmpty(value)?.lowercased()
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+}
+
 enum SubscriptionRenewalScheduler {
     enum Cycle: Equatable {
         case monthly

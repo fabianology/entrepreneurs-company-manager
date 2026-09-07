@@ -289,22 +289,13 @@ struct SubscriptionReceiptView: View {
     // MARK: - Helpers
     
     private func getBankAccountTuple(for sub: Subscription) -> (bank: String, account: String)? {
-        if (sub.paymentMethod ?? "").isEmpty { return nil }
-        
-        if let card = cards.first(where: { $0.name == sub.paymentMethod }) {
-            let inst = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
-            let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4 ?? "")"
-            return (inst, "\(card.name)\(suffix)")
-        }
-        
-        for inst in institutions {
-            if let acc = inst.accounts.first(where: { ($0.name.isEmpty ? $0.type : $0.name) == sub.paymentMethod }) {
-                let instName = inst.name.isEmpty ? "Paid From" : inst.name
-                let accName = acc.name.isEmpty ? acc.type : acc.name
-                let suffix = (acc.last4 ?? "").isEmpty ? "" : " ••••\(acc.last4 ?? "")"
-                return (instName, "\(accName)\(suffix)")
-            }
-        }
-        return nil
+        guard let source = PaymentSourceResolver.display(
+            paymentMethod: sub.paymentMethod,
+            paymentMethodId: sub.paymentMethodId,
+            plaidAccountId: sub.plaidAccountId,
+            institutions: institutions,
+            cards: cards
+        ) else { return nil }
+        return (source.bank, source.account)
     }
 }

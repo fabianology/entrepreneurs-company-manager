@@ -197,6 +197,72 @@ final class PremiumEngineTests: XCTestCase {
         )
     }
 
+    func testPaymentSourceResolverUsesPlaidAccountIdentityBeforeAccountName() {
+        let owner = UUID(), company = UUID()
+        let firstInstitution = Institution(
+            userId: owner,
+            companyId: company,
+            name: "SoFi",
+            accounts: [InstitutionAccount(
+                id: "plaid-cash-account",
+                plaidAccountId: "plaid-cash-account",
+                name: "Cash Management",
+                type: "Checking",
+                last4: "4507"
+            )]
+        )
+        let secondInstitution = Institution(
+            userId: owner,
+            companyId: company,
+            name: "Schools First FCU",
+            accounts: [InstitutionAccount(
+                id: "plaid-schools-first-account",
+                plaidAccountId: "plaid-schools-first-account",
+                name: "Cash Management",
+                type: "Checking",
+                last4: "9921"
+            )]
+        )
+
+        let source = PaymentSourceResolver.display(
+            paymentMethod: "Cash Management",
+            paymentMethodId: nil,
+            plaidAccountId: "plaid-schools-first-account",
+            institutions: [firstInstitution, secondInstitution],
+            cards: []
+        )
+
+        XCTAssertEqual(source?.bank, "Schools First FCU")
+        XCTAssertEqual(source?.account, "Cash Management ••••9921")
+    }
+
+    func testPaymentSourceResolverUsesInstitutionIdentityForManualBankSelections() {
+        let owner = UUID(), company = UUID()
+        let firstInstitution = Institution(
+            userId: owner,
+            companyId: company,
+            name: "First Bank",
+            accounts: [InstitutionAccount(name: "Business Checking", last4: "1111")]
+        )
+        let secondInstitution = Institution(
+            userId: owner,
+            companyId: company,
+            name: "Second Bank",
+            accounts: [InstitutionAccount(name: "Business Checking", last4: "2222")]
+        )
+
+        let source = PaymentSourceResolver.display(
+            paymentMethod: "Business Checking",
+            paymentMethodId: secondInstitution.id,
+            plaidAccountId: firstInstitution.accounts[0].id,
+            institutions: [firstInstitution, secondInstitution],
+            cards: []
+        )
+
+        XCTAssertEqual(source?.bank, "Second Bank")
+        XCTAssertEqual(source?.account, "Business Checking ••••2222")
+    }
+
     func testTransactionDecodesWithoutOptionalMerchantWebsiteColumn() throws {
         let owner = UUID()
         let transactionId = UUID()

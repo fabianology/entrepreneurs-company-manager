@@ -215,245 +215,6 @@ struct OwnerBriefingCard: View {
     }
 }
 
-struct OwnerHealthBriefingDashboard: View {
-    @Environment(AppState.self) private var appState
-    @Bindable var vm: AppViewModel
-    @State private var scope: OwnerBriefingScope = .business
-    @State private var showingReminderQueue = false
-    @State private var selectedDataSummary: OwnerHealthCategorySummary?
-    @State private var selectedRecurringReview: RecurringSuggestionReview?
-    @State private var ignoredDataIssueIDs = OwnerHealthDataIssueStore.load()
-
-    var onOpenResource: (PortfolioObligation) -> Void
-    var onOpenHealthResource: (ResourceKind, UUID) -> Void
-    var onExploreConnections: () -> Void
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            let snapshot = OwnerHealthEngine.snapshot(
-                appState: appState,
-                scope: scope,
-                now: context.date,
-                ignoredDataIssueIDs: ignoredDataIssueIDs
-            )
-            let attentionCategories = snapshot.categories.filter(\.requiresAttention)
-            let compactCategories = snapshot.categories.filter { !$0.requiresAttention }
-
-            VStack(alignment: .leading, spacing: 12) {
-                scopePicker
-                portfolioSummary(snapshot: snapshot, date: context.date)
-
-                ForEach(attentionCategories) { summary in
-                    HealthCategoryCard(
-                        summary: summary,
-                        compact: false,
-                        onDataDetails: reviewAction(for: summary)
-                    )
-                }
-
-                VStack(spacing: 7) {
-                    ForEach(compactCategories) { summary in
-                        HealthCategoryCard(
-                            summary: summary,
-                            compact: true,
-                            onDataDetails: reviewAction(for: summary)
-                        )
-                    }
-                }
-            }
-            .animation(.easeInOut(duration: 0.22), value: scope)
-        }
-        .sheet(isPresented: $showingReminderQueue) {
-            OwnerBriefingView(scope: scope, onOpenResource: onOpenResource)
-        }
-        .sheet(item: $selectedDataSummary) { summary in
-            MissingDataDetailSheet(
-                summary: summary,
-                onOpen: { issue in
-                    selectedDataSummary = nil
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        onOpenHealthResource(issue.resourceType, issue.resourceID)
-                    }
-                },
-                onIgnore: ignoreDataIssue,
-                onRestore: restoreDataIssue
-            )
-        }
-        .sheet(item: $selectedRecurringReview) { review in
-            DetectedSubscriptionsSheet(
-                detected: review.suggestions,
-                cardId: nil,
-                cardName: "\(scope.rawValue.lowercased()) accounts",
-                companyId: nil,
-                vm: vm,
-                onDismissAll: { selectedRecurringReview = nil }
-            )
-            .environment(appState)
-        }
-        .onAppear {
-            let hasBusiness = appState.companies.contains { OwnerBriefingScope.business.includes($0) }
-            let hasPersonal = appState.companies.contains { OwnerBriefingScope.personal.includes($0) }
-            if !hasBusiness && hasPersonal {
-                scope = .personal
-            }
-        }
-    }
-
-    private func ignoreDataIssue(_ issue: OwnerHealthDataIssue) {
-        ignoredDataIssueIDs.insert(issue.id)
-        OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
-    }
-
-    private func reviewAction(for summary: OwnerHealthCategorySummary) -> (() -> Void)? {
-        if !summary.recurringSuggestions.isEmpty {
-            return {
-                selectedRecurringReview = RecurringSuggestionReview(suggestions: summary.recurringSuggestions)
-            }
-        }
-        if !summary.dataIssues.isEmpty {
-            return { selectedDataSummary = summary }
-        }
-        return nil
-    }
-
-    private func restoreDataIssue(_ issue: OwnerHealthDataIssue) {
-        ignoredDataIssueIDs.remove(issue.id)
-        OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
-    }
-
-    private var scopedCompanyIDs: Set<UUID> {
-        Set(appState.companies.filter(scope.includes).map(\.id))
-    }
-
-    private var scopedOpenObligations: [PortfolioObligation] {
-        appState.openObligations.filter(matchesScope)
-    }
-
-    private var scopedDeferredObligations: [PortfolioObligation] {
-        appState.deferredObligations.filter(matchesScope)
-    }
-
-    private func matchesScope(_ obligation: PortfolioObligation) -> Bool {
-        guard let companyID = obligation.companyId else { return scope == .business }
-        return scopedCompanyIDs.contains(companyID)
-    }
-
-    private var scopePicker: some View {
-        HStack(spacing: 4) {
-            ForEach(OwnerBriefingScope.allCases) { item in
-                Button {
-                    UISelectionFeedbackGenerator().selectionChanged()
-                    withAnimation(.easeInOut(duration: 0.2)) { scope = item }
-                } label: {
-                    Text(item.rawValue)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(scope == item ? .white : Color.white.opacity(0.4))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 34)
-                        .background(
-                            scope == item ? Color.white.opacity(0.09) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(3)
-        .background(Color.black.opacity(0.24), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 0.7)
-        )
-        .accessibilityLabel("Briefing scope")
-    }
-
-    private func portfolioSummary(snapshot: OwnerHealthSnapshot, date: Date) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("\(scope.rawValue) Health")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text("\(snapshot.entityCount) entit\(snapshot.entityCount == 1 ? "y" : "ies") • \(OwnerBriefingPresentation.dateLabel(for: date))")
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundStyle(Color.white.opacity(0.42))
-                }
-                Spacer(minLength: 6)
-                VStack(alignment: .trailing, spacing: 7) {
-                    HealthStatusBadge(status: snapshot.status)
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        showingReminderQueue = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("\(scopedOpenObligations.count) open")
-                                .font(.system(size: 9, weight: .bold))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 8, weight: .black))
-                        }
-                        .foregroundStyle(Color.zifrGold.opacity(0.82))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Review reminders, \(scopedOpenObligations.count) open, \(scopedDeferredObligations.count) complete later")
-                }
-            }
-
-            if snapshot.affectedEntityNames.isEmpty {
-                Text(snapshot.entityCount == 0
-                    ? "Add an entity to begin measuring this part of your portfolio."
-                    : "No known issues need attention across these entities.")
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.56))
-            } else {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("ENTITIES NEEDING ATTENTION")
-                        .font(.system(size: 9, weight: .black))
-                        .tracking(1.2)
-                        .foregroundStyle(Color.white.opacity(0.34))
-                    Text(snapshot.affectedEntityNames.joined(separator: " • "))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                }
-            }
-
-            Button {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                onExploreConnections()
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "point.3.connected.trianglepath.dotted")
-                        .font(.system(size: 13, weight: .bold))
-                    Text("EXPLORE CONNECTIONS")
-                        .font(.system(size: 10, weight: .black))
-                        .tracking(1.1)
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 10, weight: .black))
-                }
-                .foregroundStyle(Color.zifrGold)
-                .frame(height: 38)
-                .padding(.horizontal, 12)
-                .background(Color.zifrGold.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.zifrGold.opacity(0.24), lineWidth: 0.7)
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint("Opens an interactive map of every company and shared touchpoint")
-        }
-        .padding(15)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.zifrTabBarFill.opacity(0.7), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color(hex: "#918457").opacity(0.5), lineWidth: 1)
-        )
-    }
-
-}
-
 private struct HealthCategoryCard: View {
     let summary: OwnerHealthCategorySummary
     let compact: Bool
@@ -592,7 +353,7 @@ private struct HealthCategoryCard: View {
     }
 }
 
-private struct MissingDataDetailSheet: View {
+struct MissingDataDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     let summary: OwnerHealthCategorySummary
     let onOpen: (OwnerHealthDataIssue) -> Void
@@ -733,7 +494,7 @@ private struct MissingDataDetailSheet: View {
     }
 }
 
-private enum OwnerHealthDataIssueStore {
+enum OwnerHealthDataIssueStore {
     private static let key = "ownerHealthIgnoredDataIssues"
 
     static func load() -> Set<String> {
@@ -745,7 +506,7 @@ private enum OwnerHealthDataIssueStore {
     }
 }
 
-private struct RecurringSuggestionReview: Identifiable {
+struct RecurringSuggestionReview: Identifiable {
     let id = UUID()
     let suggestions: [DetectedSubscription]
 }
@@ -790,6 +551,7 @@ struct OwnerBriefingView: View {
     @State private var mutationError: String?
 
     var scope: OwnerBriefingScope? = nil
+    var companyID: UUID? = nil
     var onOpenResource: (PortfolioObligation) -> Void
 
     var body: some View {
@@ -970,8 +732,10 @@ struct OwnerBriefingView: View {
     }
 
     private func matchesScope(_ obligation: PortfolioObligation) -> Bool {
+        let ownerID = ExecutiveBriefingSnapshot.companyID(for: obligation, in: appState)
+        if let companyID, ownerID != companyID { return false }
         guard let scope else { return true }
-        guard let companyID = obligation.companyId else { return scope == .business }
+        guard let companyID = ownerID else { return scope == .business }
         return scopedCompanyIDs.contains(companyID)
     }
 
