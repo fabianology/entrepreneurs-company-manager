@@ -656,7 +656,7 @@ struct CustomSegmentedControl: View {
                         .background {
                             if selection == option {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(hex: "#C1AA78"))
+                                    .fill(Color.miloomGold)
                                     .matchedGeometryEffect(id: "SEGMENT", in: animation)
                             }
                         }
@@ -707,7 +707,7 @@ struct CompactPickerField: View {
 
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color(hex: "#C1AA78"))
+                        .foregroundStyle(Color.miloomGold)
                 }
                 .padding(.horizontal, 14)
                 .frame(maxWidth: .infinity)

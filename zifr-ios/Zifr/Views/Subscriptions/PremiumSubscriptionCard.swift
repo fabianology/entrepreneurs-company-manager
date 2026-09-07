@@ -385,7 +385,7 @@ struct PremiumSubscriptionCard: View {
                                                     .foregroundStyle(Color.white.opacity(0.6))
 
                                                 Circle()
-                                                    .fill(ss.autoPay == .auto ? Color.zifrGreen : Color(hex: "#EBC351"))
+                                                    .fill(ss.autoPay == .auto ? Color.zifrGreen : Color.miloomGold)
                                                     .frame(width: 6, height: 6)
                                             }
                                         }
