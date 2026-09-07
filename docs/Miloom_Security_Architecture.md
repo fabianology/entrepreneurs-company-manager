@@ -25,3 +25,13 @@ It serves as a reference for all AI agents and developers working on the codebas
 - **Proxy Architecture**: The app does not communicate directly with the Gemini API. All AI requests pass through a Supabase Edge Function (`gemini-rest-proxy` or `gemini-live-proxy`), which validates the user's Supabase authentication token before forwarding the request.
 - **What gets sent**: Only highly specific metadata needed for the feature (e.g., a minified string of portfolio stats or a generic question like "what is an admin email used for") is sent to Gemini.
 - **What DOES NOT get sent**: Raw financial documents, IDs, or sensitive OCR extractions are **never** passed to Gemini. 
+
+## Tax Opportunities (2026-09 implementation)
+
+Tax Opportunities uses one explicit feature-level consent, includes current and future owned accounts by default, and supports account exclusions. Reviews, suggestions, private receipt metadata and export snapshots are owner-only; Company collaboration does not grant access. Only selected files leave through the owner's export action.
+
+The dedicated screening endpoint sends sanitized merchant/category/date/amount and bounded business activity/confirmation evidence to Gemini. It does not reuse `generateMinifiedPortfolio`, which currently includes institution usernames/emails. It does not invoke `categorizeDocument`, which currently sends OCR text to Gemini. Those existing paths mean the earlier document-wide claims that sensitive OCR is *never* sent to a third party are not accurate descriptions of all current code. Tax receipt scanning remains local, and no receipt text/image is sent through the new screening pipeline.
+
+Provider processing requires a supported configured model and an explicitly verified paid project. Paid-service processing is not a promise of zero retention; deployment must verify the applicable settings and terms. Application logs exclude financial payloads and model responses.
+
+Removing a bank retains reviewed source snapshots and documents. Permanent review deletion removes database history and queues unreferenced private files for Storage API deletion; deletion is asynchronous and retried by the background worker. Local generated export files are removed when their sheet closes. Already downloaded exports cannot be recalled. Account deletion also queues private receipt cleanup through an auth.users trigger.

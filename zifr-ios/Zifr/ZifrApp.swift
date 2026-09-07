@@ -75,6 +75,7 @@ struct ZifrApp: App {
                 async let pushRegistration: Void = PushNotificationService.shared.registerPendingTokenIfNeeded()
 
                 await dataRefresh
+                try? await DataRepository.shared.refreshBusinessExpenses(appState: appState)
                 await accessRefresh
                 appState.entitlementSnapshot = accessController.snapshot
                 await pushRegistration
@@ -88,6 +89,7 @@ struct ZifrApp: App {
                             await accessController.refresh()
                             appState.entitlementSnapshot = accessController.snapshot
                             try? await DataRepository.shared.refreshNotifications(appState: appState)
+                            try? await DataRepository.shared.refreshBusinessExpenses(appState: appState)
                         }
                     }
                     if let bgDate = backgroundDate {
@@ -109,6 +111,7 @@ struct ZifrApp: App {
             .onChange(of: authViewModel.isAuthenticated) { wasAuthenticated, isAuthenticated in
                 if wasAuthenticated && !isAuthenticated {
                     appState.hasLoadedPortfolio = false
+                    appState.clearBusinessExpenses()
                     if authViewModel.currentUser == nil {
                         notificationRouter.clear()
                     }

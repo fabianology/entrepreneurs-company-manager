@@ -79,7 +79,7 @@ struct DocumentListView: View {
                                                     shareResourceId = doc.id
                                                     shareResourceType = "document"
                                                     shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                                    showShareSheet = true
+                                                    if doc.visibility != "owner_private" { showShareSheet = true }
                                                 } onDelete: {
                                                     documentToDelete = doc
                                                 }
@@ -113,7 +113,7 @@ struct DocumentListView: View {
                                                 shareResourceId = doc.id
                                                 shareResourceType = "document"
                                                 shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                                showShareSheet = true
+                                                if doc.visibility != "owner_private" { showShareSheet = true }
                                             } onDelete: {
                                                 documentToDelete = doc
                                             }
@@ -538,7 +538,7 @@ struct DocumentRow: View {
     var body: some View {
         ZStack {
             // Share Action Button revealed on sliding right (left side)
-            if (dragOffset > 0 || revealedState == .leftActions) && onShare != nil {
+            if (dragOffset > 0 || revealedState == .leftActions) && onShare != nil && doc.visibility != "owner_private" {
                 HStack {
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -645,6 +645,9 @@ struct DocumentRow: View {
                     .frame(width: 28, height: 28)
 
                 VStack(alignment: .leading, spacing: 3) {
+                    if doc.visibility == "owner_private" {
+                        Label("Private receipt", systemImage: "lock.fill").font(.caption2).foregroundStyle(Color.zifrGold)
+                    }
                     Text(doc.name.isEmpty ? "Document" : doc.name)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
@@ -712,7 +715,7 @@ struct DocumentRow: View {
                     .onChanged { value in
                         let translation = value.translation.width
                         if revealedState == .none {
-                            if translation > 0 && onShare != nil {
+                            if translation > 0 && onShare != nil && doc.visibility != "owner_private" {
                                 dragOffset = min(leftRevealWidth + 15, translation)
                             } else if translation < 0 && onDelete != nil {
                                 if translation > rightRevealWidth {
@@ -747,7 +750,7 @@ struct DocumentRow: View {
                                     dragOffset = rightRevealWidth
                                     revealedState = .rightAction
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                } else if translation > 30 && onShare != nil {
+                                } else if translation > 30 && onShare != nil && doc.visibility != "owner_private" {
                                     dragOffset = leftRevealWidth
                                     revealedState = .leftActions
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -796,6 +799,7 @@ struct EditDocumentSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
     @State private var showShareSheet = false
+    @State private var linkedBusinessReview: BusinessExpenseReview?
     
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var showFileImporter = false
@@ -1032,10 +1036,13 @@ struct EditDocumentSheet: View {
                             if !isNew {
                                 ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
                                     VStack(spacing: 12) {
+                                        if doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
+                                            Button("Open business expense review") { linkedBusinessReview = review }
+                                        }
                                         // Share Document
                                         Button {
                                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            showShareSheet = true
+                                            if doc.visibility != "owner_private" { showShareSheet = true }
                                         } label: {
                                             VStack(spacing: 4) {
                                                 HStack(spacing: 6) {
@@ -1248,6 +1255,7 @@ struct EditDocumentSheet: View {
                 }
             }
             .interactiveDismissDisabled(isNew)
+            .sheet(item: $linkedBusinessReview) { BusinessExpenseReviewSheet(initialReview: $0) }
             .sheet(isPresented: $showShareSheet) {
                 ShareEntitySheet(resourceId: doc.id, resourceType: "document", resourceTitle: doc.name.isEmpty ? "Document" : doc.name)
             }

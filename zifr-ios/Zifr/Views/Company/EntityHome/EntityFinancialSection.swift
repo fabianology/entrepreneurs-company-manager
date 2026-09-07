@@ -624,6 +624,7 @@ struct TransactionFeedView: View {
     }
 
     @State private var isSyncing = false
+    @State private var expenseTransaction: ResolvedTransaction?
     @State private var syncError: String? = nil
     @State private var hasSyncedOnAppear = false
 
@@ -862,6 +863,11 @@ struct TransactionFeedView: View {
                                     .font(.system(size: 15, weight: .bold))
                                     .foregroundStyle((tx.amount ?? 0.0) < 0 ? Color(hex: "#30D158") : .white)
                             }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                expenseTransaction = TransactionIntelligence.resolveAll([tx], companies: appState.companies, institutions: appState.institutions, cards: appState.cards, overrides: appState.transactionOverrides).first
+                            }
+                            .accessibilityAddTraits(.isButton)
                             .listRowBackground(Color.clear)
                             .listRowSeparatorTint(Color.white.opacity(0.08))
                             .padding(.vertical, 2)
@@ -879,6 +885,7 @@ struct TransactionFeedView: View {
                     Task { await syncAndRefresh() }
                 }
             }
+            .sheet(item: $expenseTransaction) { BusinessExpenseReviewSheet(transaction: $0) }
             .navigationTitle("Transactions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

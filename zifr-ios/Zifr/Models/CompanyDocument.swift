@@ -10,10 +10,12 @@ struct CompanyDocument: Identifiable, Codable, Hashable {
     var uploadDate: String?
     var notes: String?
     var expiresAt: Date?
+    var visibility: String? = nil
     var renewalMetadata: [String: String]
 
     enum CodingKeys: String, CodingKey {
         case id
+        case visibility
         case userId = "user_id"
         case companyId = "company_id"
         case name

@@ -53,7 +53,7 @@ enum PortfolioConnectionEngine {
             }
         }
         appState.loans.forEach { belongs(kind: .loan, id: $0.id, companyId: $0.companyId) }
-        appState.documents.forEach { belongs(kind: .document, id: $0.id, companyId: $0.companyId) }
+        appState.documents.filter { $0.visibility != "owner_private" }.forEach { belongs(kind: .document, id: $0.id, companyId: $0.companyId) }
 
         let rejectedKeys = Set(appState.resourceConnections.filter { $0.state == .rejected }.compactMap(\.inferenceKey))
         var emailResources: [String: [ResourceReference]] = [:]

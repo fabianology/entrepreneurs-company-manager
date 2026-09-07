@@ -12,6 +12,26 @@ final class AppState {
     var documents: [CompanyDocument] = []
     var transactions: [Transaction] = []
     var transactionOverrides: [TransactionOverride] = []
+    var businessExpenseReviews: [BusinessExpenseReview] = []
+    var businessExpenseSettings = BusinessExpenseSettings()
+    var businessExpenseProfiles: [BusinessExpenseProfile] = []
+    var businessExpenseAccounts: [BusinessExpenseAccount] = []
+    var businessExpenseJob: BusinessExpenseJob?
+    var businessExpenseLoadError: String?
+
+    func clearBusinessExpenses() {
+        businessExpenseReviews = []
+        businessExpenseSettings = BusinessExpenseSettings()
+        businessExpenseProfiles = []
+        businessExpenseAccounts = []
+        businessExpenseJob = nil
+        businessExpenseLoadError = nil
+        let files = (try? FileManager.default.contentsOfDirectory(at: FileManager.default.temporaryDirectory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.lastPathComponent.hasPrefix("miloom-expense-export-") {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
+
 
     var transactionsForAnalysis: [Transaction] {
         let ignoredIDs = Set(transactionOverrides.filter { $0.flowOverride == .ignored }.map(\.transactionId))

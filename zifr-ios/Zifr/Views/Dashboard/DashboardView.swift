@@ -32,6 +32,7 @@ struct DashboardView: View {
     @State private var dashboardMode: DashboardDisplayMode = .portfolio
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
+    @State private var taxReviewCompany: Company?
     @State private var initialTransactionID: UUID?
     @State private var initiallyShowsTransactionReview = false
     
@@ -312,6 +313,7 @@ struct DashboardView: View {
             .sheet(item: $selectedLoan) { loan in
                 EditLoanSheet(loan: loan, vm: vm, isNew: false, institutions: institutions, cards: cards)
             }
+            .sheet(item: $taxReviewCompany) { company in TaxOpportunitiesView(initialCompanyId: company.id) }
             .sheet(item: $selectedDocument) { doc in
                 EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
             }
@@ -774,6 +776,10 @@ struct DashboardView: View {
     }
 
     private func openBriefingResource(_ obligation: PortfolioObligation) {
+        if obligation.actionType == "open_tax_opportunities" {
+            taxReviewCompany = appState.companies.first { $0.id == obligation.companyId }
+            return
+        }
         openHealthResource(obligation.sourceType, obligation.sourceId)
     }
 

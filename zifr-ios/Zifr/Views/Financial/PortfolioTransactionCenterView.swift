@@ -649,6 +649,7 @@ struct PortfolioTransactionCenterView: View {
     @State private var syncError: String?
     @State private var showDuplicateReview = false
     @State private var showSpendingCategories = false
+    @State private var showTaxOpportunities = false
     @State private var showNeedsReviewOnly = false
     @State private var dismissedDuplicateIds: Set<String> = []
     @State private var assigningTransactionId: UUID?
@@ -787,6 +788,7 @@ struct PortfolioTransactionCenterView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar { transactionToolbar }
+            .sheet(isPresented: $showTaxOpportunities) { TaxOpportunitiesView() }
             .sheet(isPresented: $showSpendingCategories) {
                 SpendingCategorySheet(
                     insights: cashFlowInsights,
@@ -828,7 +830,10 @@ struct PortfolioTransactionCenterView: View {
             } else if allRecords.isEmpty && isSyncing {
                 loadingState("Syncing all accounts…")
             } else if allRecords.isEmpty {
-                emptyState
+                VStack {
+                    TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }.padding(20)
+                    emptyState
+                }
             } else {
                 transactionList
             }
@@ -918,6 +923,7 @@ struct PortfolioTransactionCenterView: View {
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
                         spendingByCategory(insights)
+                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
 
                         VStack(spacing: 0) {
                             if let largestExpense = insights.largestExpense {
@@ -942,6 +948,7 @@ struct PortfolioTransactionCenterView: View {
                                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
                         )
                     } else {
+                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
                         HStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 19, weight: .semibold))
@@ -1426,6 +1433,9 @@ struct PortfolioTransactionCenterView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
+                    if let review = appState.businessExpenseReviews.first(where: { $0.transactionId == record.id }) {
+                        Text(review.statusLabel).font(.system(size: 10, weight: .semibold)).foregroundStyle(Color.zifrGold)
+                    }
                     Text(TransactionIntelligence.displayName(for: record))
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
@@ -2061,7 +2071,9 @@ private struct SpendingCategorySheet: View {
     }
 }
 
-private struct TransactionDetailSheet: View {
+struct TransactionDetailSheet: View {
+    @Environment(AppState.self) private var appState
+    @State private var showBusinessReview = false
     let record: ResolvedTransaction
     let onSave: (TransactionOverrideDraft) async throws -> Void
     let onReset: () async throws -> Void
@@ -2144,6 +2156,10 @@ private struct TransactionDetailSheet: View {
                     VStack(spacing: 16) {
                         transactionHero
                         sourceDetails
+                        TaxOpportunitiesButton(count: 0) { showBusinessReview = true }
+                        if let review = appState.businessExpenseReviews.first(where: { $0.transactionId == record.id }) {
+                            Text(review.statusLabel).font(.caption).foregroundStyle(Color.zifrGold)
+                        }
                         correctionForm
                         if record.override != nil {
                             Button(role: .destructive) {
@@ -2163,6 +2179,7 @@ private struct TransactionDetailSheet: View {
                     .padding(.bottom, 36)
                 }
             }
+            .sheet(isPresented: $showBusinessReview) { BusinessExpenseReviewSheet(transaction: record) }
             .navigationTitle("Transaction Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
