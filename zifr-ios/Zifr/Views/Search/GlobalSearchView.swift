@@ -55,26 +55,32 @@ struct GlobalSearchView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Search bar
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.white.opacity(0.45))
                     TextField("Search companies, services, cards...", text: $vm.searchQuery)
                         .focused($searchFocused)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.primary)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white)
+                        .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     if !vm.searchQuery.isEmpty {
                         Button { vm.searchQuery = "" } label: {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Color.white.opacity(0.4))
                         }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .liquidGlass(cornerRadius: 14)
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(Color(hex: "#2C2C2E"))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                )
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 
@@ -84,6 +90,13 @@ struct GlobalSearchView: View {
                         Text("Across \(company.name)").tag(SearchScope.company)
                     }
                     .pickerStyle(.segmented)
+                    .padding(4)
+                    .background(Color(hex: "#2C2C2E"))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    )
                     .padding(.horizontal, 20)
                     .padding(.bottom, 12)
                 }
@@ -147,21 +160,31 @@ struct GlobalSearchView: View {
                     .scrollDismissesKeyboard(.immediately)
                 }
             }
-            .background(Color.zifrBG)
-            .navigationTitle(!vm.path.isEmpty && vm.selectedCompany != nil ? "Search \(vm.selectedCompany!.name.uppercased())" : "Search")
+            .background(Color(hex: "#1C1C1E"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .principal) {
+                    Text("Search")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         vm.searchQuery = ""
                         dismiss()
                     }
-                    .foregroundStyle(Color.white.opacity(0.5))
+                    .fontWeight(.semibold)
                 }
             }
 
         }
+        .presentationDetents([.fraction(0.92), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#1C1C1E"))
         .onAppear {
+            vm.searchQuery = ""
             searchFocused = true
             
             // Apply DESIGN.md colors to segmented picker
@@ -170,17 +193,21 @@ struct GlobalSearchView: View {
             UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
             UISegmentedControl.appearance().setTitleTextAttributes([.foregroundColor: UIColor(white: 1, alpha: 0.5)], for: .normal)
         }
+        .onDisappear {
+            searchFocused = false
+            vm.searchQuery = ""
+        }
     }
 
     private var relationshipSearchSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("CONNECTIONS")
-                .font(.system(size: 12, weight: .heavy))
-                .tracking(1)
-                .foregroundStyle(Color.white.opacity(0.4))
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-
+        ZifrSheetCard(
+            title: "CONNECTIONS",
+            cornerRadius: 20,
+            contentHorizontalPadding: 0,
+            contentTopPadding: 0,
+            contentBottomPadding: 0,
+            contentSpacing: 0
+        ) {
             VStack(spacing: 0) {
                 ForEach(relationshipResults) { connection in
                     Button {
@@ -208,7 +235,6 @@ struct GlobalSearchView: View {
                     .buttonStyle(.plain)
                 }
             }
-            .glassCard(cornerRadius: 16)
         }
         .padding(.bottom, 12)
     }
@@ -217,14 +243,14 @@ struct GlobalSearchView: View {
 
     @ViewBuilder
     private func searchSection(title: String, items: [AppViewModel.SearchResult]) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 12, weight: .heavy))
-                .tracking(1)
-                .foregroundStyle(Color.white.opacity(0.4))
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-            
+        ZifrSheetCard(
+            title: title,
+            cornerRadius: 20,
+            contentHorizontalPadding: 0,
+            contentTopPadding: 0,
+            contentBottomPadding: 0,
+            contentSpacing: 0
+        ) {
             VStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, result in
                     searchResultRow(result)
@@ -237,7 +263,6 @@ struct GlobalSearchView: View {
                     }
                 }
             }
-            .glassCard(cornerRadius: 16)
         }
         .padding(.bottom, 12)
     }
