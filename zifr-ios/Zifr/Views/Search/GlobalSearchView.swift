@@ -160,7 +160,7 @@ struct GlobalSearchView: View {
                     .scrollDismissesKeyboard(.immediately)
                 }
             }
-            .background(Color(hex: "#1C1C1E"))
+            .background(Color(hex: "#1C1C1E").ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
             .toolbar {
@@ -179,7 +179,8 @@ struct GlobalSearchView: View {
             }
 
         }
-        .presentationDetents([.fraction(0.92), .large])
+        .zifrFullWidthSheetSizing()
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
         .presentationBackground(Color(hex: "#1C1C1E"))
@@ -483,6 +484,17 @@ struct GlobalSearchView: View {
         case .subscription: return .zifrGreen
         case .financial: return .zifrGold
         case .document: return .zifrBlue
+        }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func zifrFullWidthSheetSizing() -> some View {
+        if #available(iOS 18.0, *) {
+            presentationSizing(.page)
+        } else {
+            self
         }
     }
 }
