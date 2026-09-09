@@ -1,6 +1,16 @@
 import SwiftUI
 import Supabase
 
+private struct AdminProButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.975 : 1)
+            .offset(y: configuration.isPressed ? 3 : 0)
+            .brightness(configuration.isPressed ? -0.04 : 0)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}
+
 struct AdminSettingsView: View {
     @Bindable var vm: AppViewModel
     @Environment(AuthViewModel.self) private var authVM
@@ -176,36 +186,55 @@ struct AdminSettingsView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showingPremiumUpgrade = true
                     } label: {
-                        HStack {
+                        HStack(spacing: 14) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.white.opacity(0.2))
-                                    .frame(width: 44, height: 44)
+                                    .fill(Color.black.opacity(0.12))
+                                    .frame(width: 46, height: 46)
                                 Image(systemName: accessController.isPro ? "checkmark.seal.fill" : "star.fill")
-                                    .foregroundStyle(.white)
-                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color(hex: "#171914"))
+                                    .font(.system(size: 19, weight: .bold))
                             }
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(accessController.isPro ? "MILOOM PRO" : "UPGRADE TO MILOOM PRO")
+                                Text(accessController.isPro ? "MANAGE MILOOM PRO" : "UPGRADE TO MILOOM PRO")
                                     .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color(hex: "#171914"))
                                 Text(accessController.membershipSubtitle)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(Color.white.opacity(0.8))
+                                    .foregroundStyle(Color.black.opacity(0.62))
                             }
                             
                             Spacer()
                             
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.6))
-                                .padding(.leading, 8)
+                            ZStack {
+                                Circle()
+                                    .fill(Color.black.opacity(0.10))
+                                    .frame(width: 34, height: 34)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 13, weight: .black))
+                                    .foregroundStyle(Color(hex: "#171914"))
+                            }
                         }
-                        .padding(16)
-                        .background(.miloomSecondary)
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .padding(.horizontal, 16)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 78)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(hex: "#D1BE91"), Color.miloomGold],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .stroke(Color.white.opacity(0.30), lineWidth: 1)
+                        }
+                        .shadow(color: Color.black.opacity(0.42), radius: 12, x: 0, y: 8)
+                        .shadow(color: Color.miloomGold.opacity(0.22), radius: 18, x: 0, y: 5)
                     }
+                    .buttonStyle(AdminProButtonStyle())
                     .padding(.horizontal, 20)
                     
                     // Inbox
