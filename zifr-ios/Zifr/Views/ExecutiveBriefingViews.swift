@@ -88,46 +88,133 @@ private struct ExecutiveSummaryCard: View {
     }
 
     var body: some View {
-        BriefingGlassPanel(spacing: 10, padding: 14) {
+        VStack(spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
-                Image(systemName: snapshot.scope == .business ? "building.2.crop.circle" : "person.crop.circle")
-                    .font(.title3).foregroundStyle(Color.zifrGold)
-                    .accessibilityHidden(true)
-                Text("\(snapshot.scope.rawValue) Summary")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                Text("30 DAYS").font(.caption2.bold()).tracking(0.8)
-                    .foregroundStyle(Color.white.opacity(0.62))
-            }
-            LazyVGrid(columns: metricColumns, alignment: .leading, spacing: 10) {
-                BriefingMetric(label: "Income", value: money { $0.income }, accessibilityValue: money({ $0.income }, compact: false))
-                BriefingMetric(label: "Outflow", value: money { $0.insight.current.moneyOut }, accessibilityValue: money({ $0.insight.current.moneyOut }, compact: false))
-                BriefingMetric(label: "Cash flow", value: money { $0.insight.current.net }, accessibilityValue: money({ $0.insight.current.net }, compact: false), emphasized: true)
-                BriefingMetric(label: "Subscriptions", value: snapshot.isLoaded ? "\(snapshot.activeSubscriptionCount)" : "—", emphasized: false)
-                BriefingMetric(label: "Add-ons", value: snapshot.isLoaded ? "\(snapshot.supplementalCount)" : "—", emphasized: false)
-                BriefingMetric(
-                    label: "Monthly",
-                    value: snapshot.isLoaded ? BriefingFormat.compactAmounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "—") : "—",
-                    accessibilityValue: snapshot.isLoaded ? BriefingFormat.amounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "No active recurring services") : "Loading",
-                    emphasized: false
-                )
-            }
-            Divider().overlay(Color.white.opacity(0.06))
-            urgentStrip
-            Button(action: onBreakdown) {
-                HStack {
-                    Text("View breakdown")
-                    Spacer()
-                    Image(systemName: "arrow.right")
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 56, height: 56)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+
+                    Image(systemName: snapshot.scope == .business ? "building.2" : "person.crop.circle")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.8))
+                        .accessibilityHidden(true)
                 }
-                .font(.body.weight(.semibold)).padding(.horizontal, 12)
-                    .frame(height: 44)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(snapshot.scope.rawValue) Summary")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .accessibilityAddTraits(.isHeader)
+
+                    HStack(spacing: 6) {
+                        HStack(spacing: 3) {
+                            Text("\(snapshot.companies.count)")
+                                .foregroundStyle(.white)
+                            Text(snapshot.companies.count == 1 ? "Entity" : "Entities")
+                                .foregroundStyle(Color.miloomGold)
+                        }
+
+                        Text("|")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.white.opacity(0.2))
+
+                        HStack(spacing: 3) {
+                            Text("30")
+                                .foregroundStyle(.white)
+                            Text("Days")
+                                .foregroundStyle(Color.miloomGold)
+                        }
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .fixedSize(horizontal: true, vertical: false)
+                }
+
+                Spacer(minLength: 0)
             }
-            .buttonStyle(MiloomSecondaryButtonStyle())
-            .accessibilityLabel("View \(snapshot.scope.rawValue.lowercased()) breakdown")
-            .accessibilityHint("Shows financial, services, and vault details")
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            .background(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 24,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: 24
+                )
+                .fill(Color.black.opacity(0.70))
+                .overlay(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 24,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 24
+                    )
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                LazyVGrid(columns: metricColumns, alignment: .leading, spacing: 10) {
+                    BriefingMetric(label: "Income", value: money { $0.income }, accessibilityValue: money({ $0.income }, compact: false))
+                    BriefingMetric(label: "Outflow", value: money { $0.insight.current.moneyOut }, accessibilityValue: money({ $0.insight.current.moneyOut }, compact: false))
+                    BriefingMetric(label: "Cash flow", value: money { $0.insight.current.net }, accessibilityValue: money({ $0.insight.current.net }, compact: false), emphasized: true)
+                    BriefingMetric(label: "Subscriptions", value: snapshot.isLoaded ? "\(snapshot.activeSubscriptionCount)" : "—", emphasized: false)
+                    BriefingMetric(label: "Add-ons", value: snapshot.isLoaded ? "\(snapshot.supplementalCount)" : "—", emphasized: false)
+                    BriefingMetric(
+                        label: "Monthly",
+                        value: snapshot.isLoaded ? BriefingFormat.compactAmounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "—") : "—",
+                        accessibilityValue: snapshot.isLoaded ? BriefingFormat.amounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "No active recurring services") : "Loading",
+                        emphasized: false
+                    )
+                }
+                Divider().overlay(Color.white.opacity(0.06))
+                urgentStrip
+                Button(action: onBreakdown) {
+                    HStack {
+                        Text("View breakdown")
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.body.weight(.semibold)).padding(.horizontal, 12)
+                        .frame(height: 44)
+                }
+                .buttonStyle(MiloomSecondaryButtonStyle())
+                .accessibilityLabel("View \(snapshot.scope.rawValue.lowercased()) breakdown")
+                .accessibilityHint("Shows financial, services, and vault details")
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(hex: "#1C1C1E").opacity(0.40))
+        )
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: .black.opacity(0.4), radius: 10, x: 0, y: 4)
+        .foregroundStyle(.white)
     }
 
     @ViewBuilder
