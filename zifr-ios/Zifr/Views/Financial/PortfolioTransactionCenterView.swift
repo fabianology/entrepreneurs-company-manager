@@ -351,10 +351,6 @@ struct MiloomMonthPicker: View {
         .buttonStyle(.plain)
         .tint(Color.miloomGold)
         .background { pickerGlass(Capsule()) }
-        .overlay(
-            Capsule()
-                .stroke(Color.miloomGold.opacity(0.72), lineWidth: 1)
-        )
         .accessibilityLabel("Choose transaction month")
         .accessibilityValue(selection.title())
         .accessibilityHint("Shows the latest twelve calendar months")
