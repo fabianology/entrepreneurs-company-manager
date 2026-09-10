@@ -30,6 +30,7 @@ struct DashboardView: View {
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
     @State private var showBriefing = false
+    @State private var showClassicBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
     @State private var taxReviewCompany: Company?
@@ -274,10 +275,10 @@ struct DashboardView: View {
                 )
             }
             .sheet(isPresented: $showBriefing) {
-                NavigationStack {
+                GeometryReader { geometry in
                     ZStack {
-                        Color(hex: "#1C1C1E").ignoresSafeArea()
-                        ScrollView {
+                        receiptSheetBackground
+                        ScrollView(.vertical) {
                             OwnerHealthBriefingDashboard(
                                 vm: vm,
                                 onOpenResource: { obligation in
@@ -296,6 +297,43 @@ struct DashboardView: View {
                                     }
                                 }
                             )
+                            .frame(width: max(geometry.size.width - 40, 0))
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+                        .scrollIndicators(.hidden)
+                        .clipped()
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .preferredColorScheme(.light)
+            }
+            .sheet(isPresented: $showClassicBriefing) {
+                NavigationStack {
+                    ZStack {
+                        Color(hex: "#1C1C1E").ignoresSafeArea()
+                        ScrollView {
+                            ClassicOwnerHealthBriefingDashboard(
+                                vm: vm,
+                                onOpenResource: { obligation in
+                                    dismissClassicBriefing {
+                                        openBriefingResource(obligation)
+                                    }
+                                },
+                                onOpenHealthResource: { kind, resourceID in
+                                    dismissClassicBriefing {
+                                        openHealthResource(kind, resourceID)
+                                    }
+                                },
+                                onExploreConnections: {
+                                    dismissClassicBriefing {
+                                        showConnectionGraph = true
+                                    }
+                                }
+                            )
                             .padding(.horizontal, 20)
                             .padding(.vertical, 16)
                         }
@@ -305,7 +343,7 @@ struct DashboardView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { showBriefing = false }
+                            Button("Done") { showClassicBriefing = false }
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.miloomGold)
                         }
@@ -504,6 +542,16 @@ struct DashboardView: View {
                         }
                     )
 
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        presentClassicBriefing()
+                    } label: {
+                        dashboardBriefingIcon
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open briefing")
+                    .accessibilityHint("Shows personal and business summaries with detailed breakdowns")
+
                     plusCommandMenu
                         .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
                         .background(
@@ -631,6 +679,11 @@ struct DashboardView: View {
         let rawItem: Any
     }
 
+    private var receiptSheetBackground: some View {
+        Color(hex: "#1C1C1E")
+            .ignoresSafeArea()
+    }
+
     @ViewBuilder
     private func bottomControlGlass<S: Shape>(_ shape: S) -> some View {
         if #available(iOS 26.0, *) {
@@ -648,6 +701,37 @@ struct DashboardView: View {
                     shape.fill(Color.zifrTabBarFill.opacity(0.35))
                 )
         }
+    }
+
+    private var dashboardBriefingIcon: some View {
+        ZStack {
+            bottomControlGlass(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "list.clipboard.fill")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+
+            Image(systemName: "sparkles")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(Color.miloomGold)
+                .offset(x: 10, y: -10)
+        }
+        .frame(width: 44, height: 44)
     }
 
     @ViewBuilder
@@ -722,8 +806,26 @@ struct DashboardView: View {
         showBriefing = true
     }
 
+    private func presentClassicBriefing() {
+        guard accessController.request(
+            .ownerBriefing,
+            source: "dashboard_briefing_button",
+            appState: appState,
+            userId: currentUserId
+        ) else {
+            showPremiumUpgrade = true
+            return
+        }
+        showClassicBriefing = true
+    }
+
     private func dismissBriefing(then action: @escaping () -> Void) {
         showBriefing = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: action)
+    }
+
+    private func dismissClassicBriefing(then action: @escaping () -> Void) {
+        showClassicBriefing = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: action)
     }
 
