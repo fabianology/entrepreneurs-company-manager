@@ -3,68 +3,1113 @@ import SwiftUI
 struct OwnerHealthBriefingDashboard: View {
     @Environment(AppState.self) private var appState
     @Bindable var vm: AppViewModel
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var selectedScope: OwnerBriefingScope?
-    @State private var selectedSection: ExecutiveBriefingSection?
+    @State private var selectedScope: OwnerBriefingScope = .personal
+    @State private var financialMonth: CashFlowMonth = .current
+    @State private var activeHUD: BriefingReceiptHUD?
+    @State private var showingReminders = false
+    @State private var selectedRecurringReview: RecurringSuggestionReview?
+    @State private var queuedRecurringReview: RecurringSuggestionReview?
+    @State private var ignoredDataIssueIDs = OwnerHealthDataIssueStore.load()
     @State private var pendingNavigation: (() -> Void)?
     var onOpenResource: (PortfolioObligation) -> Void
     var onOpenHealthResource: (ResourceKind, UUID) -> Void
     var onExploreConnections: () -> Void
 
+    private var visibleScopes: [OwnerBriefingScope] {
+        let available = ExecutiveBriefingLayout.visibleScopes(companies: appState.companies)
+        return [.personal, .business].filter(available.contains)
+    }
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(ExecutiveBriefingLayout.visibleScopes(companies: appState.companies)) { scope in
-                    ExecutiveSummaryCard(
-                        snapshot: ExecutiveBriefingSnapshot(appState: appState, scope: scope, now: context.date),
-                        now: context.date,
-                        urgentNotices: ExecutiveUrgentNotice.cardNotices(in: appState, scope: scope, now: context.date),
-                        onOpenUrgent: openUrgent
-                    ) { section in
-                        selectedSection = section
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        selectedScope = scope
-                    }
+            let snapshot = ExecutiveBriefingSnapshot(
+                appState: appState,
+                scope: selectedScope,
+                now: context.date
+            )
+            let health = OwnerHealthEngine.snapshot(
+                appState: appState,
+                scope: selectedScope,
+                now: context.date,
+                ignoredDataIssueIDs: ignoredDataIssueIDs
+            )
+            let notices = ExecutiveUrgentNotice.cardNotices(
+                in: appState,
+                scope: selectedScope,
+                now: context.date
+            )
+
+            ExecutiveBriefingReceipt(
+                snapshot: snapshot,
+                health: health,
+                notices: notices,
+                selectedScope: $selectedScope,
+                financialMonth: $financialMonth,
+                visibleScopes: visibleScopes,
+                now: context.date,
+                onShowTransactions: { activeHUD = .transactions },
+                onShowAccounts: { activeHUD = .accounts },
+                onShowReview: { activeHUD = .review },
+                onShowReminders: { showingReminders = true },
+                onExploreConnections: onExploreConnections,
+                onOpenResource: onOpenHealthResource,
+                onOpenUrgent: openUrgent
+            )
+        }
+        .onAppear { keepScopeAvailable() }
+        .onChange(of: appState.companies) { _, _ in keepScopeAvailable() }
+        .sheet(item: $activeHUD, onDismiss: finishHUD) { hud in
+            let snapshot = ExecutiveBriefingSnapshot(appState: appState, scope: selectedScope, now: Date())
+            let health = OwnerHealthEngine.snapshot(
+                appState: appState,
+                scope: selectedScope,
+                ignoredDataIssueIDs: ignoredDataIssueIDs
+            )
+            switch hud {
+            case .transactions:
+                BriefingTransactionsReceipt(
+                    snapshot: snapshot,
+                    month: financialMonth,
+                    now: Date()
+                )
+            case .accounts:
+                BriefingAccountsReceipt(snapshot: snapshot) { kind, id in
+                    pendingNavigation = { onOpenHealthResource(kind, id) }
+                    activeHUD = nil
                 }
-                Button(action: onExploreConnections) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "point.3.connected.trianglepath.dotted")
-                        Text("Explore connections")
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
+            case .review:
+                BriefingReviewReceipt(
+                    health: health,
+                    onOpen: { issue in
+                        pendingNavigation = { onOpenHealthResource(issue.resourceType, issue.resourceID) }
+                        activeHUD = nil
+                    },
+                    onIgnore: { issue in
+                        ignoredDataIssueIDs.insert(issue.id)
+                        OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
+                    },
+                    onReviewRecurring: { suggestions in
+                        queuedRecurringReview = RecurringSuggestionReview(suggestions: suggestions)
+                        activeHUD = nil
                     }
-                    .font(.body.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .frame(height: 44)
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(MiloomSecondaryButtonStyle())
-                .accessibilityLabel("Explore connections")
-                .accessibilityHint("Opens the existing portfolio connection map")
+                )
             }
         }
-        .sheet(item: $selectedScope, onDismiss: {
-            let action = pendingNavigation
-            pendingNavigation = nil
-            action?()
-        }) { scope in
-            ExecutiveBreakdownView(scope: scope, vm: vm, initialSection: selectedSection, onOpenResource: { obligation in
+        .sheet(isPresented: $showingReminders, onDismiss: finishPendingNavigation) {
+            OwnerBriefingView(scope: selectedScope) { obligation in
                 pendingNavigation = { onOpenResource(obligation) }
-                selectedScope = nil
-            }, onOpenHealthResource: { kind, id in
-                pendingNavigation = { onOpenHealthResource(kind, id) }
-                selectedScope = nil
-            })
-            .dynamicTypeSize(dynamicTypeSize)
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+                showingReminders = false
+            }
         }
+        .sheet(item: $selectedRecurringReview) { review in
+            DetectedSubscriptionsSheet(
+                detected: review.suggestions,
+                cardId: nil,
+                cardName: "\(selectedScope.rawValue.lowercased()) accounts",
+                companyId: nil,
+                vm: vm,
+                onDismissAll: { selectedRecurringReview = nil }
+            )
+            .environment(appState)
+        }
+    }
+
+    private func keepScopeAvailable() {
+        if !visibleScopes.contains(selectedScope) {
+            selectedScope = visibleScopes.first ?? .personal
+        }
+    }
+
+    private func finishHUD() {
+        if let review = queuedRecurringReview {
+            queuedRecurringReview = nil
+            selectedRecurringReview = review
+            return
+        }
+        finishPendingNavigation()
+    }
+
+    private func finishPendingNavigation() {
+        let action = pendingNavigation
+        pendingNavigation = nil
+        action?()
     }
 
     private func openUrgent(_ notice: ExecutiveUrgentNotice) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if let obligation = notice.obligation { onOpenResource(obligation) }
         else { onOpenHealthResource(notice.sourceType, notice.sourceID) }
+    }
+}
+
+private enum BriefingReceiptHUD: String, Identifiable {
+    case transactions
+    case accounts
+    case review
+
+    var id: String { rawValue }
+}
+
+private enum BriefingReceiptTheme {
+    static let paper = Color(hex: "#F8F9FA")
+    static let ink = Color(hex: "#1A1A1A")
+    static let fadedInk = Color(hex: "#1A1A1A").opacity(0.64)
+    static let gold = Color(hex: "#918457")
+    static let backdrop = Color(hex: "#121212")
+}
+
+private struct ExecutiveBriefingReceipt: View {
+    let snapshot: ExecutiveBriefingSnapshot
+    let health: OwnerHealthSnapshot
+    let notices: [ExecutiveUrgentNotice]
+    @Binding var selectedScope: OwnerBriefingScope
+    @Binding var financialMonth: CashFlowMonth
+    let visibleScopes: [OwnerBriefingScope]
+    let now: Date
+    let onShowTransactions: () -> Void
+    let onShowAccounts: () -> Void
+    let onShowReview: () -> Void
+    let onShowReminders: () -> Void
+    let onExploreConnections: () -> Void
+    let onOpenResource: (ResourceKind, UUID) -> Void
+    let onOpenUrgent: (ExecutiveUrgentNotice) -> Void
+
+    private var financials: [ExecutiveCurrencySummary] {
+        ExecutiveBriefingSnapshot.financials(records: snapshot.records, now: now, month: financialMonth)
+    }
+
+    private var transactionCount: Int {
+        financials.reduce(0) { $0 + $1.insight.records.count }
+    }
+
+    private var accountCount: Int {
+        snapshot.institutions.reduce(0) { $0 + $1.accounts.count } + snapshot.cards.count + snapshot.loans.count
+    }
+
+    private var reviewCount: Int {
+        health.categories.reduce(0) { $0 + $1.dataIssues.count + $1.recurringSuggestions.count }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            receiptHeader
+            dashedDivider
+            selectors
+            Text(snapshot.coverage)
+                .font(.system(.caption, design: .monospaced))
+                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            receiptSection("01", title: "FINANCIAL", icon: "chart.bar.xaxis") {
+                financialContent
+            }
+            receiptSection("02", title: "SERVICES", icon: "square.stack.3d.up") {
+                servicesContent
+            }
+            receiptSection("03", title: "VAULT", icon: "lock.doc") {
+                vaultContent
+            }
+            receiptSection("04", title: "ATTENTION", icon: "exclamationmark.circle") {
+                attentionContent
+            }
+
+            dashedDivider
+            ReceiptActionButton(
+                title: reviewCount == 0 ? "DATA REVIEW COMPLETE" : "REVIEW DATA SUGGESTIONS",
+                detail: reviewCount == 0 ? "No suggestions" : "\(reviewCount) to review",
+                icon: reviewCount == 0 ? "checkmark.circle" : "text.badge.checkmark",
+                enabled: reviewCount > 0,
+                action: onShowReview
+            )
+            ReceiptActionButton(
+                title: "REMINDERS & COMPLETE LATER",
+                detail: "Open owner briefing tasks",
+                icon: "checklist",
+                action: onShowReminders
+            )
+            ReceiptActionButton(
+                title: "EXPLORE CONNECTIONS",
+                detail: "See how records are linked",
+                icon: "point.3.connected.trianglepath.dotted",
+                action: onExploreConnections
+            )
+
+            VStack(spacing: 4) {
+                Text("BASED ON SAVED RECORDS")
+                Text("BALANCES AND CONNECTIONS REMAIN UNCHANGED")
+            }
+            .font(.system(.caption2, design: .monospaced).weight(.medium))
+            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            .frame(maxWidth: .infinity)
+            .padding(.top, 4)
+        }
+        .padding(22)
+        .background(BriefingReceiptTheme.paper)
+        .foregroundStyle(BriefingReceiptTheme.ink)
+        .shadow(color: .black.opacity(0.38), radius: 18, y: 10)
+    }
+
+    private var receiptHeader: some View {
+        VStack(spacing: 5) {
+            Image(systemName: "receipt")
+                .font(.title3.weight(.semibold))
+            Text("MILOOM COMMAND CENTER")
+                .font(.system(.headline, design: .monospaced).weight(.bold))
+            Text("EXECUTIVE BRIEFING")
+                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+            Text(now.formatted(date: .numeric, time: .shortened))
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private var selectors: some View {
+        VStack(spacing: 10) {
+            Menu {
+                ForEach(visibleScopes) { scope in
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        selectedScope = scope
+                    } label: {
+                        if selectedScope == scope {
+                            Label(scope.rawValue, systemImage: "checkmark")
+                        } else {
+                            Text(scope.rawValue)
+                        }
+                    }
+                }
+            } label: {
+                ReceiptPickerLabel(label: "BRIEFING", value: selectedScope.rawValue)
+            }
+            .accessibilityLabel("Briefing profile")
+            .accessibilityValue(selectedScope.rawValue)
+
+            Menu {
+                ForEach(CashFlowMonth.recent(count: 12, from: now)) { month in
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        financialMonth = month
+                    } label: {
+                        if financialMonth == month {
+                            Label(month.title(), systemImage: "checkmark")
+                        } else {
+                            Text(month.title())
+                        }
+                    }
+                }
+            } label: {
+                ReceiptPickerLabel(label: "MONTH", value: financialMonth.title())
+            }
+            .accessibilityLabel("Report month")
+            .accessibilityValue(financialMonth.title())
+        }
+    }
+
+    @ViewBuilder
+    private var financialContent: some View {
+        if financials.isEmpty {
+            receiptNote("No posted transactions in \(financialMonth.title()).")
+        } else {
+            ForEach(financials) { summary in
+                receiptSubheading(summary.currency)
+                receiptRow("Income", BriefingFormat.money(summary.income, summary.currency))
+                receiptRow("Outflow", BriefingFormat.money(summary.insight.current.moneyOut, summary.currency))
+                receiptRow("Refunds", BriefingFormat.money(summary.refunds, summary.currency))
+                receiptTotal("NET CASH FLOW", BriefingFormat.money(summary.insight.current.net, summary.currency))
+                if !summary.insight.expenseCategories.isEmpty {
+                    receiptSubheading("TOP SPENDING CATEGORIES")
+                    ForEach(summary.insight.expenseCategories.prefix(3), id: \.key) { category in
+                        receiptRow(category.label, BriefingFormat.money(category.amount, summary.currency))
+                    }
+                }
+            }
+        }
+        ReceiptActionButton(
+            title: "VIEW TRANSACTIONS",
+            detail: "\(transactionCount) in \(financialMonth.title())",
+            icon: "list.bullet.rectangle",
+            action: onShowTransactions
+        )
+        receiptRow("Recorded balances", BriefingFormat.amounts(snapshot.balances, empty: "—"))
+        ReceiptActionButton(
+            title: "ACCOUNTS, CARDS & LOANS",
+            detail: "\(accountCount) financial records",
+            icon: "wallet.bifold",
+            action: onShowAccounts
+        )
+        if snapshot.unassignedTransactionCount > 0 {
+            receiptNote("\(snapshot.unassignedTransactionCount) unassigned transactions are excluded from totals.")
+        }
+    }
+
+    @ViewBuilder
+    private var servicesContent: some View {
+        receiptRow("Active bills", "\(snapshot.activeBillCount)")
+        receiptRow("Subscriptions", "\(snapshot.activeSubscriptionCount)")
+        receiptRow("Add-ons", "\(snapshot.supplementalCount)")
+        receiptTotal("EST. MONTHLY COMMITMENT", BriefingFormat.amounts(snapshot.recurringCosts, empty: "—"))
+
+        let projection = snapshot.upcomingCoverage
+        receiptSubheading("PAYMENT FUNDING · NEXT \(projection.days) DAYS")
+        receiptRow("Payments due", "\(projection.chargeCount)")
+        receiptRow("May fall short", "\(projection.atRiskCount)")
+        receiptRow("Unable to verify", "\(projection.unknownCount)")
+        if projection.groups.isEmpty {
+            receiptNote(projection.unscheduledCount > 0
+                ? "No dated payments in this window. \(projection.unscheduledCount) services need a renewal date."
+                : "No scheduled payments in this window.")
+        } else {
+            ForEach(projection.groups.prefix(4)) { group in
+                coverageRow(group)
+            }
+            if projection.groups.count > 4 {
+                receiptNote("+\(projection.groups.count - 4) more payment sources")
+            }
+        }
+
+        ForEach([RecurringServiceType.bill, .subscription]) { type in
+            let services = snapshot.subscriptions.filter {
+                $0.resolvedServiceType == type && ExecutiveBriefingSnapshot.isActive($0.status)
+            }
+            if !services.isEmpty {
+                receiptSubheading(type == .bill ? "BILLS" : "SUBSCRIPTIONS")
+                ForEach(services) { service in
+                    receiptResourceRow(
+                        service.name,
+                        BriefingFormat.money(service.cost, service.currency),
+                        detail: service.nextRenewalAt.map { "Due \($0.formatted(date: .abbreviated, time: .omitted))" }
+                            ?? service.nextRenewal.map { "Due \($0)" }
+                            ?? service.billingCycle,
+                        kind: .subscription,
+                        id: service.id
+                    )
+                }
+            }
+        }
+        if snapshot.unknownBillingCount > 0 {
+            receiptNote("\(snapshot.unknownBillingCount) billing cycles could not be included in the monthly estimate.")
+        }
+    }
+
+    @ViewBuilder
+    private var vaultContent: some View {
+        let metrics = ExecutiveCardMetrics(snapshot: snapshot, now: now)
+        receiptRow("Documents", "\(snapshot.documents.count)")
+        receiptRow("With expiration dates", "\(metrics.datedDocumentCount)")
+        receiptRow("Expired", "\(metrics.expiredDocuments.count)")
+        receiptRow("Expiring in 60 days", "\(metrics.expiringDocuments.count)")
+
+        let categories = Array(Set(snapshot.documents.map { CompanyDocument.normalizeType($0.type) })).sorted()
+        if categories.isEmpty {
+            receiptNote("No vault documents added.")
+        } else {
+            receiptSubheading("DOCUMENT CATEGORIES")
+            ForEach(categories, id: \.self) { category in
+                receiptRow(category, "\(snapshot.documents.filter { CompanyDocument.normalizeType($0.type) == category }.count)")
+            }
+        }
+        let sortedDocuments = snapshot.documents.sorted {
+            ($0.expiresAt ?? .distantFuture) < ($1.expiresAt ?? .distantFuture)
+        }
+        if !sortedDocuments.isEmpty {
+            receiptSubheading("DOCUMENTS")
+            ForEach(sortedDocuments) { document in
+                receiptResourceRow(
+                    document.name,
+                    document.expiresAt?.formatted(date: .abbreviated, time: .omitted)
+                        ?? CompanyDocument.normalizeType(document.type),
+                    kind: .document,
+                    id: document.id
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var attentionContent: some View {
+        if notices.isEmpty {
+            Label("No urgent notices", systemImage: "checkmark.circle.fill")
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                .foregroundStyle(Color.zifrGreen)
+                .frame(minHeight: 44)
+        } else {
+            ForEach(notices.prefix(5)) { notice in
+                Button { onOpenUrgent(notice) } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(Color.red)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(notice.title.uppercased())
+                                .font(.system(.caption, design: .monospaced).weight(.bold))
+                            Text("\(notice.entityName) · \(notice.detail)")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                    }
+                    .foregroundStyle(BriefingReceiptTheme.ink)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func coverageRow(_ group: UpcomingCoverageGroup) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: coverageIcon(group.status))
+                    .foregroundStyle(coverageColor(group.status))
+                Text(group.sourceName)
+                    .font(.system(.caption, design: .monospaced).weight(.semibold))
+                Spacer(minLength: 6)
+                Text(coverageTitle(group.status))
+                    .font(.system(.caption2, design: .monospaced).weight(.bold))
+                    .foregroundStyle(coverageColor(group.status))
+            }
+            Text(coverageDetail(group))
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 5)
+    }
+
+    private func coverageTitle(_ status: UpcomingCoverageStatus) -> String {
+        switch status {
+        case .covered: return "FUNDED"
+        case .atRisk: return "SHORT"
+        case .unknown: return "CHECK LINK"
+        }
+    }
+
+    private func coverageIcon(_ status: UpcomingCoverageStatus) -> String {
+        switch status {
+        case .covered: return "checkmark.circle.fill"
+        case .atRisk: return "exclamationmark.triangle.fill"
+        case .unknown: return "questionmark.circle.fill"
+        }
+    }
+
+    private func coverageColor(_ status: UpcomingCoverageStatus) -> Color {
+        switch status {
+        case .covered: return Color.zifrGreen
+        case .atRisk: return Color.red
+        case .unknown: return Color.orange
+        }
+    }
+
+    private func coverageDetail(_ group: UpcomingCoverageGroup) -> String {
+        let due = BriefingFormat.money(group.totalDue, group.currency)
+        if let reason = group.reason { return "\(due) due · \(reason)" }
+        guard let available = group.availableAmount, let difference = group.difference else {
+            return "\(due) due · available funds unavailable"
+        }
+        let availableText = BriefingFormat.money(available, group.currency)
+        let result = difference >= 0
+            ? "\(BriefingFormat.money(difference, group.currency)) left"
+            : "\(BriefingFormat.money(abs(difference), group.currency)) short"
+        let route = group.paymentRoutes.isEmpty ? "" : " via \(group.paymentRoutes.joined(separator: ", "))"
+        return "\(due) due · \(group.availableLabel) \(availableText) · \(result)\(route)"
+    }
+
+    private func receiptSection<Content: View>(
+        _ number: String,
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            dashedDivider
+            HStack(spacing: 8) {
+                Text(number)
+                    .foregroundStyle(BriefingReceiptTheme.gold)
+                Image(systemName: icon)
+                Text(title)
+            }
+            .font(.system(.subheadline, design: .monospaced).weight(.bold))
+            .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    private var dashedDivider: some View {
+        Text(String(repeating: "- ", count: 45))
+            .font(.system(.caption2, design: .monospaced))
+            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            .lineLimit(1)
+            .accessibilityHidden(true)
+    }
+
+    private func receiptSubheading(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.caption2, design: .monospaced).weight(.bold))
+            .tracking(0.7)
+            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            .padding(.top, 3)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func receiptRow(_ label: String, _ value: String, detail: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(label)
+                Spacer(minLength: 8)
+                Text(value).fontWeight(.semibold).multilineTextAlignment(.trailing)
+            }
+            if let detail {
+                Text(detail)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            }
+        }
+        .font(.system(.caption, design: .monospaced))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func receiptTotal(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label)
+            Spacer(minLength: 8)
+            Text(value).multilineTextAlignment(.trailing)
+        }
+        .font(.system(.caption, design: .monospaced).weight(.bold))
+        .padding(.vertical, 7)
+        .overlay(alignment: .top) { Rectangle().frame(height: 1).foregroundStyle(BriefingReceiptTheme.ink) }
+        .overlay(alignment: .bottom) { Rectangle().frame(height: 1).foregroundStyle(BriefingReceiptTheme.ink) }
+    }
+
+    private func receiptResourceRow(
+        _ label: String,
+        _ value: String,
+        detail: String? = nil,
+        kind: ResourceKind,
+        id: UUID
+    ) -> some View {
+        Button { onOpenResource(kind, id) } label: {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                    if let detail {
+                        Text(detail)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                    }
+                }
+                Spacer(minLength: 8)
+                Text(value).fontWeight(.semibold).multilineTextAlignment(.trailing)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(BriefingReceiptTheme.gold)
+            }
+            .font(.system(.caption, design: .monospaced))
+            .foregroundStyle(BriefingReceiptTheme.ink)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func receiptNote(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.caption2, design: .monospaced))
+            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+private struct ReceiptPickerLabel: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(.system(.caption2, design: .monospaced).weight(.bold))
+                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            Text(value.uppercased())
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .foregroundStyle(BriefingReceiptTheme.ink)
+            Spacer(minLength: 6)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(BriefingReceiptTheme.gold)
+        }
+        .padding(.horizontal, 12)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(BriefingReceiptTheme.gold.opacity(0.75), lineWidth: 1)
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct ReceiptActionButton: View {
+    let title: String
+    let detail: String
+    let icon: String
+    var enabled: Bool = true
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(.caption2, design: .monospaced).weight(.bold))
+                    Text(detail)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                }
+                Spacer(minLength: 6)
+                if enabled {
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(BriefingReceiptTheme.gold)
+                }
+            }
+            .foregroundStyle(BriefingReceiptTheme.ink)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .background(Color.black.opacity(0.035), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(BriefingReceiptTheme.ink.opacity(0.16), lineWidth: 1)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.7)
+    }
+}
+
+private struct ReceiptHUDShell<Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let subtitle: String
+    @ViewBuilder let content: Content
+
+    init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.subtitle = subtitle
+        self.content = content()
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(spacing: 4) {
+                        Image(systemName: "receipt")
+                            .font(.title3.weight(.semibold))
+                        Text("MILOOM")
+                            .font(.system(.subheadline, design: .monospaced).weight(.bold))
+                        Text(title.uppercased())
+                            .font(.system(.subheadline, design: .monospaced).weight(.bold))
+                        Text(subtitle.uppercased())
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isHeader)
+
+                    ReceiptDash()
+                    content
+                    ReceiptDash()
+                    Text("END OF REPORT")
+                        .font(.system(.caption2, design: .monospaced).weight(.medium))
+                        .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                        .frame(maxWidth: .infinity)
+                }
+                .padding(22)
+                .background(BriefingReceiptTheme.paper)
+                .foregroundStyle(BriefingReceiptTheme.ink)
+                .shadow(color: .black.opacity(0.4), radius: 18, y: 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 24)
+            }
+            .background(BriefingReceiptTheme.backdrop.ignoresSafeArea())
+            .scrollIndicators(.hidden)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(BriefingReceiptTheme.backdrop, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Close") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(BriefingReceiptTheme.backdrop)
+        .preferredColorScheme(.dark)
+    }
+}
+
+private struct ReceiptDash: View {
+    var body: some View {
+        Text(String(repeating: "- ", count: 45))
+            .font(.system(.caption2, design: .monospaced))
+            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+            .lineLimit(1)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct BriefingTransactionsReceipt: View {
+    let snapshot: ExecutiveBriefingSnapshot
+    let month: CashFlowMonth
+    let now: Date
+
+    private var financials: [ExecutiveCurrencySummary] {
+        ExecutiveBriefingSnapshot.financials(records: snapshot.records, now: now, month: month)
+    }
+
+    var body: some View {
+        ReceiptHUDShell(title: "Transactions", subtitle: "\(snapshot.scope.rawValue) · \(month.title())") {
+            if financials.allSatisfy({ $0.insight.records.isEmpty }) {
+                Text("NO POSTED TRANSACTIONS")
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
+                    .frame(maxWidth: .infinity, minHeight: 88)
+            } else {
+                ForEach(financials) { summary in
+                    transactionSummary(summary)
+                    ForEach(grouped(summary.insight.records), id: \.date) { group in
+                        Text(formattedDate(group.date).uppercased())
+                            .font(.system(.caption2, design: .monospaced).weight(.bold))
+                            .tracking(0.6)
+                            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                            .padding(.top, 6)
+                        ForEach(group.records) { record in
+                            transactionRow(record, currency: summary.currency)
+                        }
+                    }
+                    ReceiptDash()
+                }
+                Text("Posted transactions only. Transfers, ignored items, and pending transactions are excluded from cash flow totals.")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func transactionSummary(_ summary: ExecutiveCurrencySummary) -> some View {
+        VStack(spacing: 5) {
+            Text(summary.currency)
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            compactRow("INCOME", BriefingFormat.money(summary.income, summary.currency))
+            compactRow("OUTFLOW", BriefingFormat.money(summary.insight.current.moneyOut, summary.currency))
+            compactRow("NET", BriefingFormat.money(summary.insight.current.net, summary.currency), bold: true)
+        }
+    }
+
+    private func transactionRow(_ record: ResolvedTransaction, currency: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(TransactionIntelligence.displayName(for: record))
+                    .font(.system(.caption, design: .monospaced).weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(flowName(record)) · \(record.accountName)")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Text(flowAmount(record, currency: currency))
+                .font(.system(.caption, design: .monospaced).weight(.bold))
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 5)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func compactRow(_ label: String, _ value: String, bold: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+            Spacer(minLength: 8)
+            Text(value)
+        }
+        .font(.system(.caption2, design: .monospaced).weight(bold ? .bold : .regular))
+        .padding(.vertical, bold ? 5 : 0)
+        .overlay(alignment: bold ? .top : .center) {
+            if bold { Rectangle().frame(height: 1) }
+        }
+    }
+
+    private func grouped(_ records: [ResolvedTransaction]) -> [(date: String, records: [ResolvedTransaction])] {
+        Dictionary(grouping: records, by: { $0.transaction.date })
+            .map { (date: $0.key, records: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+
+    private func formattedDate(_ value: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: value) else { return value }
+        return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    }
+
+    private func flowName(_ record: ResolvedTransaction) -> String {
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income: return "Income"
+        case .refund: return "Refund"
+        case .expense: return "Expense"
+        case .transfer: return "Transfer"
+        case .ignored: return "Ignored"
+        }
+    }
+
+    private func flowAmount(_ record: ResolvedTransaction, currency: String) -> String {
+        let amount = BriefingFormat.money(abs(record.transaction.amount ?? 0), currency)
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income, .refund: return "+\(amount)"
+        case .expense: return "−\(amount)"
+        case .transfer, .ignored: return amount
+        }
+    }
+}
+
+private struct BriefingAccountsReceipt: View {
+    let snapshot: ExecutiveBriefingSnapshot
+    let onOpen: (ResourceKind, UUID) -> Void
+
+    var body: some View {
+        ReceiptHUDShell(title: "Financial records", subtitle: "\(snapshot.scope.rawValue) accounts, cards & loans") {
+            if snapshot.institutions.isEmpty && snapshot.cards.isEmpty && snapshot.loans.isEmpty {
+                Text("NO FINANCIAL RECORDS")
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
+                    .frame(maxWidth: .infinity, minHeight: 88)
+            }
+
+            ForEach(snapshot.institutions) { institution in
+                resourceButton(
+                    institution.name,
+                    detail: institution.isDisconnected ? "RECONNECT REQUIRED" : "\(institution.accounts.count) ACCOUNTS",
+                    icon: "building.columns",
+                    kind: .institution,
+                    id: institution.id
+                )
+                ForEach(institution.accounts) { account in
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("↳ \((account.name.isEmpty ? account.type : account.name).uppercased())")
+                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                            Text("\(account.type) · ••••\(account.last4.isEmpty ? "—" : account.last4)")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                        }
+                        Spacer(minLength: 8)
+                        Text(BriefingFormat.money(account.availableBalance ?? account.balance, account.currency))
+                            .font(.system(.caption2, design: .monospaced).weight(.bold))
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .padding(.leading, 8)
+                    .padding(.vertical, 4)
+                }
+                ReceiptDash()
+            }
+
+            if !snapshot.cards.isEmpty {
+                sectionLabel("CARDS")
+                ForEach(snapshot.cards) { card in
+                    resourceButton(
+                        card.name + ((card.last4 ?? "").isEmpty ? "" : " · ••••\(card.last4!)"),
+                        detail: "\(card.type) · \(card.status) · BAL \(card.balance.formatted())",
+                        icon: "creditcard",
+                        kind: .card,
+                        id: card.id
+                    )
+                }
+            }
+
+            if !snapshot.loans.isEmpty {
+                sectionLabel("LOANS")
+                ForEach(snapshot.loans) { loan in
+                    resourceButton(
+                        loan.name,
+                        detail: "\(loan.role) · BAL \(loan.remainingBalance.formatted())",
+                        icon: "banknote",
+                        kind: .loan,
+                        id: loan.id
+                    )
+                }
+            }
+
+            Text("Account balances use the latest saved values. Card and loan records show their stored balance without assuming a currency.")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func sectionLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.system(.caption, design: .monospaced).weight(.bold))
+            .tracking(0.7)
+            .padding(.top, 4)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func resourceButton(
+        _ title: String,
+        detail: String,
+        icon: String,
+        kind: ResourceKind,
+        id: UUID
+    ) -> some View {
+        Button { onOpen(kind, id) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon).frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title.uppercased())
+                        .font(.system(.caption2, design: .monospaced).weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(detail)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                }
+                Spacer(minLength: 6)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(BriefingReceiptTheme.gold)
+            }
+            .foregroundStyle(BriefingReceiptTheme.ink)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct BriefingReviewReceipt: View {
+    let health: OwnerHealthSnapshot
+    let onOpen: (OwnerHealthDataIssue) -> Void
+    let onIgnore: (OwnerHealthDataIssue) -> Void
+    let onReviewRecurring: ([DetectedSubscription]) -> Void
+    @State private var ignoredInSheet: Set<String> = []
+
+    private var issues: [OwnerHealthDataIssue] {
+        health.categories.flatMap(\.dataIssues).filter { !ignoredInSheet.contains($0.id) }
+    }
+
+    private var recurring: [DetectedSubscription] {
+        var seen = Set<String>()
+        return health.categories.flatMap(\.recurringSuggestions).filter { seen.insert($0.id).inserted }
+    }
+
+    var body: some View {
+        ReceiptHUDShell(title: "Review data", subtitle: "\(health.scope.rawValue) suggestions") {
+            Text("Optional details that can make reports and reminders more complete.")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach(health.categories.filter { $0.requiresAttention }) { summary in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: summary.category.icon)
+                        .foregroundStyle(summary.status == .critical ? Color.red : Color.orange)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(summary.category.title.uppercased())
+                            .font(.system(.caption2, design: .monospaced).weight(.bold))
+                        Text(summary.summary)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+
+            if issues.isEmpty && recurring.isEmpty {
+                Label("SUGGESTIONS CLEARED", systemImage: "checkmark.circle.fill")
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
+                    .foregroundStyle(Color.zifrGreen)
+                    .frame(maxWidth: .infinity, minHeight: 88)
+            }
+
+            ForEach(issues) { issue in
+                ReceiptDash()
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(issue.resourceName.uppercased())
+                        .font(.system(.caption, design: .monospaced).weight(.bold))
+                    Text(issue.entityName)
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                    ForEach(issue.missingFields, id: \.self) { field in
+                        Text("• \(field)")
+                            .font(.system(.caption2, design: .monospaced))
+                    }
+                    HStack(spacing: 10) {
+                        smallButton("ADD INFORMATION", filled: true) { onOpen(issue) }
+                        smallButton("IGNORE", filled: false) {
+                            ignoredInSheet.insert(issue.id)
+                            onIgnore(issue)
+                        }
+                    }
+                }
+            }
+
+            if !recurring.isEmpty {
+                ReceiptDash()
+                Text("DETECTED RECURRING CHARGES")
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(recurring) { item in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name.uppercased())
+                                .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                            Text("\(item.frequency) · \(item.occurrences) charges")
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                        }
+                        Spacer(minLength: 8)
+                        Text(BriefingFormat.money(item.amount, item.currency))
+                            .font(.system(.caption2, design: .monospaced).weight(.bold))
+                    }
+                }
+                ReceiptActionButton(
+                    title: "REVIEW RECURRING CHARGES",
+                    detail: "\(recurring.count) possible services",
+                    icon: "sparkle.magnifyingglass"
+                ) {
+                    onReviewRecurring(recurring)
+                }
+            }
+        }
+    }
+
+    private func smallButton(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(.caption2, design: .monospaced).weight(.bold))
+                .foregroundStyle(filled ? Color.white : BriefingReceiptTheme.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(filled ? BriefingReceiptTheme.gold : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(BriefingReceiptTheme.gold, lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -277,727 +1322,6 @@ struct ExecutiveSummaryCard: View {
     }
 }
 
-private struct ExecutiveBreakdownView: View {
-    @Environment(AppState.self) private var appState
-    @Environment(\.dismiss) private var dismiss
-    let scope: OwnerBriefingScope
-    @Bindable var vm: AppViewModel
-    var initialSection: ExecutiveBriefingSection? = nil
-    let onOpenResource: (PortfolioObligation) -> Void
-    let onOpenHealthResource: (ResourceKind, UUID) -> Void
-    @State private var companyID: UUID?
-    @State private var showingReminders = false
-    @State private var selectedDataSummary: OwnerHealthCategorySummary?
-    @State private var selectedRecurringReview: RecurringSuggestionReview?
-    @State private var ignoredDataIssueIDs = OwnerHealthDataIssueStore.load()
-    @State private var nestedNavigation: (() -> Void)?
-    @State private var isFinancialExpanded = false
-    @State private var isServicesExpanded = false
-    @State private var isVaultExpanded = false
-    @State private var financialMonth: CashFlowMonth = .current
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "#1C1C1E").ignoresSafeArea()
-
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    let snapshot = ExecutiveBriefingSnapshot(appState: appState, scope: scope, companyID: companyID, now: context.date)
-                    let health = OwnerHealthEngine.snapshot(appState: appState, scope: scope, now: context.date,
-                        ignoredDataIssueIDs: ignoredDataIssueIDs, companyID: companyID)
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 18) {
-                                breakdownHeader(snapshot, health: health)
-                                financialCard(snapshot, now: context.date).id(ExecutiveBriefingSection.financial)
-                                servicesCard(snapshot, health: health).id(ExecutiveBriefingSection.services)
-                                vaultCard(snapshot, health: health).id(ExecutiveBriefingSection.vault)
-                            }
-                            .padding(.horizontal, 20)
-                            .padding(.top, 12)
-                            .padding(.bottom, 36)
-                        }
-                        .scrollIndicators(.hidden)
-                        .task {
-                            guard let initialSection else { return }
-                            isFinancialExpanded = initialSection == .financial
-                            isServicesExpanded = initialSection == .services
-                            isVaultExpanded = initialSection == .vault
-                            await Task.yield()
-                            proxy.scrollTo(initialSection, anchor: .top)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("\(scope.rawValue) breakdown")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("\(scope.rawValue) breakdown")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(Color.miloomGold)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.white)
-                }
-            }
-            .sheet(isPresented: $showingReminders, onDismiss: finishNestedNavigation) {
-                OwnerBriefingView(scope: scope, companyID: companyID) { obligation in
-                    nestedNavigation = { onOpenResource(obligation) }
-                    showingReminders = false
-                }
-            }
-            .sheet(item: $selectedDataSummary, onDismiss: finishNestedNavigation) { summary in
-                MissingDataDetailSheet(summary: summary, onOpen: { issue in
-                    nestedNavigation = { onOpenHealthResource(issue.resourceType, issue.resourceID) }
-                    selectedDataSummary = nil
-                }, onIgnore: { issue in
-                    ignoredDataIssueIDs.insert(issue.id)
-                    OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
-                }, onRestore: { issue in
-                    ignoredDataIssueIDs.remove(issue.id)
-                    OwnerHealthDataIssueStore.save(ignoredDataIssueIDs)
-                })
-            }
-            .sheet(item: $selectedRecurringReview) { review in
-                DetectedSubscriptionsSheet(detected: review.suggestions, cardId: nil,
-                    cardName: "\(scope.rawValue.lowercased()) accounts", companyId: companyID, vm: vm,
-                    onDismissAll: { selectedRecurringReview = nil }).environment(appState)
-            }
-        }
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
-        .presentationBackground(Color(hex: "#1C1C1E"))
-        .preferredColorScheme(.dark)
-    }
-
-    private func finishNestedNavigation() {
-        let action = nestedNavigation
-        nestedNavigation = nil
-        action?()
-    }
-
-    private func breakdownHeader(_ snapshot: ExecutiveBriefingSnapshot, health: OwnerHealthSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Picker(scope == .business ? "Company" : "Profile", selection: $companyID) {
-                Text(scope == .business ? "All businesses" : "All personal profiles").tag(nil as UUID?)
-                ForEach(appState.companies.filter(scope.includes)) { company in
-                    Text(company.name).tag(Optional(company.id))
-                }
-            }
-            .tint(Color.zifrGold)
-            Text(snapshot.coverage).briefingSecondary()
-            if snapshot.unassignedTransactionCount > 0 {
-                Text("\(snapshot.unassignedTransactionCount) unassigned transactions are excluded from these totals. Review their account assignments in Financial.")
-                    .briefingSecondary()
-            }
-            DisclosureGroup("Entities & profile information") {
-                ForEach(snapshot.companies) { company in
-                    resourceRow(company.name, detail: company.structure, kind: .company, id: company.id)
-                }
-                dataReview(health, categories: [.company, .collaborator, .other])
-            }
-            .font(.system(size: 13, weight: .medium)).tint(Color.zifrGold)
-            Button { showingReminders = true } label: {
-                Label("Reminders & Complete Later", systemImage: "checklist")
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(maxWidth: .infinity).padding(12)
-            }
-            .buttonStyle(MiloomSecondaryButtonStyle())
-        }
-    }
-
-    private func financialCard(_ snapshot: ExecutiveBriefingSnapshot, now: Date) -> some View {
-        let financials = ExecutiveBriefingSnapshot.financials(
-            records: snapshot.records,
-            now: now,
-            month: financialMonth
-        )
-        return BreakdownSectionCard(
-            title: "Financial",
-            subtitle: "\(financialMonth.title()) · posted only",
-            icon: "chart.bar.xaxis",
-            isExpanded: $isFinancialExpanded
-        ) {
-            MiloomMonthPicker(selection: $financialMonth, anchorDate: now)
-            if financials.isEmpty {
-                Text("No transaction history available.").briefingSecondary()
-            } else {
-                ForEach(financials) { summary in
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(summary.currency)
-                            .font(.caption2.bold())
-                            .tracking(0.8)
-                            .foregroundStyle(Color.miloomGold)
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), alignment: .leading)], spacing: 14) {
-                            BriefingMetric(label: "Income", value: BriefingFormat.money(summary.income, summary.currency))
-                            BriefingMetric(label: "Outflow", value: BriefingFormat.money(summary.insight.current.moneyOut, summary.currency))
-                            BriefingMetric(
-                                label: "Net cash flow",
-                                value: BriefingFormat.money(summary.insight.current.net, summary.currency),
-                                emphasized: true
-                            )
-                        }
-                    }
-                }
-            }
-        } details: {
-            VStack(alignment: .leading, spacing: 16) {
-                ForEach(financials) { summary in
-                    VStack(alignment: .leading, spacing: 12) {
-                        BriefingMetric(label: "Refunds", value: BriefingFormat.money(summary.refunds, summary.currency))
-                        if summary.insight.previous.transactionCount > 0 {
-                            Text("Cash-flow change: \(BriefingFormat.money(summary.insight.netChange, summary.currency)) vs. \(financialMonth.previous(in: .current).title())")
-                                .briefingSecondary()
-                        } else {
-                            Text("No previous-period activity available for comparison.").briefingSecondary()
-                        }
-                        ForEach(summary.insight.expenseCategories.prefix(3), id: \.key) { category in
-                            detailLine(category.label, BriefingFormat.money(category.amount, summary.currency))
-                        }
-                        if let largest = summary.insight.largestExpense {
-                            Text("Largest expense: \(TransactionIntelligence.displayName(for: largest)) · \(BriefingFormat.money(abs(largest.transaction.amount ?? 0), summary.currency))")
-                                .briefingSecondary()
-                        }
-                        selectedMonthTransactions(summary)
-                    }
-                }
-                Text("Net cash flow includes refunds. Transfers, ignored items, and pending transactions are excluded.")
-                    .briefingSecondary()
-
-                Divider().overlay(Color.white.opacity(0.08))
-
-                BriefingMetric(label: "Recorded account balances", value: BriefingFormat.amounts(snapshot.balances, empty: "No account balances"))
-                Text("Balances reflect saved account updates and may include investment accounts.").briefingSecondary()
-                DisclosureGroup("Accounts, cards & loans (\(snapshot.institutions.count + snapshot.cards.count + snapshot.loans.count))") {
-                    ForEach(snapshot.institutions) { bank in
-                        resourceRow(bank.name, detail: "\(BriefingFormat.count(bank.accounts.count, "account"))\(bank.isDisconnected || appState.plaidItems.contains { $0.institutionId == bank.id && $0.requiresReconnect } ? " · Reconnect required" : "")", kind: .institution, id: bank.id)
-                    }
-                    ForEach(snapshot.cards) { card in
-                        resourceRow(card.name, detail: "\(card.type) · \(card.status) · Balance \(card.balance.formatted())", kind: .card, id: card.id)
-                    }
-                    ForEach(snapshot.loans) { loan in
-                        resourceRow(loan.name, detail: "\(loan.role) · Balance \(loan.remainingBalance.formatted())\(loan.nextPaymentAt.map { " · Due " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "")", kind: .loan, id: loan.id)
-                    }
-                    if !snapshot.cards.isEmpty || !snapshot.loans.isEmpty {
-                        Text("Card and loan records do not specify currency; their balances are shown individually.").briefingSecondary()
-                    }
-                }
-                .font(.subheadline.weight(.medium))
-                .tint(Color.miloomGold)
-                dataReview(OwnerHealthEngine.snapshot(appState: appState, scope: scope, ignoredDataIssueIDs: ignoredDataIssueIDs, companyID: companyID), categories: [.institution, .card, .loan])
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func selectedMonthTransactions(_ summary: ExecutiveCurrencySummary) -> some View {
-        if !summary.insight.records.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Transactions in \(financialMonth.title())")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .accessibilityAddTraits(.isHeader)
-                ForEach(groupedMonthRecords(summary.insight.records), id: \.date) { group in
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(formattedTransactionDate(group.date))
-                            .font(.caption2.weight(.bold))
-                            .textCase(.uppercase)
-                            .tracking(0.5)
-                            .foregroundStyle(Color.white.opacity(0.52))
-                        ForEach(group.records) { record in
-                            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(TransactionIntelligence.displayName(for: record))
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(.white)
-                                    Text(monthTransactionKind(record)).briefingSecondary()
-                                }
-                                Spacer(minLength: 8)
-                                Text(monthTransactionAmount(record, currency: summary.currency))
-                                    .font(.subheadline.weight(.semibold))
-                                    .monospacedDigit()
-                                    .foregroundStyle(monthTransactionColor(record))
-                            }
-                            .frame(minHeight: 44)
-                        }
-                    }
-                }
-            }
-        } else {
-            Text("No posted transactions in \(financialMonth.title()).")
-                .briefingSecondary()
-        }
-    }
-
-    private func groupedMonthRecords(_ records: [ResolvedTransaction]) -> [(date: String, records: [ResolvedTransaction])] {
-        Dictionary(grouping: records, by: { $0.transaction.date })
-            .map { (date: $0.key, records: $0.value) }
-            .sorted { $0.date > $1.date }
-    }
-
-    private func monthTransactionKind(_ record: ResolvedTransaction) -> String {
-        switch TransactionIntelligence.effectiveFlow(for: record) {
-        case .income: return "Income"
-        case .refund: return "Refund"
-        case .expense: return "Expense"
-        case .transfer: return "Transfer"
-        case .ignored: return "Ignored"
-        }
-    }
-
-    private func monthTransactionAmount(_ record: ResolvedTransaction, currency: String) -> String {
-        let amount = BriefingFormat.money(abs(record.transaction.amount ?? 0), currency)
-        switch TransactionIntelligence.effectiveFlow(for: record) {
-        case .income, .refund: return "+\(amount)"
-        case .expense: return "−\(amount)"
-        case .transfer, .ignored: return amount
-        }
-    }
-
-    private func monthTransactionColor(_ record: ResolvedTransaction) -> Color {
-        switch TransactionIntelligence.effectiveFlow(for: record) {
-        case .income, .refund: return Color.zifrGreen
-        case .transfer: return Color.miloomGold
-        case .expense, .ignored: return .white
-        }
-    }
-
-    private func formattedTransactionDate(_ value: String) -> String {
-        let input = DateFormatter()
-        input.locale = Locale(identifier: "en_US_POSIX")
-        input.dateFormat = "yyyy-MM-dd"
-        guard let date = input.date(from: value) else { return value }
-        return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
-    }
-
-    private func servicesCard(_ snapshot: ExecutiveBriefingSnapshot, health: OwnerHealthSnapshot) -> some View {
-        BreakdownSectionCard(
-            title: "Services",
-            subtitle: "Bills, subscriptions & add-ons",
-            icon: "square.stack.3d.up",
-            isExpanded: $isServicesExpanded
-        ) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), alignment: .leading)], spacing: 14) {
-                BriefingMetric(label: "Active bills", value: "\(snapshot.activeBillCount)")
-                BriefingMetric(label: "Subscriptions", value: "\(snapshot.activeSubscriptionCount)")
-                BriefingMetric(label: "Add-ons", value: "\(snapshot.supplementalCount)")
-                BriefingMetric(
-                    label: "Monthly commitment",
-                    value: BriefingFormat.amounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "No active services"),
-                    emphasized: true
-                )
-            }
-        } details: {
-            VStack(alignment: .leading, spacing: 16) {
-                if snapshot.unknownBillingCount > 0 {
-                    Text("\(snapshot.unknownBillingCount) unsupported billing periods excluded.").briefingSecondary()
-                }
-                Text("Active services only. Annual costs are spread over 12 months and are separate from actual spending.")
-                    .briefingSecondary()
-                Divider().overlay(Color.white.opacity(0.08))
-                upcomingCoverage(snapshot.upcomingCoverage)
-                if snapshot.subscriptions.isEmpty {
-                    Text("Services you add will appear here.").briefingSecondary()
-                }
-                ForEach([RecurringServiceType.bill, .subscription]) { type in
-                    let services = snapshot.subscriptions.filter { $0.resolvedServiceType == type }
-                    if !services.isEmpty {
-                        DisclosureGroup("\(type == .bill ? "Bills" : "Subscriptions") (\(services.count))") {
-                            ForEach(services) { service in
-                                VStack(alignment: .leading, spacing: 5) {
-                                    resourceRow(service.name, detail: "\(service.status) · \(BriefingFormat.money(service.cost, service.currency)) / \(service.billingCycle.lowercased())", kind: .subscription, id: service.id)
-                                    if let date = service.nextRenewalAt {
-                                        Text("Renews \(date.formatted(date: .abbreviated, time: .omitted))").briefingSecondary()
-                                    } else if let renewal = service.nextRenewal, !renewal.isEmpty {
-                                        Text("Renews \(renewal)").briefingSecondary()
-                                    }
-                                    if let source = service.paymentMethod, !source.isEmpty {
-                                        Text("Payment source: \(source)").briefingSecondary()
-                                    }
-                                    ForEach(service.subServices) { addon in
-                                        Text("↳ \(addon.name) · \(addon.status.rawValue) · \(BriefingFormat.money(addon.cost, service.currency)) / \(addon.billingCycle.rawValue.lowercased())")
-                                            .briefingSecondary()
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                        .font(.subheadline.weight(.medium))
-                        .tint(Color.miloomGold)
-                    }
-                }
-                if let summary = health.categories.first(where: { $0.category == .subscription }), !summary.recurringSuggestions.isEmpty {
-                    Button { selectedRecurringReview = RecurringSuggestionReview(suggestions: summary.recurringSuggestions) } label: {
-                        Label("Review \(summary.recurringSuggestions.count) detected recurring charges", systemImage: "sparkle.magnifyingglass")
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(MiloomSecondaryButtonStyle())
-                }
-                dataReview(health, categories: [.subscription])
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func upcomingCoverage(_ projection: UpcomingCoverageProjection) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Label("Upcoming payments", systemImage: "checkmark.shield")
-                    .font(.headline)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 8)
-                Text("\(projection.days) DAYS")
-                    .font(.caption2.bold()).tracking(0.8)
-                    .foregroundStyle(Color.white.opacity(0.62))
-            }
-
-            Text("Will your payment accounts have enough money for bills, subscriptions, and add-ons due in the next \(projection.days) days?")
-                .briefingSecondary()
-
-            if projection.groups.isEmpty {
-                Text(projection.unscheduledCount > 0
-                    ? "No dated charges fall in this window. Add renewal dates to check \(BriefingFormat.count(projection.unscheduledCount, "service or add-on"))."
-                    : "No scheduled bills, subscriptions, or add-ons fall in the next \(projection.days) days.")
-                    .briefingSecondary()
-            } else {
-                HStack(spacing: 10) {
-                    coverageCount(projection.chargeCount, label: "Payments due", status: nil)
-                    coverageCount(projection.atRiskCount, label: "May fall short", status: .atRisk)
-                    coverageCount(projection.unknownCount, label: "Can't verify", status: .unknown)
-                }
-
-                ForEach(projection.groups) { group in
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 10) {
-                            ForEach(group.charges) { charge in
-                                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(charge.name).font(.subheadline.weight(.medium))
-                                        Text((charge.isSupplemental ? "Add-on · " : "") + charge.dueAt.formatted(date: .abbreviated, time: .omitted))
-                                            .briefingSecondary()
-                                    }
-                                    Spacer(minLength: 8)
-                                    Text(BriefingFormat.money(charge.amount, charge.currency))
-                                        .font(.subheadline.weight(.semibold)).monospacedDigit()
-                                }
-                            }
-                        }
-                        .padding(.top, 8)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 7) {
-                            HStack(spacing: 8) {
-                                Image(systemName: coverageIcon(group.status))
-                                    .foregroundStyle(coverageColor(group.status))
-                                    .accessibilityHidden(true)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(group.sourceName).font(.subheadline.weight(.semibold))
-                                    Text(group.sourceDetail).briefingSecondary()
-                                    if !group.paymentRoutes.isEmpty {
-                                        Text("Pays through \(group.paymentRoutes.joined(separator: ", "))")
-                                            .briefingSecondary()
-                                    }
-                                }
-                                Spacer(minLength: 8)
-                                Text(coverageTitle(group.status))
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(coverageColor(group.status))
-                            }
-                            Text(coverageDetail(group))
-                                .font(.caption).foregroundStyle(Color.white.opacity(0.76))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(.vertical, 6)
-                    }
-                    .tint(Color.zifrGold)
-                    .accessibilityLabel("\(group.sourceName), \(coverageTitle(group.status))")
-                    .accessibilityValue(coverageDetail(group))
-                }
-                if projection.unscheduledCount > 0 {
-                    Text("\(BriefingFormat.count(projection.unscheduledCount, "active service or add-on")) cannot be checked because a renewal date is missing.")
-                        .briefingSecondary()
-                }
-            }
-
-            Text("Estimate based on saved due dates and the latest available balances. Other spending and pending transactions can change the result.")
-                .briefingSecondary()
-        }
-    }
-
-    private func coverageCount(_ value: Int, label: String, status: UpcomingCoverageStatus?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text("\(value)").font(.headline).monospacedDigit()
-                .foregroundStyle(status.map(coverageColor) ?? Color.white)
-            Text(label).font(.caption2).foregroundStyle(Color.white.opacity(0.62))
-        }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func coverageDetail(_ group: UpcomingCoverageGroup) -> String {
-        let scheduled = BriefingFormat.money(group.totalDue, group.currency)
-        if let reason = group.reason { return "\(scheduled) scheduled · \(reason)" }
-        guard let available = group.availableAmount, let difference = group.difference else {
-            return "\(scheduled) scheduled · Available funds unavailable"
-        }
-        let funds = BriefingFormat.money(available, group.currency)
-        if difference >= 0 {
-            return "\(scheduled) scheduled · \(group.availableLabel) \(funds) · \(BriefingFormat.money(difference, group.currency)) left after payments"
-        }
-        return "\(scheduled) scheduled · \(group.availableLabel) \(funds) · \(BriefingFormat.money(abs(difference), group.currency)) short"
-    }
-
-    private func coverageTitle(_ status: UpcomingCoverageStatus) -> String {
-        switch status {
-        case .covered: return "Enough funds"
-        case .atRisk: return "May fall short"
-        case .unknown: return "Can't verify"
-        }
-    }
-
-    private func coverageIcon(_ status: UpcomingCoverageStatus) -> String {
-        switch status {
-        case .covered: return "checkmark.circle.fill"
-        case .atRisk: return "exclamationmark.triangle.fill"
-        case .unknown: return "questionmark.circle.fill"
-        }
-    }
-
-    private func coverageColor(_ status: UpcomingCoverageStatus) -> Color {
-        switch status {
-        case .covered: return Color.green
-        case .atRisk: return Color.red
-        case .unknown: return Color.orange
-        }
-    }
-
-    private func vaultCard(_ snapshot: ExecutiveBriefingSnapshot, health: OwnerHealthSnapshot) -> some View {
-        BreakdownSectionCard(
-            title: "Vault",
-            subtitle: "Documents & expiration dates",
-            icon: "lock.doc",
-            isExpanded: $isVaultExpanded
-        ) {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), alignment: .leading)], spacing: 14) {
-                BriefingMetric(label: "Documents", value: "\(snapshot.documents.count)")
-                BriefingMetric(label: "With expiration dates", value: "\(snapshot.documents.filter { $0.expiresAt != nil }.count)")
-            }
-        } details: {
-            VStack(alignment: .leading, spacing: 14) {
-                if snapshot.documents.isEmpty {
-                    Text("Documents you add will appear here.").briefingSecondary()
-                }
-                ForEach(Array(Set(snapshot.documents.map { CompanyDocument.normalizeType($0.type) })).sorted(), id: \.self) { category in
-                    let documents = snapshot.documents.filter { CompanyDocument.normalizeType($0.type) == category }
-                    DisclosureGroup("\(category) (\(documents.count))") {
-                        ForEach(documents.sorted { ($0.expiresAt ?? .distantFuture) < ($1.expiresAt ?? .distantFuture) }) { document in
-                            resourceRow(document.name, detail: document.expiresAt.map { "Expires " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "No expiration date recorded", kind: .document, id: document.id)
-                        }
-                    }
-                    .font(.subheadline.weight(.medium))
-                    .tint(Color.miloomGold)
-                }
-                dataReview(health, categories: [.document])
-            }
-        }
-    }
-
-    private func dataReview(_ health: OwnerHealthSnapshot, categories: [BriefingResourceCategory]) -> some View {
-        ForEach(health.categories.filter { categories.contains($0.category) && ($0.requiresAttention || !$0.dataIssues.isEmpty) }) { summary in
-            if summary.requiresAttention {
-                Label(summary.summary, systemImage: "exclamationmark.circle")
-                    .font(.caption).foregroundStyle(summary.status == .critical ? Color.red : Color.orange)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !summary.affectedEntityNames.isEmpty {
-                    Text(summary.affectedEntityNames.joined(separator: " · ")).briefingSecondary()
-                }
-            }
-            if !summary.dataIssues.isEmpty {
-                Button { selectedDataSummary = summary } label: {
-                    Label("\(summary.category.title): review data suggestions (\(summary.dataIssues.count))", systemImage: "info.circle")
-                        .font(.caption.weight(.medium)).padding(.vertical, 8)
-                }.tint(Color.zifrGold)
-            }
-        }
-    }
-
-    private func resourceRow(_ title: String, detail: String, kind: ResourceKind, id: UUID) -> some View {
-        Button { onOpenHealthResource(kind, id) } label: {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
-                    Text(detail).briefingSecondary()
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.zifrGold)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 10).contentShape(Rectangle())
-        }.buttonStyle(.plain)
-    }
-
-    private func detailLine(_ title: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(title).foregroundStyle(Color.white.opacity(0.65))
-            Spacer()
-            Text(value).monospacedDigit()
-        }.font(.system(size: 12))
-    }
-}
-
-private struct BreakdownSectionCard<Summary: View, Details: View>: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    let title: String
-    let subtitle: String
-    let icon: String
-    @Binding var isExpanded: Bool
-    let summary: Summary
-    let details: Details
-
-    init(
-        title: String,
-        subtitle: String,
-        icon: String,
-        isExpanded: Binding<Bool>,
-        @ViewBuilder summary: () -> Summary,
-        @ViewBuilder details: () -> Details
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.icon = icon
-        _isExpanded = isExpanded
-        self.summary = summary()
-        self.details = details()
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Button(action: toggleExpanded) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.06))
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                        Image(systemName: icon)
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.86))
-                    }
-                    .frame(width: 48, height: 48)
-                    .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                        Text(subtitle)
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.58))
-                            .lineLimit(2)
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(Color.miloomGold)
-                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
-                        .frame(width: 44, height: 44)
-                        .accessibilityHidden(true)
-                }
-                .padding(.leading, 18)
-                .padding(.trailing, 8)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(title)
-            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
-            .accessibilityHint(isExpanded ? "Collapses details" : "Shows details")
-
-            Divider().overlay(Color.white.opacity(0.08))
-
-            VStack(alignment: .leading, spacing: 16) {
-                summary
-
-                if isExpanded {
-                    Divider().overlay(Color.white.opacity(0.08))
-                    details
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 20)
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.black.opacity(0.70))
-        )
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
-        .shadow(color: Color.black.opacity(0.35), radius: 10, y: 4)
-        .foregroundStyle(.white)
-    }
-
-    private func toggleExpanded() {
-        if reduceMotion {
-            isExpanded.toggle()
-        } else {
-            withAnimation(.easeInOut(duration: 0.22)) {
-                isExpanded.toggle()
-            }
-        }
-    }
-}
-
-private struct BriefingMetric: View {
-    let label: String
-    let value: String
-    let accessibilityValue: String
-    let emphasized: Bool
-
-    init(label: String, value: String, accessibilityValue: String? = nil, emphasized: Bool = false) {
-        self.label = label
-        self.value = value
-        self.accessibilityValue = accessibilityValue ?? value
-        self.emphasized = emphasized
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(value)
-                .font(emphasized ? .headline : .subheadline.weight(.semibold))
-                .monospacedDigit()
-                .lineLimit(2)
-                .foregroundStyle(emphasized ? Color.zifrGold : Color.white)
-            Text(label).font(.caption2).foregroundStyle(Color.white.opacity(0.66))
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(label)
-        .accessibilityValue(accessibilityValue)
-    }
-}
-
 enum BriefingFormat {
     static func cardAmounts(_ values: [String: Double], empty: String, signed: Bool = false) -> String {
         guard !values.isEmpty else { return empty }
@@ -1037,12 +1361,5 @@ enum BriefingFormat {
     }
     static func compactAmounts(_ values: [String: Double], empty: String) -> String {
         values.isEmpty ? empty : values.keys.sorted().map { compactMoney(values[$0] ?? 0, $0) }.joined(separator: "\n")
-    }
-}
-
-private extension View {
-    func briefingSecondary() -> some View {
-        font(.caption).foregroundStyle(Color.white.opacity(0.58))
-            .fixedSize(horizontal: false, vertical: true)
     }
 }

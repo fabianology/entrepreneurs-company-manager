@@ -504,15 +504,6 @@ struct DashboardView: View {
                         }
                     )
 
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        presentBriefing()
-                    } label: {
-                        dashboardBriefingIcon
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open Briefing")
-
                     plusCommandMenu
                         .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
                         .background(
@@ -657,37 +648,6 @@ struct DashboardView: View {
                     shape.fill(Color.zifrTabBarFill.opacity(0.35))
                 )
         }
-    }
-
-    private var dashboardBriefingIcon: some View {
-        ZStack {
-            bottomControlGlass(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#918457"),
-                                    Color(hex: "#918457").opacity(0.3)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 1.5
-                        )
-                )
-                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-            Image(systemName: "list.clipboard.fill")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.85))
-
-            Image(systemName: "sparkles")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Color.miloomGold)
-                .offset(x: 10, y: -10)
-        }
-        .frame(width: 44, height: 44)
     }
 
     @ViewBuilder
@@ -906,8 +866,22 @@ struct DashboardView: View {
                     .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
             }
 
-            HStack {
+            HStack(spacing: 8) {
                 Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    presentBriefing(source: "dashboard_header_receipt")
+                } label: {
+                    Image(systemName: "receipt")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.82))
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.32), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Executive briefing receipt")
+                .accessibilityHint("Opens the personal or business monthly briefing")
+
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showNotificationInbox = true
@@ -935,8 +909,8 @@ struct DashboardView: View {
                 .accessibilityValue(appState.unreadNotificationCount == 0
                     ? "No unread alerts"
                     : "\(appState.unreadNotificationCount) unread alerts")
-                .padding(.trailing, 20)
             }
+            .padding(.trailing, 20)
         }
         .frame(height: 52)
     }
