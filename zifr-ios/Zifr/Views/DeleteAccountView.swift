@@ -10,7 +10,7 @@ struct DeleteAccountView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            Color.zifrBG.ignoresSafeArea()
+            Color(hex: "#141414").ignoresSafeArea()
             
             VStack(spacing: 24) {
                 // Header
@@ -143,6 +143,11 @@ struct DeleteAccountView: View {
             }
         }
         .interactiveDismissDisabled(isDeleting)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#141414"))
+        .preferredColorScheme(.dark)
     }
     
     private func performDeletion() {

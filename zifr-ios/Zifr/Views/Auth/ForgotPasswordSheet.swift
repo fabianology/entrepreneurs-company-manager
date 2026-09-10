@@ -14,18 +14,12 @@ struct ForgotPasswordSheet: View {
     
     var body: some View {
         ZStack {
-            Color.zifrBG.ignoresSafeArea()
+            Color(hex: "#141414").ignoresSafeArea()
                 .onTapGesture {
                     UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
+            }
             
             VStack(spacing: 24) {
-                // Drag Indicator
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 40, height: 5)
-                    .padding(.top, 10)
-                
                 Spacer()
                 
                 // Icon Header
@@ -152,5 +146,10 @@ struct ForgotPasswordSheet: View {
             }
             .padding(.horizontal, 32)
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#141414"))
+        .preferredColorScheme(.dark)
     }
 }

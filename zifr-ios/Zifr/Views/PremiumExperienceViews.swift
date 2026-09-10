@@ -370,7 +370,7 @@ struct MissingDataDetailSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.zifrBG.ignoresSafeArea()
+                Color(hex: "#141414").ignoresSafeArea()
 
                 if visibleIssues.isEmpty {
                     ContentUnavailableView(
@@ -380,92 +380,122 @@ struct MissingDataDetailSheet: View {
                     )
                     .foregroundStyle(.white)
                 } else {
-                    List {
-                        Section {
-                            Text("Adding these details can improve the briefing, but they are optional and do not affect health on their own.")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.white.opacity(0.55))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                        }
+                    ScrollView(showsIndicators: false) {
+                        LazyVStack(spacing: 12) {
+                            Text("Adding these details can improve the briefing. They are optional and do not affect health on their own.")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.white.opacity(0.58))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.bottom, 4)
 
-                        ForEach(visibleIssues) { issue in
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: summary.category.icon)
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 24)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(issue.resourceName)
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundStyle(.white)
-                                        Text(issue.entityName)
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.38))
+                            ForEach(visibleIssues) { issue in
+                                VStack(alignment: .leading, spacing: 16) {
+                                    HStack(alignment: .top, spacing: 12) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                                .fill(Color.miloomGold.opacity(0.14))
+                                            Image(systemName: summary.category.icon)
+                                                .font(.system(size: 17, weight: .semibold))
+                                                .foregroundStyle(Color.miloomGold)
+                                        }
+                                        .frame(width: 44, height: 44)
+                                        .accessibilityHidden(true)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(issue.resourceName)
+                                                .font(.headline)
+                                                .foregroundStyle(.white)
+                                            Text(issue.entityName)
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(Color.white.opacity(0.48))
+                                        }
+
+                                        Spacer(minLength: 0)
                                     }
-                                }
 
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text("USEFUL INFORMATION")
-                                        .font(.system(size: 8, weight: .black))
-                                        .tracking(1)
-                                        .foregroundStyle(Color.white.opacity(0.3))
-                                    ForEach(issue.missingFields, id: \.self) { field in
-                                        HStack(spacing: 7) {
-                                            Circle()
-                                                .fill(Color.zifrGold)
-                                                .frame(width: 4, height: 4)
-                                            Text(field)
-                                                .font(.system(size: 12, weight: .regular))
-                                                .foregroundStyle(Color.white.opacity(0.72))
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        Text("USEFUL INFORMATION")
+                                            .font(.caption2.bold())
+                                            .tracking(1.1)
+                                            .foregroundStyle(Color.white.opacity(0.42))
+                                        ForEach(issue.missingFields, id: \.self) { field in
+                                            HStack(alignment: .firstTextBaseline, spacing: 9) {
+                                                Circle()
+                                                    .fill(Color.miloomGold)
+                                                    .frame(width: 5, height: 5)
+                                                Text(field)
+                                                    .font(.subheadline)
+                                                    .foregroundStyle(Color.white.opacity(0.74))
+                                            }
                                         }
                                     }
-                                }
 
-                                HStack(spacing: 9) {
-                                    Button {
-                                        onOpen(issue)
-                                    } label: {
-                                        Text("Add information")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(Color.zifrBG)
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 44)
-                                            .background(Color.zifrGold, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                    }
-                                    .buttonStyle(.plain)
+                                    HStack(spacing: 10) {
+                                        Button {
+                                            onOpen(issue)
+                                        } label: {
+                                            Text("Add information")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Color(hex: "#171914"))
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 46)
+                                                .background(Color.miloomGold, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        }
+                                        .buttonStyle(.plain)
 
-                                    Button {
-                                        ignoredInSheet.insert(issue.id)
-                                        lastIgnored = issue
-                                        onIgnore(issue)
-                                    } label: {
-                                        Text("Ignore suggestion")
-                                            .font(.system(size: 11, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.62))
-                                            .frame(maxWidth: .infinity)
-                                            .frame(height: 44)
-                                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        Button {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                _ = ignoredInSheet.insert(issue.id)
+                                            }
+                                            lastIgnored = issue
+                                            onIgnore(issue)
+                                        } label: {
+                                            Text("Ignore")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(Color.white.opacity(0.72))
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 46)
+                                                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                                .overlay {
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                                }
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
+                                .padding(16)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                        .fill(Color.white.opacity(0.05))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                        }
+                                }
+                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
                             }
-                            .padding(.vertical, 7)
-                            .listRowBackground(Color.zifrTabBarFill.opacity(0.66))
-                            .listRowSeparator(.hidden)
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 18)
+                        .padding(.bottom, 36)
                     }
-                    .listStyle(.insetGrouped)
-                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle(summary.category.title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#141414"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(summary.category.title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.miloomGold)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
-                        .foregroundStyle(Color.zifrGold)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.miloomGold)
                 }
             }
         }
@@ -491,6 +521,11 @@ struct MissingDataDetailSheet: View {
                 .padding(.bottom, 10)
             }
         }
+        .presentationDetents([.fraction(0.85), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#141414"))
+        .preferredColorScheme(.dark)
     }
 }
 
@@ -557,7 +592,7 @@ struct OwnerBriefingView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.zifrBG.ignoresSafeArea()
+                Color(hex: "#141414").ignoresSafeArea()
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     VStack(spacing: 16) {
                         Picker("Briefing view", selection: $selectedTab) {
@@ -587,13 +622,22 @@ struct OwnerBriefingView: View {
             }
             .navigationTitle("Owner Briefing")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#141414"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showingPreferences = true } label: { Image(systemName: "bell.badge") }
-                        .foregroundStyle(Color.zifrGold)
+                        .foregroundStyle(Color.miloomGold)
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("Owner Briefing")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.miloomGold)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }.foregroundStyle(Color.zifrGold)
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.miloomGold)
                 }
             }
             .task { await pushService.refreshAuthorizationStatus() }
@@ -637,6 +681,11 @@ struct OwnerBriefingView: View {
         } message: {
             Text(mutationError ?? "Please try again.")
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#141414"))
+        .preferredColorScheme(.dark)
         .onDisappear { undoTask?.cancel() }
     }
 
@@ -1598,10 +1647,17 @@ struct ManualConnectionSheet: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.zifrBG)
+            .background(Color(hex: "#141414"))
             .navigationTitle("Add Connection")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#141414"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Add Connection")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.miloomGold)
+                }
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Connect") { Task { await save() } }
@@ -1609,6 +1665,11 @@ struct ManualConnectionSheet: View {
                 }
             }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#141414"))
+        .preferredColorScheme(.dark)
     }
 
     private func save() async {
@@ -1690,10 +1751,17 @@ struct DowngradeSelectionView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.zifrBG)
+            .background(Color(hex: "#141414"))
             .navigationTitle("Choose Free Access")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#141414"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Choose Free Access")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.miloomGold)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "Saving…" : "Continue") {
                         Task { await save() }
@@ -1702,6 +1770,11 @@ struct DowngradeSelectionView: View {
                 }
             }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#141414"))
+        .preferredColorScheme(.dark)
         .onAppear {
             companyId = accessController.snapshot.selectedFreeCompanyId ?? appState.companies.first?.id
             plaidItemId = accessController.snapshot.selectedFreePlaidItemId ?? activeItems.first?.id
