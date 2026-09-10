@@ -130,14 +130,19 @@ struct ExecutiveBriefingSnapshot {
         }
     }
 
-    static func financials(records: [ResolvedTransaction], now: Date) -> [ExecutiveCurrencySummary] {
-        Dictionary(grouping: records, by: { currency($0.transaction.currency) }).map { code, values in
-            let insight = CashFlowInsightEngine.analyze(records: values, anchorDate: now)
+    static func financials(
+        records: [ResolvedTransaction],
+        now: Date,
+        month: CashFlowMonth? = nil
+    ) -> [ExecutiveCurrencySummary] {
+        let selectedMonth = month ?? CashFlowMonth(containing: now)
+        return Dictionary(grouping: records, by: { currency($0.transaction.currency) }).map { code, values in
+            let insight = CashFlowInsightEngine.analyze(records: values, month: selectedMonth, anchorDate: now)
             let incomeOnly = values.filter { TransactionIntelligence.effectiveFlow(for: $0) == .income }
             let refundsOnly = values.filter { TransactionIntelligence.effectiveFlow(for: $0) == .refund }
             return ExecutiveCurrencySummary(currency: code, insight: insight,
-                income: CashFlowInsightEngine.analyze(records: incomeOnly, anchorDate: now).current.moneyIn,
-                refunds: CashFlowInsightEngine.analyze(records: refundsOnly, anchorDate: now).current.moneyIn)
+                income: CashFlowInsightEngine.analyze(records: incomeOnly, month: selectedMonth, anchorDate: now).current.moneyIn,
+                refunds: CashFlowInsightEngine.analyze(records: refundsOnly, month: selectedMonth, anchorDate: now).current.moneyIn)
         }.sorted { $0.currency < $1.currency }
     }
 

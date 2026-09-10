@@ -974,7 +974,7 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(restored[0].override?.note, "Purchase for Mom")
     }
 
-    func testCashFlowInsightsCompareRollingThirtyDayPeriodsAndExcludeNoise() {
+    func testCashFlowInsightsCompareMonthToDateWithSamePointLastMonthAndExcludeNoise() {
         let owner = UUID(), companyId = UUID()
         let currentExpense = makeTransaction(
             owner: owner, company: companyId, name: "Current expense", amount: 100, date: "2027-08-20"
@@ -996,7 +996,10 @@ final class PremiumEngineTests: XCTestCase {
         let previousIncome = makeTransaction(
             owner: owner, company: companyId, name: "Previous income", amount: -100, date: "2027-07-15"
         )
-        let records = [currentExpense, currentIncome, transfer, pending, previousExpense, previousIncome].map {
+        let outsideComparableDays = makeTransaction(
+            owner: owner, company: companyId, name: "End of previous month", amount: 900, date: "2027-07-31"
+        )
+        let records = [currentExpense, currentIncome, transfer, pending, previousExpense, previousIncome, outsideComparableDays].map {
             TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
         }
 
@@ -1016,6 +1019,57 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(insights.expenseCategories.reduce(0) { $0 + $1.amount }, 100)
         XCTAssertEqual(insights.expenseCategories.reduce(0) { $0 + $1.transactionCount }, 1)
         XCTAssertEqual(insights.expenseRecords.map(\.id), [currentExpense.id])
+        XCTAssertEqual(Set(insights.records.map(\.id)), Set([currentExpense.id, currentIncome.id, transfer.id]))
+    }
+
+    func testCashFlowInsightsSelectOneCompleteHistoricalCalendarMonth() {
+        let owner = UUID(), companyId = UUID()
+        let may = makeTransaction(
+            owner: owner, company: companyId, name: "May", amount: 99, date: "2027-05-20"
+        )
+        let june = makeTransaction(
+            owner: owner, company: companyId, name: "June", amount: 10, date: "2027-06-05"
+        )
+        let endOfJune = makeTransaction(
+            owner: owner, company: companyId, name: "End of June", amount: 30, date: "2027-06-30"
+        )
+        let july = makeTransaction(
+            owner: owner, company: companyId, name: "July", amount: 500, date: "2027-07-01"
+        )
+        let records = [may, june, endOfJune, july].map {
+            TransactionIntelligence.resolve($0, companies: [], institutions: [], cards: [])
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let insights = CashFlowInsightEngine.analyze(
+            records: records,
+            month: CashFlowMonth(year: 2027, month: 6),
+            anchorDate: utcDate("2027-08-15"),
+            calendar: calendar
+        )
+
+        XCTAssertEqual(insights.current.moneyOut, 40)
+        XCTAssertEqual(insights.previous.moneyOut, 99)
+        XCTAssertEqual(Set(insights.records.map(\.id)), Set([june.id, endOfJune.id]))
+    }
+
+    func testCashFlowMonthListCoversTheLatestTwelveNamedCalendarMonths() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let months = CashFlowMonth.recent(
+            from: utcDate("2027-09-10"),
+            calendar: calendar
+        )
+
+        XCTAssertEqual(months.count, 12)
+        XCTAssertEqual(months.first, CashFlowMonth(year: 2027, month: 9))
+        XCTAssertEqual(months.last, CashFlowMonth(year: 2026, month: 10))
+        XCTAssertEqual(
+            months.first?.title(calendar: calendar, locale: Locale(identifier: "en_US_POSIX")),
+            "September 2027"
+        )
     }
 
     func testCashFlowInsightsUseCorrectedCategoriesAndFindLargestExpense() {

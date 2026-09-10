@@ -18,29 +18,69 @@ enum TransactionPostingFilter: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-enum CashFlowWindow: String, CaseIterable, Identifiable {
-    case thirtyDays = "30D"
-    case sixtyDays = "60D"
-    case ninetyDays = "90D"
-    case oneYear = "1Y"
+struct CashFlowMonth: Identifiable, Hashable {
+    let year: Int
+    let month: Int
 
-    var id: String { rawValue }
+    var id: Int { year * 100 + month }
 
-    var dayCount: Int {
-        switch self {
-        case .thirtyDays: return 30
-        case .sixtyDays: return 60
-        case .ninetyDays: return 90
-        case .oneYear: return 365
+    static var current: CashFlowMonth {
+        CashFlowMonth(containing: Date())
+    }
+
+    init(year: Int, month: Int) {
+        self.year = year
+        self.month = month
+    }
+
+    init(containing date: Date, calendar: Calendar = .current) {
+        year = calendar.component(.year, from: date)
+        month = calendar.component(.month, from: date)
+    }
+
+    static func recent(
+        count: Int = 12,
+        from anchorDate: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [CashFlowMonth] {
+        guard count > 0 else { return [] }
+        let current = CashFlowMonth(containing: anchorDate, calendar: calendar)
+        guard let currentStart = current.start(in: calendar) else { return [current] }
+        return (0..<count).compactMap { offset in
+            calendar.date(byAdding: .month, value: -offset, to: currentStart).map {
+                CashFlowMonth(containing: $0, calendar: calendar)
+            }
         }
     }
 
-    var title: String {
-        self == .oneYear ? "LAST 12 MONTHS" : "LAST \(dayCount) DAYS"
+    func start(in calendar: Calendar) -> Date? {
+        calendar.date(from: DateComponents(
+            calendar: calendar,
+            timeZone: calendar.timeZone,
+            year: year,
+            month: month,
+            day: 1
+        ))
     }
 
-    var previousPeriodTitle: String {
-        self == .oneYear ? "the previous year" : "the previous \(dayCount) days"
+    func previous(in calendar: Calendar) -> CashFlowMonth {
+        guard let start = start(in: calendar),
+              let previous = calendar.date(byAdding: .month, value: -1, to: start) else { return self }
+        return CashFlowMonth(containing: previous, calendar: calendar)
+    }
+
+    func title(calendar: Calendar = .current, locale: Locale = .current) -> String {
+        guard let start = start(in: calendar) else { return "Selected month" }
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = locale
+        formatter.dateFormat = "LLLL yyyy"
+        return formatter.string(from: start)
+    }
+
+    func isCurrent(at date: Date, calendar: Calendar = .current) -> Bool {
+        self == CashFlowMonth(containing: date, calendar: calendar)
     }
 }
 
@@ -101,6 +141,7 @@ struct CashFlowInsightSnapshot: Equatable {
     let expenseCategories: [CashFlowExpenseConcentration]
     let expenseRecords: [ResolvedTransaction]
     let largestExpense: ResolvedTransaction?
+    let records: [ResolvedTransaction]
 
     var topExpenseCategory: CashFlowExpenseConcentration? { expenseCategories.first }
     var netChange: Double { current.net - previous.net }
@@ -116,15 +157,29 @@ enum CashFlowInsightEngine {
 
     static func analyze(
         records: [ResolvedTransaction],
-        window: CashFlowWindow = .thirtyDays,
+        month: CashFlowMonth? = nil,
         anchorDate: Date = Date(),
         calendar: Calendar = Calendar(identifier: .gregorian)
     ) -> CashFlowInsightSnapshot {
         let calendar = calendar
         let anchor = calendar.startOfDay(for: anchorDate)
-        let currentStart = calendar.date(byAdding: .day, value: -(window.dayCount - 1), to: anchor)!
-        let previousEnd = calendar.date(byAdding: .day, value: -window.dayCount, to: anchor)!
-        let previousStart = calendar.date(byAdding: .day, value: -(window.dayCount * 2 - 1), to: anchor)!
+        let anchorMonth = CashFlowMonth(containing: anchor, calendar: calendar)
+        let selectedMonth = month ?? anchorMonth
+        let currentStart = selectedMonth.start(in: calendar) ?? anchor
+        let nextMonthStart = calendar.date(byAdding: .month, value: 1, to: currentStart) ?? anchor
+        let fullMonthEnd = calendar.date(byAdding: .day, value: -1, to: nextMonthStart) ?? anchor
+        let currentEnd = selectedMonth == anchorMonth ? min(anchor, fullMonthEnd) : fullMonthEnd
+        let previousStart = selectedMonth.previous(in: calendar).start(in: calendar) ?? currentStart
+        let previousEnd: Date
+        if selectedMonth == anchorMonth {
+            let elapsedDays = calendar.dateComponents([.day], from: currentStart, to: anchor).day ?? 0
+            let previousMonthDays = calendar.range(of: .day, in: .month, for: previousStart)?.count ?? 1
+            previousEnd = calendar.date(
+                byAdding: .day, value: min(elapsedDays, previousMonthDays - 1), to: previousStart
+            ) ?? previousStart
+        } else {
+            previousEnd = calendar.date(byAdding: .day, value: -1, to: currentStart) ?? currentStart
+        }
 
         let posted = records.compactMap { record -> (ResolvedTransaction, Date)? in
             guard record.transaction.pending != true,
@@ -132,7 +187,7 @@ enum CashFlowInsightEngine {
             return (record, date)
         }
         let currentRecords = posted
-            .filter { $0.1 >= currentStart && $0.1 <= anchor }
+            .filter { $0.1 >= currentStart && $0.1 <= currentEnd }
             .map(\.0)
         let previousRecords = posted
             .filter { $0.1 >= previousStart && $0.1 <= previousEnd }
@@ -151,13 +206,23 @@ enum CashFlowInsightEngine {
         let largestExpense = currentExpenses.max {
             abs($0.transaction.amount ?? 0) < abs($1.transaction.amount ?? 0)
         }
+        let reviewableRecords = currentRecords.filter {
+            abs($0.transaction.amount ?? 0) > 0.005
+                && TransactionIntelligence.effectiveFlow(for: $0) != .ignored
+        }.sorted {
+            if $0.transaction.date == $1.transaction.date {
+                return $0.id.uuidString < $1.id.uuidString
+            }
+            return $0.transaction.date > $1.transaction.date
+        }
 
         return CashFlowInsightSnapshot(
             current: currentSummary,
             previous: previousSummary,
             expenseCategories: categories,
             expenseRecords: currentExpenses,
-            largestExpense: largestExpense
+            largestExpense: largestExpense,
+            records: reviewableRecords
         )
     }
 
@@ -239,6 +304,75 @@ enum CashFlowInsightEngine {
             .replacingOccurrences(of: "_", with: " ")
             .lowercased()
             .capitalized
+    }
+}
+
+struct MiloomMonthPicker: View {
+    @Binding var selection: CashFlowMonth
+    let anchorDate: Date
+
+    private var months: [CashFlowMonth] {
+        CashFlowMonth.recent(from: anchorDate)
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(months) { month in
+                Button {
+                    selection = month
+                } label: {
+                    if month == selection {
+                        Label(month.title(), systemImage: "checkmark")
+                    } else {
+                        Text(month.title())
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.miloomGold)
+                    .accessibilityHidden(true)
+                Text(selection.title())
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.miloomGold)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .tint(Color.miloomGold)
+        .background { pickerGlass(Capsule()) }
+        .overlay(
+            Capsule()
+                .stroke(Color.miloomGold.opacity(0.72), lineWidth: 1)
+        )
+        .accessibilityLabel("Choose transaction month")
+        .accessibilityValue(selection.title())
+        .accessibilityHint("Shows the latest twelve calendar months")
+    }
+
+    @ViewBuilder
+    private func pickerGlass<S: Shape>(_ shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            Color.clear
+                .glassEffect(
+                    .clear.tint(Color.miloomGold.opacity(0.28)).interactive(),
+                    in: shape
+                )
+        } else {
+            shape
+                .fill(.ultraThinMaterial)
+                .overlay(shape.fill(Color.miloomGold.opacity(0.14)))
+        }
     }
 }
 
@@ -642,7 +776,7 @@ struct PortfolioTransactionCenterView: View {
     @State private var searchText = ""
     @State private var flowFilter: TransactionFlowFilter = .all
     @State private var postingFilter: TransactionPostingFilter = .all
-    @State private var cashFlowWindow: CashFlowWindow = .thirtyDays
+    @State private var cashFlowMonth: CashFlowMonth = .current
     @State private var selectedCompanyId: UUID?
     @State private var selectedAccountId: String?
     @State private var isSyncing = false
@@ -703,7 +837,7 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private var cashFlowInsights: CashFlowInsightSnapshot {
-        CashFlowInsightEngine.analyze(records: cashFlowScopeRecords, window: cashFlowWindow)
+        CashFlowInsightEngine.analyze(records: cashFlowScopeRecords, month: cashFlowMonth)
     }
 
     private var duplicateAlerts: [DuplicateChargeAlert] {
@@ -792,7 +926,7 @@ struct PortfolioTransactionCenterView: View {
             .sheet(isPresented: $showSpendingCategories) {
                 SpendingCategorySheet(
                     insights: cashFlowInsights,
-                    window: cashFlowWindow,
+                    month: cashFlowMonth,
                     onSave: { draft, record in try await saveOverride(draft, for: record) },
                     onReset: { record in try await resetOverride(for: record) }
                 )
@@ -903,7 +1037,7 @@ struct PortfolioTransactionCenterView: View {
         return ZifrSheetCard(
             title: "CASH-FLOW INSIGHTS",
             icon: "waveform.path.ecg",
-            subtitle: cashFlowWindow.title,
+            subtitle: cashFlowMonth.title().uppercased(),
             showsBorder: false,
             contentHorizontalPadding: 20,
             contentTopPadding: 18,
@@ -918,7 +1052,7 @@ struct PortfolioTransactionCenterView: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    cashFlowWindowPicker
+                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date())
 
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
@@ -954,7 +1088,7 @@ struct PortfolioTransactionCenterView: View {
                                 .font(.system(size: 19, weight: .semibold))
                                 .foregroundStyle(Color.white.opacity(0.35))
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("No recent cash-flow activity")
+                                Text("No activity in \(cashFlowMonth.title())")
                                     .font(.system(size: 13, weight: .bold))
                                     .foregroundStyle(.white)
                                 Text("Sync Plaid or choose another company or account to analyze the selected period.")
@@ -1023,37 +1157,6 @@ struct PortfolioTransactionCenterView: View {
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(cashFlowAccessibilityLabel(insights))
-    }
-
-    private var cashFlowWindowPicker: some View {
-        HStack(spacing: 0) {
-            ForEach(CashFlowWindow.allCases) { window in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        cashFlowWindow = window
-                    }
-                } label: {
-                    Text(window.rawValue)
-                        .font(.system(size: 14, weight: cashFlowWindow == window ? .semibold : .medium))
-                        .foregroundStyle(cashFlowWindow == window ? Color(hex: "#121212") : Color.white.opacity(0.7))
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background(
-                            cashFlowWindow == window
-                                ? Color(hex: "#C1AA78")
-                                : Color.clear
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 9))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(cashFlowWindow == window ? .isSelected : [])
-            }
-        }
-        .padding(2)
-        .background(Color(hex: "#2C2C2E"))
-        .clipShape(RoundedRectangle(cornerRadius: 11))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Cash-flow time period")
     }
 
     private func cashFlowMetric(title: String, value: String, color: Color) -> some View {
@@ -1146,15 +1249,16 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private func cashFlowComparisonText(_ insights: CashFlowInsightSnapshot) -> String {
+        let previousMonth = cashFlowMonth.previous(in: .current).title()
         guard insights.previous.transactionCount > 0 else {
-            return "No activity in \(cashFlowWindow.previousPeriodTitle) to compare"
+            return "No activity in \(previousMonth) to compare"
         }
         let direction = insights.netChange >= 0 ? "better" : "lower"
-        return "\(formatCurrency(abs(insights.netChange))) \(direction) than \(cashFlowWindow.previousPeriodTitle)"
+        return "\(formatCurrency(abs(insights.netChange))) \(direction) than \(previousMonth)"
     }
 
     private func cashFlowAccessibilityLabel(_ insights: CashFlowInsightSnapshot) -> String {
-        "\(cashFlowWindow.title.capitalized). Net cash flow \(signedCurrency(insights.current.net)). "
+        "\(cashFlowMonth.title()). Net cash flow \(signedCurrency(insights.current.net)). "
             + "Income \(formatCurrency(insights.current.moneyIn)). "
             + "Outflow \(formatCurrency(insights.current.moneyOut)). "
             + cashFlowComparisonText(insights)
@@ -1806,7 +1910,7 @@ struct TransactionOverrideDraft: Equatable {
 
 private struct SpendingCategorySheet: View {
     let insights: CashFlowInsightSnapshot
-    let window: CashFlowWindow
+    let month: CashFlowMonth
     let onSave: (TransactionOverrideDraft, ResolvedTransaction) async throws -> Void
     let onReset: (ResolvedTransaction) async throws -> Void
 
@@ -1893,7 +1997,7 @@ private struct SpendingCategorySheet: View {
                     .font(.system(size: 12, weight: .black))
                     .tracking(1.5)
                     .foregroundStyle(Color(hex: "#C1AA78"))
-                Text(window.title)
+                Text(month.title())
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.5))
                 Spacer(minLength: 0)

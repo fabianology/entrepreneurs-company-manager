@@ -17,6 +17,7 @@ struct OwnerHealthBriefingDashboard: View {
                 ForEach(ExecutiveBriefingLayout.visibleScopes(companies: appState.companies)) { scope in
                     ExecutiveSummaryCard(
                         snapshot: ExecutiveBriefingSnapshot(appState: appState, scope: scope, now: context.date),
+                        reportingMonth: CashFlowMonth(containing: context.date),
                         urgentNotices: notices.filter { $0.belongs(to: scope, in: appState) },
                         onOpenUrgent: openUrgent
                     ) {
@@ -69,6 +70,7 @@ struct OwnerHealthBriefingDashboard: View {
 private struct ExecutiveSummaryCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let snapshot: ExecutiveBriefingSnapshot
+    let reportingMonth: CashFlowMonth
     let urgentNotices: [ExecutiveUrgentNotice]
     let onOpenUrgent: (ExecutiveUrgentNotice) -> Void
     var onBreakdown: () -> Void
@@ -125,12 +127,8 @@ private struct ExecutiveSummaryCard: View {
                             .font(.system(size: 10))
                             .foregroundStyle(Color.white.opacity(0.2))
 
-                        HStack(spacing: 3) {
-                            Text("30")
-                                .foregroundStyle(.white)
-                            Text("Days")
-                                .foregroundStyle(Color.miloomGold)
-                        }
+                        Text(reportingMonth.title())
+                            .foregroundStyle(Color.miloomGold)
                     }
                     .font(.system(size: 12, weight: .medium))
                     .fixedSize(horizontal: true, vertical: false)
@@ -266,28 +264,49 @@ private struct ExecutiveBreakdownView: View {
     @State private var selectedRecurringReview: RecurringSuggestionReview?
     @State private var ignoredDataIssueIDs = OwnerHealthDataIssueStore.load()
     @State private var nestedNavigation: (() -> Void)?
+    @State private var isFinancialExpanded = false
+    @State private var isServicesExpanded = false
+    @State private var isVaultExpanded = false
+    @State private var financialMonth: CashFlowMonth = .current
 
     var body: some View {
         NavigationStack {
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                let snapshot = ExecutiveBriefingSnapshot(appState: appState, scope: scope, companyID: companyID, now: context.date)
-                let health = OwnerHealthEngine.snapshot(appState: appState, scope: scope, now: context.date,
-                    ignoredDataIssueIDs: ignoredDataIssueIDs, companyID: companyID)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        breakdownHeader(snapshot, health: health)
-                        financialCard(snapshot)
-                        servicesCard(snapshot, health: health)
-                        vaultCard(snapshot, health: health)
+            ZStack {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    let snapshot = ExecutiveBriefingSnapshot(appState: appState, scope: scope, companyID: companyID, now: context.date)
+                    let health = OwnerHealthEngine.snapshot(appState: appState, scope: scope, now: context.date,
+                        ignoredDataIssueIDs: ignoredDataIssueIDs, companyID: companyID)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            breakdownHeader(snapshot, health: health)
+                            financialCard(snapshot, now: context.date)
+                            servicesCard(snapshot, health: health)
+                            vaultCard(snapshot, health: health)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 36)
                     }
-                    .padding(20)
+                    .scrollIndicators(.hidden)
                 }
-                .background(Color.zifrBG.ignoresSafeArea())
             }
             .navigationTitle("\(scope.rawValue) breakdown")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("Close") { dismiss() }.tint(Color.zifrGold) }
+                ToolbarItem(placement: .principal) {
+                    Text("\(scope.rawValue) breakdown")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.miloomGold)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                }
             }
             .sheet(isPresented: $showingReminders, onDismiss: finishNestedNavigation) {
                 OwnerBriefingView(scope: scope, companyID: companyID) { obligation in
@@ -313,6 +332,10 @@ private struct ExecutiveBreakdownView: View {
                     onDismissAll: { selectedRecurringReview = nil }).environment(appState)
             }
         }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#1C1C1E"))
         .preferredColorScheme(.dark)
     }
 
@@ -352,90 +375,236 @@ private struct ExecutiveBreakdownView: View {
         }
     }
 
-    private func financialCard(_ snapshot: ExecutiveBriefingSnapshot) -> some View {
-        BriefingGlassPanel {
-            panelTitle("Financial", icon: "chart.bar.xaxis")
-            Text("Last 30 days · posted transactions").briefingSecondary()
-            if snapshot.financials.isEmpty { Text("No transaction history available.").briefingSecondary() }
-            ForEach(snapshot.financials) { summary in
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(summary.currency).font(.system(size: 12, weight: .bold)).foregroundStyle(Color.zifrGold)
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 120), alignment: .leading)], spacing: 14) {
-                        BriefingMetric(label: "Income", value: BriefingFormat.money(summary.income, summary.currency))
-                        BriefingMetric(label: "Refunds", value: BriefingFormat.money(summary.refunds, summary.currency))
-                        BriefingMetric(label: "Outflow", value: BriefingFormat.money(summary.insight.current.moneyOut, summary.currency))
-                        BriefingMetric(label: "Net cash flow", value: BriefingFormat.money(summary.insight.current.net, summary.currency))
-                    }
-                    if summary.insight.previous.transactionCount > 0 {
-                        Text("Cash-flow change: \(BriefingFormat.money(summary.insight.netChange, summary.currency)) vs. previous 30 days").briefingSecondary()
-                    } else { Text("No previous-period activity available for comparison.").briefingSecondary() }
-                    ForEach(summary.insight.expenseCategories.prefix(3), id: \.key) { category in
-                        detailLine(category.label, BriefingFormat.money(category.amount, summary.currency))
-                    }
-                    if let largest = summary.insight.largestExpense {
-                        Text("Largest expense: \(TransactionIntelligence.displayName(for: largest)) · \(BriefingFormat.money(abs(largest.transaction.amount ?? 0), summary.currency))").briefingSecondary()
+    private func financialCard(_ snapshot: ExecutiveBriefingSnapshot, now: Date) -> some View {
+        let financials = ExecutiveBriefingSnapshot.financials(
+            records: snapshot.records,
+            now: now,
+            month: financialMonth
+        )
+        return BreakdownSectionCard(
+            title: "Financial",
+            subtitle: "\(financialMonth.title()) · posted only",
+            icon: "chart.bar.xaxis",
+            isExpanded: $isFinancialExpanded
+        ) {
+            MiloomMonthPicker(selection: $financialMonth, anchorDate: now)
+            if financials.isEmpty {
+                Text("No transaction history available.").briefingSecondary()
+            } else {
+                ForEach(financials) { summary in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(summary.currency)
+                            .font(.caption2.bold())
+                            .tracking(0.8)
+                            .foregroundStyle(Color.miloomGold)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), alignment: .leading)], spacing: 14) {
+                            BriefingMetric(label: "Income", value: BriefingFormat.money(summary.income, summary.currency))
+                            BriefingMetric(label: "Outflow", value: BriefingFormat.money(summary.insight.current.moneyOut, summary.currency))
+                            BriefingMetric(
+                                label: "Net cash flow",
+                                value: BriefingFormat.money(summary.insight.current.net, summary.currency),
+                                emphasized: true
+                            )
+                        }
                     }
                 }
             }
-            Text("Net cash flow includes refunds. Transfers, ignored items, and pending transactions are excluded.").briefingSecondary()
-            Divider()
-            BriefingMetric(label: "Recorded account balances", value: BriefingFormat.amounts(snapshot.balances, empty: "No account balances"))
-            Text("Balances reflect saved account updates and may include investment accounts.").briefingSecondary()
-            DisclosureGroup("Accounts, cards & loans (\(snapshot.institutions.count + snapshot.cards.count + snapshot.loans.count))") {
-                ForEach(snapshot.institutions) { bank in
-                    resourceRow(bank.name, detail: "\(BriefingFormat.count(bank.accounts.count, "account"))\(bank.isDisconnected || appState.plaidItems.contains { $0.institutionId == bank.id && $0.requiresReconnect } ? " · Reconnect required" : "")", kind: .institution, id: bank.id)
+        } details: {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(financials) { summary in
+                    VStack(alignment: .leading, spacing: 12) {
+                        BriefingMetric(label: "Refunds", value: BriefingFormat.money(summary.refunds, summary.currency))
+                        if summary.insight.previous.transactionCount > 0 {
+                            Text("Cash-flow change: \(BriefingFormat.money(summary.insight.netChange, summary.currency)) vs. \(financialMonth.previous(in: .current).title())")
+                                .briefingSecondary()
+                        } else {
+                            Text("No previous-period activity available for comparison.").briefingSecondary()
+                        }
+                        ForEach(summary.insight.expenseCategories.prefix(3), id: \.key) { category in
+                            detailLine(category.label, BriefingFormat.money(category.amount, summary.currency))
+                        }
+                        if let largest = summary.insight.largestExpense {
+                            Text("Largest expense: \(TransactionIntelligence.displayName(for: largest)) · \(BriefingFormat.money(abs(largest.transaction.amount ?? 0), summary.currency))")
+                                .briefingSecondary()
+                        }
+                        selectedMonthTransactions(summary)
+                    }
                 }
-                ForEach(snapshot.cards) { card in
-                    resourceRow(card.name, detail: "\(card.type) · \(card.status) · Balance \(card.balance.formatted())", kind: .card, id: card.id)
+                Text("Net cash flow includes refunds. Transfers, ignored items, and pending transactions are excluded.")
+                    .briefingSecondary()
+
+                Divider().overlay(Color.white.opacity(0.08))
+
+                BriefingMetric(label: "Recorded account balances", value: BriefingFormat.amounts(snapshot.balances, empty: "No account balances"))
+                Text("Balances reflect saved account updates and may include investment accounts.").briefingSecondary()
+                DisclosureGroup("Accounts, cards & loans (\(snapshot.institutions.count + snapshot.cards.count + snapshot.loans.count))") {
+                    ForEach(snapshot.institutions) { bank in
+                        resourceRow(bank.name, detail: "\(BriefingFormat.count(bank.accounts.count, "account"))\(bank.isDisconnected || appState.plaidItems.contains { $0.institutionId == bank.id && $0.requiresReconnect } ? " · Reconnect required" : "")", kind: .institution, id: bank.id)
+                    }
+                    ForEach(snapshot.cards) { card in
+                        resourceRow(card.name, detail: "\(card.type) · \(card.status) · Balance \(card.balance.formatted())", kind: .card, id: card.id)
+                    }
+                    ForEach(snapshot.loans) { loan in
+                        resourceRow(loan.name, detail: "\(loan.role) · Balance \(loan.remainingBalance.formatted())\(loan.nextPaymentAt.map { " · Due " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "")", kind: .loan, id: loan.id)
+                    }
+                    if !snapshot.cards.isEmpty || !snapshot.loans.isEmpty {
+                        Text("Card and loan records do not specify currency; their balances are shown individually.").briefingSecondary()
+                    }
                 }
-                ForEach(snapshot.loans) { loan in
-                    resourceRow(loan.name, detail: "\(loan.role) · Balance \(loan.remainingBalance.formatted())\(loan.nextPaymentAt.map { " · Due " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "")", kind: .loan, id: loan.id)
-                }
-                if !snapshot.cards.isEmpty || !snapshot.loans.isEmpty {
-                    Text("Card and loan records do not specify currency; their balances are shown individually.").briefingSecondary()
-                }
-            }.font(.system(size: 13, weight: .medium)).tint(Color.zifrGold)
-            dataReview(OwnerHealthEngine.snapshot(appState: appState, scope: scope, ignoredDataIssueIDs: ignoredDataIssueIDs, companyID: companyID), categories: [.institution, .card, .loan])
+                .font(.subheadline.weight(.medium))
+                .tint(Color.miloomGold)
+                dataReview(OwnerHealthEngine.snapshot(appState: appState, scope: scope, ignoredDataIssueIDs: ignoredDataIssueIDs, companyID: companyID), categories: [.institution, .card, .loan])
+            }
         }
     }
 
-    private func servicesCard(_ snapshot: ExecutiveBriefingSnapshot, health: OwnerHealthSnapshot) -> some View {
-        BriefingGlassPanel {
-            panelTitle("Services", icon: "square.stack.3d.up")
-            Text("\(BriefingFormat.count(snapshot.activeBillCount, "active bill")) · \(BriefingFormat.count(snapshot.activeSubscriptionCount, "subscription")) · \(BriefingFormat.count(snapshot.supplementalCount, "add-on"))").briefingSecondary()
-            BriefingMetric(label: "Estimated monthly commitment", value: BriefingFormat.amounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "No active services"))
-            if snapshot.unknownBillingCount > 0 { Text("\(snapshot.unknownBillingCount) unsupported billing periods excluded.").briefingSecondary() }
-            Text("Active bills, subscriptions, and add-ons only. Annual costs are spread over 12 months; this estimate is separate from actual spending.").briefingSecondary()
-            Divider().overlay(Color.white.opacity(0.06))
-            upcomingCoverage(snapshot.upcomingCoverage)
-            if snapshot.subscriptions.isEmpty { Text("Services you add will appear here.").briefingSecondary() }
-            ForEach([RecurringServiceType.bill, .subscription]) { type in
-                let services = snapshot.subscriptions.filter { $0.resolvedServiceType == type }
-                if !services.isEmpty {
-                    DisclosureGroup("\(type == .bill ? "Bills" : "Subscriptions") (\(services.count))") {
-                        ForEach(services) { service in
-                            VStack(alignment: .leading, spacing: 5) {
-                                resourceRow(service.name, detail: "\(service.status) · \(BriefingFormat.money(service.cost, service.currency)) / \(service.billingCycle.lowercased())", kind: .subscription, id: service.id)
-                                if let date = service.nextRenewalAt {
-                                    Text("Renews \(date.formatted(date: .abbreviated, time: .omitted))").briefingSecondary()
-                                } else if let renewal = service.nextRenewal, !renewal.isEmpty { Text("Renews \(renewal)").briefingSecondary() }
-                                if let source = service.paymentMethod, !source.isEmpty { Text("Payment source: \(source)").briefingSecondary() }
-                                ForEach(service.subServices) { addon in
-                                    Text("↳ \(addon.name) · \(addon.status.rawValue) · \(BriefingFormat.money(addon.cost, service.currency)) / \(addon.billingCycle.rawValue.lowercased())")
-                                        .briefingSecondary()
+    @ViewBuilder
+    private func selectedMonthTransactions(_ summary: ExecutiveCurrencySummary) -> some View {
+        if !summary.insight.records.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Transactions in \(financialMonth.title())")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .accessibilityAddTraits(.isHeader)
+                ForEach(groupedMonthRecords(summary.insight.records), id: \.date) { group in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(formattedTransactionDate(group.date))
+                            .font(.caption2.weight(.bold))
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                            .foregroundStyle(Color.white.opacity(0.52))
+                        ForEach(group.records) { record in
+                            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(TransactionIntelligence.displayName(for: record))
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.white)
+                                    Text(monthTransactionKind(record)).briefingSecondary()
                                 }
-                            }.padding(.vertical, 4)
+                                Spacer(minLength: 8)
+                                Text(monthTransactionAmount(record, currency: summary.currency))
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(monthTransactionColor(record))
+                            }
+                            .frame(minHeight: 44)
                         }
-                    }.font(.system(size: 13, weight: .medium)).tint(Color.zifrGold)
+                    }
                 }
             }
-            if let summary = health.categories.first(where: { $0.category == .subscription }), !summary.recurringSuggestions.isEmpty {
-                Button { selectedRecurringReview = RecurringSuggestionReview(suggestions: summary.recurringSuggestions) } label: {
-                    Label("Review \(summary.recurringSuggestions.count) detected recurring charges", systemImage: "sparkle.magnifyingglass")
-                        .font(.system(size: 13, weight: .semibold)).padding(.vertical, 10)
-                }.tint(Color.zifrGold)
+        } else {
+            Text("No posted transactions in \(financialMonth.title()).")
+                .briefingSecondary()
+        }
+    }
+
+    private func groupedMonthRecords(_ records: [ResolvedTransaction]) -> [(date: String, records: [ResolvedTransaction])] {
+        Dictionary(grouping: records, by: { $0.transaction.date })
+            .map { (date: $0.key, records: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+
+    private func monthTransactionKind(_ record: ResolvedTransaction) -> String {
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income: return "Income"
+        case .refund: return "Refund"
+        case .expense: return "Expense"
+        case .transfer: return "Transfer"
+        case .ignored: return "Ignored"
+        }
+    }
+
+    private func monthTransactionAmount(_ record: ResolvedTransaction, currency: String) -> String {
+        let amount = BriefingFormat.money(abs(record.transaction.amount ?? 0), currency)
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income, .refund: return "+\(amount)"
+        case .expense: return "−\(amount)"
+        case .transfer, .ignored: return amount
+        }
+    }
+
+    private func monthTransactionColor(_ record: ResolvedTransaction) -> Color {
+        switch TransactionIntelligence.effectiveFlow(for: record) {
+        case .income, .refund: return Color.zifrGreen
+        case .transfer: return Color.miloomGold
+        case .expense, .ignored: return .white
+        }
+    }
+
+    private func formattedTransactionDate(_ value: String) -> String {
+        let input = DateFormatter()
+        input.locale = Locale(identifier: "en_US_POSIX")
+        input.dateFormat = "yyyy-MM-dd"
+        guard let date = input.date(from: value) else { return value }
+        return date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+    }
+
+    private func servicesCard(_ snapshot: ExecutiveBriefingSnapshot, health: OwnerHealthSnapshot) -> some View {
+        BreakdownSectionCard(
+            title: "Services",
+            subtitle: "Bills, subscriptions & add-ons",
+            icon: "square.stack.3d.up",
+            isExpanded: $isServicesExpanded
+        ) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), alignment: .leading)], spacing: 14) {
+                BriefingMetric(label: "Active bills", value: "\(snapshot.activeBillCount)")
+                BriefingMetric(label: "Subscriptions", value: "\(snapshot.activeSubscriptionCount)")
+                BriefingMetric(label: "Add-ons", value: "\(snapshot.supplementalCount)")
+                BriefingMetric(
+                    label: "Monthly commitment",
+                    value: BriefingFormat.amounts(snapshot.recurringCosts, empty: snapshot.activeSubscriptionCount + snapshot.activeBillCount > 0 ? "Unavailable" : "No active services"),
+                    emphasized: true
+                )
             }
-            dataReview(health, categories: [.subscription])
+        } details: {
+            VStack(alignment: .leading, spacing: 16) {
+                if snapshot.unknownBillingCount > 0 {
+                    Text("\(snapshot.unknownBillingCount) unsupported billing periods excluded.").briefingSecondary()
+                }
+                Text("Active services only. Annual costs are spread over 12 months and are separate from actual spending.")
+                    .briefingSecondary()
+                Divider().overlay(Color.white.opacity(0.08))
+                upcomingCoverage(snapshot.upcomingCoverage)
+                if snapshot.subscriptions.isEmpty {
+                    Text("Services you add will appear here.").briefingSecondary()
+                }
+                ForEach([RecurringServiceType.bill, .subscription]) { type in
+                    let services = snapshot.subscriptions.filter { $0.resolvedServiceType == type }
+                    if !services.isEmpty {
+                        DisclosureGroup("\(type == .bill ? "Bills" : "Subscriptions") (\(services.count))") {
+                            ForEach(services) { service in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    resourceRow(service.name, detail: "\(service.status) · \(BriefingFormat.money(service.cost, service.currency)) / \(service.billingCycle.lowercased())", kind: .subscription, id: service.id)
+                                    if let date = service.nextRenewalAt {
+                                        Text("Renews \(date.formatted(date: .abbreviated, time: .omitted))").briefingSecondary()
+                                    } else if let renewal = service.nextRenewal, !renewal.isEmpty {
+                                        Text("Renews \(renewal)").briefingSecondary()
+                                    }
+                                    if let source = service.paymentMethod, !source.isEmpty {
+                                        Text("Payment source: \(source)").briefingSecondary()
+                                    }
+                                    ForEach(service.subServices) { addon in
+                                        Text("↳ \(addon.name) · \(addon.status.rawValue) · \(BriefingFormat.money(addon.cost, service.currency)) / \(addon.billingCycle.rawValue.lowercased())")
+                                            .briefingSecondary()
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .tint(Color.miloomGold)
+                    }
+                }
+                if let summary = health.categories.first(where: { $0.category == .subscription }), !summary.recurringSuggestions.isEmpty {
+                    Button { selectedRecurringReview = RecurringSuggestionReview(suggestions: summary.recurringSuggestions) } label: {
+                        Label("Review \(summary.recurringSuggestions.count) detected recurring charges", systemImage: "sparkle.magnifyingglass")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(MiloomSecondaryButtonStyle())
+                }
+                dataReview(health, categories: [.subscription])
+            }
         }
     }
 
@@ -572,19 +741,33 @@ private struct ExecutiveBreakdownView: View {
     }
 
     private func vaultCard(_ snapshot: ExecutiveBriefingSnapshot, health: OwnerHealthSnapshot) -> some View {
-        BriefingGlassPanel {
-            panelTitle("Vault", icon: "lock.doc")
-            Text("\(BriefingFormat.count(snapshot.documents.count, "document")) · \(snapshot.documents.filter { $0.expiresAt != nil }.count) with expiration dates").briefingSecondary()
-            if snapshot.documents.isEmpty { Text("Documents you add will appear here.").briefingSecondary() }
-            ForEach(Array(Set(snapshot.documents.map { CompanyDocument.normalizeType($0.type) })).sorted(), id: \.self) { category in
-                let documents = snapshot.documents.filter { CompanyDocument.normalizeType($0.type) == category }
-                DisclosureGroup("\(category) (\(documents.count))") {
-                    ForEach(documents.sorted { ($0.expiresAt ?? .distantFuture) < ($1.expiresAt ?? .distantFuture) }) { document in
-                        resourceRow(document.name, detail: document.expiresAt.map { "Expires " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "No expiration date recorded", kind: .document, id: document.id)
-                    }
-                }.font(.system(size: 13, weight: .medium)).tint(Color.zifrGold)
+        BreakdownSectionCard(
+            title: "Vault",
+            subtitle: "Documents & expiration dates",
+            icon: "lock.doc",
+            isExpanded: $isVaultExpanded
+        ) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), alignment: .leading)], spacing: 14) {
+                BriefingMetric(label: "Documents", value: "\(snapshot.documents.count)")
+                BriefingMetric(label: "With expiration dates", value: "\(snapshot.documents.filter { $0.expiresAt != nil }.count)")
             }
-            dataReview(health, categories: [.document])
+        } details: {
+            VStack(alignment: .leading, spacing: 14) {
+                if snapshot.documents.isEmpty {
+                    Text("Documents you add will appear here.").briefingSecondary()
+                }
+                ForEach(Array(Set(snapshot.documents.map { CompanyDocument.normalizeType($0.type) })).sorted(), id: \.self) { category in
+                    let documents = snapshot.documents.filter { CompanyDocument.normalizeType($0.type) == category }
+                    DisclosureGroup("\(category) (\(documents.count))") {
+                        ForEach(documents.sorted { ($0.expiresAt ?? .distantFuture) < ($1.expiresAt ?? .distantFuture) }) { document in
+                            resourceRow(document.name, detail: document.expiresAt.map { "Expires " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "No expiration date recorded", kind: .document, id: document.id)
+                        }
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .tint(Color.miloomGold)
+                }
+                dataReview(health, categories: [.document])
+            }
         }
     }
 
@@ -620,10 +803,6 @@ private struct ExecutiveBreakdownView: View {
         }.buttonStyle(.plain)
     }
 
-    private func panelTitle(_ title: String, icon: String) -> some View {
-        Label(title, systemImage: icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(.white)
-    }
-
     private func detailLine(_ title: String, _ value: String) -> some View {
         HStack(alignment: .top) {
             Text(title).foregroundStyle(Color.white.opacity(0.65))
@@ -633,33 +812,123 @@ private struct ExecutiveBreakdownView: View {
     }
 }
 
-private struct BriefingGlassPanel<Content: View>: View {
-    var spacing: CGFloat = 14
-    var padding: CGFloat = 18
-    @ViewBuilder var content: Content
+private struct BreakdownSectionCard<Summary: View, Details: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    let title: String
+    let subtitle: String
+    let icon: String
+    @Binding var isExpanded: Bool
+    let summary: Summary
+    let details: Details
+
+    init(
+        title: String,
+        subtitle: String,
+        icon: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder summary: () -> Summary,
+        @ViewBuilder details: () -> Details
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.icon = icon
+        _isExpanded = isExpanded
+        self.summary = summary()
+        self.details = details()
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: spacing) { content }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(padding)
-            .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24).fill(Color.zifrBG)
-                    RoundedRectangle(cornerRadius: 24).fill(Color.zifrTabBarFill.opacity(0.70))
+        VStack(spacing: 0) {
+            Button(action: toggleExpanded) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        Image(systemName: icon)
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.86))
+                    }
+                    .frame(width: 48, height: 48)
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(Color.white.opacity(0.58))
+                            .lineLimit(2)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.miloomGold)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
+                        .frame(width: 44, height: 44)
+                        .accessibilityHidden(true)
                 }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24))
-            .overlay(
-                RoundedRectangle(cornerRadius: 24)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1.5
-                    )
-            )
-            .foregroundStyle(.white)
+                .padding(.leading, 18)
+                .padding(.trailing, 8)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint(isExpanded ? "Collapses details" : "Shows details")
+
+            Divider().overlay(Color.white.opacity(0.08))
+
+            VStack(alignment: .leading, spacing: 16) {
+                summary
+
+                if isExpanded {
+                    Divider().overlay(Color.white.opacity(0.08))
+                    details
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 20)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color.black.opacity(0.70))
+        )
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 10, y: 4)
+        .foregroundStyle(.white)
+    }
+
+    private func toggleExpanded() {
+        if reduceMotion {
+            isExpanded.toggle()
+        } else {
+            withAnimation(.easeInOut(duration: 0.22)) {
+                isExpanded.toggle()
+            }
+        }
     }
 }
 

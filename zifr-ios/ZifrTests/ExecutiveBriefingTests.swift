@@ -58,6 +58,27 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertEqual(snapshot.financials.first { $0.currency == "EUR" }?.insight.current.net, -70)
     }
 
+    func testExecutiveSummaryUsesCalendarMonthAndSamePointLastMonth() throws {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Business", structure: "LLC")
+        state.companies = [company]
+
+        var currentMonth = transaction(company: company.id, amount: 40)
+        currentMonth.date = "2027-08-01"
+        var comparablePreviousMonth = transaction(company: company.id, amount: 20)
+        comparablePreviousMonth.date = "2027-07-30"
+        var laterPreviousMonth = transaction(company: company.id, amount: 70)
+        laterPreviousMonth.date = "2027-07-31"
+        state.transactions = [currentMonth, comparablePreviousMonth, laterPreviousMonth]
+
+        let summary = try XCTUnwrap(
+            ExecutiveBriefingSnapshot(appState: state, scope: .business, now: now).financials.first
+        )
+        XCTAssertEqual(summary.insight.current.moneyOut, 40)
+        XCTAssertEqual(summary.insight.previous.moneyOut, 20)
+        XCTAssertEqual(summary.insight.records.map(\.id), [currentMonth.id])
+    }
+
     func testRecurringCommitmentCountsOnlyActiveServicesAndAddonsOnce() {
         let state = AppState()
         let company = Company(userId: owner, name: "Business", structure: "LLC")
