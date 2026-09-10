@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import Zifr
 
 final class ExecutiveBriefingTests: XCTestCase {
@@ -366,6 +367,162 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertEqual(group.totalDue, 250)
         XCTAssertEqual(group.status, .atRisk)
         XCTAssertEqual(group.difference, -50)
+    }
+
+    func testCardBankCashExcludesInvestmentsCreditAndClosedAccounts() {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Business", structure: "LLC")
+        state.companies = [company]
+        state.institutions = [Institution(userId: owner, companyId: company.id, accounts: [
+            InstitutionAccount(id: "checking", type: "Checking", balance: 500, availableBalance: 100),
+            InstitutionAccount(id: "savings", type: "Savings", balance: 200),
+            InstitutionAccount(id: "investment", type: "Investing", balance: 9000),
+            InstitutionAccount(id: "credit", type: "Credit Card", balance: 800),
+            InstitutionAccount(id: "closed", type: "Checking", balance: 1000, status: "Closed"),
+            InstitutionAccount(id: "euro", type: "Savings", balance: 50, currency: "EUR")
+        ])]
+        let metrics = ExecutiveCardMetrics(snapshot: ExecutiveBriefingSnapshot(appState: state, scope: .business, now: now), now: now)
+        XCTAssertEqual(metrics.bankCash, ["USD": 700, "EUR": 50])
+        XCTAssertTrue(ExecutiveCardMetrics(snapshot: ExecutiveBriefingSnapshot(appState: state, scope: .personal, now: now), now: now).bankCash.isEmpty)
+        XCTAssertEqual(BriefingFormat.cardAmounts(metrics.bankCash, empty: "—"), "2 currencies")
+        XCTAssertTrue(BriefingFormat.cardAmounts(["USD": 3100], empty: "—", signed: true).hasPrefix("+"))
+        XCTAssertEqual(BriefingFormat.cardAmounts(["Unknown currency": 10], empty: "—"), "Unknown")
+    }
+
+    func testCardSevenDaysIncludesTodayAndDaySixButNotDaySeven() {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Business", structure: "LLC")
+        state.companies = [company]
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        // Window crosses the spring daylight-saving change.
+        let anchor = ISO8601DateFormatter().date(from: "2027-03-12T20:00:00Z")!
+        let today = calendar.startOfDay(for: anchor)
+        state.subscriptions = [0, 6, 7].map { day in
+            Subscription(userId: owner, companyId: company.id, name: "Day \(day)", cost: 10,
+                nextRenewalAt: calendar.date(byAdding: .day, value: day, to: today))
+        }
+        state.subscriptions.append(Subscription(userId: owner, companyId: company.id, name: "No date", cost: 20))
+        state.subscriptions.append(Subscription(userId: owner, companyId: company.id, name: "Unsupported", cost: 50,
+            billingCycle: "Weekly", nextRenewalAt: today))
+        var cancelled = state.subscriptions[0]
+        cancelled.id = UUID(); cancelled.status = "Cancelled"
+        state.subscriptions.append(cancelled)
+        let snapshot = ExecutiveBriefingSnapshot(appState: state, scope: .business, now: anchor)
+        let metrics = ExecutiveCardMetrics(snapshot: snapshot, now: anchor, calendar: calendar)
+        XCTAssertEqual(metrics.scheduledCosts, ["USD": 20])
+        XCTAssertEqual(metrics.scheduleIncompleteCount, 2)
+        XCTAssertEqual(state.subscriptions[0].nextRenewalAt, today)
+    }
+
+    func testCardDocumentDatesUseCalendarDaysAndUnknownIsNotHealthy() {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Household", structure: "Household")
+        state.companies = [company]
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let today = calendar.startOfDay(for: now)
+        state.documents = [-1, 0, 60, 61].map { offset in
+            CompanyDocument(userId: owner, companyId: company.id, name: "Document \(offset)",
+                expiresAt: calendar.date(byAdding: .day, value: offset, to: today))
+        }
+        state.documents.append(CompanyDocument(userId: owner, companyId: company.id, name: "Undated"))
+        let snapshot = ExecutiveBriefingSnapshot(appState: state, scope: .personal, now: now)
+        let metrics = ExecutiveCardMetrics(snapshot: snapshot, now: now, calendar: calendar)
+        XCTAssertEqual(metrics.expiredDocuments.map(\.name), ["Document -1"])
+        XCTAssertEqual(metrics.expiringDocuments.map(\.name), ["Document 0", "Document 60"])
+        XCTAssertEqual(metrics.datedDocumentCount, 4)
+        XCTAssertEqual(metrics.coverageNote(for: snapshot), "Loading tracked records")
+        state.hasLoadedPortfolio = true
+        state.portfolioLoadIssue = "Unavailable"
+        XCTAssertEqual(metrics.coverageNote(for: ExecutiveBriefingSnapshot(appState: state, scope: .personal, now: now)),
+            "Some data unavailable · totals incomplete")
+    }
+
+    func testCardAttentionPrioritizesDeadlinesOverConnectionsAndDoesNotDuplicateDocuments() {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Acme", structure: "LLC")
+        let personal = Company(userId: owner, name: "Home", structure: "Household")
+        state.companies = [company, personal]
+        state.institutions = [Institution(userId: owner, companyId: company.id, name: "Bank", isDisconnected: true)]
+        let expired = CompanyDocument(userId: owner, companyId: company.id, name: "Insurance", expiresAt: now.addingTimeInterval(-86400))
+        state.documents = [expired,
+            CompanyDocument(userId: owner, companyId: company.id, name: "License", expiresAt: now.addingTimeInterval(30 * 86400)),
+            CompanyDocument(userId: owner, companyId: personal.id, name: "Passport", expiresAt: now.addingTimeInterval(-86400))]
+        let notices = ExecutiveUrgentNotice.cardNotices(in: state, scope: .business, now: now)
+        XCTAssertEqual(notices.map(\.sourceType), [.document, .document, .institution])
+        XCTAssertEqual(notices.first?.entityName, "Acme")
+        var urgent = obligation(bank: state.institutions[0], kind: "document_expired", severity: .urgent)
+        urgent.sourceType = .document; urgent.sourceId = expired.id; urgent.dueAt = expired.expiresAt
+        state.obligations = [urgent]
+        XCTAssertEqual(ExecutiveUrgentNotice.cardNotices(in: state, scope: .business, now: now).filter { $0.sourceID == expired.id }.count, 1)
+    }
+
+    func testCardFundingWarningRequiresKnownFundsAndSurfacesStaleData() {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Acme", structure: "LLC")
+        let bank = Institution(userId: owner, companyId: company.id, name: "Bank", accounts: [
+            InstitutionAccount(id: "checking", plaidAccountId: "connected", name: "Operating", balance: 100, availableBalance: 100)
+        ], lastSyncedAt: now)
+        state.companies = [company]
+        state.institutions = [bank]
+        state.hasLoadedPortfolio = true
+        state.subscriptions = [Subscription(userId: owner, companyId: company.id, name: "Rent", cost: 150,
+            paymentMethod: "Operating", paymentMethodId: bank.id, nextRenewalAt: now.addingTimeInterval(2 * 86400),
+            serviceType: .bill, plaidAccountId: "connected")]
+        XCTAssertEqual(ExecutiveUrgentNotice.cardNotices(in: state, scope: .business, now: now).first?.title,
+            "Scheduled payments may exceed funds")
+        state.institutions[0].lastSyncedAt = now.addingTimeInterval(-10 * 86400)
+        let snapshot = ExecutiveBriefingSnapshot(appState: state, scope: .business, now: now)
+        let metrics = ExecutiveCardMetrics(snapshot: snapshot, now: now)
+        XCTAssertTrue(metrics.hasStaleBankData)
+        XCTAssertEqual(metrics.coverageNote(for: snapshot), "Bank balances out of date · review updates")
+        XCTAssertFalse(ExecutiveUrgentNotice.cardNotices(in: state, scope: .business, now: now)
+            .contains { $0.title == "Scheduled payments may exceed funds" })
+    }
+
+    @MainActor
+    func testSummaryCardsStayCompactAtSmallPhoneWidthAndExpandForAccessibility() throws {
+        let state = AppState()
+        let business = Company(userId: owner, name: "Acme International Holdings", structure: "LLC")
+        let personal = Company(userId: owner, name: "Household", structure: "Household")
+        state.companies = [business, personal]
+        state.hasLoadedPortfolio = true
+        state.institutions = [business, personal].map { company in
+            Institution(userId: owner, companyId: company.id, name: "Bank", accounts: [
+                InstitutionAccount(type: "Checking", balance: company.id == business.id ? 48_200 : 12_500)
+            ])
+        }
+        state.subscriptions = [business, personal].map { company in
+            Subscription(userId: owner, companyId: company.id, name: "Services", cost: 620,
+                nextRenewalAt: now.addingTimeInterval(2 * 86400))
+        }
+        state.documents = [CompanyDocument(userId: owner, companyId: business.id,
+            name: "Professional liability insurance", expiresAt: now.addingTimeInterval(-86400)),
+            CompanyDocument(userId: owner, companyId: personal.id,
+                name: "Passport", expiresAt: now.addingTimeInterval(100 * 86400))]
+        state.transactions = [business, personal].map { transaction(company: $0.id, amount: -3100) }
+        let cards = VStack(spacing: 12) {
+            ForEach([OwnerBriefingScope.business, .personal]) { scope in
+                ExecutiveSummaryCard(snapshot: ExecutiveBriefingSnapshot(appState: state, scope: scope, now: self.now),
+                    now: self.now, urgentNotices: ExecutiveUrgentNotice.cardNotices(in: state, scope: scope, now: self.now),
+                    onOpenUrgent: { _ in }, onBreakdown: { _ in })
+            }
+        }.environment(\.colorScheme, .dark)
+        let regular = UIHostingController(rootView: cards.environment(\.dynamicTypeSize, .large))
+        let size = regular.sizeThatFits(in: CGSize(width: 335, height: 2000))
+        // Keep the original compact stack budget, plus the requested 44-point footer
+        // button and 8-point bottom inset on each card. Small screens may scroll.
+        XCTAssertLessThanOrEqual(size.height, 500 + 2 * 52)
+        let accessible = UIHostingController(rootView: cards.environment(\.dynamicTypeSize, .accessibility3))
+        XCTAssertGreaterThan(accessible.sizeThatFits(in: CGSize(width: 335, height: 4000)).height, size.height)
+        let renderer = ImageRenderer(content: cards.environment(\.dynamicTypeSize, .large)
+            .frame(width: 335).padding(20).background(Color(hex: "#1C1C1E")))
+        renderer.scale = 2
+        let attachment = XCTAttachment(image: try XCTUnwrap(renderer.uiImage))
+        attachment.name = "Briefing cards — iPhone SE width"
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     private func transaction(company: UUID, amount: Double) -> Zifr.Transaction {

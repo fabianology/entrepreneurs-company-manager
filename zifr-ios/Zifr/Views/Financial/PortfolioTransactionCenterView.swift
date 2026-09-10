@@ -365,13 +365,12 @@ struct MiloomMonthPicker: View {
         if #available(iOS 26.0, *) {
             Color.clear
                 .glassEffect(
-                    .clear.tint(Color.miloomGold.opacity(0.28)).interactive(),
+                    .clear.interactive(),
                     in: shape
                 )
         } else {
             shape
                 .fill(.ultraThinMaterial)
-                .overlay(shape.fill(Color.miloomGold.opacity(0.14)))
         }
     }
 }

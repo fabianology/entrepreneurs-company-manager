@@ -1,5 +1,85 @@
 import Foundation
 
+enum ExecutiveBriefingSection: String, Hashable {
+    case financial = "Financial"
+    case services = "Services"
+    case vault = "Vault"
+}
+
+/// Card-only values; the existing breakdown projections and saved records stay unchanged.
+struct ExecutiveCardMetrics {
+    let bankCash: [String: Double]
+    let scheduledCosts: [String: Double]
+    let upcoming: UpcomingCoverageProjection
+    let scheduleIncompleteCount: Int
+    let hasStaleBankData: Bool
+    let expiredDocuments: [CompanyDocument]
+    let expiringDocuments: [CompanyDocument]
+    let datedDocumentCount: Int
+
+    init(snapshot: ExecutiveBriefingSnapshot, now: Date, calendar: Calendar = .current) {
+        bankCash = snapshot.institutions.flatMap(\.accounts).filter {
+            ["checking", "savings"].contains($0.type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+                && ExecutiveBriefingSnapshot.isActive($0.status)
+        }.reduce(into: [:]) { result, account in
+            result[ExecutiveBriefingSnapshot.currency(account.currency), default: 0] += account.balance
+        }
+
+        // The shared scheduler supports monthly/yearly recurrence. Do not guess dates for
+        // other cycles or change their behavior elsewhere in the app.
+        let active = snapshot.subscriptions.filter { ExecutiveBriefingSnapshot.isActive($0.status) }
+        var unsupported = 0
+        let schedulable = active.compactMap { original -> Subscription? in
+            var service = original
+            service.status = "Active"
+            switch service.billingCycle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "monthly": service.billingCycle = "Monthly"
+            case "yearly", "annual", "annually": service.billingCycle = "Yearly"
+            default:
+                unsupported += 1 + service.subServices.filter { $0.status == .active }.count
+                return nil
+            }
+            return service
+        }
+        // The shared window is inclusive: today through day six is seven calendar days.
+        upcoming = UpcomingCoverageEngine.project(subscriptions: schedulable,
+            institutions: snapshot.institutions, cards: snapshot.cards, plaidItems: snapshot.plaidItems,
+            now: now, days: 6, calendar: calendar)
+        scheduledCosts = upcoming.groups.reduce(into: [:]) { result, group in
+            result[group.currency, default: 0] += group.totalDue
+        }
+        scheduleIncompleteCount = upcoming.unscheduledCount + unsupported
+
+        let today = calendar.startOfDay(for: now)
+        let staleBefore = calendar.date(byAdding: .day, value: -7, to: today) ?? today
+        hasStaleBankData = snapshot.oldestSync.map { $0 < staleBefore } ?? false
+        let lastDay = calendar.date(byAdding: .day, value: 60, to: today) ?? today
+        datedDocumentCount = snapshot.documents.filter { $0.expiresAt != nil }.count
+        expiredDocuments = snapshot.documents.filter {
+            $0.expiresAt.map { calendar.startOfDay(for: $0) < today } ?? false
+        }
+        expiringDocuments = snapshot.documents.filter {
+            guard let expiry = $0.expiresAt.map({ calendar.startOfDay(for: $0) }) else { return false }
+            return expiry >= today && expiry <= lastDay
+        }
+    }
+
+    func coverageNote(for snapshot: ExecutiveBriefingSnapshot) -> String? {
+        if !snapshot.isLoaded { return "Loading tracked records" }
+        if snapshot.loadIssue { return "Some data unavailable · totals incomplete" }
+        if snapshot.connectionIssueCount > 0 { return "Bank connection issue · totals may be incomplete" }
+        if hasStaleBankData { return "Bank balances out of date · review updates" }
+        if snapshot.unknownBillingCount > 0 || scheduleIncompleteCount > 0 {
+            return "Service estimates incomplete · review dates and cycles"
+        }
+        if snapshot.companies.isEmpty { return "No profiles added" }
+        if snapshot.institutions.isEmpty && snapshot.subscriptions.isEmpty && snapshot.documents.isEmpty {
+            return "No records added"
+        }
+        return nil
+    }
+}
+
 /// A read-only projection. Resource ownership, persisted totals, and connection records are never mutated.
 struct ExecutiveBriefingSnapshot {
     let scope: OwnerBriefingScope
@@ -22,6 +102,7 @@ struct ExecutiveBriefingSnapshot {
     let loadIssue: Bool
     let unassignedTransactionCount: Int
     let upcomingCoverage: UpcomingCoverageProjection
+    let plaidItems: [PlaidItemSummary]
 
     init(appState: AppState, scope: OwnerBriefingScope, companyID: UUID? = nil, now: Date = Date()) {
         self.scope = scope
@@ -81,6 +162,7 @@ struct ExecutiveBriefingSnapshot {
         let items = appState.plaidItems.filter { item in
             item.institutionId.map(bankIDs.contains) ?? ids.contains(item.companyId)
         }
+        plaidItems = items
         upcomingCoverage = UpcomingCoverageEngine.project(
             subscriptions: subscriptions,
             institutions: institutions,
@@ -500,6 +582,66 @@ struct ExecutiveUrgentNotice: Identifiable {
     let sourceID: UUID
     let obligation: PortfolioObligation?
     let dueAt: Date?
+
+    /// Position-plus-attention ordering is confined to the two summary cards.
+    static func cardNotices(in state: AppState, scope: OwnerBriefingScope, now: Date,
+        calendar: Calendar = .current) -> [Self] {
+        let snapshot = ExecutiveBriefingSnapshot(appState: state, scope: scope, now: now)
+        let metrics = ExecutiveCardMetrics(snapshot: snapshot, now: now, calendar: calendar)
+        let today = calendar.startOfDay(for: now)
+        var ranked: [(rank: Int, notice: Self)] = notices(in: state).filter {
+            $0.belongs(to: scope, in: state)
+        }.map { notice in
+            let overdue = notice.dueAt.map { calendar.startOfDay(for: $0) < today } ?? false
+            return (overdue ? 0 : (notice.obligation == nil ? 3 : 1), notice)
+        }
+
+        func entityName(_ companyID: UUID?) -> String {
+            state.companies.first { $0.id == companyID }?.name ?? "Unassigned"
+        }
+        var existingIDs = Set(ranked.compactMap { $0.notice.obligation?.id })
+        for obligation in state.openObligations where !existingIDs.contains(obligation.id) {
+            guard let due = obligation.dueAt, calendar.startOfDay(for: due) < today else { continue }
+            let owner = ExecutiveBriefingSnapshot.companyID(for: obligation, in: state)
+            let notice = Self(id: "overdue:\(obligation.id)", title: obligation.title,
+                detail: obligation.summary, entityName: entityName(owner), companyID: owner,
+                sourceType: obligation.sourceType, sourceID: obligation.sourceId,
+                obligation: obligation, dueAt: due)
+            if notice.belongs(to: scope, in: state) {
+                existingIDs.insert(obligation.id)
+                ranked.append((0, notice))
+            }
+        }
+
+        for document in metrics.expiredDocuments + metrics.expiringDocuments {
+            guard !ranked.contains(where: { $0.notice.sourceType == .document && $0.notice.sourceID == document.id }) else { continue }
+            let expired = document.expiresAt.map { calendar.startOfDay(for: $0) < today } ?? false
+            let owner = state.localCompanyOverrides[document.id.uuidString] ?? document.companyId
+            ranked.append((expired ? 0 : 2, Self(id: "document:\(document.id)",
+                title: "\(document.name) \(expired ? "expired" : "expires soon")",
+                detail: document.expiresAt.map { "Recorded expiration: " + $0.formatted(date: .abbreviated, time: .omitted) } ?? "",
+                entityName: entityName(owner), companyID: owner, sourceType: .document,
+                sourceID: document.id, obligation: nil, dueAt: document.expiresAt)))
+        }
+        for group in metrics.upcoming.groups where group.status == .atRisk {
+            guard let charge = group.charges.first,
+                  let serviceID = charge.id.split(separator: ":").dropFirst().first.flatMap({ UUID(uuidString: String($0)) }),
+                  let service = snapshot.subscriptions.first(where: { $0.id == serviceID }),
+                  !ranked.contains(where: { $0.notice.sourceType == .subscription && $0.notice.sourceID == serviceID }) else { continue }
+            let owner = state.localCompanyOverrides[service.id.uuidString] ?? service.companyId
+            ranked.append((1, Self(id: "funding:\(group.id)", title: "Scheduled payments may exceed funds",
+                detail: "Review \(group.sourceName) and its scheduled charges.", entityName: entityName(owner),
+                companyID: owner, sourceType: .subscription, sourceID: service.id,
+                obligation: nil, dueAt: charge.dueAt)))
+        }
+        return ranked.sorted {
+            if $0.rank != $1.rank { return $0.rank < $1.rank }
+            let lhs = $0.notice.dueAt ?? .distantFuture
+            let rhs = $1.notice.dueAt ?? .distantFuture
+            if lhs != rhs { return lhs < rhs }
+            return $0.notice.id < $1.notice.id
+        }.map(\.notice)
+    }
 
     static func notices(in state: AppState) -> [Self] {
         func entity(_ companyID: UUID?, resourceID: UUID) -> String {
