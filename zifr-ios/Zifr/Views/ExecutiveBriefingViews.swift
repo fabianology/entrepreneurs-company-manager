@@ -440,7 +440,7 @@ private struct ExecutiveBriefingReceipt: View {
         }
         ReceiptActionButton(
             title: "SEE ALL SPENDING CATEGORIES",
-            detail: "Category totals and transactions for \(financialMonth.title())",
+            detail: nil,
             icon: "chart.pie",
             enabled: financials.contains { !$0.insight.expenseCategories.isEmpty },
             action: onShowCategories
@@ -1018,7 +1018,7 @@ private struct ReceiptPickerLabel: View {
 
 private struct ReceiptActionButton: View {
     let title: String
-    let detail: String
+    let detail: String?
     let icon: String
     var enabled: Bool = true
     let action: () -> Void
@@ -1030,9 +1030,11 @@ private struct ReceiptActionButton: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(.caption2, design: .monospaced).weight(.bold))
-                    Text(detail)
-                        .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(Color.white.opacity(0.68))
+                    if let detail, !detail.isEmpty {
+                        Text(detail)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(Color.white.opacity(0.68))
+                    }
                 }
                 Spacer(minLength: 6)
                 if enabled {
@@ -1058,7 +1060,6 @@ private struct ReceiptActionButton: View {
 }
 
 private struct ReceiptHUDShell<Content: View>: View {
-    @Environment(\.dismiss) private var dismiss
     let title: String
     let subtitle: String
     @ViewBuilder let content: Content
@@ -1070,58 +1071,54 @@ private struct ReceiptHUDShell<Content: View>: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    VStack(spacing: 4) {
-                        Text(title.uppercased())
-                            .font(.system(.subheadline, design: .monospaced).weight(.bold))
-                        Text(subtitle.uppercased())
-                            .font(.system(.caption2, design: .monospaced))
-                            .foregroundStyle(BriefingReceiptTheme.fadedInk)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(.isHeader)
+        GeometryReader { geometry in
+            ZStack {
+                Color(hex: "#1C1C1E")
+                    .ignoresSafeArea()
 
-                    ReceiptDash()
-                    content
-                    ReceiptDash()
-                    Text("END OF REPORT")
-                        .font(.system(.caption2, design: .monospaced).weight(.medium))
-                        .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(spacing: 4) {
+                            Text(title.uppercased())
+                                .font(.system(.subheadline, design: .monospaced).weight(.bold))
+                            Text(subtitle.uppercased())
+                                .font(.system(.caption2, design: .monospaced))
+                                .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                        }
                         .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isHeader)
+
+                        ReceiptDash()
+                        content
+                        ReceiptDash()
+                        Text("END OF REPORT")
+                            .font(.system(.caption2, design: .monospaced).weight(.medium))
+                            .foregroundStyle(BriefingReceiptTheme.fadedInk)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .padding(22)
+                    .frame(width: max(geometry.size.width - 40, 0))
+                    .background(BriefingReceiptTheme.paper)
+                    .clipShape(ReceiptPaperShape())
+                    .overlay {
+                        ReceiptPaperShape()
+                            .stroke(BriefingReceiptTheme.ink.opacity(0.14), lineWidth: 1)
+                    }
+                    .foregroundStyle(BriefingReceiptTheme.ink)
+                    .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(22)
-                .background(BriefingReceiptTheme.paper)
-                .clipShape(ReceiptPaperShape())
-                .overlay {
-                    ReceiptPaperShape()
-                        .stroke(BriefingReceiptTheme.ink.opacity(0.14), lineWidth: 1)
-                }
-                .foregroundStyle(BriefingReceiptTheme.ink)
-                .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 24)
-            }
-            .background(Color.white.ignoresSafeArea())
-            .scrollIndicators(.hidden)
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.white, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { dismiss() }
-                        .fontWeight(.semibold)
-                        .foregroundStyle(BriefingReceiptTheme.gold)
-                }
+                .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+                .scrollIndicators(.hidden)
+                .clipped()
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
-        .presentationBackground(Color.white)
+        .presentationBackground(Color(hex: "#1C1C1E"))
         .preferredColorScheme(.light)
     }
 }
