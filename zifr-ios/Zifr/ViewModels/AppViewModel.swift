@@ -531,7 +531,7 @@ final class AppViewModel {
     }
 
     // MARK: - AI Search & Context
-    func generateMinifiedPortfolio(appState: AppState) -> String {
+    func generateMinifiedPortfolio(appState: AppState, includeLoginIdentifiers: Bool = true) -> String {
         var minifiedData = ""
         for company in appState.companies {
             minifiedData += "Company: \(company.name)\n"
@@ -551,7 +551,10 @@ final class AppViewModel {
             
             let coInst = appState.institutions.filter { $0.companyId == company.id }
             if !coInst.isEmpty {
-                minifiedData += "- Banks: " + coInst.map { "\($0.name)(user: \(($0.username?.isEmpty ?? true) ? "none" : ($0.username ?? "")) email: \(($0.email?.isEmpty ?? true) ? "none" : ($0.email ?? "")))" }.joined(separator: ", ") + "\n"
+                minifiedData += "- Banks: " + coInst.map { institution in
+                    guard includeLoginIdentifiers else { return institution.name }
+                    return "\(institution.name)(user: \((institution.username?.isEmpty ?? true) ? "none" : (institution.username ?? "")) email: \((institution.email?.isEmpty ?? true) ? "none" : (institution.email ?? "")))"
+                }.joined(separator: ", ") + "\n"
             }
             
             let coLoans = appState.loans.filter { $0.companyId == company.id }

@@ -71,7 +71,7 @@ actor GeminiService {
         }
         
         // Construct target proxy URL
-        var request = URLRequest(url: URL(string: "\(SupabaseService.shared.urlString)/functions/v1/gemini-live-proxy")!)
+        var request = URLRequest(url: URL(string: "\(SupabaseService.shared.urlString)/functions/v1/gemini-rest-proxy")!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

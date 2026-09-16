@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 import AVFoundation
 
+@MainActor
 struct AssistantOnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
@@ -12,7 +13,16 @@ struct AssistantOnboardingView: View {
     @StateObject private var captureManager = AudioCaptureManager()
     @State private var showPermissionAlert = false
     @State private var client: GeminiLiveClient?
-    @State private var debugLog: String = "Waiting..."
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var liveState: LiveConnectionState = .idle
+    @State private var transcript = LiveTranscript()
+    @State private var toolQueue = LiveToolQueue()
+    @State private var microphoneMuted = false
+    @State private var audioInterrupted = false
+    @State private var assistantVisible = false
+    @State private var connectionTask: Task<Void, Never>?
+    @State private var audioTask: Task<Void, Never>?
+    @State private var voiceGeneration = UUID()
     
     @State private var isConnecting = true
     @State private var connectionError: String? = nil
@@ -25,8 +35,6 @@ struct AssistantOnboardingView: View {
     @State private var pendingCard: FinancialCard? = nil
     @State private var pendingDelete: PendingDelete? = nil
     
-    @State private var synthesizer = AVSpeechSynthesizer()
-    @State private var pendingTTS: String? = nil
     
     // Chat Mode states
     @State private var isChatMode = false
@@ -227,34 +235,10 @@ struct AssistantOnboardingView: View {
                         }
                         .padding(.top, 4)
                     }
-                } else if isConnecting {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
+                } else if isChatMode {
+                    chatView
                 } else {
-                    if isChatMode {
-                        chatView
-                    } else {
-                        VStack(spacing: 24) {
-                            PulsingOrbView(volume: captureManager.volume)
-                            
-                            Button {
-                                toggleMode()
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "keyboard")
-                                    Text("Type Instead")
-                                }
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.5))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color.white.opacity(0.05))
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    voiceView
                 }
                 
                 Spacer()
@@ -307,6 +291,7 @@ struct AssistantOnboardingView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 30)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .disabled(!isChatMode && (liveState != .ready || scenePhase != .active))
             }
             
             // Draft Loan Confirmation Dialog
@@ -360,6 +345,7 @@ struct AssistantOnboardingView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 30)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .disabled(!isChatMode && (liveState != .ready || scenePhase != .active))
             }
             
             // Draft Card Confirmation Dialog
@@ -413,6 +399,7 @@ struct AssistantOnboardingView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 30)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .disabled(!isChatMode && (liveState != .ready || scenePhase != .active))
             }
             
             // Delete Confirmation Dialog
@@ -459,6 +446,7 @@ struct AssistantOnboardingView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 30)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .disabled(!isChatMode && (liveState != .ready || scenePhase != .active))
             }
             
             // Voice Assistant Draft Confirmation Dialog
@@ -494,7 +482,6 @@ struct AssistantOnboardingView: View {
                         Button("Confirm & Save") {
                             if saveCompany(company) {
                                 sendToolResponse(for: call, success: true)
-                                disconnectAndDismiss()
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -510,6 +497,7 @@ struct AssistantOnboardingView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .padding(.horizontal, 30)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                .disabled(!isChatMode && (liveState != .ready || scenePhase != .active))
             }
             
             // Manual Text Input Fallback Form
@@ -599,38 +587,48 @@ struct AssistantOnboardingView: View {
                 .padding(.horizontal, 30)
             }
             
-            // Debug overlay
-            VStack {
-                Spacer()
-                Text(debugLog)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.green)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-                    .background(Color.black.opacity(0.8))
-            }
-            .allowsHitTesting(false)
         }
         .onAppear {
+            assistantVisible = true
             setupConnection()
         }
-        .onChange(of: captureManager.isAssistantSpeaking) { isSpeaking in
-            if !isSpeaking, let val = pendingTTS {
-                pendingTTS = nil
-                let utterance = AVSpeechUtterance(string: val)
-                utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-                utterance.volume = 1.0
-                
-                // Slight micro-delay to let the mic un-mute cleanly before Apple speaks
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    synthesizer.speak(utterance)
+        .onDisappear {
+            assistantVisible = false
+            stopVoiceSession()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                pauseVoiceCapture()
+                captureManager.stop()
+                if captureManager.isReadingSecureField {
+                    captureManager.cancelSecureSpeech()
+                    if let call = activeToolCall { sendToolResponse(for: call, success: false) }
                 }
+            } else { processNextTool(); updateVoiceAudio() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.interruptionNotification)) { notification in
+            let type = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap(AVAudioSession.InterruptionType.init)
+            audioInterrupted = type == .began
+            if audioInterrupted {
+                pauseVoiceCapture()
+                captureManager.stop()
+                if captureManager.isReadingSecureField {
+                    captureManager.cancelSecureSpeech()
+                    if let call = activeToolCall { sendToolResponse(for: call, success: false) }
+                }
+            } else {
+                let options = AVAudioSession.InterruptionOptions(rawValue: notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0)
+                if !options.contains(.shouldResume) { microphoneMuted = true }
+                updateVoiceAudio()
             }
         }
-        .onDisappear {
-            recordVoiceUsage()
+        .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)) { notification in
+            let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt).flatMap(AVAudioSession.RouteChangeReason.init)
+            guard reason == .oldDeviceUnavailable || reason == .newDeviceAvailable else { return }
+            pauseVoiceCapture()
             captureManager.stop()
-            client?.disconnect()
+            if reason == .oldDeviceUnavailable { microphoneMuted = true }
+            updateVoiceAudio()
         }
         .sheet(isPresented: $showPremiumUpgrade) {
             PremiumUpgradeView(gate: accessController.pendingGate)
@@ -647,16 +645,18 @@ struct AssistantOnboardingView: View {
     @State private var cancellables = Set<AnyCancellable>()
     
     private func setupConnection() {
-        client?.disconnect()
-        cancellables.removeAll()
-        
+        stopVoiceSession()
+        voiceGeneration = UUID()
+        toolQueue = LiveToolQueue()
+        clearPendingTool()
+        transcript = LiveTranscript()
+        liveState = .idle
         isConnecting = true
         connectionError = nil
         
         if isChatMode {
             DispatchQueue.main.async {
                 self.isConnecting = false
-                self.debugLog = "Chat mode active. Ready for typed questions."
             }
             return
         }
@@ -673,7 +673,7 @@ struct AssistantOnboardingView: View {
             return
         }
         
-        let minifiedData = vm.generateMinifiedPortfolio(appState: appState)
+        let minifiedData = vm.generateMinifiedPortfolio(appState: appState, includeLoginIdentifiers: false)
         let dynamicInstruction = """
         You are Miloom, an elite AI Executive Assistant for the Miloom app. Your job is to help the user onboard and manage their businesses and finances.
         You can create companies, subscriptions, loans, and credit/debit cards. You can also delete them, or navigate the user to different parts of the app.
@@ -689,73 +689,163 @@ struct AssistantOnboardingView: View {
         Use this data to answer their questions about their portfolio directly. Do not make up any information.
         """
         
-        client = GeminiLiveClient(
-            systemInstruction: dynamicInstruction,
-            tools: tools,
-            responseModalities: ["AUDIO"]
-        ) { log in
-            DispatchQueue.main.async {
-                self.debugLog = log
+        let newClient = GeminiLiveClient(systemInstruction: dynamicInstruction, tools: tools)
+        client = newClient
+        let id = voiceGeneration
+        newClient.events.sink { event in
+            guard id == self.voiceGeneration else { return }
+            self.handleLiveEvent(event)
+        }.store(in: &cancellables)
+        newClient.state.sink { state in
+            guard id == self.voiceGeneration else { return }
+            self.liveState = state
+            self.isConnecting = state != .ready
+            switch state {
+            case .ready:
+                self.connectionError = nil
+                self.voiceSessionStartedAt = self.voiceSessionStartedAt ?? Date()
+                self.processNextTool()
+                self.updateVoiceAudio()
+            case .failed(let failure):
+                self.pauseVoiceCapture()
+                self.captureManager.cancelSecureSpeech()
+                self.captureManager.stop()
+                self.clearPendingTool()
+                self.toolQueue = LiveToolQueue()
+                self.connectionError = failure.localizedDescription
+            case .reconnecting, .connecting, .idle:
+                self.pauseVoiceCapture()
+                self.captureManager.interruptPlayback()
             }
-        }
-        
-        Task {
-            do {
-                try await client?.connect()
-                
-                // Subscribe to audio data (only play if not in chat mode)
-                client?.audioDataPublisher
-                    .receive(on: RunLoop.main)
-                    .sink { data in
-                        if !self.isChatMode {
-                            self.captureManager.schedule(audioData: data)
-                        }
-                    }
-                    .store(in: &cancellables)
-                
-                // Subscribe to text response chunks (fallback)
-                client?.textDataPublisher
-                    .receive(on: RunLoop.main)
-                    .sink { text in
-                        self.handleIncomingText(text)
-                    }
-                    .store(in: &cancellables)
-                
-                // Subscribe to tool calls
-                client?.toolCallPublisher
-                    .receive(on: RunLoop.main)
-                    .sink { call in
-                        self.handleToolCall(call)
-                    }
-                    .store(in: &cancellables)
-                
-                // Send audio to Gemini
-                captureManager.audioDataPublisher
-                    .sink { data in
-                        client?.sendAudio(pcmBufferData: data)
-                    }
-                    .store(in: &cancellables)
-                
-                await captureManager.start()
-                
-                DispatchQueue.main.async {
-                    self.voiceSessionStartedAt = Date()
-                    self.isConnecting = false
-                }
-            } catch {
-                AppDiagnostics.failure("ai", "live_connection", error: error)
-                await MainActor.run {
-                    self.connectionError = error.localizedDescription
-                    self.isConnecting = false
-                }
+        }.store(in: &cancellables)
+        captureManager.audioDataPublisher.sink { data in
+            guard id == self.voiceGeneration, self.canForwardAudio else { return }
+            newClient.sendAudio(pcmBufferData: data)
+        }.store(in: &cancellables)
+        connectionTask = Task {
+            do { try await newClient.connect() }
+            catch is CancellationError { }
+            catch {
+                guard id == self.voiceGeneration else { return }
+                self.connectionError = (error as? LiveFailure)?.localizedDescription ?? LiveFailure.setup.localizedDescription
             }
         }
     }
-    
+
+    private var canForwardAudio: Bool {
+        assistantVisible && !isChatMode && scenePhase == .active && !audioInterrupted
+            && liveState == .ready && !microphoneMuted && activeToolCall == nil
+            && !captureManager.isReadingSecureField
+    }
+
+    private func pauseVoiceCapture() {
+        audioTask?.cancel()
+        audioTask = nil
+        captureManager.setInputEnabled(false)
+        client?.endAudioStream()
+    }
+
+    private func updateVoiceAudio() {
+        audioTask?.cancel()
+        guard assistantVisible, !isChatMode, liveState == .ready,
+              scenePhase == .active, !audioInterrupted, activeToolCall == nil,
+              !captureManager.isReadingSecureField else {
+            captureManager.setInputEnabled(false)
+            return
+        }
+        let id = voiceGeneration
+        audioTask = Task {
+            let started = await captureManager.start()
+            guard !Task.isCancelled, id == voiceGeneration else { return }
+            if started { captureManager.setInputEnabled(canForwardAudio) }
+            else if captureManager.permissionDenied {
+                showPermissionAlert = true
+                connectionError = "Microphone access is disabled. Enable it in Settings to use voice."
+                client?.disconnect()
+            } else if let error = captureManager.audioError {
+                connectionError = error
+                client?.disconnect()
+            }
+        }
+    }
+
+    private func handleLiveEvent(_ event: LiveEvent) {
+        switch event {
+        case .audio(let data):
+            if assistantVisible && scenePhase == .active && !audioInterrupted && activeToolCall == nil {
+                captureManager.schedule(audioData: data)
+            }
+        case .inputTranscript(let value): transcript.append(value, speaker: .user)
+        case .outputTranscript(let value): transcript.append(value, speaker: .assistant)
+        case .interrupted:
+            captureManager.interruptPlayback()
+            transcript.interrupt()
+            AppDiagnostics.event("ai", "live_interruption", status: "received")
+        case .generationComplete: break
+        case .turnComplete: transcript.endTurn()
+        case .tools(let calls):
+            for response in toolQueue.enqueue(calls.functionCalls) { client?.sendToolResponse(response: response) }
+            processNextTool()
+        case .cancelledTools(let ids):
+            toolQueue.cancel(ids)
+            if let call = activeToolCall, ids.contains(call.id) {
+                captureManager.cancelSecureSpeech()
+                clearPendingTool()
+            }
+            processNextTool()
+            updateVoiceAudio()
+        }
+    }
+
+    private func processNextTool() {
+        guard liveState == .ready, activeToolCall == nil, scenePhase == .active,
+              let call = toolQueue.next() else { return }
+        handleToolCall(ToolCall(functionCalls: [call]))
+    }
+
+    private func clearPendingTool() {
+        pendingCompany = nil
+        pendingSubscription = nil
+        pendingLoan = nil
+        pendingCard = nil
+        pendingDelete = nil
+        activeToolCall = nil
+    }
+
+    private func stopVoiceSession() {
+        voiceGeneration = UUID()
+        connectionTask?.cancel()
+        connectionTask = nil
+        audioTask?.cancel()
+        audioTask = nil
+        recordVoiceUsage()
+        cancellables.removeAll()
+        captureManager.setInputEnabled(false)
+        captureManager.cancelSecureSpeech()
+        captureManager.stop()
+        client?.disconnect()
+        client = nil
+        transcript = LiveTranscript()
+        toolQueue = LiveToolQueue()
+        clearPendingTool()
+    }
+
     private func handleToolCall(_ toolCall: ToolCall) {
         guard let firstCall = toolCall.functionCalls.first else { return }
+        if !isChatMode {
+            activeToolCall = firstCall
+            pauseVoiceCapture()
+        }
+        if let declaration = tools.flatMap(\.functionDeclarations).first(where: { $0.name == firstCall.name }),
+           let error = firstCall.validationError(for: declaration) {
+            sendToolResponse(for: firstCall, success: false, errorMessage: error)
+            return
+        }
         let args = firstCall.args
-        let currentUserId = authViewModel.currentUser?.id ?? UUID()
+        guard let currentUserId = authViewModel.currentUser?.id else {
+            sendToolResponse(for: firstCall, success: false, errorMessage: "Please sign in again.")
+            return
+        }
         
         switch firstCall.name {
         case "draftCompany":
@@ -775,12 +865,12 @@ struct AssistantOnboardingView: View {
                 self.pendingCompany = newCompany
                 self.activeToolCall = firstCall
             }
-            captureManager.stop()
+            captureManager.interruptPlayback()
             
         case "draftSubscription":
             let companyName = (args["companyName"]?.value as? String) ?? ""
             let name = (args["name"]?.value as? String) ?? "Subscription"
-            let cost = (args["cost"]?.value as? Double) ?? 0.0
+            let cost = args["cost"]?.doubleValue ?? 0.0
             let billingCycle = (args["billingCycle"]?.value as? String) ?? "Monthly"
             
             guard let company = findCompany(named: companyName) else {
@@ -801,14 +891,14 @@ struct AssistantOnboardingView: View {
                 self.pendingSubscription = newSub
                 self.activeToolCall = firstCall
             }
-            captureManager.stop()
+            captureManager.interruptPlayback()
             
         case "draftLoan":
             let companyName = (args["companyName"]?.value as? String) ?? ""
             let name = (args["name"]?.value as? String) ?? "Loan"
             let lender = (args["lender"]?.value as? String) ?? ""
-            let remainingBalance = (args["remainingBalance"]?.value as? Double) ?? 0.0
-            let monthlyPayment = (args["monthlyPayment"]?.value as? Double) ?? 0.0
+            let remainingBalance = args["remainingBalance"]?.doubleValue ?? 0.0
+            let monthlyPayment = args["monthlyPayment"]?.doubleValue ?? 0.0
             
             guard let company = findCompany(named: companyName) else {
                 sendToolResponse(for: firstCall, success: false, errorMessage: "Company named '\(companyName)' not found.")
@@ -829,14 +919,14 @@ struct AssistantOnboardingView: View {
                 self.pendingLoan = newLoan
                 self.activeToolCall = firstCall
             }
-            captureManager.stop()
+            captureManager.interruptPlayback()
             
         case "draftCard":
             let companyName = (args["companyName"]?.value as? String) ?? ""
             let name = (args["name"]?.value as? String) ?? "Card"
             let cardType = (args["type"]?.value as? String) ?? "Credit"
-            let balance = (args["balance"]?.value as? Double) ?? 0.0
-            let limit = (args["limit"]?.value as? Double) ?? 0.0
+            let balance = args["balance"]?.doubleValue ?? 0.0
+            let limit = args["limit"]?.doubleValue ?? 0.0
             
             guard let company = findCompany(named: companyName) else {
                 sendToolResponse(for: firstCall, success: false, errorMessage: "Company named '\(companyName)' not found.")
@@ -857,7 +947,7 @@ struct AssistantOnboardingView: View {
                 self.pendingCard = newCard
                 self.activeToolCall = firstCall
             }
-            captureManager.stop()
+            captureManager.interruptPlayback()
             
         case "navigateTo":
             let tabStr = (args["tab"]?.value as? String) ?? "Home"
@@ -887,8 +977,13 @@ struct AssistantOnboardingView: View {
                     self.vm.activeTab = tab
                 }
                 
-                self.sendToolResponse(for: firstCall, success: true)
-                self.disconnectAndDismiss()
+                self.sendToolResponse(for: firstCall, success: true, advanceQueue: false)
+                let id = self.voiceGeneration
+                Task {
+                    await self.client?.flushResponses()
+                    guard id == self.voiceGeneration else { return }
+                    self.disconnectAndDismiss()
+                }
             }
             
         case "deleteEntity":
@@ -900,35 +995,35 @@ struct AssistantOnboardingView: View {
                 if let comp = appState.companies.first(where: { $0.name.lowercased() == cleanedName }) {
                     self.pendingDelete = PendingDelete(type: "company", name: comp.name, id: comp.id, companyId: comp.id)
                     self.activeToolCall = firstCall
-                    captureManager.stop()
+                    captureManager.interruptPlayback()
                     return
                 }
             } else if entityType.lowercased() == "subscription" {
                 if let sub = appState.subscriptions.first(where: { $0.name.lowercased() == cleanedName }) {
                     self.pendingDelete = PendingDelete(type: "subscription", name: sub.name, id: sub.id, companyId: sub.companyId)
                     self.activeToolCall = firstCall
-                    captureManager.stop()
+                    captureManager.interruptPlayback()
                     return
                 }
             } else if entityType.lowercased() == "card" {
                 if let card = appState.cards.first(where: { $0.name.lowercased() == cleanedName }) {
                     self.pendingDelete = PendingDelete(type: "card", name: card.name, id: card.id, companyId: card.companyId)
                     self.activeToolCall = firstCall
-                    captureManager.stop()
+                    captureManager.interruptPlayback()
                     return
                 }
             } else if entityType.lowercased() == "loan" {
                 if let loan = appState.loans.first(where: { $0.name.lowercased() == cleanedName }) {
                     self.pendingDelete = PendingDelete(type: "loan", name: loan.name, id: loan.id, companyId: loan.companyId)
                     self.activeToolCall = firstCall
-                    captureManager.stop()
+                    captureManager.interruptPlayback()
                     return
                 }
             } else if entityType.lowercased() == "document" {
                 if let doc = appState.documents.first(where: { $0.name.lowercased() == cleanedName }) {
                     self.pendingDelete = PendingDelete(type: "document", name: doc.name, id: doc.id, companyId: doc.companyId)
                     self.activeToolCall = firstCall
-                    captureManager.stop()
+                    captureManager.interruptPlayback()
                     return
                 }
             }
@@ -993,11 +1088,12 @@ struct AssistantOnboardingView: View {
                     customPayload: ["error": AnyCodable("That protected value is locked on this device. Open the item to replace or clear it.")]
                 )
             } else if let val = valueToRead, !val.isEmpty {
-                sendToolResponse(for: firstCall, success: true, customPayload: ["status": AnyCodable("handed_off_to_local_system_and_waiting_for_assistant_to_finish")])
-                
-                // Store it. The onChange(of: captureManager.isAssistantSpeaking) will trigger it.
-                DispatchQueue.main.async {
-                    self.pendingTTS = val
+                pauseVoiceCapture()
+                let id = voiceGeneration
+                captureManager.speakSecurely(val) {
+                    guard id == voiceGeneration, assistantVisible else { return }
+                    sendToolResponse(for: firstCall, success: true,
+                                     customPayload: ["status": AnyCodable("read_on_device")])
                 }
             } else {
                 sendToolResponse(for: firstCall, success: false, errorMessage: "Could not find a \(fieldType) locally for '\(accountName)'.")
@@ -1068,7 +1164,7 @@ struct AssistantOnboardingView: View {
         }
     }
     
-    private func sendToolResponse(for call: FunctionCall, success: Bool, errorMessage: String? = nil, customPayload: [String: AnyCodable]? = nil) {
+    private func sendToolResponse(for call: FunctionCall, success: Bool, errorMessage: String? = nil, customPayload: [String: AnyCodable]? = nil, advanceQueue: Bool = true) {
         var payload: [String: AnyCodable] = ["success": AnyCodable(success)]
         if let err = errorMessage {
             payload["error"] = AnyCodable(err)
@@ -1126,37 +1222,40 @@ struct AssistantOnboardingView: View {
                 response: payload
             )
             
+            toolQueue.finish(response)
             client?.sendToolResponse(response: response)
-                
-            DispatchQueue.main.async {
-                withAnimation {
-                    self.pendingCompany = nil
-                    self.pendingSubscription = nil
-                    self.pendingLoan = nil
-                    self.pendingCard = nil
-                    self.pendingDelete = nil
-                    self.activeToolCall = nil
-                }
-                // Resume mic if in audio mode
-                if !self.isChatMode {
-                    Task { await self.captureManager.start() }
-                    
-                    // Show permission alert if needed
-                    if self.captureManager.permissionDenied {
-                        self.showPermissionAlert = true
-                    }
+            clearPendingTool()
+            if advanceQueue {
+                processNextTool()
+                updateVoiceAudio()
+            } else {
+                let pending = toolQueue.pending
+                toolQueue.cancel(pending.map(\.id))
+                for pendingCall in pending {
+                    client?.sendToolResponse(response: FunctionResponse(id: pendingCall.id, name: pendingCall.name,
+                        response: ["success": AnyCodable(false), "error": AnyCodable("Conversation closed for navigation.")]))
                 }
             }
         }
     }
-    
+
     private func disconnectAndDismiss() {
-        recordVoiceUsage()
-        captureManager.stop()
-        client?.disconnect()
+        stopVoiceSession()
         dismiss()
     }
     
+    private var voiceView: some View {
+        LiveVoicePanel(entries: transcript.entries, inputVolume: captureManager.volume,
+                       outputVolume: captureManager.outputVolume,
+                       isActive: assistantVisible && scenePhase == .active,
+                       microphoneMuted: microphoneMuted,
+                       onToggleMicrophone: {
+                           microphoneMuted.toggle()
+                           if microphoneMuted { pauseVoiceCapture() }
+                           else { processNextTool(); updateVoiceAudio() }
+                       }, onType: toggleMode, onEnd: disconnectAndDismiss)
+    }
+
     // MARK: - Chat view and Helpers
     
     private func toggleMode() {

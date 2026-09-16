@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A38A38A38A38A38A38A38001 /* GeminiLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */; };
 		040C1B465BBF9CDEDF000CCD /* ActivityLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C022DD3ABEFB2F9B7AD38355 /* ActivityLogsView.swift */; };
 		07549C6F481951A912F9ECEC /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C594CA72D48122B0D50169 /* ActivityLog.swift */; };
 		09BE6FE2E56BFD9B7C1144A2 /* InstitutionAccountHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4DFF2E12CA02748A1371FB /* InstitutionAccountHUD.swift */; };
@@ -145,6 +146,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveTests.swift; sourceTree = "<group>"; };
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
 		032520FD864A3B1FF73C81A0 /* AdminSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSettingsView.swift; sourceTree = "<group>"; };
 		035737E80A51990996AF6F2E /* AudioPlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackManager.swift; sourceTree = "<group>"; };
@@ -301,6 +303,7 @@
 			isa = PBXGroup;
 			children = (
 				51478D5FCEE3293BF6A573BB /* PremiumEngineTests.swift */,
+				A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */,
 				19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */,
 			);
 			name = ZifrTests;
@@ -725,6 +728,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				CB35D73769E288AA746CA7E7 /* PremiumEngineTests.swift in Sources */,
+				A38A38A38A38A38A38A38001 /* GeminiLiveTests.swift in Sources */,
 				88974DA6FB57F4806E327280 /* BusinessExpenseTests.swift in Sources */,
 				404ADBE780A93BBCD99794FB /* ExecutiveBriefingTests.swift in Sources */,
 			);
