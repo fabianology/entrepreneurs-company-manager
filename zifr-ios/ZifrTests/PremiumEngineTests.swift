@@ -1,8 +1,183 @@
 import XCTest
 import CryptoKit
+import class SwiftUI.ImageRenderer
+import enum SwiftUI.DynamicTypeSize
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testReceiptSplitsMonthlyAndYearlyChargesByIndependentServiceType() {
+        let owner = UUID(), company = UUID()
+        let bill = Subscription(userId: owner, companyId: company, name: "Vehicle", cost: 400, subServices: [
+            SubService(name: "Connectivity", cost: 200, billingCycle: .yearly, serviceType: .subscription),
+            SubService(name: "Insurance", cost: 75, serviceType: .bill),
+            SubService(name: "Paused", cost: 999, status: .paused, serviceType: .subscription)
+        ], serviceType: .bill)
+        let monthly = Subscription(userId: owner, companyId: company, name: "Streaming", cost: 20, serviceType: .subscription)
+        let yearly = Subscription(userId: owner, companyId: company, name: "Annual bill", cost: 120, billingCycle: "Yearly", serviceType: .bill)
+        let report = SubscriptionReceiptSummary(subscriptions: [bill, monthly, yearly], institutions: [], cards: [])
+        XCTAssertEqual(report.total(.monthly, currency: "USD", serviceType: .bill), 475)
+        XCTAssertEqual(report.total(.monthly, currency: "USD", serviceType: .subscription), 20)
+        XCTAssertEqual(report.total(.yearly, currency: "USD", serviceType: .bill), 120)
+        XCTAssertEqual(report.total(.yearly, currency: "USD", serviceType: .subscription), 200)
+        for cycle in SubService.BillingCycle.allCases {
+            XCTAssertEqual(report.total(cycle, currency: "USD"),
+                           report.total(cycle, currency: "USD", serviceType: .bill)
+                           + report.total(cycle, currency: "USD", serviceType: .subscription))
+        }
+    }
+
+    @MainActor
+    func testSubscriptionReportRendersCompactAndAccessibleLayouts() throws {
+        let owner = UUID()
+        let company = Company(userId: owner, name: "Personal")
+        let card = FinancialCard(userId: owner, companyId: company.id, name: "Costco Citi",
+                                 institutionName: "Citibank Online", last4: "9225", network: "Visa")
+        let bank = Institution(userId: owner, companyId: company.id, name: "Schools First FCU",
+                               accounts: [InstitutionAccount(name: "71 NEW CHECKING", last4: "9716")])
+        let kia = Subscription(userId: owner, companyId: company.id, name: "KIA", cost: 413.88,
+            paymentMethod: "71 NEW CHECKING", paymentMethodId: bank.id, nextRenewal: "15", subServices: [
+                SubService(name: "Premium connectivity", paymentMethod: "Costco Citi", paymentMethodId: card.id,
+                           cost: 200, billingCycle: .yearly, purpose: "Connected vehicle features", serviceType: .subscription)
+            ], notes: "Family vehicle payment", serviceType: .bill)
+        let netflix = Subscription(userId: owner, companyId: company.id, name: "Netflix", cost: 26.99,
+                                    paymentMethod: "Costco Citi", paymentMethodId: card.id, nextRenewal: "5",
+                                    notes: "Family entertainment", serviceType: .subscription)
+        let view = SubscriptionReceiptView(company: company, subscriptions: [kia, netflix], institutions: [bank], cards: [card])
+        for size in [DynamicTypeSize.large, .accessibility1] {
+            let renderer = ImageRenderer(content: view.reportContent.frame(width: 353).environment(\.dynamicTypeSize, size))
+            renderer.scale = 2
+            let rendered = try XCTUnwrap(renderer.uiImage)
+            XCTAssertEqual(rendered.size.width, 353)
+            XCTAssertGreaterThan(rendered.size.height, 500)
+            let attachment = XCTAttachment(image: rendered)
+            attachment.name = "Subscription report - \(size)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
+    func testReceiptReconcilesAllDisplayedChargesBySourceAndCycle() {
+        let owner = UUID(), company = UUID(), oldCardID = UUID()
+        let citi = FinancialCard(userId: owner, companyId: company, name: "Costco Citi",
+                                 institutionName: "Citibank Online", last4: "9225", network: "Visa")
+        let checking = Institution(userId: owner, companyId: company, name: "Schools First FCU",
+                                   accounts: [InstitutionAccount(name: "71 NEW CHECKING", last4: "9716")])
+        let sofi = Institution(userId: owner, companyId: company, name: "SoFi",
+                               accounts: [InstitutionAccount(name: "SoFi Checking", last4: "5181")])
+        let oldCardCharges: [(String, Double)] = [
+            ("Leon Jiu Jitsu", 155), ("At&t Bill Payment", 157), ("Google", 8.40), ("Chuke E. Cheese", 11.99)
+        ]
+        var subscriptions = oldCardCharges.map { name, cost in
+            Subscription(userId: owner, companyId: company, name: name, cost: cost,
+                         paymentMethod: "Visa •••• 9225", paymentMethodId: oldCardID, plaidAccountId: "old-card-account")
+        }
+        for (name, cost) in [("Cox Internet", 130.0), ("Netflix", 26.99), ("Knott's Berry Farm", 49.83)] {
+            subscriptions.append(Subscription(userId: owner, companyId: company, name: name, cost: cost,
+                                               paymentMethod: "Costco Citi", paymentMethodId: citi.id))
+        }
+        let kia = Subscription(userId: owner, companyId: company, name: "KIA", cost: 413.88,
+                               paymentMethod: "71 NEW CHECKING", paymentMethodId: checking.id,
+                               subServices: [SubService(name: "Premium connectivity", paymentMethod: "Costco Citi",
+                                                        paymentMethodId: citi.id, cost: 200, billingCycle: .yearly)])
+        subscriptions.append(kia)
+        subscriptions.append(Subscription(userId: owner, companyId: company, name: "Tesla", cost: 283,
+            paymentMethod: "Visa •••• 9225", paymentMethodId: oldCardID, subServices: [
+                SubService(name: "Full Self Driving", paymentMethod: "Costco Citi", paymentMethodId: oldCardID, cost: 106),
+                SubService(name: "Insurance", paymentMethod: "Costco Citi", paymentMethodId: oldCardID, cost: 279),
+                SubService(name: "Premium connectivity", paymentMethod: "Costco Citi", paymentMethodId: oldCardID, cost: 120, billingCycle: .yearly)
+            ]))
+        for (name, cost) in [("Best Buy", 29.0), ("Moulton Water", 91.26)] {
+            subscriptions.append(Subscription(userId: owner, companyId: company, name: name, cost: cost,
+                                               paymentMethod: "SoFi Checking", paymentMethodId: sofi.id))
+        }
+        let report = SubscriptionReceiptSummary(subscriptions: subscriptions, institutions: [checking, sofi], cards: [citi])
+        XCTAssertEqual(report.charges.count, 15)
+        XCTAssertEqual(report.sources.count, 3)
+        XCTAssertEqual(report.total(.monthly, currency: "USD"), 1741.35, accuracy: 0.001)
+        XCTAssertEqual(report.total(.yearly, currency: "USD"), 320, accuracy: 0.001)
+        XCTAssertEqual(report.annualTotal(currency: "USD"), 21216.20, accuracy: 0.001)
+        let cardCharges = report.charges.filter { $0.source.id == "card:\(citi.id)" }
+        XCTAssertEqual(cardCharges.filter { $0.cycle == .monthly }.reduce(0) { $0 + $1.amount }, 1207.21, accuracy: 0.001)
+        XCTAssertEqual(cardCharges.filter { $0.cycle == .yearly }.reduce(0) { $0 + $1.amount }, 320, accuracy: 0.001)
+        XCTAssertTrue(report.sources.first { $0.id == "card:\(citi.id)" }!.matchedSavedLabel)
+        let kiaBase = report.charges.first { $0.name == "KIA" }!
+        XCTAssertEqual(kiaBase.amount, 413.88)
+        XCTAssertTrue(kiaBase.source.label.contains("71 NEW CHECKING"))
+        let kiaExtra = report.charges.first { $0.name == "KIA · Premium connectivity" }!
+        XCTAssertEqual(kiaExtra.amount, 200)
+        XCTAssertEqual(kiaExtra.cycle, .yearly)
+        XCTAssertEqual(kiaExtra.source.id, "card:\(citi.id)")
+        for cycle in SubService.BillingCycle.allCases {
+            let grouped = report.sources.reduce(0.0) { total, source in
+                total + report.charges.filter { $0.source.id == source.id && $0.cycle == cycle }.reduce(0) { $0 + $1.amount }
+            }
+            XCTAssertEqual(grouped, report.total(cycle, currency: "USD"), accuracy: 0.001)
+        }
+    }
+
+    func testReceiptExcludesInactiveChargesAndFreeBaseButKeepsPaidExtras() {
+        let owner = UUID(), company = UUID()
+        let free = Subscription(userId: owner, companyId: company, cost: 999, subServices: [
+            SubService(name: "Paid Extra", cost: 120, billingCycle: .yearly),
+            SubService(cost: 5, status: .paused), SubService(cost: 6, status: .cancelled), SubService(cost: 7, status: .pending)
+        ], pricingModel: "free")
+        let paused = Subscription(userId: owner, companyId: company, cost: 1000, status: "Paused", subServices: [SubService(cost: 100)])
+        let report = SubscriptionReceiptSummary(subscriptions: [free, paused], institutions: [], cards: [])
+        XCTAssertEqual(report.charges.count, 1)
+        XCTAssertEqual(report.total(.monthly, currency: "USD"), 0)
+        XCTAssertEqual(report.total(.yearly, currency: "USD"), 120)
+        XCTAssertEqual(report.sources.first?.label, "Unknown payment source")
+    }
+
+    func testReceiptKeepsCurrenciesSeparateAndDoesNotInheritUnspecifiedChildSource() {
+        let owner = UUID(), company = UUID()
+        let card = FinancialCard(userId: owner, companyId: company, name: "Parent card")
+        let usd = Subscription(userId: owner, companyId: company, cost: 10, paymentMethodId: card.id,
+                               subServices: [SubService(name: "No source chosen", cost: 24, billingCycle: .yearly)])
+        let eur = Subscription(userId: owner, companyId: company, cost: 120, currency: "EUR", billingCycle: "Yearly")
+        let report = SubscriptionReceiptSummary(subscriptions: [usd, eur], institutions: [], cards: [card])
+        XCTAssertEqual(report.currencies, ["EUR", "USD"])
+        XCTAssertEqual(report.annualTotal(currency: "USD"), 144)
+        XCTAssertEqual(report.annualTotal(currency: "EUR"), 120)
+        XCTAssertEqual(report.charges.first { $0.name.contains("No source chosen") }?.source.label, "Unknown payment source")
+    }
+
+    func testReceiptDoesNotGuessAmbiguousCardsOrOverrideCurrentIdentifiers() {
+        let owner = UUID(), company = UUID()
+        let first = FinancialCard(userId: owner, companyId: company, name: "First card", last4: "9225", network: "Visa")
+        let second = FinancialCard(userId: owner, companyId: company, name: "Second card", last4: "9225", network: "Visa")
+        let unresolved = SubscriptionReceiptSummary.source(paymentMethod: "Visa •••• 9225", paymentMethodId: UUID(),
+                                                           plaidAccountId: "old-account", institutions: [], cards: [first, second])
+        XCTAssertTrue(unresolved.id.hasPrefix("unresolved:"))
+        let explicit = SubscriptionReceiptSummary.source(paymentMethod: "First card", paymentMethodId: second.id,
+                                                         plaidAccountId: nil, institutions: [], cards: [first, second])
+        XCTAssertEqual(explicit.id, "card:\(second.id)")
+        let lastFourOnly = SubscriptionReceiptSummary.source(paymentMethod: "9225", paymentMethodId: nil,
+                                                             plaidAccountId: nil, institutions: [], cards: [first])
+        XCTAssertTrue(lastFourOnly.id.hasPrefix("unresolved:"))
+    }
+
+    func testReceiptDoesNotMergeDuplicateNamesAndPrefersExactAccountID() {
+        let owner = UUID(), company = UUID()
+        let first = FinancialCard(userId: owner, companyId: company, name: "Visa")
+        let second = FinancialCard(userId: owner, companyId: company, name: "Visa")
+        let ambiguousCard = SubscriptionReceiptSummary.source(paymentMethod: "Visa", paymentMethodId: nil,
+            plaidAccountId: nil, institutions: [], cards: [first, second])
+        XCTAssertTrue(ambiguousCard.id.hasPrefix("unresolved:"))
+        let bank = Institution(userId: owner, companyId: company, name: "Bank", accounts: [
+            InstitutionAccount(name: "Checking", last4: "1111"),
+            InstitutionAccount(name: "Checking", last4: "2222")
+        ])
+        for selectedInstitution in [nil, bank.id] {
+            let ambiguousAccount = SubscriptionReceiptSummary.source(paymentMethod: "Checking", paymentMethodId: selectedInstitution,
+                plaidAccountId: nil, institutions: [bank], cards: [])
+            XCTAssertTrue(ambiguousAccount.id.hasPrefix("unresolved:"))
+        }
+        let explicit = SubscriptionReceiptSummary.source(paymentMethod: "Checking", paymentMethodId: bank.id,
+            plaidAccountId: bank.accounts[1].id, institutions: [bank], cards: [])
+        XCTAssertTrue(explicit.label.contains("2222"))
+    }
+
     func testSupplementalServiceClassifiesIndependentlyAndRespectsManualChoice() {
         var addon = SubService(name: "Full Self Driving")
         let parent = Subscription(

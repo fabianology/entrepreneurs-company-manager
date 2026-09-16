@@ -238,7 +238,7 @@ private enum BriefingReceiptHUD: String, Identifiable {
     var id: String { rawValue }
 }
 
-private enum BriefingReceiptTheme {
+enum BriefingReceiptTheme {
     static let paper = Color.white
     static let ink = Color(hex: "#1A1A1A")
     static let fadedInk = Color(hex: "#1A1A1A").opacity(0.64)
@@ -937,7 +937,7 @@ private struct ExecutiveBriefingReceipt: View {
     }
 }
 
-private struct ReceiptPaperShape: Shape {
+struct ReceiptPaperShape: Shape {
     private let toothWidth: CGFloat = 12
     private let toothDepth: CGFloat = 8
 
@@ -960,7 +960,7 @@ private struct ReceiptPaperShape: Shape {
     }
 }
 
-private struct ReceiptMarkerSectionHeader: View {
+struct ReceiptMarkerSectionHeader: View {
     let title: String
     let icon: String
     let highlighted: Bool

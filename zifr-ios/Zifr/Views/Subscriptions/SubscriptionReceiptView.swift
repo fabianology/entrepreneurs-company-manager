@@ -1,306 +1,448 @@
 import SwiftUI
 
+/// One ledger powers the receipt detail, source breakdown, and totals so a
+/// supplemental charge cannot inherit its parent's frequency or payment source.
+struct SubscriptionReceiptSummary {
+    struct Source: Hashable {
+        let id: String
+        let label: String
+        var matchedSavedLabel = false
+    }
+
+    struct Charge: Identifiable {
+        let id: String
+        let subscriptionId: UUID
+        let name: String
+        let amount: Double
+        let cycle: SubService.BillingCycle
+        let currency: String
+        let source: Source
+        let serviceType: RecurringServiceType
+
+        var annualAmount: Double { cycle == .monthly ? amount * 12 : amount }
+    }
+
+    let charges: [Charge]
+    var currencies: [String] { Array(Set(charges.map(\.currency))).sorted() }
+    var sources: [Source] {
+        Dictionary(grouping: charges, by: { $0.source.id }).values.map { group in
+            var source = group[0].source
+            source.matchedSavedLabel = group.contains { $0.source.matchedSavedLabel }
+            return source
+        }.sorted { ($0.label, $0.id) < ($1.label, $1.id) }
+    }
+
+    func total(_ cycle: SubService.BillingCycle, currency: String, serviceType: RecurringServiceType? = nil) -> Double {
+        charges.filter {
+            $0.cycle == cycle && $0.currency == currency && (serviceType == nil || $0.serviceType == serviceType)
+        }.reduce(0) { $0 + $1.amount }
+    }
+
+    func annualTotal(currency: String) -> Double {
+        total(.monthly, currency: currency) * 12 + total(.yearly, currency: currency)
+    }
+
+    init(subscriptions: [Subscription], institutions: [Institution], cards: [FinancialCard]) {
+        var charges: [Charge] = []
+        for sub in subscriptions where sub.status == "Active" {
+            let name = sub.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let currency = sub.currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            let code = currency.isEmpty ? "USD" : currency
+            if !sub.isFree, sub.cost != 0 {
+                charges.append(Charge(
+                    id: "\(sub.id):base", subscriptionId: sub.id,
+                    name: name.isEmpty ? "Unnamed Service" : name, amount: sub.cost,
+                    cycle: sub.billingCycle == "Yearly" ? .yearly : .monthly, currency: code,
+                    source: Self.source(paymentMethod: sub.paymentMethod, paymentMethodId: sub.paymentMethodId,
+                                        plaidAccountId: sub.plaidAccountId, institutions: institutions, cards: cards),
+                    serviceType: sub.resolvedServiceType
+                ))
+            }
+            for (index, service) in sub.subServices.enumerated() where service.status == .active && service.cost != 0 {
+                charges.append(Charge(
+                    id: "\(sub.id):service:\(index)", subscriptionId: sub.id,
+                    name: "\(name.isEmpty ? "Unnamed Service" : name) · \(service.name.isEmpty ? "Unnamed Service" : service.name)",
+                    amount: service.cost, cycle: service.billingCycle, currency: code,
+                    source: Self.source(paymentMethod: service.paymentMethod, paymentMethodId: service.paymentMethodId,
+                                        plaidAccountId: nil, institutions: institutions, cards: cards),
+                    serviceType: service.resolvedServiceType
+                ))
+            }
+        }
+        self.charges = charges
+    }
+
+    static func source(paymentMethod: String?, paymentMethodId: UUID?, plaidAccountId: String?,
+                       institutions: [Institution], cards: [FinancialCard]) -> Source {
+        func cardSource(_ card: FinancialCard, matchedLabel: Bool = false) -> Source {
+            let bank = (card.institutionName ?? "").isEmpty ? "Paid From" : card.institutionName!
+            let suffix = (card.last4 ?? "").isEmpty ? "" : " ••••\(card.last4!)"
+            return Source(id: "card:\(card.id)", label: "\(bank) • \(card.name)\(suffix)", matchedSavedLabel: matchedLabel)
+        }
+        let label = (paymentMethod ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        func accountSource(_ institution: Institution, _ account: InstitutionAccount) -> Source {
+            let name = account.name.isEmpty ? account.type : account.name
+            let suffix = account.last4.isEmpty ? "" : " ••••\(account.last4)"
+            return Source(id: "account:\(institution.id):\(account.id)",
+                          label: "\(institution.name) • \(name)\(suffix)")
+        }
+        if let card = PaymentSourceResolver.card(paymentMethod: nil, paymentMethodId: paymentMethodId,
+                                                plaidAccountId: plaidAccountId, cards: cards) {
+            return cardSource(card)
+        }
+        let accounts = institutions.flatMap { institution in institution.accounts.map { (institution, $0) } }
+        if let plaidAccountId, !plaidAccountId.isEmpty {
+            let matches = accounts.filter { $0.1.id == plaidAccountId || $0.1.plaidAccountId == plaidAccountId }
+            if matches.count == 1 { return accountSource(matches[0].0, matches[0].1) }
+        }
+        if let institution = institutions.first(where: { $0.id == paymentMethodId }) {
+            let matches = institution.accounts.filter {
+                ($0.name.isEmpty ? $0.type : $0.name).trimmingCharacters(in: .whitespacesAndNewlines)
+                    .caseInsensitiveCompare(label) == .orderedSame
+            }
+            if matches.count == 1 { return accountSource(institution, matches[0]) }
+            if institution.accounts.count == 1 { return accountSource(institution, institution.accounts[0]) }
+        }
+        // Recover display-only matches after a card was replaced/relinked. Never
+        // override a current explicit selection, or guess from the last four alone.
+        let knownSelection = cards.contains { $0.id == paymentMethodId || (plaidAccountId != nil && $0.plaidAccountId == plaidAccountId) }
+            || institutions.contains { $0.id == paymentMethodId || $0.accounts.contains { account in
+                plaidAccountId != nil && (account.id == plaidAccountId || account.plaidAccountId == plaidAccountId)
+            } }
+        if !knownSelection, !label.isEmpty {
+            let candidates = cards.filter { card in
+                if card.name.caseInsensitiveCompare(label) == .orderedSame { return true }
+                guard let last4 = card.last4, last4.count == 4, card.network != "Other" else { return false }
+                let compact = label.lowercased().filter { !$0.isWhitespace }
+                let prefix = card.network.lowercased().filter { !$0.isWhitespace }
+                return ["••••", "****", "xxxx"].contains { compact == "\(prefix)\($0)\(last4)" }
+            }
+            let accountCandidates = accounts.filter {
+                ($0.1.name.isEmpty ? $0.1.type : $0.1.name).trimmingCharacters(in: .whitespacesAndNewlines)
+                    .caseInsensitiveCompare(label) == .orderedSame
+            }
+            if candidates.count == 1, accountCandidates.isEmpty { return cardSource(candidates[0], matchedLabel: true) }
+            if candidates.isEmpty, accountCandidates.count == 1, paymentMethodId == nil,
+               (plaidAccountId ?? "").isEmpty {
+                return accountSource(accountCandidates[0].0, accountCandidates[0].1)
+            }
+        }
+        return Source(id: "unresolved:\(paymentMethodId?.uuidString ?? ""):\(plaidAccountId ?? ""):\(label.lowercased())",
+                      label: label.isEmpty ? "Unknown payment source" : "Saved payment label • \(label)")
+    }
+}
+
 struct SubscriptionReceiptView: View {
     let company: Company
     let subscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
-    
+
     @Environment(\.dismiss) private var dismiss
-    
+
     private var activeSubscriptions: [Subscription] {
         subscriptions.filter { $0.status == "Active" }
     }
-    
-    private var totalMonthlyBurn: Double {
-        activeSubscriptions.reduce(0.0) { acc, sub in
-            let base = sub.billingCycle == "Monthly" ? sub.cost : sub.cost / 12
-            let extras = sub.subServices.filter { $0.status != .paused }.reduce(0.0) { $0 + $1.cost }
-            return acc + base + extras
-        }
+
+    private var summary: SubscriptionReceiptSummary {
+        SubscriptionReceiptSummary(subscriptions: activeSubscriptions, institutions: institutions, cards: cards)
     }
-    
-    private var totalAnnualBurn: Double {
-        totalMonthlyBurn * 12
-    }
-    
-    // Aesthetic tokens for the White Paper receipt
-    private let paperColor = Color(hex: "#F8F9FA")
-    private let inkColor = Color(hex: "#1A1A1A")
-    private let fadedInk = Color(hex: "#1A1A1A").opacity(0.6)
-    
+
+    private let ink = BriefingReceiptTheme.ink
+    private let muted = BriefingReceiptTheme.fadedInk
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
-                    // Receipt Content
-                    VStack(alignment: .leading, spacing: 16) {
-                        receiptHeader
-                        
-                        dashedDivider
-                        
-                        ForEach(activeSubscriptions) { sub in
-                            subscriptionItem(sub: sub)
-                            dashedDivider
-                        }
-                        
-                        paymentBreakdown
-                        dashedDivider
-                        
-                        receiptFooter
-                    }
-                    .padding(24)
-                    .background(paperColor)
-                }
-                .padding(.vertical, 32)
-                .padding(.horizontal, 16)
-                .shadow(color: .white.opacity(0.1), radius: 20, x: 0, y: 10)
+                reportContent
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
             }
-            .background(Color(hex: "#121212").ignoresSafeArea())
+            .scrollIndicators(.hidden)
+            .background(Color(hex: "#1C1C1E").ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Close") { dismiss() }
-                        .font(.system(.body, design: .monospaced).bold())
                         .foregroundStyle(.white)
                 }
             }
         }
-    }
-    
-    // MARK: - Components
-    
-    private var dashedDivider: some View {
-        Text(String(repeating: "- ", count: 50))
-            .font(.system(size: 10, design: .monospaced))
-            .foregroundStyle(fadedInk)
-            .lineLimit(1)
-            .padding(.vertical, 8)
-    }
-    
-    private var receiptHeader: some View {
-        VStack(alignment: .center, spacing: 6) {
-            Text("MILOOM COMMAND CENTER")
-                .font(.system(size: 18, weight: .bold, design: .monospaced))
-            Text("SUBSCRIPTION REPORT")
-                .font(.system(size: 14, weight: .medium, design: .monospaced))
-            
-            Text(company.name.uppercased())
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .padding(.top, 4)
-            
-            Text(Date().formatted(date: .numeric, time: .shortened))
-                .font(.system(size: 12, design: .monospaced))
-                .foregroundStyle(fadedInk)
-        }
-        .frame(maxWidth: .infinity)
-        .foregroundStyle(inkColor)
-    }
-    
-    private func subscriptionItem(sub: Subscription) -> some View {
-        let baseCost = sub.billingCycle == "Monthly" ? sub.cost : sub.cost / 12
-        let extras = sub.subServices.filter { $0.status != .paused }.reduce(0.0) { $0 + $1.cost }
-        let totalSubMonthly = baseCost + extras
-        let impactPct = totalMonthlyBurn > 0 ? (totalSubMonthly / totalMonthlyBurn) * 100 : 0
-        
-        let bankTuple = getBankAccountTuple(for: sub)
-        
-        return VStack(alignment: .leading, spacing: 10) {
-            // Title & Cost
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(sub.name.uppercased())
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    Text("TYPE: \(sub.resolvedServiceType.title.uppercased())")
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(fadedInk)
-                    if sub.isFree {
-                        Text("FREE TIER")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(fadedInk)
-                    } else {
-                        Text("$\(String(format: "%.2f", sub.cost)) / \(sub.billingCycle.prefix(2).uppercased())")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(fadedInk)
-                    }
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(String(format: "%.1f%%", impactPct))
-                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    Text("IMPACT")
-                        .font(.system(size: 9, design: .monospaced))
-                        .foregroundStyle(fadedInk)
-                }
-            }
-            .foregroundStyle(inkColor)
-            
-            // Payment & Auto-pay Context
-            if !sub.isFree {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top) {
-                        Text("PAID FROM:").frame(width: 80, alignment: .leading)
-                        if let b = bankTuple {
-                            Text("\(b.bank) • \(b.account)")
-                        } else {
-                            Text(sub.paymentMethod ?? "UNKNOWN")
-                        }
-                    }
-                    HStack(alignment: .top) {
-                        Text("AUTO-PAY:").frame(width: 80, alignment: .leading)
-                        Text(sub.renew == "Manual" ? "NO" : "YES")
-                    }
-                    HStack(alignment: .top) {
-                        Text("NEXT DUE:").frame(width: 80, alignment: .leading)
-                        Text(sub.nextRenewal?.withOrdinal ?? "—")
-                    }
-                }
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(fadedInk)
-            }
-            
-            // Supplemental Services
-            if !sub.subServices.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)):")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    ForEach(sub.subServices.indices, id: \.self) { i in
-                        let ss = sub.subServices[i]
-                        VStack(alignment: .leading, spacing: 2) {
-                            HStack {
-                                Text("- \(ss.name.isEmpty ? "Unnamed Service" : ss.name)")
-                                Spacer()
-                                Text("$\(String(format: "%.0f", ss.cost))")
-                            }
-                            Text("  TYPE: \(ss.resolvedServiceType.title.uppercased())")
-                                .foregroundStyle(fadedInk)
-                            if !ss.purpose.isEmpty {
-                                Text("  PURPOSE: \(ss.purpose)").foregroundStyle(fadedInk)
-                            }
-                        }
-                    }
-                }
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(inkColor)
-                .padding(.top, 2)
-            }
-            
-            // Linked Emails
-            if !sub.linkedEmails.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("LINKED EMAILS (\(sub.linkedEmails.count)):")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    ForEach(sub.linkedEmails.indices, id: \.self) { i in
-                        let le = sub.linkedEmails[i]
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("- \(le.email)")
-                            if !le.usedFor.isEmpty {
-                                Text("  PURPOSE: \(le.usedFor)").foregroundStyle(fadedInk)
-                            }
-                            if !le.notes.isEmpty {
-                                Text("  NOTES: \(le.notes.joined(separator: ", "))").foregroundStyle(fadedInk)
-                            }
-                        }
-                    }
-                }
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(inkColor)
-                .padding(.top, 2)
-            }
-        }
-    }
-    
-    private var receiptFooter: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("TOTAL MONTHLY BURN")
-                Spacer()
-                Text("$\(String(format: "%.2f", totalMonthlyBurn))")
-            }
-            .font(.system(size: 14, weight: .bold, design: .monospaced))
-            
-            HStack {
-                Text("EST. ANNUAL BURN")
-                Spacer()
-                Text("$\(String(format: "%.2f", totalAnnualBurn))")
-            }
-            .font(.system(size: 12, weight: .medium, design: .monospaced))
-            .foregroundStyle(fadedInk)
-            
-            Text("END OF REPORT")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .padding(.top, 16)
-        }
-        .foregroundStyle(inkColor)
-    }
-    
-    private var paymentBreakdown: some View {
-        // Group subs by payment source
-        var breakdown: [String: [(name: String, cost: Double)]] = [:]
-        
-        for sub in activeSubscriptions {
-            let baseCost = sub.billingCycle == "Monthly" ? sub.cost : sub.cost / 12
-            let extras = sub.subServices.filter { $0.status != .paused }.reduce(0.0) { $0 + $1.cost }
-            let totalSubMonthly = baseCost + extras
-            
-            if totalSubMonthly == 0 { continue } // Skip free subs for the payment breakdown
-            
-            let sourceName: String
-            if let tuple = getBankAccountTuple(for: sub) {
-                sourceName = "\(tuple.bank) • \(tuple.account)"
-            } else {
-                sourceName = sub.paymentMethod?.isEmpty == false ? sub.paymentMethod! : "UNKNOWN SOURCE"
-            }
-            
-            breakdown[sourceName, default: []].append((name: sub.name.isEmpty ? "Unnamed Service" : sub.name, cost: totalSubMonthly))
-        }
-        
-        let sortedSources = breakdown.keys.sorted()
-        
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("PAYMENT SOURCE BREAKDOWN")
-                .font(.system(size: 14, weight: .bold, design: .monospaced))
-                .padding(.bottom, 4)
-            
-            ForEach(sortedSources, id: \.self) { source in
-                let items = breakdown[source]!
-                let totalCost = items.reduce(0.0) { $0 + $1.cost }
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(source.uppercased())
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        Spacer()
-                        Text("$\(String(format: "%.2f", totalCost))")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    }
-                    
-                    ForEach(items.indices, id: \.self) { i in
-                        let item = items[i]
-                        HStack {
-                            Text("- \(item.name)")
-                            Spacer()
-                            Text("$\(String(format: "%.2f", item.cost))")
-                        }
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(fadedInk)
-                    }
-                }
-            }
-        }
-        .foregroundStyle(inkColor)
+        .preferredColorScheme(.light)
     }
 
-    // MARK: - Helpers
-    
-    private func getBankAccountTuple(for sub: Subscription) -> (bank: String, account: String)? {
-        guard let source = PaymentSourceResolver.display(
-            paymentMethod: sub.paymentMethod,
-            paymentMethodId: sub.paymentMethodId,
-            plaidAccountId: sub.plaidAccountId,
-            institutions: institutions,
-            cards: cards
-        ) else { return nil }
-        return (source.bank, source.account)
+    // Also used by rendering tests, without a navigation or scrolling container.
+    var reportContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            reportHeader
+            sectionHeader("SERVICES", icon: "square.stack.3d.up")
+            if activeSubscriptions.isEmpty {
+                note("No active services.")
+            }
+            VStack(spacing: 0) {
+                ForEach(activeSubscriptions) { sub in
+                    if !sub.subServices.isEmpty { supplementalGroupDivider }
+                    mainService(sub)
+                    if !sub.subServices.isEmpty {
+                        Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)) · \(sub.name.isEmpty ? "Unnamed Service" : sub.name)")
+                            .font(.system(.caption2, design: .monospaced).weight(.bold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                            .padding(.horizontal, 6)
+                            .background(ink.opacity(0.06))
+                            .padding(.top, 6)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    ForEach(sub.subServices) { service in
+                        supplementalService(service, parent: sub)
+                    }
+                    if !sub.subServices.isEmpty { supplementalGroupDivider }
+                }
+            }
+            sectionHeader("PAYMENT SOURCES", icon: "creditcard")
+            paymentBreakdown
+            sectionHeader("CHARGE SUMMARY", icon: "sum")
+            reportFooter
+            Text("END OF REPORT")
+                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                .foregroundStyle(muted)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(22)
+        .background(BriefingReceiptTheme.paper)
+        .clipShape(ReceiptPaperShape())
+        .overlay {
+            ReceiptPaperShape().stroke(ink.opacity(0.14), lineWidth: 1)
+        }
+        .foregroundStyle(ink)
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+    }
+
+    private var reportHeader: some View {
+        VStack(spacing: 5) {
+            Text("SUBSCRIPTION REPORT")
+                .font(.system(.headline, design: .monospaced).weight(.bold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .background(Color(hex: "#3A3A3C"))
+            Text(company.name.uppercased())
+                .font(.system(.caption, design: .monospaced).weight(.semibold))
+            Text(Date().formatted(date: .numeric, time: .shortened))
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(muted)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    private func sectionHeader(_ title: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Rectangle().fill(ink.opacity(0.22)).frame(height: 1)
+            ReceiptMarkerSectionHeader(title: title, icon: icon, highlighted: true)
+        }
+    }
+
+    private func mainService(_ sub: Subscription) -> some View {
+        serviceRow(
+            name: sub.name.isEmpty ? "Unnamed Service" : sub.name,
+            amount: sub.isFree ? "FREE" : chargeAmount(sub.cost, currency: sub.currency, yearly: sub.billingCycle == "Yearly"),
+            type: sub.resolvedServiceType,
+            source: sub.isFree ? nil : SubscriptionReceiptSummary.source(
+                paymentMethod: sub.paymentMethod, paymentMethodId: sub.paymentMethodId,
+                plaidAccountId: sub.plaidAccountId, institutions: institutions, cards: cards).label,
+            schedule: sub.isFree ? nil : "Auto-pay: \(sub.renew == "Manual" ? "No" : "Yes") · Due: \(sub.billingCycle == "Yearly" ? (sub.nextRenewal ?? "—") : (sub.nextRenewal?.withOrdinal ?? "—"))"
+        ) {
+            if let purpose = sub.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !purpose.isEmpty {
+                note("Purpose: \(purpose)")
+            }
+            if !sub.linkedEmails.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    note("Linked emails (\(sub.linkedEmails.count))")
+                    ForEach(sub.linkedEmails.indices, id: \.self) { index in
+                        let email = sub.linkedEmails[index]
+                        note(email.email)
+                        if !email.usedFor.isEmpty { note("Purpose: \(email.usedFor)") }
+                        if !email.notes.isEmpty { note("Notes: \(email.notes.joined(separator: ", "))") }
+                    }
+                }
+            }
+        }
+    }
+
+    private func supplementalService(_ service: SubService, parent: Subscription) -> some View {
+        serviceRow(
+            name: "- \(service.name.isEmpty ? "Unnamed Service" : service.name)",
+            amount: chargeAmount(service.cost, currency: parent.currency, yearly: service.billingCycle == .yearly),
+            type: service.resolvedServiceType,
+            source: SubscriptionReceiptSummary.source(
+                paymentMethod: service.paymentMethod, paymentMethodId: service.paymentMethodId,
+                plaidAccountId: nil, institutions: institutions, cards: cards).label,
+            schedule: "Auto-pay: \(service.autoPay == .manual ? "No" : "Yes") · Due: \(service.renewsOn?.formatted(date: .abbreviated, time: .omitted) ?? "—")",
+            context: "Supplemental · \(parent.name.isEmpty ? "Unnamed Service" : parent.name)",
+            status: service.status,
+            showsDivider: service.id != parent.subServices.last?.id
+        ) {
+            let purpose = service.purpose.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !purpose.isEmpty { note("Purpose: \(purpose)") }
+        }
+    }
+
+    private var supplementalGroupDivider: some View {
+        GeometryReader { geometry in
+            Path { path in
+                path.move(to: CGPoint(x: 0, y: 0.5))
+                path.addLine(to: CGPoint(x: geometry.size.width, y: 0.5))
+            }
+            .stroke(muted, style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
+        }
+        .frame(height: 1)
+        .padding(.vertical, 4)
+        .accessibilityHidden(true)
+    }
+
+    // Identical typography, spacing, and alignment for parent and supplemental services.
+    private func serviceRow<Details: View>(
+        name: String, amount: String, type: RecurringServiceType,
+        source: String?, schedule: String?, context: String? = nil,
+        status: SubService.ServiceStatus = .active,
+        showsDivider: Bool = true,
+        @ViewBuilder details: () -> Details
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            valueRow(name, amount, emphasized: true)
+            note([type.title, context].compactMap { $0 }.joined(separator: " · "))
+            if let source { note("Paid from: \(source)") }
+            if let schedule { note(schedule) }
+            if status != .active { note("\(status.rawValue) · Excluded from totals") }
+            details()
+        }
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            if showsDivider { Rectangle().fill(ink.opacity(0.12)).frame(height: 0.5) }
+        }
+    }
+
+    private var paymentBreakdown: some View {
+        let ledger = summary
+        return VStack(alignment: .leading, spacing: 12) {
+            ForEach(ledger.sources, id: \.id) { source in
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(source.label)
+                        .font(.system(.caption, design: .monospaced).weight(.bold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    if source.matchedSavedLabel {
+                        note("Matched saved card label; review payment settings.")
+                    }
+                    ForEach(ledger.currencies, id: \.self) { currency in
+                        ForEach(SubService.BillingCycle.allCases, id: \.self) { cycle in
+                            let items = ledger.charges.filter { $0.source.id == source.id && $0.currency == currency && $0.cycle == cycle }
+                            if !items.isEmpty {
+                                valueRow(
+                                    cycle.rawValue.uppercased(),
+                                    chargeAmount(items.reduce(0) { $0 + $1.amount }, currency: currency, yearly: cycle == .yearly),
+                                    emphasized: true
+                                )
+                                ForEach(items) { item in
+                                    valueRow(item.name, money(item.amount, currency: currency))
+                                        .foregroundStyle(muted)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if ledger.charges.isEmpty { note("No active paid charges.") }
+        }
+    }
+
+    private var reportFooter: some View {
+        let ledger = summary
+        return VStack(alignment: .leading, spacing: 12) {
+            ForEach(ledger.currencies.isEmpty ? ["USD"] : ledger.currencies, id: \.self) { currency in
+                VStack(alignment: .leading, spacing: 10) {
+                    if ledger.currencies.count > 1 {
+                        Text(currency).font(.system(.caption, design: .monospaced).weight(.bold))
+                    }
+                    ForEach(SubService.BillingCycle.allCases, id: \.self) { cycle in
+                        VStack(spacing: 5) {
+                            Text("\(cycle.rawValue.uppercased()) CHARGES")
+                                .font(.system(.caption2, design: .monospaced).weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .frame(maxWidth: .infinity, minHeight: 26, alignment: .leading)
+                                .background(Color(hex: "#3A3A3C"))
+                            valueRow("Subscriptions", money(ledger.total(cycle, currency: currency, serviceType: .subscription), currency: currency))
+                            valueRow("Bills", money(ledger.total(cycle, currency: currency, serviceType: .bill), currency: currency))
+                            valueRow("TOTAL", chargeAmount(ledger.total(cycle, currency: currency), currency: currency, yearly: cycle == .yearly), emphasized: true)
+                                .padding(.top, 5)
+                                .overlay(alignment: .top) { Rectangle().fill(ink).frame(height: 1) }
+                        }
+                    }
+                    valueRow("Est. annual total", money(ledger.annualTotal(currency: currency), currency: currency), emphasized: true)
+                    valueRow("Avg. monthly equivalent", money(ledger.annualTotal(currency: currency) / 12, currency: currency))
+                }
+            }
+            note("Annual total = monthly charges × 12 + yearly charges. Only active charges are included. Each supplemental service uses its own type, payment source, and billing cycle.")
+        }
+    }
+
+    private func money(_ amount: Double, currency: String) -> String {
+        let code = currency.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let formatted = amount.formatted(.currency(code: code.isEmpty ? "USD" : code))
+        return code.isEmpty || code == "USD" ? formatted : "\(formatted) \(code)"
+    }
+
+    private func chargeAmount(_ amount: Double, currency: String, yearly: Bool) -> String {
+        "\(money(amount, currency: currency)) / \(yearly ? "YR" : "MO")"
+    }
+
+    private func valueRow(_ title: String, _ value: String, emphasized: Bool = false) -> some View {
+        ReceiptValueRow(title: title, value: value, emphasized: emphasized)
+    }
+
+    private struct ReceiptValueRow: View {
+        let title: String
+        let value: String
+        let emphasized: Bool
+        @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+        var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                    Text(value).fontWeight(.semibold)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title).fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 4)
+                    Text(value)
+                        .multilineTextAlignment(.trailing)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(1)
+                }
+            }
+        }
+        .font(.system(.caption, design: .monospaced).weight(emphasized ? .bold : .regular))
+        }
+    }
+
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.caption2, design: .monospaced))
+            .foregroundStyle(muted)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
