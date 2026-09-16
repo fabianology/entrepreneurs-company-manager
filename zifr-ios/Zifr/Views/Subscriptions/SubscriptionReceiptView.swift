@@ -138,8 +138,6 @@ struct SubscriptionReceiptView: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
 
-    @Environment(\.dismiss) private var dismiss
-
     private var activeSubscriptions: [Subscription] {
         subscriptions.filter { $0.status == "Active" }
     }
@@ -152,24 +150,18 @@ struct SubscriptionReceiptView: View {
     private let muted = BriefingReceiptTheme.fadedInk
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                reportContent
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 16)
-            }
-            .scrollIndicators(.hidden)
-            .background(Color(hex: "#1C1C1E").ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") { dismiss() }
-                        .foregroundStyle(.white)
-                }
-            }
+        ScrollView(.vertical) {
+            reportContent
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
         }
+        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+        .scrollIndicators(.hidden)
+        .background(Color(hex: "#1C1C1E").ignoresSafeArea())
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+        .presentationBackground(Color(hex: "#1C1C1E"))
         .preferredColorScheme(.light)
     }
 
@@ -182,8 +174,11 @@ struct SubscriptionReceiptView: View {
                 note("No active services.")
             }
             VStack(spacing: 0) {
-                ForEach(activeSubscriptions) { sub in
-                    if !sub.subServices.isEmpty { supplementalGroupDivider }
+                ForEach(Array(activeSubscriptions.enumerated()), id: \.element.id) { index, sub in
+                    if !sub.subServices.isEmpty,
+                       index == 0 || activeSubscriptions[index - 1].subServices.isEmpty {
+                        supplementalGroupDivider
+                    }
                     mainService(sub)
                     if !sub.subServices.isEmpty {
                         Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)) · \(sub.name.isEmpty ? "Unnamed Service" : sub.name)")
@@ -191,7 +186,6 @@ struct SubscriptionReceiptView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 6)
-                            .padding(.horizontal, 6)
                             .background(ink.opacity(0.06))
                             .padding(.top, 6)
                             .accessibilityAddTraits(.isHeader)
@@ -258,7 +252,8 @@ struct SubscriptionReceiptView: View {
             source: sub.isFree ? nil : SubscriptionReceiptSummary.source(
                 paymentMethod: sub.paymentMethod, paymentMethodId: sub.paymentMethodId,
                 plaidAccountId: sub.plaidAccountId, institutions: institutions, cards: cards).label,
-            schedule: sub.isFree ? nil : "Auto-pay: \(sub.renew == "Manual" ? "No" : "Yes") · Due: \(sub.billingCycle == "Yearly" ? (sub.nextRenewal ?? "—") : (sub.nextRenewal?.withOrdinal ?? "—"))"
+            schedule: sub.isFree ? nil : "Auto-pay: \(sub.renew == "Manual" ? "No" : "Yes") · Due: \(sub.billingCycle == "Yearly" ? (sub.nextRenewal ?? "—") : (sub.nextRenewal?.withOrdinal ?? "—"))",
+            prominent: true
         ) {
             if let purpose = sub.notes?.trimmingCharacters(in: .whitespacesAndNewlines), !purpose.isEmpty {
                 note("Purpose: \(purpose)")
@@ -308,16 +303,17 @@ struct SubscriptionReceiptView: View {
         .accessibilityHidden(true)
     }
 
-    // Identical typography, spacing, and alignment for parent and supplemental services.
+    // Parent services carry more visual weight while supplemental rows remain compact.
     private func serviceRow<Details: View>(
         name: String, amount: String, type: RecurringServiceType,
         source: String?, schedule: String?, context: String? = nil,
         status: SubService.ServiceStatus = .active,
         showsDivider: Bool = true,
+        prominent: Bool = false,
         @ViewBuilder details: () -> Details
     ) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            valueRow(name, amount, emphasized: true)
+            valueRow(name, amount, emphasized: true, prominent: prominent)
             note([type.title, context].compactMap { $0 }.joined(separator: " · "))
             if let source { note("Paid from: \(source)") }
             if let schedule { note(schedule) }
@@ -339,9 +335,6 @@ struct SubscriptionReceiptView: View {
                     Text(source.label)
                         .font(.system(.caption, design: .monospaced).weight(.bold))
                         .fixedSize(horizontal: false, vertical: true)
-                    if source.matchedSavedLabel {
-                        note("Matched saved card label; review payment settings.")
-                    }
                     ForEach(ledger.currencies, id: \.self) { currency in
                         ForEach(SubService.BillingCycle.allCases, id: \.self) { cycle in
                             let items = ledger.charges.filter { $0.source.id == source.id && $0.currency == currency && $0.cycle == cycle }
@@ -357,6 +350,9 @@ struct SubscriptionReceiptView: View {
                                 }
                             }
                         }
+                    }
+                    if source.matchedSavedLabel {
+                        note("Payment source may need confirmation.")
                     }
                 }
             }
@@ -405,14 +401,20 @@ struct SubscriptionReceiptView: View {
         "\(money(amount, currency: currency)) / \(yearly ? "YR" : "MO")"
     }
 
-    private func valueRow(_ title: String, _ value: String, emphasized: Bool = false) -> some View {
-        ReceiptValueRow(title: title, value: value, emphasized: emphasized)
+    private func valueRow(
+        _ title: String,
+        _ value: String,
+        emphasized: Bool = false,
+        prominent: Bool = false
+    ) -> some View {
+        ReceiptValueRow(title: title, value: value, emphasized: emphasized, prominent: prominent)
     }
 
     private struct ReceiptValueRow: View {
         let title: String
         let value: String
         let emphasized: Bool
+        let prominent: Bool
         @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
         var body: some View {
@@ -435,7 +437,7 @@ struct SubscriptionReceiptView: View {
                 }
             }
         }
-        .font(.system(.caption, design: .monospaced).weight(emphasized ? .bold : .regular))
+        .font(.system(prominent ? .footnote : .caption, design: .monospaced).weight(emphasized ? .bold : .regular))
         }
     }
 
