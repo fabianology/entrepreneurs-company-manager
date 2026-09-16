@@ -279,7 +279,9 @@ struct AddFinancialWizard: View {
                     let req = LinkRequest(item_id: plaidItemId, institution_id: instToSave.id.uuidString)
                     let options = FunctionInvokeOptions(body: try JSONEncoder().encode(req))
                     try await SupabaseService.shared.client.functions.invoke("link-plaid-institution", options: options)
-                    try? await PlaidService.shared.syncSubscriptions(institutionId: instToSave.id)
+                    // Keep the initial transaction import after activation. The
+                    // backend reads cached balances, so this adds no Balance fee.
+                    try? await PlaidService.shared.syncLatestAvailableData(institutionId: instToSave.id)
                 }
 
                 await MainActor.run {

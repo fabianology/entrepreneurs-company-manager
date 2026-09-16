@@ -87,7 +87,10 @@ class PlaidService {
         }
     }
     
-    func syncSubscriptions(institutionId: UUID? = nil) async throws {
+    /// Retrieves Plaid's available transactions, cached balances, and debt details.
+    /// Does not request a forced bank refresh. Keep the existing backend contract
+    /// so older installed versions receive the same lower-cost behavior.
+    func syncLatestAvailableData(institutionId: UUID? = nil) async throws {
         let session = try await client.auth.session
         var bodyData = Data()
         if let instId = institutionId {

@@ -748,7 +748,7 @@ struct TransactionFeedView: View {
                         Text("No Transactions Yet")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundStyle(.white)
-                        Text("Tap \"Sync Now\" to pull the latest transactions from Plaid.")
+                        Text("Transactions update automatically. Tap \"Sync Available Data\" to check what is available from Plaid.")
                             .font(.system(size: 14))
                             .foregroundStyle(Color.white.opacity(0.5))
                             .multilineTextAlignment(.center)
@@ -771,7 +771,7 @@ struct TransactionFeedView: View {
                                 } else {
                                     Image(systemName: "arrow.clockwise")
                                 }
-                                Text(isSyncing ? "Syncing..." : "Sync Now")
+                                Text(isSyncing ? "Syncing..." : "Sync Available Data")
                                     .font(.system(size: 15, weight: .semibold))
                             }
                             .foregroundStyle(.white)
@@ -935,7 +935,7 @@ struct TransactionFeedView: View {
         do {
             // Account sheets should sync only their bank. Syncing every linked bank
             // made opening one account slow and could time out before it refreshed.
-            try await PlaidService.shared.syncSubscriptions(institutionId: resolvedInstitutionId)
+            try await PlaidService.shared.syncLatestAvailableData(institutionId: resolvedInstitutionId)
         } catch {
             // Don't show error if it's just "no Plaid items" — still refresh
             let msg = error.localizedDescription

@@ -66,7 +66,7 @@ serve(async (req) => {
       item_id: exchangeData.item_id,
       plaid_institution_id: institution_id,
       institution_name,
-      products: ['transactions', 'auth', 'liabilities', 'balance'],
+      products: ['transactions', 'auth', 'liabilities'],
       webhook_url: plaidWebhookURL(),
       webhook_configured_at: new Date().toISOString(),
       // The item becomes active only after the institution cascade is saved and
@@ -89,13 +89,21 @@ serve(async (req) => {
           access_token: exchangeData.access_token
         })
       })
-      return await response.json()
+      const data = await response.json()
+      if (!response.ok && !data.error_code) {
+        throw new Error(`Plaid request failed (HTTP ${response.status})`)
+      }
+      return data
     }
 
-    const balanceData = await plaidRequest('/accounts/balance/get')
-    if (balanceData.error_code) {
-      throw new Error(balanceData.error_message || balanceData.error_code)
+    // Link already populated Plaid's account data. Read that cached snapshot;
+    // a forced Balance extraction here adds a per-call fee without being needed
+    // for Miloom's account import. Do not fall back to a paid refresh on failure.
+    const accountData = await plaidRequest('/accounts/get')
+    if (accountData.error_code) {
+      throw new Error(accountData.error_message || accountData.error_code)
     }
+    if (!Array.isArray(accountData.accounts)) throw new Error('Plaid account data is unavailable')
 
     const [authData, liabilityData] = await Promise.all([
       plaidRequest('/auth/get').catch(() => ({})),
@@ -119,7 +127,7 @@ serve(async (req) => {
       if (liability.account_id) liabilityByAccount.set(liability.account_id, { ...liability, liability_type: 'student' })
     }
 
-    const enrichedAccounts = (balanceData.accounts || []).map((account: any) => {
+    const enrichedAccounts = (accountData.accounts || []).map((account: any) => {
       const ach = achByAccount.get(account.account_id) as any
       const authAccount = authAccountById.get(account.account_id) as any
       const liability = liabilityByAccount.get(account.account_id)

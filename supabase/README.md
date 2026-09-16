@@ -16,6 +16,8 @@ Before deployment, configure these function secrets:
 - `PLAID_CLIENT_ID`, `PLAID_SECRET`, and `PLAID_ENV`
 - `PLAID_WEBHOOK_URL` (recommended; defaults to
   `$SUPABASE_URL/functions/v1/plaid-webhook`)
+- `PLAID_SYNC_CRON_SECRET` (dedicated secret for the daily Plaid recovery job;
+  store the same value as `plaid_sync_cron_secret` in Vault)
 
 Deploy the migration first, then deploy `sync-entitlement`,
 `app-store-notifications`, and `send-briefings`. Configure App Store Server
@@ -43,6 +45,11 @@ supabase functions deploy plaid-nightly-sync
 Keep `plaid-nightly-sync` scheduled as a recovery sweep. It also registers the
 webhook on pre-existing Items once and then uses the same serialized,
 cursor-based `/transactions/sync` engine as webhook deliveries and manual sync.
+Account retrieval now uses `/accounts/get` for cached balances, including during
+Link. Routine sync never forces a paid Balance or Transactions Refresh call.
+See [cached-sync rollout](PLAID_CACHED_SYNC_ROLLOUT.md) for verification results,
+deployment order, and the missing production recovery schedule discovered during
+the 2026-09-15 review.
 Do not expose the webhook function behind an additional proxy that rewrites or
 reformats its JSON body, because Plaid's signature covers the exact raw bytes.
 

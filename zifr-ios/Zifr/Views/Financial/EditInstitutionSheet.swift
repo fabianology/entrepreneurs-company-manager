@@ -114,7 +114,8 @@ struct EditInstitutionSheet: View {
             )
         }
 
-        let lastSync = item.lastSyncedAt ?? institution.lastSyncedAt
+        // Transaction imports and account snapshot retrieval have separate clocks.
+        let lastSync = item.lastSyncedAt
         guard let lastSync else {
             return SyncHealthPresentation(
                 title: "Waiting for first sync",
@@ -125,7 +126,7 @@ struct EditInstitutionSheet: View {
         }
         let relative = RelativeDateTimeFormatter()
         relative.unitsStyle = .abbreviated
-        let updated = "Updated \(relative.localizedString(for: lastSync, relativeTo: Date()))"
+        let updated = "Transactions synced \(relative.localizedString(for: lastSync, relativeTo: Date()))"
         if item.isStale() {
             return SyncHealthPresentation(
                 title: "Sync delayed",
@@ -135,11 +136,20 @@ struct EditInstitutionSheet: View {
             )
         }
         return SyncHealthPresentation(
-            title: "Plaid up to date",
+            title: "Connected to Plaid",
             detail: "\(updated) • \(countText)",
             icon: "checkmark.circle.fill",
             color: .zifrGreen
         )
+    }
+
+    private var balanceRetrievalDetail: String {
+        guard let retrievedAt = institution.lastSyncedAt else {
+            return "Balances reflect the latest available bank data. Bank updates may be delayed."
+        }
+        let relative = RelativeDateTimeFormatter()
+        relative.unitsStyle = .abbreviated
+        return "Balances retrieved \(relative.localizedString(for: retrievedAt, relativeTo: Date())). Bank updates may be delayed."
     }
 
     @State private var showAccountHUD = false
@@ -340,7 +350,7 @@ struct EditInstitutionSheet: View {
                                             syncSuccess = false
                                             Task {
                                                 do {
-                                                    try await PlaidService.shared.syncSubscriptions(institutionId: institution.id)
+                                                    try await PlaidService.shared.syncLatestAvailableData(institutionId: institution.id)
                                                     await DataRepository.shared.fetchAllData(appState: appState)
                                                     if let updatedInst = appState.institutions.first(where: { $0.id == institution.id }) {
                                                         self.institution = updatedInst
@@ -371,11 +381,11 @@ struct EditInstitutionSheet: View {
                                                             .foregroundStyle(Color.zifrGreen)
                                                     } else {
                                                         Image(systemName: "arrow.triangle.2.circlepath")
-                                                        Text("Sync Latest Data")
+                                                        Text("Sync Available Data")
                                                     }
                                                 }
                                                 .font(.system(size: 13, weight: .semibold))
-                                                Text(isSyncing || syncSuccess ? "Updates may take a few moments to appear" : "Pull newest balances and subscriptions from Plaid")
+                                                Text("Get the latest data available from Plaid")
                                                     .font(.system(size: 10, weight: .regular))
                                                     .foregroundStyle(Color.white.opacity(0.6))
                                             }
@@ -383,6 +393,12 @@ struct EditInstitutionSheet: View {
                                             .padding(.vertical, 10)
                                         }
                                         .buttonStyle(MiloomSecondaryButtonStyle())
+
+                                        Text(balanceRetrievalDetail)
+                                            .font(.system(size: 10, weight: .regular))
+                                            .foregroundStyle(Color.white.opacity(0.6))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .fixedSize(horizontal: false, vertical: true)
                                         
                                         if let syncHealth {
                                             HStack(alignment: .top, spacing: 8) {

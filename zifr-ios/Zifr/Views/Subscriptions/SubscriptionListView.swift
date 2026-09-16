@@ -114,7 +114,7 @@ struct SubscriptionListView: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     Task {
                         do {
-                            try await PlaidService.shared.syncSubscriptions()
+                            try await PlaidService.shared.syncLatestAvailableData()
                             await DataRepository.shared.fetchAllData(appState: appState)
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
                         } catch {
@@ -122,7 +122,7 @@ struct SubscriptionListView: View {
                         }
                     }
                 } label: {
-                    Label("Refresh from Bank", systemImage: "arrow.triangle.2.circlepath")
+                    Label("Sync Available Data", systemImage: "arrow.triangle.2.circlepath")
                 }
                 
                 if !subscriptions.isEmpty {

@@ -1035,6 +1035,7 @@ struct PortfolioTransactionCenterView: View {
                 }
             }
             .disabled(isSyncing)
+            .accessibilityLabel("Sync available transactions")
         }
         ToolbarItem(placement: .principal) {
             Text("Transactions")
@@ -1667,12 +1668,12 @@ struct PortfolioTransactionCenterView: View {
             Text("No Transactions Yet")
                 .font(.system(size: 20, weight: .bold))
                 .foregroundStyle(.white)
-            Text(syncError ?? "Sync Plaid to pull transactions from every connected account.")
+            Text(syncError ?? "Transactions update automatically. Sync to retrieve the latest available data from your connected accounts.")
                 .font(.system(size: 13))
                 .foregroundStyle(Color.white.opacity(0.5))
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 36)
-            Button("Sync All Accounts") { Task { await syncAndRefresh() } }
+            Button("Sync Available Data") { Task { await syncAndRefresh() } }
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
@@ -1711,7 +1712,7 @@ struct PortfolioTransactionCenterView: View {
         isSyncing = true
         syncError = nil
         do {
-            try await PlaidService.shared.syncSubscriptions()
+            try await PlaidService.shared.syncLatestAvailableData()
         } catch {
             let message = error.localizedDescription
             if !message.contains("No active Plaid connection") {

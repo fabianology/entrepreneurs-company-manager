@@ -22,6 +22,7 @@ export type PlaidSyncResult = {
   modified: number;
   removed: number;
   cursor?: string;
+  awaiting_initial_data?: boolean;
 };
 
 export class PlaidAPIError extends Error {
@@ -169,8 +170,13 @@ export async function fetchPlaidTransactionChanges(
         modified.push(...(response.modified || []));
         removed.push(...(response.removed || []));
         cursor = response.next_cursor;
+        // Plaid documents an empty string while the initial transaction pull is
+        // still preparing. It is valid only before any cursor/data exists.
+        if (
+          typeof cursor !== "string" ||
+          (!cursor && (response.has_more || startingCursor || added.length || modified.length || removed.length))
+        ) throw new Error("Plaid sync response did not include a valid next_cursor");
         if (!response.has_more) {
-          if (!cursor) throw new Error("Plaid sync response did not include next_cursor");
           return { added, modified, removed, cursor };
         }
       }
@@ -256,7 +262,16 @@ export async function requestPlaidTransactionSync(
   try {
     for (let cycle = 0; cycle < maxCycles; cycle += 1) {
       const changes = await fetchPlaidTransactionChanges(item, config, request);
-      await applyTransactionChanges(admin, item, changes);
+      if (changes.cursor === "") {
+        // Clear a previous false error, but do not advance the cursor or mark
+        // transaction freshness until the initial data actually arrives.
+        const { error } = await admin.from("plaid_items")
+          .update({ error_code: null }).eq("id", item.id);
+        if (error) throw error;
+      } else {
+        await applyTransactionChanges(admin, item, changes);
+      }
+      total.awaiting_initial_data = changes.cursor === "";
       total.cycles += 1;
       total.added += changes.added.length;
       total.modified += changes.modified.length;

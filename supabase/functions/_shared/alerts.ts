@@ -350,7 +350,7 @@ export function buildAlertCandidates(
           title: "Significant balance change",
           body: `${account.name || "An account"} changed by ${
             currencyValue(change, account.currency)
-          } since the previous sync.`,
+          } compared with the previously retrieved balance.`,
           fingerprintParts: [
             "balance_change",
             institution.id,

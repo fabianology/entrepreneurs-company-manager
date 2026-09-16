@@ -19,7 +19,12 @@ serve(async (req) => {
 
     const authorization = req.headers.get('Authorization') ?? ''
     const bearerToken = authorization.replace(/^Bearer\s+/i, '')
-    const isServiceRequest = bearerToken === serviceRoleKey
+    // Scheduled requests use a dedicated secret: a dashboard service-role JWT
+    // need not be byte-identical to the runtime's injected service-role key.
+    // Keep platform JWT verification and the existing user ownership checks.
+    const cronSecret = Deno.env.get('PLAID_SYNC_CRON_SECRET') ?? ''
+    const isServiceRequest = (serviceRoleKey.length > 0 && bearerToken === serviceRoleKey)
+      || (cronSecret.length > 0 && req.headers.get('x-cron-secret') === cronSecret)
     let callerUserId: string | null = null
     if (!isServiceRequest) {
       if (!bearerToken) {
@@ -57,7 +62,11 @@ serve(async (req) => {
           access_token: accessToken
         })
       })
-      return await response.json()
+      const data = await response.json()
+      if (!response.ok && !data.error_code) {
+        throw new PlaidAPIError(`HTTP_${response.status}`, 'Plaid request failed', response.status)
+      }
+      return data
     }
 
     const normalizeIdentity = (value: any) =>
@@ -274,14 +283,17 @@ serve(async (req) => {
           item.webhook_url = webhookURL
         }
 
-        // ── A. Fetch Balances ──────────────────────────────────────────
-        const balanceData = await plaidRequest('/accounts/balance/get', item.access_token)
+        // ── A. Retrieve cached accounts and balances ───────────────────
+        // This path also serves manual refresh and the first post-Link import.
+        // /accounts/get reads Plaid's latest snapshot without a paid Balance
+        // extraction. Keep account reconciliation and card/loan enrichment below.
+        const accountData = await plaidRequest('/accounts/get', item.access_token)
 
-        if (balanceData.error_code) {
-          console.error(`Plaid balance error for item ${item.id}:`, balanceData.error_message)
-          if (balanceData.error_code === 'ITEM_LOGIN_REQUIRED') {
+        if (accountData.error_code) {
+          console.error(`Plaid account error for item ${item.id}:`, accountData.error_message)
+          if (accountData.error_code === 'ITEM_LOGIN_REQUIRED') {
             await supabaseAdmin.from('plaid_items')
-              .update({ status: 'requires_reauth', error_code: balanceData.error_code })
+              .update({ status: 'requires_reauth', error_code: accountData.error_code })
               .eq('id', item.id)
             await supabaseAdmin.from('institutions')
               .update({ is_disconnected: true })
@@ -291,11 +303,13 @@ serve(async (req) => {
             item_id: item.id,
             institution_name: item.institution_name,
             success: false,
-            error_code: balanceData.error_code,
-            error: balanceData.error_message ?? 'Plaid balance request failed'
+            error_code: accountData.error_code,
+            error: accountData.error_message ?? 'Plaid account request failed'
           })
           return
         }
+
+        if (!Array.isArray(accountData.accounts)) throw new Error('Plaid account data is unavailable')
 
         // Liabilities enrich supported card records. Auth numbers are imported
         // during Link and encrypted by the iOS client; the sync must not replace
@@ -320,7 +334,7 @@ serve(async (req) => {
         // any missing non-liability account after a transient client save failure.
         // Auth numbers remain client-only because only the iOS app can encrypt them.
         const currentAccounts = institution.accounts_data || []
-        const plaidAccounts = balanceData.accounts || []
+        const plaidAccounts = accountData.accounts || []
         await persistAccountSnapshots(item, plaidAccounts, 'active')
         const reconciledHistoryAccounts = await reconcileArchivedHistory(item, plaidAccounts)
         const updatedAccounts = currentAccounts.reduce((deduplicated: any[], account: any) => {
@@ -387,11 +401,12 @@ serve(async (req) => {
           else updatedAccounts.push(merged)
         }
 
+        // This timestamp records retrieval by Miloom, not bank balance freshness.
         await supabaseAdmin.from('institutions')
           .update({ accounts_data: updatedAccounts, last_synced_at: new Date().toISOString(), is_disconnected: false })
           .eq('id', item.institution_id)
 
-        // Keep Plaid-backed cards current using Balance and Liabilities fields.
+        // Keep Plaid-backed cards current using cached balances and Liabilities.
         for (const pAcc of plaidAccounts.filter((account: any) => account.type === 'credit')) {
           const liability = liabilityByAccount.get(pAcc.account_id)
           const preferredAPR = liability?.aprs?.find((apr: any) => apr.apr_type === 'purchase_apr')
@@ -527,6 +542,7 @@ serve(async (req) => {
           transactions_added: transactionSync.added,
           transactions_modified: transactionSync.modified,
           transactions_removed: transactionSync.removed,
+          transactions_pending: transactionSync.awaiting_initial_data ?? false,
           history_accounts_reconciled: reconciledHistoryAccounts
       })
     }, async (item, err) => {

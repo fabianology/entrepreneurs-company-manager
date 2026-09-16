@@ -77,6 +77,27 @@ Deno.test("pagination mutation restarts from the original cursor", async () => {
   assertEquals(result.cursor, "cursor-2");
 });
 
+Deno.test("an empty initial cursor means Plaid is still preparing transactions", async () => {
+  const changes = await fetchPlaidTransactionChanges({ ...item, cursor: null }, config, async () => ({
+    added: [], modified: [], removed: [], next_cursor: "", has_more: false,
+  }));
+  assertEquals(changes.cursor, "");
+  assertEquals(changes.added, []);
+});
+
+for (const scenario of [
+  { name: "missing cursor", cursor: null, response: { has_more: false } },
+  { name: "empty cursor after an existing cursor", cursor: "cursor-0", response: { next_cursor: "", has_more: false } },
+  { name: "empty cursor with transaction changes", cursor: null, response: { next_cursor: "", added: [{ transaction_id: "tx" }], has_more: false } },
+  { name: "empty cursor with more pages", cursor: null, response: { next_cursor: "", has_more: true } },
+]) {
+  Deno.test(`transaction sync rejects ${scenario.name}`, async () => {
+    await assertRejects(() => fetchPlaidTransactionChanges(
+      { ...item, cursor: scenario.cursor }, config, async () => scenario.response,
+    ), Error, "valid next_cursor");
+  });
+}
+
 Deno.test("transaction mapping preserves enrichment and ownership scope", () => {
   const row = plaidTransactionRow(item, {
     transaction_id: "transaction-id",
