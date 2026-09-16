@@ -151,7 +151,14 @@ struct TaxScreeningSetupSheet: View {
     @State private var resetLearning = false
     @State private var showDeleteHistory = false
     private var accounts: [(String, String)] {
-        let records = TransactionIntelligence.resolveAll(state.transactions.filter { $0.userId == auth.currentUser?.id }, companies: state.companies, institutions: state.institutions, cards: state.cards)
+        let records = TransactionIntelligence.resolveAll(
+            state.transactions.filter { $0.userId == auth.currentUser?.id },
+            companies: state.companies,
+            institutions: state.institutions,
+            cards: state.cards,
+            overrides: state.transactionOverrides,
+            categoryRules: state.transactionCategoryRules
+        )
         var labels: [String: String] = [:]
         for r in records {
             let account = state.institutions.filter { $0.userId == auth.currentUser?.id }.flatMap(\.accounts).first { $0.id == r.accountId || $0.plaidAccountId == r.accountId }

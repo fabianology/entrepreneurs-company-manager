@@ -91,6 +91,7 @@ struct ResolvedTransaction: Identifiable, Equatable {
     let accountName: String
     let institutionName: String
     let override: TransactionOverride?
+    let categoryRule: TransactionCategoryRule?
 
     init(
         transaction: Transaction,
@@ -98,7 +99,8 @@ struct ResolvedTransaction: Identifiable, Equatable {
         companyName: String,
         accountName: String,
         institutionName: String,
-        override: TransactionOverride? = nil
+        override: TransactionOverride? = nil,
+        categoryRule: TransactionCategoryRule? = nil
     ) {
         self.transaction = transaction
         self.companyId = companyId
@@ -106,6 +108,7 @@ struct ResolvedTransaction: Identifiable, Equatable {
         self.accountName = accountName
         self.institutionName = institutionName
         self.override = override
+        self.categoryRule = categoryRule
     }
 
     var id: UUID { transaction.id }
@@ -532,7 +535,8 @@ enum TransactionIntelligence {
         companies: [Company],
         institutions: [Institution],
         cards: [FinancialCard],
-        overrides: [TransactionOverride] = []
+        overrides: [TransactionOverride] = [],
+        categoryRules: [TransactionCategoryRule] = []
     ) -> [ResolvedTransaction] {
         let companiesById = companies.reduce(into: [UUID: Company]()) { $0[$1.id] = $1 }
         let institutionsById = institutions.reduce(into: [UUID: Institution]()) { $0[$1.id] = $1 }
@@ -557,6 +561,9 @@ enum TransactionIntelligence {
         let overridesByTransactionId = overrides.reduce(into: [UUID: TransactionOverride]()) {
             $0[$1.transactionId] = $1
         }
+        let categoryRulesByMerchant = categoryRules.reduce(into: [String: TransactionCategoryRule]()) {
+            $0[merchantRuleKey(scopeKey: $1.scopeKey, merchantKey: $1.merchantKey)] = $1
+        }
 
         return transactions
             .map { transaction in
@@ -574,6 +581,11 @@ enum TransactionIntelligence {
                 let institutionName = institution?.name.nonEmpty
                     ?? card?.institutionName?.nonEmpty
                     ?? "Connected account"
+                let scopeKey = TransactionCategoryRule.scopeKey(companyId: resolvedCompanyId)
+                let merchantKey = SubscriptionDetector.normalize(displayName(for: transaction))
+                let categoryRule = merchantKey.isEmpty ? nil : categoryRulesByMerchant[
+                    merchantRuleKey(scopeKey: scopeKey, merchantKey: merchantKey)
+                ]
 
                 return ResolvedTransaction(
                     transaction: transaction,
@@ -581,7 +593,8 @@ enum TransactionIntelligence {
                     companyName: companyName,
                     accountName: accountName,
                     institutionName: institutionName,
-                    override: overridesByTransactionId[transaction.id]
+                    override: overridesByTransactionId[transaction.id],
+                    categoryRule: categoryRule
                 )
             }
             .sorted {
@@ -603,10 +616,10 @@ enum TransactionIntelligence {
                 transaction.merchantName = merchantName
                 transaction.name = merchantName
             }
-            if let primary = record.override?.categoryPrimary?.nonEmpty {
+            if let primary = categoryPrimary(for: record) {
                 transaction.personalFinancePrimary = primary
             }
-            if let detailed = record.override?.categoryDetailed?.nonEmpty {
+            if let detailed = categoryDetailed(for: record) {
                 transaction.personalFinanceDetailed = detailed
             }
             switch record.override?.flowOverride {
@@ -637,12 +650,14 @@ enum TransactionIntelligence {
 
     static func categoryPrimary(for record: ResolvedTransaction) -> String? {
         record.override?.categoryPrimary?.nonEmpty
+            ?? record.categoryRule?.categoryPrimary.nonEmpty
             ?? record.transaction.personalFinancePrimary?.nonEmpty
             ?? record.transaction.category?.first?.nonEmpty
     }
 
     static func categoryDetailed(for record: ResolvedTransaction) -> String? {
         record.override?.categoryDetailed?.nonEmpty
+            ?? record.categoryRule?.categoryDetailed?.nonEmpty
             ?? record.transaction.personalFinanceDetailed?.nonEmpty
             ?? record.transaction.category?.dropFirst().first?.nonEmpty
     }
@@ -746,6 +761,10 @@ enum TransactionIntelligence {
             (transaction.category ?? []).joined(separator: " ")
         ].joined(separator: " ").lowercased()
         return searchable.contains(normalizedQuery)
+    }
+
+    private static func merchantRuleKey(scopeKey: String, merchantKey: String) -> String {
+        "\(scopeKey)|\(merchantKey)"
     }
 }
 
@@ -875,6 +894,7 @@ struct PortfolioTransactionCenterView: View {
             hasher.combine(transaction.pending)
         }
         appState.transactionOverrides.forEach { hasher.combine($0) }
+        appState.transactionCategoryRules.forEach { hasher.combine($0) }
         appState.companies.forEach { hasher.combine($0) }
         appState.institutions.forEach { hasher.combine($0) }
         appState.cards.forEach { hasher.combine($0) }
@@ -1721,6 +1741,7 @@ struct PortfolioTransactionCenterView: View {
         let cards = appState.cards
         let subscriptions = appState.subscriptions
         let overrides = appState.transactionOverrides
+        let categoryRules = appState.transactionCategoryRules
 
         let analysis = await Task.detached(priority: .userInitiated) {
             let records = TransactionIntelligence.resolveAll(
@@ -1728,7 +1749,8 @@ struct PortfolioTransactionCenterView: View {
                 companies: companies,
                 institutions: institutions,
                 cards: cards,
-                overrides: overrides
+                overrides: overrides,
+                categoryRules: categoryRules
             )
             return TransactionCenterAnalysis(
                 records: records,
@@ -1780,35 +1802,102 @@ struct PortfolioTransactionCenterView: View {
         _ draft: TransactionOverrideDraft,
         for record: ResolvedTransaction
     ) async throws {
-        if draft.isEmpty {
-            try await resetOverride(for: record)
-            return
+        if draft.rememberCategory,
+           (record.categoryRule == nil || draft.categoryChanged),
+           let category = draft.categoryPrimary?.nonEmpty {
+            try await saveCategoryRule(
+                for: record,
+                categoryPrimary: category,
+                categoryDetailed: draft.categoryDetailed?.nonEmpty
+            )
+        } else if let rule = record.categoryRule {
+            try await deleteCategoryRule(rule)
         }
 
-        var transactionOverride = record.override ?? TransactionOverride(
-            userId: record.transaction.userId,
-            transactionId: record.id
-        )
-        transactionOverride.merchantName = draft.merchantName
-        transactionOverride.categoryPrimary = draft.categoryPrimary
-        transactionOverride.categoryDetailed = draft.categoryDetailed
-        transactionOverride.flowOverride = draft.flowOverride
-        transactionOverride.note = draft.note
-        transactionOverride.updatedAt = Date()
+        let transactionCategoryPrimary = draft.rememberCategory
+            ? (draft.categoryChanged ? nil : record.override?.categoryPrimary?.nonEmpty)
+            : draft.categoryPrimary?.nonEmpty
+        let transactionCategoryDetailed = draft.rememberCategory
+            ? (draft.categoryChanged ? nil : record.override?.categoryDetailed?.nonEmpty)
+            : draft.categoryDetailed?.nonEmpty
+        let hasTransactionChanges = draft.merchantName != nil
+            || transactionCategoryPrimary != nil
+            || transactionCategoryDetailed != nil
+            || draft.flowOverride != nil
+            || draft.note != nil
 
-        let saved = try await DataRepository.shared.upsertTransactionOverride(transactionOverride)
-        if let index = appState.transactionOverrides.firstIndex(where: { $0.transactionId == record.id }) {
-            appState.transactionOverrides[index] = saved
-        } else {
-            appState.transactionOverrides.append(saved)
+        if hasTransactionChanges {
+            var transactionOverride = record.override ?? TransactionOverride(
+                userId: record.transaction.userId,
+                transactionId: record.id
+            )
+            transactionOverride.merchantName = draft.merchantName
+            transactionOverride.categoryPrimary = transactionCategoryPrimary
+            transactionOverride.categoryDetailed = transactionCategoryDetailed
+            transactionOverride.flowOverride = draft.flowOverride
+            transactionOverride.note = draft.note
+            transactionOverride.updatedAt = Date()
+
+            let saved = try await DataRepository.shared.upsertTransactionOverride(transactionOverride)
+            if let index = appState.transactionOverrides.firstIndex(where: { $0.transactionId == record.id }) {
+                appState.transactionOverrides[index] = saved
+            } else {
+                appState.transactionOverrides.append(saved)
+            }
+        } else if appState.transactionOverrides.contains(where: { $0.transactionId == record.id }) {
+            try await DataRepository.shared.deleteTransactionOverride(transactionId: record.id)
+            appState.transactionOverrides.removeAll { $0.transactionId == record.id }
         }
     }
 
     @MainActor
+    private func saveCategoryRule(
+        for record: ResolvedTransaction,
+        categoryPrimary: String,
+        categoryDetailed: String?
+    ) async throws {
+        let rawMerchantName = TransactionIntelligence.displayName(for: record.transaction)
+        let merchantKey = SubscriptionDetector.normalize(rawMerchantName)
+        guard !merchantKey.isEmpty else { return }
+
+        var rule = record.categoryRule ?? TransactionCategoryRule(
+            userId: record.transaction.userId,
+            scopeKey: TransactionCategoryRule.scopeKey(companyId: record.companyId),
+            merchantKey: merchantKey,
+            merchantName: rawMerchantName,
+            categoryPrimary: categoryPrimary
+        )
+        rule.merchantName = rawMerchantName
+        rule.categoryPrimary = categoryPrimary
+        rule.categoryDetailed = categoryDetailed
+        rule.updatedAt = Date()
+
+        let saved = try await DataRepository.shared.upsertTransactionCategoryRule(rule)
+        if let index = appState.transactionCategoryRules.firstIndex(where: { $0.id == saved.id }) {
+            appState.transactionCategoryRules[index] = saved
+        } else {
+            appState.transactionCategoryRules.removeAll {
+                $0.scopeKey == saved.scopeKey && $0.merchantKey == saved.merchantKey
+            }
+            appState.transactionCategoryRules.append(saved)
+        }
+    }
+
+    @MainActor
+    private func deleteCategoryRule(_ rule: TransactionCategoryRule) async throws {
+        try await DataRepository.shared.deleteTransactionCategoryRule(id: rule.id)
+        appState.transactionCategoryRules.removeAll { $0.id == rule.id }
+    }
+
+    @MainActor
     private func resetOverride(for record: ResolvedTransaction) async throws {
-        guard appState.transactionOverrides.contains(where: { $0.transactionId == record.id }) else { return }
-        try await DataRepository.shared.deleteTransactionOverride(transactionId: record.id)
-        appState.transactionOverrides.removeAll { $0.transactionId == record.id }
+        if appState.transactionOverrides.contains(where: { $0.transactionId == record.id }) {
+            try await DataRepository.shared.deleteTransactionOverride(transactionId: record.id)
+            appState.transactionOverrides.removeAll { $0.transactionId == record.id }
+        }
+        if let rule = record.categoryRule {
+            try await deleteCategoryRule(rule)
+        }
     }
 
     private func transactionIcon(_ record: ResolvedTransaction) -> String {
@@ -1893,14 +1982,8 @@ struct TransactionOverrideDraft: Equatable {
     var categoryDetailed: String?
     var flowOverride: TransactionFlowOverride?
     var note: String?
-
-    var isEmpty: Bool {
-        merchantName == nil
-            && categoryPrimary == nil
-            && categoryDetailed == nil
-            && flowOverride == nil
-            && note == nil
-    }
+    var rememberCategory: Bool = false
+    var categoryChanged: Bool = false
 }
 
 private struct SpendingCategorySheet: View {
@@ -2181,6 +2264,7 @@ struct TransactionDetailSheet: View {
     @State private var merchantName: String
     @State private var categoryPrimary: String
     @State private var categoryDetailed: String
+    @State private var rememberCategory: Bool
     @State private var flowSelection: String
     @State private var note: String
     @State private var isSaving = false
@@ -2201,6 +2285,53 @@ struct TransactionDetailSheet: View {
         "OTHER"
     ]
 
+    private var categoryChoices: [String] {
+        let learned = appState.transactionCategoryRules.map(\.categoryPrimary)
+            + appState.transactionOverrides.compactMap(\.categoryPrimary)
+        return Array(Set(Self.primaryCategories + learned))
+            .sorted { displayLabel($0).localizedCaseInsensitiveCompare(displayLabel($1)) == .orderedAscending }
+    }
+
+    private var merchantKey: String {
+        SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record.transaction))
+    }
+
+    private var recurringPatternDetected: Bool {
+        guard !merchantKey.isEmpty else { return false }
+        if appState.subscriptions.contains(where: {
+            $0.companyId == record.companyId && SubscriptionDetector.normalize($0.name) == merchantKey
+        }) {
+            return true
+        }
+
+        let matching = appState.transactions.filter { transaction in
+            guard transaction.pending != true,
+                  (transaction.amount ?? 0) > 0,
+                  !TransactionIntelligence.isFinancialMovement(transaction),
+                  SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: transaction)) == merchantKey
+            else { return false }
+            return transaction.accountId == record.accountId || transaction.companyId == record.companyId
+        }
+        guard matching.count >= 2 else { return false }
+
+        let amounts = matching.compactMap(\.amount)
+        let average = amounts.reduce(0, +) / Double(amounts.count)
+        guard average > 0,
+              amounts.allSatisfy({ abs($0 - average) / average < 0.25 })
+        else { return false }
+
+        let dates = matching.compactMap { Self.transactionDate($0.date) }.sorted()
+        guard let first = dates.first, let last = dates.last else { return false }
+        return last.timeIntervalSince(first) >= 15 * 24 * 60 * 60
+    }
+
+    private static func transactionDate(_ value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+
     init(
         record: ResolvedTransaction,
         onSave: @escaping (TransactionOverrideDraft) async throws -> Void,
@@ -2212,6 +2343,7 @@ struct TransactionDetailSheet: View {
         _merchantName = State(initialValue: TransactionIntelligence.displayName(for: record))
         _categoryPrimary = State(initialValue: TransactionIntelligence.categoryPrimary(for: record) ?? "")
         _categoryDetailed = State(initialValue: TransactionIntelligence.categoryDetailed(for: record) ?? "")
+        _rememberCategory = State(initialValue: record.categoryRule != nil)
         _flowSelection = State(initialValue: record.override?.flowOverride?.rawValue ?? "automatic")
         _note = State(initialValue: record.override?.note ?? "")
     }
@@ -2225,23 +2357,36 @@ struct TransactionDetailSheet: View {
         let cleanedMerchant = merchantName.nonEmpty
         let cleanedPrimary = categoryPrimary.nonEmpty
         let cleanedDetailed = categoryDetailed.nonEmpty
+        let primaryOverride = rememberCategory
+            ? cleanedPrimary
+            : (cleanedPrimary == rawPrimary ? nil : cleanedPrimary)
+        let detailedOverride = rememberCategory
+            ? cleanedDetailed
+            : (cleanedDetailed == rawDetailed ? nil : cleanedDetailed)
 
         return TransactionOverrideDraft(
             merchantName: cleanedMerchant == rawMerchant.nonEmpty ? nil : cleanedMerchant,
-            categoryPrimary: cleanedPrimary == rawPrimary ? nil : cleanedPrimary,
-            categoryDetailed: cleanedDetailed == rawDetailed ? nil : cleanedDetailed,
+            categoryPrimary: primaryOverride,
+            categoryDetailed: detailedOverride,
             flowOverride: TransactionFlowOverride(rawValue: flowSelection),
-            note: note.nonEmpty
+            note: note.nonEmpty,
+            rememberCategory: rememberCategory,
+            categoryChanged: cleanedPrimary != TransactionIntelligence.categoryPrimary(for: record)?.nonEmpty
+                || cleanedDetailed != TransactionIntelligence.categoryDetailed(for: record)?.nonEmpty
         )
     }
 
     private var persistedDraft: TransactionOverrideDraft {
         TransactionOverrideDraft(
             merchantName: record.override?.merchantName?.nonEmpty,
-            categoryPrimary: record.override?.categoryPrimary?.nonEmpty,
-            categoryDetailed: record.override?.categoryDetailed?.nonEmpty,
+            categoryPrimary: record.override?.categoryPrimary?.nonEmpty
+                ?? record.categoryRule?.categoryPrimary.nonEmpty,
+            categoryDetailed: record.override?.categoryDetailed?.nonEmpty
+                ?? record.categoryRule?.categoryDetailed?.nonEmpty,
             flowOverride: record.override?.flowOverride,
-            note: record.override?.note?.nonEmpty
+            note: record.override?.note?.nonEmpty,
+            rememberCategory: record.categoryRule != nil,
+            categoryChanged: false
         )
     }
 
@@ -2260,7 +2405,7 @@ struct TransactionDetailSheet: View {
                             Text(review.statusLabel).font(.caption).foregroundStyle(Color.zifrGold)
                         }
                         correctionForm
-                        if record.override != nil {
+                        if record.override != nil || record.categoryRule != nil {
                             Button(role: .destructive) {
                                 showResetConfirmation = true
                             } label: {
@@ -2315,13 +2460,20 @@ struct TransactionDetailSheet: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Your merchant, category, cash-flow, and note corrections will be removed. The original Plaid transaction stays intact.")
+                Text(record.categoryRule == nil
+                    ? "Your merchant, category, cash-flow, and note corrections will be removed. The original Plaid transaction stays intact."
+                    : "Your corrections and the remembered category for this merchant will be removed. Matching transactions will return to their own saved or Plaid categories.")
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(24)
         .presentationBackground(Color(hex: "#1C1C1E"))
+        .onAppear {
+            if record.categoryRule == nil && recurringPatternDetected {
+                rememberCategory = true
+            }
+        }
     }
 
     private var transactionHero: some View {
@@ -2341,9 +2493,9 @@ struct TransactionDetailSheet: View {
                     Label("Pending", systemImage: "clock.fill")
                         .foregroundStyle(.orange)
                 }
-                if record.override != nil {
+                if record.override != nil || record.categoryRule != nil {
                     Text("·")
-                    Label("Reviewed", systemImage: "checkmark.seal.fill")
+                    Label(record.categoryRule == nil ? "Reviewed" : "Remembered", systemImage: "checkmark.seal.fill")
                         .foregroundStyle(Color.zifrGold)
                 }
             }
@@ -2462,29 +2614,51 @@ struct TransactionDetailSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
             fieldLabel("PRIMARY CATEGORY")
-            Menu {
-                Button("Use Plaid Category") {
-                    categoryPrimary = record.transaction.personalFinancePrimary
-                        ?? record.transaction.category?.first
-                        ?? ""
-                }
-                Divider()
-                ForEach(Self.primaryCategories, id: \.self) { category in
-                    Button(displayLabel(category)) { categoryPrimary = category }
-                }
-            } label: {
-                HStack {
-                    Text(categoryPrimary.nonEmpty.map(displayLabel) ?? "Choose a category")
-                        .foregroundStyle(categoryPrimary.isEmpty ? Color.white.opacity(0.4) : .white)
-                    Spacer()
+            HStack(spacing: 8) {
+                TextField("e.g. Kids Sports", text: $categoryPrimary)
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.done)
+                    .foregroundStyle(.white)
+
+                Menu {
+                    Button("Use Plaid Category") {
+                        categoryPrimary = record.transaction.personalFinancePrimary
+                            ?? record.transaction.category?.first
+                            ?? ""
+                    }
+                    Divider()
+                    ForEach(categoryChoices, id: \.self) { category in
+                        Button(displayLabel(category)) { categoryPrimary = category }
+                    }
+                } label: {
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.4))
+                        .foregroundStyle(Color.zifrGold)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                .padding(.horizontal, 13)
-                .frame(height: 44)
-                .background(Color(hex: "#2C2C2E"))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .padding(.leading, 13)
+            .frame(height: 44)
+            .background(Color(hex: "#2C2C2E"))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            if !merchantKey.isEmpty {
+                Toggle(isOn: $rememberCategory) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("REMEMBER FOR THIS MERCHANT")
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(0.7)
+                        Text(recurringPatternDetected
+                            ? "Recurring activity detected. Matching transactions will use this category."
+                            : "Apply this category to matching transactions from this merchant.")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.48))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .tint(Color.zifrGold)
+                .frame(minHeight: 44)
             }
 
             fieldLabel("DETAILED CATEGORY")

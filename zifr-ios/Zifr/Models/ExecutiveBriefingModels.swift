@@ -139,7 +139,8 @@ struct ExecutiveBriefingSnapshot {
         let resolved = TransactionIntelligence.resolveAll(
             appState.transactions, companies: appState.companies,
             institutions: appState.institutions, cards: appState.cards,
-            overrides: appState.transactionOverrides
+            overrides: appState.transactionOverrides,
+            categoryRules: appState.transactionCategoryRules
         ).map { record -> ResolvedTransaction in
             var owner = record.companyId
             if let card = appState.cards.first(where: { $0.id.uuidString == record.accountId || $0.plaidAccountId == record.accountId }),
@@ -152,7 +153,8 @@ struct ExecutiveBriefingSnapshot {
             }
             return ResolvedTransaction(transaction: record.transaction, companyId: owner,
                 companyName: appState.companies.first { $0.id == owner }?.name ?? "Unassigned",
-                accountName: record.accountName, institutionName: record.institutionName, override: record.override)
+                accountName: record.accountName, institutionName: record.institutionName,
+                override: record.override, categoryRule: record.categoryRule)
         }
         unassignedTransactionCount = resolved.filter { $0.companyId == nil }.count
         records = resolved.filter { $0.companyId.map(ids.contains) ?? false }

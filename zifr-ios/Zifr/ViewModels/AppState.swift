@@ -12,6 +12,7 @@ final class AppState {
     var documents: [CompanyDocument] = []
     var transactions: [Transaction] = []
     var transactionOverrides: [TransactionOverride] = []
+    var transactionCategoryRules: [TransactionCategoryRule] = []
     var businessExpenseReviews: [BusinessExpenseReview] = []
     var businessExpenseSettings = BusinessExpenseSettings()
     var businessExpenseProfiles: [BusinessExpenseProfile] = []

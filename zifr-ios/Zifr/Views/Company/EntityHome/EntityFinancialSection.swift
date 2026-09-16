@@ -865,7 +865,14 @@ struct TransactionFeedView: View {
                             }
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                expenseTransaction = TransactionIntelligence.resolveAll([tx], companies: appState.companies, institutions: appState.institutions, cards: appState.cards, overrides: appState.transactionOverrides).first
+                                expenseTransaction = TransactionIntelligence.resolveAll(
+                                    [tx],
+                                    companies: appState.companies,
+                                    institutions: appState.institutions,
+                                    cards: appState.cards,
+                                    overrides: appState.transactionOverrides,
+                                    categoryRules: appState.transactionCategoryRules
+                                ).first
                             }
                             .accessibilityAddTraits(.isButton)
                             .listRowBackground(Color.clear)

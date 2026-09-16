@@ -874,6 +874,50 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(summary.moneyIn, 0)
     }
 
+    func testRememberedMerchantCategoryAppliesWithinProfileAndExplicitOverrideWins() {
+        let owner = UUID(), personalProfile = UUID(), businessProfile = UUID()
+        var personalCharge = makeTransaction(
+            owner: owner, company: personalProfile, name: "AYSO Soccer #418", amount: 95, date: "2027-08-01"
+        )
+        personalCharge.personalFinancePrimary = "GENERAL_SERVICES"
+        var correctedCharge = makeTransaction(
+            owner: owner, company: personalProfile, name: "AYSO Soccer #902", amount: 110, date: "2027-09-01"
+        )
+        correctedCharge.personalFinancePrimary = "GENERAL_SERVICES"
+        var businessCharge = makeTransaction(
+            owner: owner, company: businessProfile, name: "AYSO Soccer #512", amount: 75, date: "2027-09-01"
+        )
+        businessCharge.personalFinancePrimary = "GENERAL_SERVICES"
+
+        let rule = TransactionCategoryRule(
+            userId: owner,
+            scopeKey: TransactionCategoryRule.scopeKey(companyId: personalProfile),
+            merchantKey: "ayso soccer",
+            merchantName: "AYSO Soccer",
+            categoryPrimary: "Kids Sports"
+        )
+        var correction = TransactionOverride(userId: owner, transactionId: correctedCharge.id)
+        correction.categoryPrimary = "Education"
+
+        let records = TransactionIntelligence.resolveAll(
+            [personalCharge, correctedCharge, businessCharge],
+            companies: [],
+            institutions: [],
+            cards: [],
+            overrides: [correction],
+            categoryRules: [rule]
+        )
+        let personal = records.first { $0.id == personalCharge.id }!
+        let corrected = records.first { $0.id == correctedCharge.id }!
+        let business = records.first { $0.id == businessCharge.id }!
+
+        XCTAssertEqual(TransactionIntelligence.categoryPrimary(for: personal), "Kids Sports")
+        XCTAssertEqual(TransactionIntelligence.categoryPrimary(for: corrected), "Education")
+        XCTAssertEqual(TransactionIntelligence.categoryPrimary(for: business), "GENERAL_SERVICES")
+        XCTAssertEqual(personal.categoryRule?.id, rule.id)
+        XCTAssertNil(business.categoryRule)
+    }
+
     func testTransactionFlowOverridesProtectDuplicateAndRecurringDetection() {
         let owner = UUID(), companyId = UUID()
         let firstIncome = makeTransaction(

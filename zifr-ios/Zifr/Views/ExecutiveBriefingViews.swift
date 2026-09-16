@@ -348,6 +348,10 @@ private struct ExecutiveBriefingReceipt: View {
         VStack(spacing: 5) {
             Text("EXECUTIVE BRIEFING")
                 .font(.system(.headline, design: .monospaced).weight(.bold))
+                .foregroundStyle(Color.white)
+                .padding(.horizontal, 10)
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .background(Color(hex: "#3A3A3C"))
             Text(now.formatted(date: .numeric, time: .shortened))
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(BriefingReceiptTheme.fadedInk)

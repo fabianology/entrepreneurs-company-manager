@@ -175,6 +175,13 @@ class DataRepository {
                 .execute()
                 .value) ?? []
         }
+        async let fTransactionCategoryRules: [TransactionCategoryRule] = measure("transaction_category_rules") {
+            (try? await client
+                .from("plaid_transaction_category_rules")
+                .select()
+                .execute()
+                .value) ?? []
+        }
         
         let fetchedSubscriptions = await fSubscriptions
         let fetchedInstitutions = await fInstitutions
@@ -199,6 +206,7 @@ class DataRepository {
         }
         let transactions = await fTransactions
         let transactionOverrides = await fTransactionOverrides
+        let transactionCategoryRules = await fTransactionCategoryRules
         
         let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
         let normalizedSubscriptions = secureSubs.map { SubscriptionRenewalScheduler.normalized($0) }
@@ -232,6 +240,7 @@ class DataRepository {
         appState.alertRules = fetchedAlertRules
         appState.transactions = transactions
         appState.transactionOverrides = transactionOverrides
+        appState.transactionCategoryRules = transactionCategoryRules
         appState.resourceConnections = fetchedConnections
         appState.obligations = fetchedObligations
 
@@ -331,6 +340,31 @@ class DataRepository {
             .from("plaid_transaction_overrides")
             .delete()
             .eq("transaction_id", value: transactionId)
+            .execute()
+    }
+
+    func upsertTransactionCategoryRule(_ rule: TransactionCategoryRule) async throws -> TransactionCategoryRule {
+        let saved: [TransactionCategoryRule] = try await client
+            .from("plaid_transaction_category_rules")
+            .upsert(rule, onConflict: "user_id,scope_key,merchant_key")
+            .select()
+            .execute()
+            .value
+        guard let result = saved.first else {
+            throw NSError(
+                domain: "Miloom.TransactionCategoryRule",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "The category rule was saved but could not be reloaded."]
+            )
+        }
+        return result
+    }
+
+    func deleteTransactionCategoryRule(id: UUID) async throws {
+        try await client
+            .from("plaid_transaction_category_rules")
+            .delete()
+            .eq("id", value: id)
             .execute()
     }
 
@@ -897,6 +931,34 @@ struct TransactionOverride: Identifiable, Codable, Equatable, Hashable {
         case note
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+    }
+}
+
+struct TransactionCategoryRule: Identifiable, Codable, Equatable, Hashable {
+    var id: UUID = UUID()
+    var userId: UUID
+    var scopeKey: String
+    var merchantKey: String
+    var merchantName: String
+    var categoryPrimary: String
+    var categoryDetailed: String?
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case scopeKey = "scope_key"
+        case merchantKey = "merchant_key"
+        case merchantName = "merchant_name"
+        case categoryPrimary = "category_primary"
+        case categoryDetailed = "category_detailed"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
+    static func scopeKey(companyId: UUID?) -> String {
+        companyId.map { "company:\($0.uuidString.lowercased())" } ?? "unassigned"
     }
 }
 
