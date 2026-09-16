@@ -137,6 +137,7 @@ struct SubscriptionReceiptView: View {
     let subscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
+    @State private var showsServices = false
 
     private var activeSubscriptions: [Subscription] {
         subscriptions.filter { $0.status == "Active" }
@@ -144,6 +145,10 @@ struct SubscriptionReceiptView: View {
 
     private var summary: SubscriptionReceiptSummary {
         SubscriptionReceiptSummary(subscriptions: activeSubscriptions, institutions: institutions, cards: cards)
+    }
+
+    private var serviceCount: Int {
+        activeSubscriptions.reduce(0) { $0 + 1 + $1.subServices.count }
     }
 
     private let ink = BriefingReceiptTheme.ink
@@ -169,35 +174,65 @@ struct SubscriptionReceiptView: View {
     var reportContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             reportHeader
-            sectionHeader("SERVICES", icon: "square.stack.3d.up")
-            if activeSubscriptions.isEmpty {
-                note("No active services.")
-            }
-            VStack(spacing: 0) {
-                ForEach(Array(activeSubscriptions.enumerated()), id: \.element.id) { index, sub in
-                    if !sub.subServices.isEmpty,
-                       index == 0 || activeSubscriptions[index - 1].subServices.isEmpty {
-                        supplementalGroupDivider
-                    }
-                    mainService(sub)
-                    if !sub.subServices.isEmpty {
-                        Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)) · \(sub.name.isEmpty ? "Unnamed Service" : sub.name)")
-                            .font(.system(.caption2, design: .monospaced).weight(.bold))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 6)
-                            .background(ink.opacity(0.06))
-                            .padding(.top, 6)
-                            .accessibilityAddTraits(.isHeader)
-                    }
-                    ForEach(sub.subServices) { service in
-                        supplementalService(service, parent: sub)
-                    }
-                    if !sub.subServices.isEmpty { supplementalGroupDivider }
-                }
-            }
             sectionHeader("PAYMENT SOURCES", icon: "creditcard")
             paymentBreakdown
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.smooth(duration: 0.3)) {
+                        showsServices.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Text("SERVICES DETAILED · \(serviceCount)")
+                        Spacer(minLength: 8)
+                        Image(systemName: showsServices ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.bold))
+                    }
+                    .font(.system(.caption, design: .monospaced).weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    .background(ink, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityValue(showsServices ? "Expanded, \(serviceCount) services" : "Collapsed, \(serviceCount) services")
+                .zIndex(1)
+
+                if showsServices {
+                    Group {
+                        if activeSubscriptions.isEmpty {
+                            note("No active services.")
+                        }
+                        VStack(spacing: 0) {
+                            ForEach(Array(activeSubscriptions.enumerated()), id: \.element.id) { index, sub in
+                                if !sub.subServices.isEmpty,
+                                   index == 0 || activeSubscriptions[index - 1].subServices.isEmpty {
+                                    supplementalGroupDivider
+                                }
+                                mainService(sub)
+                                if !sub.subServices.isEmpty {
+                                    Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)) · \(sub.name.isEmpty ? "Unnamed Service" : sub.name)")
+                                        .font(.system(.caption2, design: .monospaced).weight(.bold))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical, 6)
+                                        .background(ink.opacity(0.06))
+                                        .padding(.top, 6)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
+                                ForEach(sub.subServices) { service in
+                                    supplementalService(service, parent: sub)
+                                }
+                                if !sub.subServices.isEmpty { supplementalGroupDivider }
+                            }
+                        }
+                    }
+                    .padding(.top, 14)
+                    .transition(.move(edge: .top))
+                }
+            }
+            .clipped()
             sectionHeader("CHARGE SUMMARY", icon: "sum")
             reportFooter
             Text("END OF REPORT")
@@ -334,7 +369,11 @@ struct SubscriptionReceiptView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(source.label)
                         .font(.system(.caption, design: .monospaced).weight(.bold))
+                        .foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 8)
+                        .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                        .background(Color(hex: "#3A3A3C"))
                     ForEach(ledger.currencies, id: \.self) { currency in
                         ForEach(SubService.BillingCycle.allCases, id: \.self) { cycle in
                             let items = ledger.charges.filter { $0.source.id == source.id && $0.currency == currency && $0.cycle == cycle }
