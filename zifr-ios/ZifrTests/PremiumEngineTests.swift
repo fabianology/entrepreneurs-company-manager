@@ -3,6 +3,50 @@ import CryptoKit
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testSupplementalServiceClassifiesIndependentlyAndRespectsManualChoice() {
+        var addon = SubService(name: "Full Self Driving")
+        let parent = Subscription(
+            userId: UUID(), companyId: UUID(), name: "Tesla",
+            subServices: [addon], notes: "Model 3 car payment"
+        )
+        XCTAssertEqual(parent.resolvedServiceType, .bill)
+        XCTAssertEqual(parent.subServices[0].resolvedServiceType, .subscription)
+
+        addon.name = "City Electric"
+        XCTAssertEqual(addon.resolvedServiceType, .bill)
+        addon.serviceType = .subscription
+        XCTAssertEqual(addon.resolvedServiceType, .subscription)
+        addon.serviceType = .automatic
+        addon.name = "Model 3"
+        addon.purpose = "Monthly car payment"
+        XCTAssertEqual(addon.resolvedServiceType, .bill)
+    }
+
+    func testSupplementalServiceTypeRoundTripsInsideSubscription() throws {
+        let addon = SubService(name: "Premium", serviceType: .bill)
+        let parent = Subscription(
+            userId: UUID(), companyId: UUID(), name: "Tesla", subServices: [addon]
+        )
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(parent)
+        let decoded = try JSONDecoder().decode(Subscription.self, from: data)
+        XCTAssertEqual(decoded.subServices, [addon])
+        XCTAssertEqual(decoded.subServices[0].resolvedServiceType, .bill)
+    }
+
+    func testLegacySupplementalServiceWithoutTypeStillDecodes() throws {
+        let addon = SubService(name: "Water utility", cost: 45, billingCycle: .yearly)
+        let encoded = try JSONEncoder().encode(addon)
+        var payload = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        payload.removeValue(forKey: "serviceType")
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let decoded = try JSONDecoder().decode(SubService.self, from: data)
+        XCTAssertEqual(decoded, addon)
+        XCTAssertEqual(decoded.serviceType, .automatic)
+        XCTAssertEqual(decoded.resolvedServiceType, .bill)
+    }
+
     func testRecurringServiceClassifierDistinguishesBillsAndSubscriptions() {
         XCTAssertEqual(
             RecurringServiceClassifier.classify(name: "AT&T Wireless"),

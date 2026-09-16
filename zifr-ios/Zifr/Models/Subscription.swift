@@ -13,10 +13,36 @@ struct SubService: Codable, Identifiable, Hashable {
     var purpose: String = ""
     var autoPay: AutoPay = .auto
     var status: ServiceStatus = .active
+    var serviceType: RecurringServiceType = .automatic
+
+    var resolvedServiceType: RecurringServiceType {
+        serviceType == .automatic
+            ? RecurringServiceClassifier.classify(name: name, purpose: purpose)
+            : serviceType
+    }
 
     enum BillingCycle: String, Codable, CaseIterable { case monthly = "Monthly"; case yearly = "Yearly" }
     enum AutoPay: String, Codable, CaseIterable { case auto = "Auto"; case manual = "Manual" }
     enum ServiceStatus: String, Codable, CaseIterable { case active = "Active"; case cancelled = "Cancelled"; case pending = "Pending"; case paused = "Paused" }
+}
+
+extension SubService {
+    // Existing embedded services have no serviceType; keep them readable and
+    // infer their type until the user makes an explicit choice.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        paymentMethod = try container.decodeIfPresent(String.self, forKey: .paymentMethod) ?? ""
+        paymentMethodId = try container.decodeIfPresent(UUID.self, forKey: .paymentMethodId)
+        cost = try container.decodeIfPresent(Double.self, forKey: .cost) ?? 0
+        billingCycle = try container.decodeIfPresent(BillingCycle.self, forKey: .billingCycle) ?? .monthly
+        renewsOn = try container.decodeIfPresent(Date.self, forKey: .renewsOn)
+        purpose = try container.decodeIfPresent(String.self, forKey: .purpose) ?? ""
+        autoPay = try container.decodeIfPresent(AutoPay.self, forKey: .autoPay) ?? .auto
+        status = try container.decodeIfPresent(ServiceStatus.self, forKey: .status) ?? .active
+        serviceType = try container.decodeIfPresent(RecurringServiceType.self, forKey: .serviceType) ?? .automatic
+    }
 }
 
 enum RecurringServiceType: String, Codable, CaseIterable, Identifiable {
@@ -34,7 +60,8 @@ enum RecurringServiceClassifier {
     static func classify(
         name: String,
         website: String? = nil,
-        categories: [String]? = nil
+        categories: [String]? = nil,
+        purpose: String? = nil
     ) -> RecurringServiceType {
         let merchantText = normalized([name, website ?? ""].joined(separator: " "))
         let categoryText = normalized((categories ?? []).joined(separator: " "))
@@ -47,6 +74,10 @@ enum RecurringServiceClassifier {
         if containsAny(categoryText, terms: subscriptionCategoryTerms)
             || containsAny(merchantText, terms: subscriptionMerchantTerms) {
             return .subscription
+        }
+
+        if containsAny(normalized(purpose ?? ""), terms: billMerchantTerms) {
+            return .bill
         }
 
         // The Services area historically represented subscriptions. Keeping that
@@ -63,7 +94,8 @@ enum RecurringServiceClassifier {
         "at&t", "att", "verizon", "t-mobile", "tmobile", "xfinity", "comcast",
         "spectrum", "cox", "frontier", "electric", "electricity", "energy",
         "water", "utility", "utilities", "insurance", "mortgage", "rent",
-        "wireless", "internet", "phone", "google cloud", "amazon web services", "aws"
+        "wireless", "internet", "phone", "google cloud", "amazon web services", "aws",
+        "car payment", "auto payment", "vehicle payment", "loan payment", "auto loan", "car loan"
     ]
 
     private static let subscriptionCategoryTerms = [
@@ -576,7 +608,7 @@ struct Subscription: Identifiable, Codable, Hashable {
 
     var resolvedServiceType: RecurringServiceType {
         serviceType == .automatic
-            ? RecurringServiceClassifier.classify(name: name, website: website)
+            ? RecurringServiceClassifier.classify(name: name, website: website, purpose: notes)
             : serviceType
     }
 

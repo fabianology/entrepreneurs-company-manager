@@ -111,6 +111,9 @@ struct SubscriptionReceiptView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(sub.name.uppercased())
                         .font(.system(size: 14, weight: .bold, design: .monospaced))
+                    Text("TYPE: \(sub.resolvedServiceType.title.uppercased())")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(fadedInk)
                     if sub.isFree {
                         Text("FREE TIER")
                             .font(.system(size: 12, design: .monospaced))
@@ -169,6 +172,8 @@ struct SubscriptionReceiptView: View {
                                 Spacer()
                                 Text("$\(String(format: "%.0f", ss.cost))")
                             }
+                            Text("  TYPE: \(ss.resolvedServiceType.title.uppercased())")
+                                .foregroundStyle(fadedInk)
                             if !ss.purpose.isEmpty {
                                 Text("  PURPOSE: \(ss.purpose)").foregroundStyle(fadedInk)
                             }

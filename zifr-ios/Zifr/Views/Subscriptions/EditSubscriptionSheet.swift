@@ -827,7 +827,8 @@ struct SubServiceHUD: View {
                draft.renewsOn != initial.renewsOn ||
                draft.autoPay != initial.autoPay ||
                draft.status != initial.status ||
-               draft.purpose != initial.purpose
+               draft.purpose != initial.purpose ||
+               draft.serviceType != initial.serviceType
     }
 
     private var renewsOnBinding: Binding<Date> {
@@ -931,25 +932,42 @@ struct SubServiceHUD: View {
                                 }
                             }
 
-                            // Row 3: Renewal date
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("RENEWS ON")
-                                    .font(.system(size: 12, weight: .regular))
-                                    .foregroundStyle(Color.white.opacity(0.45))
-                                DatePicker(
-                                    "Renews on",
-                                    selection: renewsOnBinding,
-                                    displayedComponents: .date
+                            // Row 3: Renewal date + Service Type
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("RENEWS ON")
+                                        .font(.system(size: 12, weight: .regular))
+                                        .foregroundStyle(Color.white.opacity(0.45))
+                                    DatePicker(
+                                        "Renews on",
+                                        selection: renewsOnBinding,
+                                        displayedComponents: .date
+                                    )
+                                    .labelsHidden()
+                                    .datePickerStyle(.compact)
+                                    .tint(.zifrBlue)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 8)
+                                    .frame(height: 48)
+                                    .background(Color(hex: "#2C2C2E"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                                }
+
+                                CompactPickerField(
+                                    title: "SERVICE TYPE",
+                                    options: RecurringServiceType.allCases.map(\.rawValue),
+                                    selection: Binding(
+                                        get: { draft.serviceType.rawValue },
+                                        set: { draft.serviceType = RecurringServiceType(rawValue: $0) ?? .automatic }
+                                    ),
+                                    displayName: { value in
+                                        if value == RecurringServiceType.automatic.rawValue {
+                                            return "Auto · \(draft.resolvedServiceType == .bill ? "Bill" : "Subs")"
+                                        }
+                                        return value == RecurringServiceType.subscription.rawValue ? "Subs" : value.capitalized
+                                    }
                                 )
-                                .labelsHidden()
-                                .datePickerStyle(.compact)
-                                .tint(.zifrBlue)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.horizontal, 16)
-                                .frame(height: 44)
-                                .background(Color(hex: "#2C2C2E"))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                             }
 
                             // Row 4: Auto Pay + Status
