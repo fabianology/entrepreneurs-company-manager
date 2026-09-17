@@ -110,7 +110,7 @@ struct ZifrApp: App {
             }
             .onChange(of: authViewModel.isAuthenticated) { wasAuthenticated, isAuthenticated in
                 if wasAuthenticated && !isAuthenticated {
-                    appState.hasLoadedPortfolio = false
+                    appState.clearSearchSession()
                     appState.clearBusinessExpenses()
                     if authViewModel.currentUser == nil {
                         notificationRouter.clear()

@@ -401,19 +401,21 @@ struct ProContextMenuModifier: ViewModifier {
     let password: String?
     let loginId: String?
     let last4: String?
-    
+    var credentialRecordID: String?
+    @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var auth
+
     func body(content: Content) -> some View {
-        let availablePassword = SecurityService.isLockedValue(password) ? nil : password
         content
             .contextMenu {
-                if let pwd = availablePassword, !pwd.isEmpty {
+                if let password, !password.isEmpty, !SecurityService.isLockedValue(password) {
                     Button {
-                        UIPasteboard.general.string = pwd
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        Task { await DataRepository.shared.logSecurityEvent(title: "Password Copied", message: "A password was copied to your clipboard.") }
-                    } label: {
-                        Label("Copy Password", systemImage: "key.fill")
-                    }
+                        guard auth.isAuthenticated, let userID = auth.currentUser?.id else { return }
+                        let value: String?
+                        if let credentialRecordID { value = try? SearchCredentialAccess.resolve(recordID: credentialRecordID, appState: appState, userID: userID) }
+                        else { value = password }
+                        if let value { SearchCredentialAccess.copy(value); UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
+                    } label: { Label("Copy Password", systemImage: "doc.on.doc") }
                 }
                 if let login = loginId, !login.isEmpty {
                     Button {
@@ -432,23 +434,16 @@ struct ProContextMenuModifier: ViewModifier {
                     }
                 }
                 
-                if (loginId != nil && !loginId!.isEmpty) || (availablePassword != nil && !availablePassword!.isEmpty) {
-                    let shareText = [
-                        (loginId != nil && !loginId!.isEmpty) ? "Login: \(loginId!)" : nil,
-                        (availablePassword != nil && !availablePassword!.isEmpty) ? "Password: \(availablePassword!)" : nil
-                    ].compactMap { $0 }.joined(separator: "\n")
-                    
-                    ShareLink(item: shareText) {
-                        Label("Share", systemImage: "square.and.arrow.up")
-                    }
+                if let loginId, !loginId.isEmpty {
+                    ShareLink(item: "Login: \(loginId)") { Label("Share login", systemImage: "square.and.arrow.up") }
                 }
             }
     }
 }
 
 extension View {
-    func proContextMenu(password: String? = nil, loginId: String? = nil, last4: String? = nil) -> some View {
-        self.modifier(ProContextMenuModifier(password: password, loginId: loginId, last4: last4))
+    func proContextMenu(password: String? = nil, loginId: String? = nil, last4: String? = nil, credentialRecordID: String? = nil) -> some View {
+        self.modifier(ProContextMenuModifier(password: password, loginId: loginId, last4: last4, credentialRecordID: credentialRecordID))
     }
 }
 

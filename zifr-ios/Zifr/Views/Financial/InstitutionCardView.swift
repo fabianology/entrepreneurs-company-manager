@@ -18,6 +18,7 @@ struct InstitutionCardView: View {
     @State private var expanded = false
     @State private var copiedField: String? = nil
     @State private var passwordRevealed = false
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var editingAccount: InstitutionAccount? = nil
     @State private var accountDraft = InstitutionAccount()
@@ -302,6 +303,8 @@ struct InstitutionCardView: View {
                     lineWidth: 1.5
                 )
         )
+        .onChange(of: scenePhase) { _, phase in if phase != .active { passwordRevealed = false } }
+        .onDisappear { passwordRevealed = false }
         .sheet(item: $editingAccount) { _ in
             InstitutionAccountHUD(
                 draft: $accountDraft,
@@ -385,12 +388,14 @@ struct InstitutionCardView: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
+                    .accessibilityLabel(passwordRevealed ? "Hide password" : "Reveal password")
                 }
             }
 
             Button {
                 guard !value.isEmpty, !isLocked else { return }
-                UIPasteboard.general.string = value
+                if isPassword { SearchCredentialAccess.copy(value) }
+                else { UIPasteboard.general.string = value }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation { copiedField = field }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -412,7 +417,7 @@ struct InstitutionCardView: View {
             }
             .buttonStyle(PremiumButtonStyle())
             .disabled(isLocked)
-            .proContextMenu(password: institution.password, loginId: (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? ""), last4: nil)
+            .proContextMenu(password: institution.password, loginId: (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? ""), last4: nil, credentialRecordID: "institution:\(institution.id.uuidString)")
         }
     }
 }

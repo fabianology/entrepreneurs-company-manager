@@ -4,15 +4,15 @@ import Observation
 
 @Observable
 final class AppState {
-    var companies: [Company] = []
-    var subscriptions: [Subscription] = []
-    var institutions: [Institution] = []
-    var cards: [FinancialCard] = []
-    var loans: [Loan] = []
-    var documents: [CompanyDocument] = []
-    var transactions: [Transaction] = []
-    var transactionOverrides: [TransactionOverride] = []
-    var transactionCategoryRules: [TransactionCategoryRule] = []
+    var companies: [Company] = [] { didSet { searchRevision &+= 1 } }
+    var subscriptions: [Subscription] = [] { didSet { searchRevision &+= 1 } }
+    var institutions: [Institution] = [] { didSet { searchRevision &+= 1 } }
+    var cards: [FinancialCard] = [] { didSet { searchRevision &+= 1 } }
+    var loans: [Loan] = [] { didSet { searchRevision &+= 1 } }
+    var documents: [CompanyDocument] = [] { didSet { searchRevision &+= 1 } }
+    var transactions: [Transaction] = [] { didSet { searchRevision &+= 1 } }
+    var transactionOverrides: [TransactionOverride] = [] { didSet { searchRevision &+= 1 } }
+    var transactionCategoryRules: [TransactionCategoryRule] = [] { didSet { searchRevision &+= 1 } }
     var businessExpenseReviews: [BusinessExpenseReview] = []
     var businessExpenseSettings = BusinessExpenseSettings()
     var businessExpenseProfiles: [BusinessExpenseProfile] = []
@@ -38,24 +38,63 @@ final class AppState {
         let ignoredIDs = Set(transactionOverrides.filter { $0.flowOverride == .ignored }.map(\.transactionId))
         return transactions.filter { !ignoredIDs.contains($0.id) }
     }
-    var resourceShares: [ResourceShare] = []
+    var resourceShares: [ResourceShare] = [] { didSet { searchRevision &+= 1 } }
     var activityLogs: [ActivityLog] = []
     var notifications: [AppNotification] = []
     var userPreferences: UserPreferences? = nil
     var alertRules: [AlertRule] = []
     var plaidItems: [PlaidItemSummary] = []
     var entitlementSnapshot: AccessSnapshot = .free
-    var resourceConnections: [ResourceConnection] = []
-    var obligations: [PortfolioObligation] = []
-    var hasLoadedPortfolio: Bool = false
+    var resourceConnections: [ResourceConnection] = [] { didSet { searchRevision &+= 1 } }
+    var obligations: [PortfolioObligation] = [] { didSet { searchRevision &+= 1 } }
+    var hasLoadedPortfolio: Bool = false { didSet { searchRevision &+= 1 } }
     
     var isLoading: Bool = false
-    var portfolioLoadIssue: String? = nil
+    var portfolioLoadIssue: String? = nil { didSet { searchRevision &+= 1 } }
     var error: String? = nil
     
+    // This session marker prevents old in-memory records from crossing account boundaries.
+    var portfolioLoadingUserID: UUID?
+    var portfolioLoadID = UUID()
+    var portfolioUserID: UUID? { didSet { searchRevision &+= 1 } }
+    var searchRevision: UInt64 = 0
+    var searchDocumentPages: [SearchDocumentPage] = [] { didSet { searchRevision &+= 1 } }
+    var searchDocumentStatus = "Document contents have not been indexed"
+    var searchDocumentRevision: String {
+        "\(portfolioUserID?.uuidString ?? "")|\(hasLoadedPortfolio)|" + documents.map { "\($0.id):\($0.url ?? ""):\($0.visibility ?? "")" }.joined(separator: "|") + "|\(resourceShares.hashValue)"
+    }
+    @ObservationIgnored private var cachedSearch: (user: UUID, revision: UInt64, index: UniversalSearchIndex)?
+
+    func searchRedactor() -> SearchRedactor {
+        var values = subscriptions.map(\.password) + cards.map(\.password) + institutions.map(\.password)
+        values += cards.map(\.cardNumber)
+        values += institutions.flatMap { $0.accounts.flatMap { [$0.accountNumber, $0.routingNumber, $0.wireRoutingNumber] } }
+        return SearchRedactor(values: values)
+    }
+
+    @MainActor
+    func searchIndex(for userID: UUID) -> UniversalSearchIndex {
+        if let cachedSearch, cachedSearch.user == userID, cachedSearch.revision == searchRevision { return cachedSearch.index }
+        let index = UniversalSearchIndex(appState: self, userID: userID, documentPages: searchDocumentPages)
+        cachedSearch = (userID, searchRevision, index)
+        return index
+    }
+
+    func clearSearchSession() {
+        portfolioLoadID = UUID()
+        portfolioLoadingUserID = nil
+        isLoading = false
+        portfolioUserID = nil
+        hasLoadedPortfolio = false
+        searchDocumentPages = []
+        searchDocumentStatus = "Document contents have not been indexed"
+        cachedSearch = nil
+    }
+
     // Local Overrides: resourceId -> companyId
     var localCompanyOverrides: [String: UUID] = [:] {
         didSet {
+            searchRevision &+= 1
             if let encoded = try? JSONEncoder().encode(localCompanyOverrides) {
                 UserDefaults.standard.set(encoded, forKey: "localCompanyOverrides")
             }

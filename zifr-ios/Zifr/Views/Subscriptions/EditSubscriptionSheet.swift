@@ -370,15 +370,7 @@ struct EditSubscriptionSheet: View {
                                             )
                                             .textInputAutocapitalization(.never)
                                             
-                                            Button {
-                                                showPassword.toggle()
-                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            } label: {
-                                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundStyle(Color.white.opacity(0.4))
-                                                    .padding()
-                                            }
+                                            SecretVisibilityToggle(isVisible: $showPassword)
                                             .padding(.bottom, 2)
                                         }
                                         if SecurityService.isLockedValue(sub.password) {

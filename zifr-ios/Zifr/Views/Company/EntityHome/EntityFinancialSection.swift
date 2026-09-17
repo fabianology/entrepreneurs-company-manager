@@ -591,7 +591,7 @@ struct EntityFinancialSection: View {
             }
         )
         .padding(.horizontal, 16)
-        .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil)
+        .proContextMenu(password: inst.password, loginId: inst.username ?? inst.email, last4: nil, credentialRecordID: "institution:\(inst.id.uuidString)")
     }
 
     private func formatCurrency(_ value: Double) -> String {

@@ -31,6 +31,7 @@ struct PremiumSubscriptionCard: View {
     @State private var showLinkedEmails = false
     @State private var copiedField: String? = nil // "login" | "password"
     @State private var passwordRevealed = false
+    @Environment(\.scenePhase) private var scenePhase
 
     // Sub-service HUD state
     @State private var showSubServiceHUD = false
@@ -544,6 +545,8 @@ struct PremiumSubscriptionCard: View {
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
         // ── Sub-service HUD ───────────────────────────────────────────────
+        .onChange(of: scenePhase) { _, phase in if phase != .active { passwordRevealed = false } }
+        .onDisappear { passwordRevealed = false }
         .sheet(isPresented: $showSubServiceHUD) {
             SubServiceHUD(
                 draft: $subDraft,
@@ -582,7 +585,7 @@ struct PremiumSubscriptionCard: View {
             .presentationCornerRadius(24)
         }
         // ── Linked email HUD ─────────────────────────────────────────────
-        .proContextMenu(password: sub.password, loginId: sub.loginId, last4: nil)
+        .proContextMenu(password: sub.password, loginId: sub.loginId, last4: nil, credentialRecordID: "subscription:\(sub.id.uuidString)")
         .sheet(isPresented: $showEmailHUD) {
             LinkedEmailHUD(
                 draft: $emailDraft,
@@ -674,12 +677,14 @@ struct PremiumSubscriptionCard: View {
                             .font(.system(size: 13))
                             .foregroundStyle(Color.white.opacity(0.4))
                     }
+                    .accessibilityLabel(passwordRevealed ? "Hide password" : "Reveal password")
                 }
             }
 
             Button {
                 guard !value.isEmpty, !isLocked else { return }
-                UIPasteboard.general.string = value
+                if isPassword { SearchCredentialAccess.copy(value) }
+                else { UIPasteboard.general.string = value }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 withAnimation { copiedField = field }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) {

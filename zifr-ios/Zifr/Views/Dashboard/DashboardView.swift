@@ -58,6 +58,13 @@ struct DashboardView: View {
     @State private var tutorialSearchFrame: CGRect = .zero
     @State private var tutorialAssistantFrame: CGRect = .zero
 
+    private func openPendingSearch() {
+        guard appState.hasLoadedPortfolio, let request = SearchRouteCoordinator.shared.pending else { return }
+        vm.searchQuery = request.query
+        vm.showSearch = true
+        SearchRouteCoordinator.shared.clear()
+    }
+
     var body: some View {
         NavigationStack(path: $vm.path) {
             ZStack(alignment: .top) {
@@ -268,10 +275,7 @@ struct DashboardView: View {
                 EditCompanySheet(vm: vm, company: company)
             }
             .sheet(isPresented: $vm.showSearch) {
-                GlobalSearchView(
-                    vm: vm, companies: companies, subscriptions: subscriptions,
-                    cards: cards, institutions: institutions, loans: loans, documents: documents
-                )
+                GlobalSearchView(vm: vm)
             }
             .sheet(isPresented: $showBriefing) {
                 GeometryReader { geometry in
@@ -401,11 +405,16 @@ struct DashboardView: View {
                     break
                 }
             }
+            .task(id: appState.searchDocumentRevision) {
+                if let userID = authViewModel.currentUser?.id { await SearchDocumentIndexer.shared.index(appState: appState, userID: userID) }
+            }
+            .onChange(of: SearchRouteCoordinator.shared.pending) { _, _ in openPendingSearch() }
             .onChange(of: notificationRouter.pendingRoute) { _, _ in
                 openPendingNotificationRouteIfReady()
             }
             .onChange(of: appState.hasLoadedPortfolio) { _, _ in
                 openPendingNotificationRouteIfReady()
+                openPendingSearch()
             }
             .onChange(of: showNotificationInbox) { _, isPresented in
                 if !isPresented { openPendingNotificationRouteIfReady() }
@@ -413,6 +422,7 @@ struct DashboardView: View {
             .onAppear {
                 checkDowngradeSelection()
                 openPendingNotificationRouteIfReady()
+                openPendingSearch()
             }
             .onChange(of: appState.companies.count) { _, _ in checkDowngradeSelection() }
             .onChange(of: accessController.snapshot.status) { _, _ in checkDowngradeSelection() }

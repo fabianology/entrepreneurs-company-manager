@@ -66,6 +66,7 @@ struct FinancialCardVisual: View {
     
     @Environment(AppState.self) private var appState
     
+    @Environment(\.scenePhase) private var scenePhase
     @State private var isFlipped: Bool = false
     @State private var isUnlocked: Bool = false
     @State private var sheenOffset: CGFloat = -0.5
@@ -150,11 +151,8 @@ struct FinancialCardVisual: View {
                     
                     Spacer(minLength: 0)
                     
-                    if isUnlocked {
-                        unlockedBackDetails(isLight: isLight, primaryColor: primaryColor)
-                    } else {
-                        lockedBackPrompt(primaryColor: primaryColor)
-                    }
+                    unlockedBackDetails(isLight: isLight, primaryColor: primaryColor)
+                        .id(isFlipped)
                     
                     Spacer(minLength: 0)
                 }
@@ -180,12 +178,9 @@ struct FinancialCardVisual: View {
             }
         }
         .onChange(of: isFlipped) { _, flipped in
-            if flipped && !isUnlocked {
-                authenticateBiometrics { success in
-                    isUnlocked = success
-                }
-            }
+            if !flipped { isUnlocked = false }
         }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { isUnlocked = false } }
     }
     
     // ── Helper Sub-Views (Opaque methods to bypass Swift compiler complex expressions checks) ──
@@ -379,13 +374,21 @@ struct FinancialCardVisual: View {
     @ViewBuilder
     private func unlockedBackDetails(isLight: Bool, primaryColor: Color) -> some View {
         VStack(spacing: 6) {
-            BackFieldView(
-                label: "CARD NUMBER",
-                value: formatCardNumber(card.cardNumber ?? "•••• •••• •••• ••••"),
-                isLight: isLight,
-                primaryColor: primaryColor,
-                isSecure: false
-            )
+            HStack(spacing: 6) {
+                BackFieldView(
+                    label: "CARD NUMBER",
+                    value: isUnlocked ? formatCardNumber(card.cardNumber ?? "•••• •••• •••• ••••") : "•••• •••• •••• \(card.last4 ?? "••••")",
+                    isLight: isLight,
+                    primaryColor: primaryColor,
+                    isSecure: false
+                )
+                Button {
+                    if isUnlocked { isUnlocked = false }
+                    else { authenticateBiometrics { isUnlocked = $0 } }
+                } label: {
+                    Image(systemName: isUnlocked ? "eye.slash" : "eye").font(.caption).foregroundStyle(primaryColor)
+                }.buttonStyle(.plain).accessibilityLabel(isUnlocked ? "Hide card number" : "Reveal full card number")
+            }
             
             HStack(spacing: 6) {
                 BackFieldView(
@@ -421,44 +424,13 @@ struct FinancialCardVisual: View {
                             value: pwd,
                             isLight: isLight,
                             primaryColor: primaryColor,
-                            isSecure: true
+                            isSecure: true,
+                            credentialRecordID: "card:\(card.id.uuidString)"
                         )
                     }
                 }
             }
         }
-    }
-    
-    @ViewBuilder
-    private func lockedBackPrompt(primaryColor: Color) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "lock.fill")
-                .font(.system(size: 28))
-                .foregroundStyle(primaryColor.opacity(0.4))
-            
-            Text("Authentication Required")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(primaryColor)
-            
-            Button {
-                authenticateBiometrics { success in
-                    isUnlocked = success
-                }
-            } label: {
-                Text("Tap to Authenticate")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(primaryColor)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(primaryColor.opacity(0.08))
-                            .overlay(Capsule().stroke(primaryColor.opacity(0.2), lineWidth: 0.5))
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     @ViewBuilder
@@ -492,7 +464,7 @@ struct FinancialCardVisual: View {
         var error: NSError?
         
         if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
-            let reason = "Reveal Zifr secure card credentials"
+            let reason = "Reveal the full card number in Miloom"
             context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason) { success, _ in
                 DispatchQueue.main.async {
                     completion(success)
@@ -648,11 +620,11 @@ struct BackFieldView: View {
     let isLight: Bool
     let primaryColor: Color
     let isSecure: Bool
-    
+    var credentialRecordID: String? = nil
+    @State private var passwordRevealed = false
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var isCopied = false
-    @State private var isPasswordRevealed = false
-    @State private var synthesizer = AVSpeechSynthesizer()
-    @State private var isSpeaking = false
     private var isLocked: Bool { SecurityService.isLockedValue(value) }
     
     var body: some View {
@@ -663,7 +635,7 @@ struct BackFieldView: View {
                 .foregroundStyle(isLight ? Color.black.opacity(0.4) : Color.white.opacity(0.4))
             
             HStack(spacing: 4) {
-                Text(isLocked ? SecurityService.lockedValueLabel : (isSecure && !isPasswordRevealed ? "••••••••" : value))
+                Text(isLocked ? SecurityService.lockedValueLabel : (isSecure && !passwordRevealed ? "••••••••" : value))
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundStyle(primaryColor)
                     .lineLimit(1)
@@ -672,49 +644,15 @@ struct BackFieldView: View {
                 Spacer()
                 
                 if isSecure && !isLocked {
-                    Button {
-                        isPasswordRevealed.toggle()
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Image(systemName: isPasswordRevealed ? "eye.slash" : "eye")
-                            .font(.system(size: 10))
-                            .foregroundStyle(primaryColor.opacity(0.5))
-                    }
-                    .buttonStyle(.plain)
-                    
-                    Button {
-                        if isSpeaking {
-                            synthesizer.stopSpeaking(at: .immediate)
-                            isSpeaking = false
-                        } else {
-                            isSpeaking = true
-                            
-                            let introUtterance = AVSpeechUtterance(string: "I cannot read your password for security reasons, but I will hand you over to your device's secure local system to read it to you.")
-                            introUtterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-                            
-                            let passUtterance = AVSpeechUtterance(string: value)
-                            passUtterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-                            
-                            synthesizer.speak(introUtterance)
-                            synthesizer.speak(passUtterance)
-                            
-                            // Simple reset
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
-                                isSpeaking = false
-                            }
-                        }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Image(systemName: isSpeaking ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                            .font(.system(size: 10))
-                            .foregroundStyle(isSpeaking ? Color.blue : primaryColor.opacity(0.5))
-                    }
-                    .buttonStyle(.plain)
+                    Button { passwordRevealed.toggle() } label: {
+                        Image(systemName: passwordRevealed ? "eye.slash" : "eye").font(.system(size: 10)).foregroundStyle(primaryColor.opacity(0.5))
+                    }.buttonStyle(.plain).accessibilityLabel(passwordRevealed ? "Hide password" : "Reveal password")
                 }
-                
+
                 Button {
                     guard !isLocked else { return }
-                    UIPasteboard.general.string = value
+                    if isSecure { SearchCredentialAccess.copy(value) }
+                    else { UIPasteboard.general.string = value }
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     withAnimation { isCopied = true }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -740,5 +678,7 @@ struct BackFieldView: View {
                 )
         )
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onChange(of: scenePhase) { _, phase in if phase != .active { passwordRevealed = false } }
+        .onDisappear { passwordRevealed = false }
     }
 }

@@ -3,6 +3,11 @@ import Supabase
 import CryptoKit
 import Security
 
+private actor PortfolioLoadFailures {
+    var names = Set<String>()
+    func record(_ name: String) { names.insert(name) }
+}
+
 class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
@@ -51,6 +56,11 @@ class DataRepository {
         }
     }
     
+    private func searchLoad<T>(_ name: String, failures: PortfolioLoadFailures, operation: () async throws -> [T]) async -> [T] {
+        do { return try await operation() }
+        catch { await failures.record(name); return [] }
+    }
+
     // MARK: - Fetch All Data
     private func fetchTransactions() async throws -> [Transaction] {
         var transactions: [Transaction] = []
@@ -91,9 +101,11 @@ class DataRepository {
 
     @MainActor
     func refreshTransactions(appState: AppState) async throws {
+        let userID = try await client.auth.session.user.id
         let transactions: [Transaction] = try await measure("transactions") {
             try await fetchTransactions()
         }
+        guard !Task.isCancelled, appState.portfolioUserID == userID, (try? await client.auth.session.user.id) == userID else { return }
         appState.transactions = transactions
     }
 
@@ -129,13 +141,23 @@ class DataRepository {
 
     @MainActor
     func fetchAllData(appState: AppState) async {
-        if appState.isLoading { return }
+        guard let loadingUserID = try? await client.auth.session.user.id else { return }
+        if appState.isLoading && appState.portfolioLoadingUserID == loadingUserID { return }
+        if appState.portfolioUserID != loadingUserID {
+            appState.clearSearchSession()
+            appState.companies = []
+        }
+        let loadID = UUID()
+        appState.portfolioLoadID = loadID
+        appState.portfolioLoadingUserID = loadingUserID
         appState.isLoading = true
-        defer { appState.isLoading = false }
+        defer { if appState.portfolioLoadID == loadID { appState.isLoading = false; appState.portfolioLoadingUserID = nil } }
 
+        let searchLoadFailures = PortfolioLoadFailures()
         // Companies drive the first dashboard paint. Publish them immediately rather
         // than holding them until every secondary portfolio request has completed.
         let fetchedCompaniesResult = await measure("companies") { await fetchCompanies() }
+        guard !Task.isCancelled, appState.portfolioLoadID == loadID, (try? await client.auth.session.user.id) == loadingUserID else { return }
         switch fetchedCompaniesResult {
         case .success(let fetchedCompanies):
             appState.companies = fetchedCompanies
@@ -146,13 +168,13 @@ class DataRepository {
             appState.portfolioLoadIssue = "Companies could not be refreshed. Pull down to try again."
         }
 
-        async let fSubscriptions: [Subscription] = measure("subscriptions") { (try? await client.from("subscriptions").select().execute().value) ?? [] }
-        async let fInstitutions: [Institution] = measure("institutions") { (try? await client.from("institutions").select().execute().value) ?? [] }
-        async let fCards: [FinancialCard] = measure("cards") { (try? await client.from("financial_cards").select().execute().value) ?? [] }
-        async let fLoans: [Loan] = measure("loans") { (try? await client.from("loans").select().execute().value) ?? [] }
-        async let fLoanPayments: [LoanPayment] = measure("loan_payments") { (try? await client.from("loan_payments").select().execute().value) ?? [] }
-        async let fDocuments: [CompanyDocument] = measure("documents") { (try? await client.from("company_documents").select().execute().value) ?? [] }
-        async let fShares = measure("shares") { await safeFetchShares() }
+        async let fSubscriptions: [Subscription] = measure("subscriptions") { await searchLoad("services", failures: searchLoadFailures) { try await client.from("subscriptions").select().execute().value } }
+        async let fInstitutions: [Institution] = measure("institutions") { await searchLoad("bank accounts", failures: searchLoadFailures) { try await client.from("institutions").select().execute().value } }
+        async let fCards: [FinancialCard] = measure("cards") { await searchLoad("cards", failures: searchLoadFailures) { try await client.from("financial_cards").select().execute().value } }
+        async let fLoans: [Loan] = measure("loans") { await searchLoad("loans", failures: searchLoadFailures) { try await client.from("loans").select().execute().value } }
+        async let fLoanPayments: [LoanPayment] = measure("loan_payments") { await searchLoad("loan payments", failures: searchLoadFailures) { try await client.from("loan_payments").select().execute().value } }
+        async let fDocuments: [CompanyDocument] = measure("documents") { await searchLoad("documents", failures: searchLoadFailures) { try await client.from("company_documents").select().execute().value } }
+        async let fShares: [ResourceShare] = measure("shares") { await searchLoad("sharing permissions", failures: searchLoadFailures) { try await client.from("resource_shares").select().execute().value } }
         async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
@@ -164,23 +186,17 @@ class DataRepository {
                 .execute()
                 .value) ?? []
         }
-        async let fConnections: [ResourceConnection] = measure("resource_connections") { (try? await client.from("resource_connections").select().execute().value) ?? [] }
+        async let fConnections: [ResourceConnection] = measure("resource_connections") { await searchLoad("connections", failures: searchLoadFailures) { try await client.from("resource_connections").select().execute().value } }
         async let fObligations: [PortfolioObligation] = measure("obligations") { (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? [] }
         async let fObligationRefresh = refreshMyObligations()
-        async let fTransactions = measure("transactions") { await safeFetchTransactions() }
+        async let fTransactions = measure("transactions") { await searchLoad("transactions", failures: searchLoadFailures) { try await fetchTransactions() } }
         async let fTransactionOverrides: [TransactionOverride] = measure("transaction_overrides") {
-            (try? await client
-                .from("plaid_transaction_overrides")
-                .select()
-                .execute()
-                .value) ?? []
+            await searchLoad("transaction classifications", failures: searchLoadFailures) { try await client
+                .from("plaid_transaction_overrides").select().execute().value }
         }
         async let fTransactionCategoryRules: [TransactionCategoryRule] = measure("transaction_category_rules") {
-            (try? await client
-                .from("plaid_transaction_category_rules")
-                .select()
-                .execute()
-                .value) ?? []
+            await searchLoad("transaction classifications", failures: searchLoadFailures) { try await client
+                .from("plaid_transaction_category_rules").select().execute().value }
         }
         
         let fetchedSubscriptions = await fSubscriptions
@@ -226,7 +242,9 @@ class DataRepository {
         
         let session = try? await client.auth.session
         let currentUserId = session?.user.id
-        
+        guard !Task.isCancelled, appState.portfolioLoadID == loadID, currentUserId == loadingUserID else { return }
+        appState.portfolioUserID = loadingUserID
+
         appState.subscriptions = normalizedSubscriptions
         appState.institutions = secureInst
         appState.cards = secureCards
@@ -247,15 +265,18 @@ class DataRepository {
         // Keep next-due dates current in Supabase. A failed background write does
         // not block the portfolio from showing the correctly calculated date.
         for subscription in subscriptionsNeedingRenewalUpdate {
+            guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
             try? await updateSubscription(subscription)
         }
 
+        guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
         if let currentUserId {
             let generatedConnections = PortfolioConnectionEngine.buildConnections(appState: appState, ownerUserId: currentUserId)
             let existingEdges = Set(fetchedConnections.map(Self.connectionIdentity))
             let newConnections = generatedConnections.filter { !existingEdges.contains(Self.connectionIdentity($0)) }
             if !newConnections.isEmpty {
                 try? await upsertConnections(newConnections)
+                guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
                 appState.resourceConnections.append(contentsOf: newConnections)
             }
 
@@ -266,6 +287,16 @@ class DataRepository {
             try? "\(transactions.count)".write(to: fileURL, atomically: true, encoding: .utf8)
         }
 
+        guard !Task.isCancelled, (try? await client.auth.session.user.id) == loadingUserID else {
+            if appState.portfolioLoadID == loadID { appState.clearSearchSession(); appState.isLoading = false; appState.portfolioLoadingUserID = nil }
+            return
+        }
+        guard appState.portfolioLoadID == loadID else { return }
+        let unavailable = await searchLoadFailures.names.sorted()
+        guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
+        if !unavailable.isEmpty {
+            appState.portfolioLoadIssue = ([appState.portfolioLoadIssue].compactMap { $0 } + ["Could not load: " + unavailable.joined(separator: ", ") + ". Search and totals may be incomplete."]).joined(separator: " ")
+        }
         appState.hasLoadedPortfolio = true
 
     }

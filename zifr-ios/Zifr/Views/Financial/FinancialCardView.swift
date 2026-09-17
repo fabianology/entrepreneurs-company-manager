@@ -54,7 +54,7 @@ struct FinancialCardView: View {
             .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
         }
         .buttonStyle(.plain)
-        .proContextMenu(password: card.password, loginId: card.login, last4: card.last4)
+        .proContextMenu(password: card.password, loginId: card.login, last4: card.last4, credentialRecordID: "card:\(card.id.uuidString)")
     }
 }
 
