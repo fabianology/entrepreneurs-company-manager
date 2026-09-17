@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A38A38A38A38A38A38A38003 /* GeminiSpokenQuestion.wav in Resources */ = {isa = PBXBuildFile; fileRef = A38A38A38A38A38A38A38004 /* GeminiSpokenQuestion.wav */; };
 		A38A38A38A38A38A38A38001 /* GeminiLiveTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */; };
 		040C1B465BBF9CDEDF000CCD /* ActivityLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C022DD3ABEFB2F9B7AD38355 /* ActivityLogsView.swift */; };
 		07549C6F481951A912F9ECEC /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C594CA72D48122B0D50169 /* ActivityLog.swift */; };
@@ -146,6 +147,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A38A38A38A38A38A38A38004 /* GeminiSpokenQuestion.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = Fixtures/GeminiSpokenQuestion.wav; sourceTree = "<group>"; };
 		A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiLiveTests.swift; sourceTree = "<group>"; };
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
 		032520FD864A3B1FF73C81A0 /* AdminSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSettingsView.swift; sourceTree = "<group>"; };
@@ -304,6 +306,7 @@
 			children = (
 				51478D5FCEE3293BF6A573BB /* PremiumEngineTests.swift */,
 				A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */,
+				A38A38A38A38A38A38A38004 /* GeminiSpokenQuestion.wav */,
 				19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */,
 			);
 			name = ZifrTests;
@@ -717,6 +720,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A38A38A38A38A38A38A38003 /* GeminiSpokenQuestion.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

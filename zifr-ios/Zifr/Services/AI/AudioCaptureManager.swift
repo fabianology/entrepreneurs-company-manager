@@ -22,6 +22,41 @@ final class LiveCaptureGate: @unchecked Sendable {
     }
 }
 
+/// Stateful resampling shared by the microphone tap and spoken-input verification.
+/// Call only from the serial audio tap (or a single test task).
+final class LivePCMEncoder {
+    private let converter: AVAudioConverter
+    private let format: AVAudioFormat
+    private let inputRate: Double
+
+    init(inputFormat: AVAudioFormat) throws {
+        guard inputFormat.sampleRate > 0,
+              let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: 1, interleaved: false),
+              let converter = AVAudioConverter(from: inputFormat, to: format) else { throw LiveFailure.audio }
+        self.format = format
+        self.converter = converter
+        inputRate = inputFormat.sampleRate
+    }
+
+    func encode(_ buffer: AVAudioPCMBuffer) -> (data: Data, rms: Float)? {
+        let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * 16000 / inputRate)) + 32
+        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+        var supplied = false
+        var error: NSError?
+        converter.convert(to: output, error: &error) { _, status in
+            if supplied { status.pointee = .noDataNow; return nil }
+            supplied = true
+            status.pointee = .haveData
+            return buffer
+        }
+        guard error == nil, output.frameLength > 0, let samples = output.int16ChannelData?[0] else { return nil }
+        let count = Int(output.frameLength)
+        var squares: Float = 0
+        for i in 0..<count { let value = Float(samples[i]) / 32768; squares += value * value }
+        return (Data(bytes: samples, count: count * 2), sqrt(squares / Float(count)))
+    }
+}
+
 @MainActor
 final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     let audioDataPublisher = PassthroughSubject<Data, Never>()
@@ -40,6 +75,8 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
     private var playbackGeneration = UUID()
     private var playbackLevels: [Float] = []
     private var requestedInput = false
+    private var capturedFirstBuffer = false
+    private var capturedFirstSignal = false
     private var secureUtterance: AVSpeechUtterance?
     private var secureGeneration = UUID()
     private var secureCompletion: (() -> Void)?
@@ -61,6 +98,8 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
         if let engine, engine.isRunning { return true }
         let id = UUID()
         startGeneration = id
+        capturedFirstBuffer = false
+        capturedFirstSignal = false
         let audioSession = AVAudioSession.sharedInstance()
         let granted = await withCheckedContinuation { continuation in
             AVAudioApplication.requestRecordPermission { continuation.resume(returning: $0) }
@@ -74,46 +113,45 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
             try audioSession.setActive(true)
             let newEngine = AVAudioEngine()
             let newPlayer = AVAudioPlayerNode()
+            newEngine.attach(newPlayer)
+            let mixer = newEngine.mainMixerNode
             let input = newEngine.inputNode
             // Acoustic echo cancellation is required for an open mic during assistant playback.
             try input.setVoiceProcessingEnabled(true)
             let inputFormat = input.outputFormat(forBus: 0)
-            guard inputFormat.sampleRate > 0,
-                  let pcm16 = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, channels: 1, interleaved: false),
-                  let converter = AVAudioConverter(from: inputFormat, to: pcm16) else { throw LiveFailure.audio }
+            let encoder = try LivePCMEncoder(inputFormat: inputFormat)
             let gate = captureGate
             input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
-                guard let token = gate.token() else { return }
-                let capacity = AVAudioFrameCount(ceil(Double(buffer.frameLength) * 16000 / inputFormat.sampleRate)) + 32
-                guard let output = AVAudioPCMBuffer(pcmFormat: pcm16, frameCapacity: capacity) else { return }
-                var supplied = false
-                var error: NSError?
-                converter.convert(to: output, error: &error) { _, status in
-                    if supplied { status.pointee = .noDataNow; return nil }
-                    supplied = true
-                    status.pointee = .haveData
-                    return buffer
-                }
-                guard error == nil, output.frameLength > 0, let samples = output.int16ChannelData?[0] else { return }
-                let count = Int(output.frameLength)
-                let data = Data(bytes: samples, count: count * 2)
-                var squares: Float = 0
-                for i in 0..<count { let v = Float(samples[i]) / 32768; squares += v * v }
-                let level = min(1, sqrt(squares / Float(count)) * 9)
+                guard let token = gate.token(), let chunk = encoder.encode(buffer) else { return }
+                let data = chunk.data
+                let level = min(1, chunk.rms * 9)
                 Task { @MainActor [weak self] in
                     guard let self, gate.accepts(token) else { return }
+                    if !capturedFirstBuffer {
+                        capturedFirstBuffer = true
+                        AppDiagnostics.event("audio", "live_microphone", status: "captured")
+                    }
+                    if !capturedFirstSignal && chunk.rms > 0.005 {
+                        capturedFirstSignal = true
+                        AppDiagnostics.event("audio", "live_microphone_signal", status: "detected")
+                    }
                     volume = volume * 0.65 + level * 0.35
                     audioDataPublisher.send(data)
                 }
             }
-            newEngine.attach(newPlayer)
-            newEngine.connect(newPlayer, to: newEngine.mainMixerNode, format: playbackFormat)
+            newEngine.connect(newPlayer, to: mixer, format: playbackFormat)
+            let output = newEngine.outputNode
+            // Voice processing replaces the I/O nodes. Explicitly reconnect the
+            // mixer to the resulting hardware output or the graph can start
+            // without advancing either microphone taps or player buffers.
+            newEngine.connect(mixer, to: output, format: output.inputFormat(forBus: 0))
             newEngine.prepare()
             try newEngine.start()
             newPlayer.play()
             engine = newEngine
             player = newPlayer
             captureGate.setEnabled(requestedInput)
+            AppDiagnostics.event("audio", "live_engine", status: "running")
             return true
         } catch {
             stop()

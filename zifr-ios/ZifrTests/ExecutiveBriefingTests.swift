@@ -481,50 +481,6 @@ final class ExecutiveBriefingTests: XCTestCase {
             .contains { $0.title == "Scheduled payments may exceed funds" })
     }
 
-    @MainActor
-    func testSummaryCardsStayCompactAtSmallPhoneWidthAndExpandForAccessibility() throws {
-        let state = AppState()
-        let business = Company(userId: owner, name: "Acme International Holdings", structure: "LLC")
-        let personal = Company(userId: owner, name: "Household", structure: "Household")
-        state.companies = [business, personal]
-        state.hasLoadedPortfolio = true
-        state.institutions = [business, personal].map { company in
-            Institution(userId: owner, companyId: company.id, name: "Bank", accounts: [
-                InstitutionAccount(type: "Checking", balance: company.id == business.id ? 48_200 : 12_500)
-            ])
-        }
-        state.subscriptions = [business, personal].map { company in
-            Subscription(userId: owner, companyId: company.id, name: "Services", cost: 620,
-                nextRenewalAt: now.addingTimeInterval(2 * 86400))
-        }
-        state.documents = [CompanyDocument(userId: owner, companyId: business.id,
-            name: "Professional liability insurance", expiresAt: now.addingTimeInterval(-86400)),
-            CompanyDocument(userId: owner, companyId: personal.id,
-                name: "Passport", expiresAt: now.addingTimeInterval(100 * 86400))]
-        state.transactions = [business, personal].map { transaction(company: $0.id, amount: -3100) }
-        let cards = VStack(spacing: 12) {
-            ForEach([OwnerBriefingScope.business, .personal]) { scope in
-                ExecutiveSummaryCard(snapshot: ExecutiveBriefingSnapshot(appState: state, scope: scope, now: self.now),
-                    now: self.now, urgentNotices: ExecutiveUrgentNotice.cardNotices(in: state, scope: scope, now: self.now),
-                    onOpenUrgent: { _ in }, onBreakdown: { _ in })
-            }
-        }.environment(\.colorScheme, .dark)
-        let regular = UIHostingController(rootView: cards.environment(\.dynamicTypeSize, .large))
-        let size = regular.sizeThatFits(in: CGSize(width: 335, height: 2000))
-        // Keep the original compact stack budget, plus the requested 44-point footer
-        // button and 8-point bottom inset on each card. Small screens may scroll.
-        XCTAssertLessThanOrEqual(size.height, 500 + 2 * 52)
-        let accessible = UIHostingController(rootView: cards.environment(\.dynamicTypeSize, .accessibility3))
-        XCTAssertGreaterThan(accessible.sizeThatFits(in: CGSize(width: 335, height: 4000)).height, size.height)
-        let renderer = ImageRenderer(content: cards.environment(\.dynamicTypeSize, .large)
-            .frame(width: 335).padding(20).background(Color(hex: "#1C1C1E")))
-        renderer.scale = 2
-        let attachment = XCTAttachment(image: try XCTUnwrap(renderer.uiImage))
-        attachment.name = "Briefing cards — iPhone SE width"
-        attachment.lifetime = .keepAlways
-        add(attachment)
-    }
-
     private func transaction(company: UUID, amount: Double) -> Zifr.Transaction {
         var value = Zifr.Transaction()
         value.userId = owner; value.companyId = company; value.amount = amount

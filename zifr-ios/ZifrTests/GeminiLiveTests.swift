@@ -2,6 +2,7 @@ import XCTest
 import Combine
 import SwiftUI
 import Supabase
+import AVFoundation
 @testable import Zifr
 
 @MainActor
@@ -149,10 +150,119 @@ final class GeminiLiveTests: XCTestCase {
             XCTFail("Use a normally signed simulator build and sign in before running the opted-in handshake test.")
             return
         }
-        let client = GeminiLiveClient(systemInstruction: "This is a connection test. No user data is provided. Remain silent.", tools: [])
+        let client = GeminiLiveClient(systemInstruction: "This is an audio connection test. No user data is provided. Respond only with the short phrase requested by the user.", tools: [])
         defer { client.disconnect() }
+        let playback = AudioCaptureManager()
+        let verifyPlayback = ProcessInfo.processInfo.environment["MILOOM_LIVE_PLAYBACK"] == "1"
+        if verifyPlayback {
+            let started = await playback.start()
+            XCTAssertTrue(started, playback.audioError ?? "Playback engine did not start")
+            guard started else { return }
+            playback.setInputEnabled(false)
+        }
+        defer { playback.stop() }
+        let audioReceived = expectation(description: "Gemini returns nonempty PCM audio")
+        let responseFinished = expectation(description: "Gemini finishes the spoken response")
+        let speechPlayed = verifyPlayback ? expectation(description: "Entire Gemini response plays through audio output") : nil
+        var receivedAudio = false
+        var receivedNonSilentAudio = false
+        var turnComplete = false
+        var speaking = false
+        var playbackFinished = false
+        func finishPlaybackIfReady() {
+            if receivedAudio && turnComplete && !speaking && !playbackFinished {
+                playbackFinished = true
+                speechPlayed?.fulfill()
+            }
+        }
+        let playbackSubscription = playback.$isAssistantSpeaking.sink { value in
+            speaking = value
+            finishPlaybackIfReady()
+        }
+        defer { playbackSubscription.cancel() }
+        let subscription = client.events.sink { event in
+            if case .audio(let data) = event, !data.isEmpty {
+                receivedNonSilentAudio = receivedNonSilentAudio || data.contains(where: { $0 != 0 })
+                if !receivedAudio {
+                    receivedAudio = true
+                    audioReceived.fulfill()
+                }
+                if verifyPlayback { playback.schedule(audioData: data) }
+            }
+            if case .turnComplete = event, !turnComplete {
+                turnComplete = true
+                responseFinished.fulfill()
+                finishPlaybackIfReady()
+            }
+        }
+        defer { subscription.cancel() }
         try await client.connect()
         XCTAssertEqual(client.state.value, .ready)
+        client.sendTextMessage("Say: Voice connection verified.")
+        await fulfillment(of: [audioReceived, responseFinished], timeout: 20)
+        if let speechPlayed { await fulfillment(of: [speechPlayed], timeout: 15) }
+        XCTAssertTrue(receivedNonSilentAudio, "Gemini must return speech, not only zero-valued PCM")
+    }
+
+    func testSpokenInputIsTranscribedAndAnsweredWhenOptedIn() async throws {
+        guard ProcessInfo.processInfo.environment["MILOOM_LIVE_INTEGRATION"] == "1" else {
+            throw XCTSkip("Enable MILOOM_LIVE_INTEGRATION for the authenticated spoken-input test.")
+        }
+        guard (try? await SupabaseService.shared.client.auth.session) != nil else {
+            XCTFail("Sign in before running the opted-in spoken-input test.")
+            return
+        }
+        // Synthetic speech only; no user recordings or portfolio context.
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "GeminiSpokenQuestion", withExtension: "wav"))
+        let file = try AVAudioFile(forReading: url)
+        guard file.length > AVAudioFramePosition(file.processingFormat.sampleRate) else {
+            XCTFail("The synthetic speech fixture must contain at least one second of audio")
+            return
+        }
+        let encoder = try LivePCMEncoder(inputFormat: file.processingFormat)
+        let frames = AVAudioFrameCount(file.processingFormat.sampleRate * 0.02)
+        let buffer = try XCTUnwrap(AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames))
+        let client = GeminiLiveClient(systemInstruction: "Answer the spoken question briefly in English. No user data is provided.", tools: [])
+        defer { client.disconnect() }
+        let answered = expectation(description: "Gemini answers a spoken question")
+        var input = "", output = ""
+        var completed = false, nonSilentAudio = false, nonSilentInput = false
+        var inputBytes = 0
+        let subscription = client.events.sink { event in
+            switch event {
+            case .inputTranscript(let value): input += value.text ?? ""
+            case .outputTranscript(let value): output += value.text ?? ""
+            case .audio(let data): nonSilentAudio = nonSilentAudio || data.contains(where: { $0 != 0 })
+            case .turnComplete where !completed:
+                completed = true
+                answered.fulfill()
+            default: break
+            }
+        }
+        defer { subscription.cancel() }
+        try await client.connect()
+        while file.framePosition < file.length {
+            try file.read(into: buffer, frameCount: frames)
+            if let chunk = encoder.encode(buffer) {
+                inputBytes += chunk.data.count
+                nonSilentInput = nonSilentInput || chunk.rms > 0.005
+                client.sendAudio(pcmBufferData: chunk.data)
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        // Keep streaming silence so automatic voice activity detection closes the turn.
+        // This mirrors an open microphone; no text prompt or forced turn completion.
+        for _ in 0..<75 {
+            client.sendAudio(pcmBufferData: Data(repeating: 0, count: 640))
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        await fulfillment(of: [answered], timeout: 20)
+        XCTAssertTrue(nonSilentInput, "The production encoder must retain speech energy")
+        let expectedBytes = Double(file.length) / file.processingFormat.sampleRate * 32000
+        XCTAssertEqual(Double(inputBytes), expectedBytes, accuracy: 1280, "Resampling must preserve duration")
+        XCTAssertTrue(input.lowercased().contains("two") || input.contains("2"), "Gemini must transcribe the synthetic spoken question; received: \(input)")
+        XCTAssertTrue(output.lowercased().contains("four") || output.contains("4"), "Gemini must correctly answer the synthetic spoken question; received: \(output)")
+        XCTAssertTrue(nonSilentAudio, "Gemini must return a spoken answer")
     }
 
     func testSetupUses38AndBlockingToolsWithoutChangingRESTDeclarations() throws {
@@ -168,6 +278,62 @@ final class GeminiLiveTests: XCTestCase {
         XCTAssertNil((json["generationConfig"] as? [String: Any])?["thinkingConfig"])
         XCTAssertEqual(setup.tools?.first?.functionDeclarations.first?.behavior, "BLOCKING")
         XCTAssertNil(try object(declaration)["behavior"])
+    }
+
+    func testTextTurnWaitsForSetupAndRequestsSpokenResponse() async throws {
+        let socket = MockLiveSocket()
+        let client = client([socket])
+        client.sendTextMessage("Too early")
+        XCTAssertTrue(socket.sent.isEmpty)
+        let connection = Task { try await client.connect() }
+        await waitFor { !socket.sent.isEmpty }
+        client.sendTextMessage("Still too early")
+        XCTAssertEqual(socket.sent.count, 1)
+        socket.push(#"{"setupComplete":{}}"#)
+        try await connection.value
+        client.sendTextMessage("Hello")
+        await waitFor { socket.sent.count == 2 }
+        let message = try JSONDecoder().decode(ClientMessage.self, from: JSONSerialization.data(withJSONObject: socket.sent[1]))
+        XCTAssertEqual(message.clientContent?.turns.first?.role, "user")
+        XCTAssertEqual(message.clientContent?.turns.first?.parts.first?.text, "Hello")
+        XCTAssertEqual(message.clientContent?.turnComplete, true)
+        client.disconnect()
+    }
+
+    func testAudioEngineCaptureAndPlaybackWhenOptedIn() async throws {
+        guard ProcessInfo.processInfo.environment["MILOOM_LIVE_INTEGRATION"] == "1" else {
+            throw XCTSkip("Enable MILOOM_LIVE_INTEGRATION for microphone and playback verification.")
+        }
+        guard AVAudioApplication.shared.recordPermission == .granted else {
+            throw XCTSkip("Grant microphone permission in Miloom before this audio-engine check.")
+        }
+        let manager = AudioCaptureManager()
+        defer { manager.stop() }
+        let captured = expectation(description: "Microphone delivers converted PCM buffers")
+        var hasCaptured = false
+        let capture = manager.audioDataPublisher.sink { data in
+            if !data.isEmpty && !hasCaptured {
+                hasCaptured = true
+                captured.fulfill()
+            }
+        }
+        defer { capture.cancel() }
+        let started = await manager.start()
+        XCTAssertTrue(started, manager.audioError ?? "Audio engine did not start")
+        guard started else { return }
+        manager.setInputEnabled(true)
+        await fulfillment(of: [captured], timeout: 5)
+        manager.setInputEnabled(false)
+        // Verify scheduling and completion without playing a test tone aloud.
+        let played = expectation(description: "Playback reaches the audio device")
+        var hasScheduled = false
+        let playback = manager.$isAssistantSpeaking.sink { speaking in
+            if speaking { hasScheduled = true }
+            else if hasScheduled { hasScheduled = false; played.fulfill() }
+        }
+        defer { playback.cancel() }
+        manager.schedule(audioData: Data(repeating: 0, count: 12_000))
+        await fulfillment(of: [played], timeout: 5)
     }
 
     func testMicrophoneWaitsForSetupAndUsesAudioField() async throws {

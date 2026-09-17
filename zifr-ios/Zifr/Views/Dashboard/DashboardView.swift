@@ -30,7 +30,6 @@ struct DashboardView: View {
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
     @State private var showBriefing = false
-    @State private var showClassicBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
     @State private var taxReviewCompany: Company?
@@ -311,48 +310,6 @@ struct DashboardView: View {
                 .presentationBackground(Color(hex: "#1C1C1E"))
                 .preferredColorScheme(.light)
             }
-            .sheet(isPresented: $showClassicBriefing) {
-                NavigationStack {
-                    ZStack {
-                        Color(hex: "#1C1C1E").ignoresSafeArea()
-                        ScrollView {
-                            ClassicOwnerHealthBriefingDashboard(
-                                vm: vm,
-                                onOpenResource: { obligation in
-                                    dismissClassicBriefing {
-                                        openBriefingResource(obligation)
-                                    }
-                                },
-                                onOpenHealthResource: { kind, resourceID in
-                                    dismissClassicBriefing {
-                                        openHealthResource(kind, resourceID)
-                                    }
-                                },
-                                onExploreConnections: {
-                                    dismissClassicBriefing {
-                                        showConnectionGraph = true
-                                    }
-                                }
-                            )
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
-                        }
-                        .scrollIndicators(.hidden)
-                    }
-                    .navigationTitle("Briefing")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Done") { showClassicBriefing = false }
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.miloomGold)
-                        }
-                    }
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color(hex: "#1C1C1E"))
-            }
             .fullScreenCover(isPresented: $showAssistant) {
                 AssistantOnboardingView(vm: vm)
                     .environment(appState)
@@ -544,29 +501,29 @@ struct DashboardView: View {
 
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        presentClassicBriefing()
+                        showAssistant = true
                     } label: {
-                        dashboardBriefingIcon
+                        dashboardGeminiIcon
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Open briefing")
-                    .accessibilityHint("Shows personal and business summaries with detailed breakdowns")
-
-                    plusCommandMenu
-                        .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
-                        .background(
-                            Group {
-                                if onboardingState.isTutorialActive {
-                                    GeometryReader { geo in
-                                        Color.clear.onAppear {
-                                            tutorialAssistantFrame = geo.frame(in: .global)
-                                        }.onChange(of: geo.frame(in: .global)) { _, f in
-                                            tutorialAssistantFrame = f
-                                        }
+                    .accessibilityLabel("Open Gemini Live")
+                    .accessibilityHint("Starts a voice conversation with Miloom")
+                    .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
+                    .background(
+                        Group {
+                            if onboardingState.isTutorialActive {
+                                GeometryReader { geo in
+                                    Color.clear.onAppear {
+                                        tutorialAssistantFrame = geo.frame(in: .global)
+                                    }.onChange(of: geo.frame(in: .global)) { _, f in
+                                        tutorialAssistantFrame = f
                                     }
                                 }
                             }
-                        )
+                        }
+                    )
+
+                    plusCommandMenu
                 }
                 .padding(.horizontal, 20)
                 .padding(.bottom, 12)
@@ -703,7 +660,7 @@ struct DashboardView: View {
         }
     }
 
-    private var dashboardBriefingIcon: some View {
+    private var dashboardGeminiIcon: some View {
         ZStack {
             bottomControlGlass(Circle())
                 .overlay(
@@ -722,14 +679,30 @@ struct DashboardView: View {
                 )
                 .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
 
-            Image(systemName: "list.clipboard.fill")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.85))
-
-            Image(systemName: "sparkles")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(Color.miloomGold)
-                .offset(x: 10, y: -10)
+            // Gemini's four-point sparkle, rendered sharply at every display scale.
+            Path { path in
+                path.move(to: CGPoint(x: 12, y: 0))
+                path.addCurve(to: CGPoint(x: 24, y: 12),
+                              control1: CGPoint(x: 13.8, y: 7.8),
+                              control2: CGPoint(x: 16.2, y: 10.2))
+                path.addCurve(to: CGPoint(x: 12, y: 24),
+                              control1: CGPoint(x: 16.2, y: 13.8),
+                              control2: CGPoint(x: 13.8, y: 16.2))
+                path.addCurve(to: CGPoint(x: 0, y: 12),
+                              control1: CGPoint(x: 10.2, y: 16.2),
+                              control2: CGPoint(x: 7.8, y: 13.8))
+                path.addCurve(to: CGPoint(x: 12, y: 0),
+                              control1: CGPoint(x: 7.8, y: 10.2),
+                              control2: CGPoint(x: 10.2, y: 7.8))
+                path.closeSubpath()
+            }
+            .fill(LinearGradient(
+                colors: [Color(hex: "#4CA6FF"), Color(hex: "#8D8BFF"), Color(hex: "#D495D9")],
+                startPoint: .bottomLeading,
+                endPoint: .topTrailing
+            ))
+            .frame(width: 24, height: 24)
+            .accessibilityHidden(true)
         }
         .frame(width: 44, height: 44)
     }
@@ -806,26 +779,8 @@ struct DashboardView: View {
         showBriefing = true
     }
 
-    private func presentClassicBriefing() {
-        guard accessController.request(
-            .ownerBriefing,
-            source: "dashboard_briefing_button",
-            appState: appState,
-            userId: currentUserId
-        ) else {
-            showPremiumUpgrade = true
-            return
-        }
-        showClassicBriefing = true
-    }
-
     private func dismissBriefing(then action: @escaping () -> Void) {
         showBriefing = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: action)
-    }
-
-    private func dismissClassicBriefing(then action: @escaping () -> Void) {
-        showClassicBriefing = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: action)
     }
 

@@ -20,6 +20,10 @@ struct AssistantOnboardingView: View {
     @State private var microphoneMuted = false
     @State private var audioInterrupted = false
     @State private var assistantVisible = false
+    // Long-lived socket callbacks must read shared state, not a captured
+    // Environment value from the render that created the connection.
+    @State private var voiceSceneIsActive = false
+    @State private var hasSentVoiceGreeting = false
     @State private var connectionTask: Task<Void, Never>?
     @State private var audioTask: Task<Void, Never>?
     @State private var voiceGeneration = UUID()
@@ -589,6 +593,7 @@ struct AssistantOnboardingView: View {
             
         }
         .onAppear {
+            voiceSceneIsActive = scenePhase == .active
             assistantVisible = true
             setupConnection()
         }
@@ -597,6 +602,7 @@ struct AssistantOnboardingView: View {
             stopVoiceSession()
         }
         .onChange(of: scenePhase) { _, phase in
+            voiceSceneIsActive = phase == .active
             if phase != .active {
                 pauseVoiceCapture()
                 captureManager.stop()
@@ -653,6 +659,7 @@ struct AssistantOnboardingView: View {
         liveState = .idle
         isConnecting = true
         connectionError = nil
+        hasSentVoiceGreeting = false
         
         if isChatMode {
             DispatchQueue.main.async {
@@ -733,7 +740,7 @@ struct AssistantOnboardingView: View {
     }
 
     private var canForwardAudio: Bool {
-        assistantVisible && !isChatMode && scenePhase == .active && !audioInterrupted
+        assistantVisible && !isChatMode && voiceSceneIsActive && !audioInterrupted
             && liveState == .ready && !microphoneMuted && activeToolCall == nil
             && !captureManager.isReadingSecureField
     }
@@ -748,16 +755,24 @@ struct AssistantOnboardingView: View {
     private func updateVoiceAudio() {
         audioTask?.cancel()
         guard assistantVisible, !isChatMode, liveState == .ready,
-              scenePhase == .active, !audioInterrupted, activeToolCall == nil,
+              voiceSceneIsActive, !audioInterrupted, activeToolCall == nil,
               !captureManager.isReadingSecureField else {
             captureManager.setInputEnabled(false)
+            AppDiagnostics.event("audio", "live_gate", status: "paused_visible_\(assistantVisible)_active_\(voiceSceneIsActive)_ready_\(liveState == .ready)")
             return
         }
         let id = voiceGeneration
         audioTask = Task {
             let started = await captureManager.start()
             guard !Task.isCancelled, id == voiceGeneration else { return }
-            if started { captureManager.setInputEnabled(canForwardAudio) }
+            if started {
+                captureManager.setInputEnabled(canForwardAudio)
+                AppDiagnostics.event("audio", "live_gate", status: canForwardAudio ? "open" : "muted")
+                if voiceSceneIsActive && liveState == .ready && !hasSentVoiceGreeting {
+                    hasSentVoiceGreeting = true
+                    client?.sendTextMessage("Greet me briefly as Miloom and ask how you can help. Do not mention portfolio details or call any tools for this greeting.")
+                }
+            }
             else if captureManager.permissionDenied {
                 showPermissionAlert = true
                 connectionError = "Microphone access is disabled. Enable it in Settings to use voice."
@@ -772,7 +787,7 @@ struct AssistantOnboardingView: View {
     private func handleLiveEvent(_ event: LiveEvent) {
         switch event {
         case .audio(let data):
-            if assistantVisible && scenePhase == .active && !audioInterrupted && activeToolCall == nil {
+            if assistantVisible && voiceSceneIsActive && !audioInterrupted && activeToolCall == nil {
                 captureManager.schedule(audioData: data)
             }
         case .inputTranscript(let value): transcript.append(value, speaker: .user)
@@ -798,7 +813,7 @@ struct AssistantOnboardingView: View {
     }
 
     private func processNextTool() {
-        guard liveState == .ready, activeToolCall == nil, scenePhase == .active,
+        guard liveState == .ready, activeToolCall == nil, voiceSceneIsActive,
               let call = toolQueue.next() else { return }
         handleToolCall(ToolCall(functionCalls: [call]))
     }
@@ -1247,7 +1262,7 @@ struct AssistantOnboardingView: View {
     private var voiceView: some View {
         LiveVoicePanel(entries: transcript.entries, inputVolume: captureManager.volume,
                        outputVolume: captureManager.outputVolume,
-                       isActive: assistantVisible && scenePhase == .active,
+                       isActive: assistantVisible && voiceSceneIsActive,
                        microphoneMuted: microphoneMuted,
                        onToggleMicrophone: {
                            microphoneMuted.toggle()

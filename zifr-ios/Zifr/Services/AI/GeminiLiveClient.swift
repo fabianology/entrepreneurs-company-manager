@@ -66,6 +66,7 @@ final class GeminiLiveClient {
     private var attempts = 0
     private var startedAt = Date()
     private var receivedFirstAudio = false
+    private var sentFirstAudio = false
 
     init(systemInstruction: String, tools: [Tool],
          setupTimeout: UInt64 = 15_000_000_000, retryDelay: UInt64 = 1_000_000_000,
@@ -97,6 +98,7 @@ final class GeminiLiveClient {
         hasConnected = false
         startedAt = Date()
         receivedFirstAudio = false
+        sentFirstAudio = false
         state.send(.connecting)
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -171,6 +173,12 @@ final class GeminiLiveClient {
             mimeType: "audio/pcm;rate=16000", data: pcmBufferData.base64EncodedString()))))
     }
 
+    func sendTextMessage(_ text: String) {
+        guard state.value == .ready, !text.isEmpty else { return }
+        enqueue(ClientMessage(clientContent: ClientContent(
+            turns: [Turn(role: "user", parts: [TextPart(text: text)])], turnComplete: true)))
+    }
+
     func endAudioStream() {
         // Remove captured audio still waiting to send, including any before a privacy pause.
         queue.removeAll { $0.realtimeInput?.audio != nil }
@@ -204,6 +212,10 @@ final class GeminiLiveClient {
                     let data = try JSONEncoder().encode(message)
                     try await socket.send(String(decoding: data, as: UTF8.self))
                     guard id == generation else { return }
+                    if message.realtimeInput?.audio != nil, !sentFirstAudio {
+                        sentFirstAudio = true
+                        AppDiagnostics.event("ai", "live_microphone_audio", status: "sent")
+                    }
                     for response in message.toolResponse?.functionResponses ?? [] {
                         pendingResponses.removeValue(forKey: response.id)
                     }

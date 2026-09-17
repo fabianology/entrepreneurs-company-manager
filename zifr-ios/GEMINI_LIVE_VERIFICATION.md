@@ -37,7 +37,9 @@ xcodebuild -project zifr-ios/Zifr.xcodeproj -scheme Zifr \
 
 - `testAuthenticatedLiveHandshakeWhenOptedIn` passed on September 16 at 11:25 PDT in 0.680 seconds, with `MILOOM_LIVE_INTEGRATION=1`. The actual Gemini client reached `.ready` after server setup confirmation through the deployed authenticated proxy. No microphone audio or portfolio data was sent.
 - Use normal simulator signing for this check; do not use `CODE_SIGNING_ALLOWED=NO`. Credentials were entered only through the app login UI and were not added to project files. Explicitly opted-in runs now fail if authentication is unavailable rather than reporting a skipped test.
-- Foreground UI inspection confirmed the signed-in dashboard after relaunch. The current dashboard control opens Briefing; its `showAssistant` flag is only set by the onboarding spotlight. CompanyDetailView also has an assistant presentation without an ordinary launch action. The hosted orb snapshot therefore remains the visual evidence for the voice panel; normal in-app voice navigation still needs an entry point.
+- The dashboard action bar now has a Gemini sparkle button that opens Live directly. The old classic briefing sheet and exclusive summary/breakdown views were removed, along with their obsolete snapshot test. The top Executive Brief receipt, its presentation/access/navigation handlers, and all shared receipt logic were checked against the pre-edit source and remain byte-for-byte unchanged.
+- Simulator UI inspection verified that the action-bar button opens the pulsating orb with mute, Type Instead, and End controls and no routine state labels. Muted the microphone and ended the session after inspection.
+- After this navigation cleanup, the Gemini and Executive Briefing regression suites executed 44 tests: 43 passed, 1 opt-in service test skipped, 0 failures. Both simulator and physical-device builds passed. The earlier authenticated handshake pass remains recorded above.
 
 ## Open acceptance checks
 
@@ -52,3 +54,24 @@ Do not mark the full live-voice acceptance complete from build or mocked protoco
 - https://ai.google.dev/api/live
 - https://ai.google.dev/gemini-api/docs/live-api/capabilities
 - https://ai.google.dev/gemini-api/docs/live-api/session-management
+
+## Silent-orb investigation (September 16)
+
+- Added a single opening greeting only after the local audio engine is ready; the previous implementation waited for user input without initiating speech. The greeting is not replayed on automatic reconnect.
+- Socket callbacks now consult shared foreground state rather than a captured SwiftUI environment value. This prevents a callback created while inactive from continuing to suppress audio after foregrounding.
+- Added privacy-safe first-buffer, first-send, engine, and audio-gate diagnostics. No captured audio, transcript, or credentials are logged.
+- Expanded the opted-in service test to request a synthetic phrase and assert that actual PCM audio is returned. It passed. A new text-turn test checks that turns are gated by setup completion.
+- The new microphone/playback integration test reproduced the silent graph on both simulator and FX: the engine reported running, but neither microphone delivery nor playback completion arrived. Initializing the main mixer before enabling voice processing and explicitly connecting it to the resulting hardware output fixes this failure. Acoustic echo cancellation remains enabled.
+- The corrected graph built and was installed on FX. At 12:11 PDT the formerly failing physical microphone/playback test passed (0.786 seconds), and the real Gemini audio-response test passed (1.089 seconds), with no skips or failures. FX disconnected after these checks.
+- With `MILOOM_LIVE_INTEGRATION=1` and `MILOOM_LIVE_PLAYBACK=1`, all 24 focused simulator tests passed, including a complete non-silent Gemini response played through AudioCaptureManager to completion. This sends a synthetic prompt only; microphone capture is not forwarded to the service by these tests. Audible listening on FX and Bluetooth/interruption scenarios still require user confirmation.
+
+- Final in-app simulator check: opening Gemini from the action bar logged engine running, microphone gate open, converted capture, audio sent, and first Gemini audio received. The greeting transcript appeared ("Hello, I'm Miloom. How can I help you today?"). Muted and ended the session after verification.
+
+## Spoken-input investigation (September 16)
+
+- Extracted the existing microphone resampler into `LivePCMEncoder` so an integration test exercises the same conversion as actual capture. Added a one-time sound-energy diagnostic separate from the first-buffer diagnostic; neither audio nor user transcripts are logged.
+- Added `Fixtures/GeminiSpokenQuestion.wav`, synthetic Samantha speech generated locally with macOS `say`: “What is two plus two? Please answer in one word.” The 48 kHz mono fixture is resampled to 16 kHz PCM by production code and streamed at real-time speed, followed by silence. The test sends no text prompt, portfolio data, or forced end-of-turn message.
+- The integration check requires a recognized question, the correct answer, non-silent response audio, and preservation of input duration. The focused spoken-input check passed; the subsequent full Gemini suite passed all 25 tests, including authenticated service and playback checks.
+- An initial fixture generation under the sandbox silently created an empty WAV; the fixture was regenerated with working speech-service access, verified as 2.800 seconds/non-silent, and the test now rejects empty fixtures before connecting. An intermediate real-audio run returned audio and completed a turn but did not satisfy transcription/answer checks; that result did not reproduce in the focused diagnostic run or the full suite. Do not interpret those successful reruns as verification of physical microphone listening.
+- Signed simulator and physical-device test builds succeeded. The updated diagnostic build was installed and launched successfully on FX on September 16 at 15:42 PDT. Actual speech into FX, acoustic playback heard by the user, Bluetooth, and interruptions still need physical acceptance. The previous graph repair remains in place; this investigation has not yet established an additional phone-specific cause.
+- Scope remains native iOS; existing unrelated work and the protected top Executive Brief implementation were preserved. This change set is limited to the Gemini action-bar entry, classic briefing removal, voice audio fixes, and their verification.
