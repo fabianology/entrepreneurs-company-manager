@@ -504,6 +504,8 @@ struct DashboardView: View {
                         showAssistant = true
                     } label: {
                         dashboardGeminiIcon
+                            .frame(width: 52, height: 52)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open Gemini Live")
@@ -678,6 +680,7 @@ struct DashboardView: View {
                         )
                 )
                 .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+                .allowsHitTesting(false)
 
             // Gemini's four-point sparkle, rendered sharply at every display scale.
             Path { path in

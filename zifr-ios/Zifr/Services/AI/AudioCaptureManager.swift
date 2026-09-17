@@ -57,11 +57,71 @@ final class LivePCMEncoder {
     }
 }
 
+/// Lightweight local pitch estimate for visual feedback, not speech recognition.
+/// Uses a 64 ms window at 4 kHz, normalized autocorrelation, and a voicing gate.
+/// Owned by the serial input tap; a new capture token clears analysis history.
+final class LivePitchTracker {
+    private var token: UUID?
+    private var samples: [Float] = []
+    private var sum: Float = 0
+    private var decimationCount = 0
+    private var pending = 0
+    private var frequency: Float?
+
+    func consume(_ data: Data, token newToken: UUID) -> Float? {
+        if token != newToken {
+            token = newToken
+            samples.removeAll(keepingCapacity: true)
+            sum = 0; decimationCount = 0; pending = 0; frequency = nil
+        }
+        data.withUnsafeBytes { bytes in
+            for offset in stride(from: 0, to: bytes.count - bytes.count % 2, by: 2) {
+                sum += Float(Int16(littleEndian: bytes.loadUnaligned(fromByteOffset: offset, as: Int16.self))) / 32768
+                decimationCount += 1
+                if decimationCount == 4 {
+                    samples.append(sum / 4)
+                    pending += 1
+                    sum = 0; decimationCount = 0
+                }
+            }
+        }
+        if samples.count > 256 { samples.removeFirst(samples.count - 256) }
+        guard samples.count == 256, pending >= 128 else { return frequency }
+        pending = 0
+        let mean = samples.reduce(0, +) / Float(samples.count)
+        let window = samples.map { $0 - mean }
+        let power = window.reduce(Float(0)) { $0 + $1 * $1 } / Float(window.count)
+        guard power > 0.000025 else { frequency = nil; return nil }
+        // 70–500 Hz covers typical voiced speech. Unvoiced sounds keep the
+        // resting halo instead of generating an arbitrary noise-derived pitch.
+        var correlation = [Float](repeating: 0, count: 59)
+        for lag in 7...58 {
+            var cross: Float = 0, left: Float = 0, right: Float = 0
+            for index in lag..<window.count {
+                let a = window[index], b = window[index - lag]
+                cross += a * b; left += a * a; right += b * b
+            }
+            correlation[lag] = cross / max(0.000001, sqrt(left * right))
+        }
+        let peaks = (8...57).filter { correlation[$0] >= correlation[$0 - 1] && correlation[$0] > correlation[$0 + 1] }
+        guard let best = peaks.map({ correlation[$0] }).max(), best > 0.8,
+              let lag = peaks.first(where: { correlation[$0] >= max(0.8, best * 0.93) }) else {
+            frequency = nil; return nil
+        }
+        let left = correlation[lag - 1], mid = correlation[lag], right = correlation[lag + 1]
+        let denominator = left - 2 * mid + right
+        let refinement = abs(denominator) > 0.000001 ? 0.5 * (left - right) / denominator : 0
+        frequency = 4000 / (Float(lag) + min(0.5, max(-0.5, refinement)))
+        return frequency
+    }
+}
+
 @MainActor
 final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     let audioDataPublisher = PassthroughSubject<Data, Never>()
     @Published private(set) var volume: Float = 0
     @Published private(set) var outputVolume: Float = 0
+    @Published private(set) var inputPitch: Float = 0
     @Published private(set) var permissionDenied = false
     @Published private(set) var isAssistantSpeaking = false
     @Published private(set) var isReadingSecureField = false
@@ -89,7 +149,7 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
     func setInputEnabled(_ enabled: Bool) {
         requestedInput = enabled
         captureGate.setEnabled(enabled && engine != nil && !isReadingSecureField)
-        if !enabled { volume = 0 }
+        if !enabled { volume = 0; inputPitch = 0 }
     }
 
     @discardableResult
@@ -120,11 +180,14 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
             try input.setVoiceProcessingEnabled(true)
             let inputFormat = input.outputFormat(forBus: 0)
             let encoder = try LivePCMEncoder(inputFormat: inputFormat)
+            let pitchTracker = LivePitchTracker()
             let gate = captureGate
             input.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
                 guard let token = gate.token(), let chunk = encoder.encode(buffer) else { return }
                 let data = chunk.data
                 let level = min(1, chunk.rms * 9)
+                let frequency = pitchTracker.consume(data, token: token)
+                let pitch = frequency.map { min(1, max(0, log2($0 / 70) / log2(500 / 70.0))) } ?? 0
                 Task { @MainActor [weak self] in
                     guard let self, gate.accepts(token) else { return }
                     if !capturedFirstBuffer {
@@ -136,6 +199,7 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
                         AppDiagnostics.event("audio", "live_microphone_signal", status: "detected")
                     }
                     volume = volume * 0.65 + level * 0.35
+                    inputPitch = inputPitch * 0.8 + pitch * 0.2
                     audioDataPublisher.send(data)
                 }
             }
@@ -170,6 +234,7 @@ final class AudioCaptureManager: NSObject, ObservableObject, AVSpeechSynthesizer
         engine = nil
         player = nil
         volume = 0
+        inputPitch = 0
     }
 
     func interruptPlayback() {

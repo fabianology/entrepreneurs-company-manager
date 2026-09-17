@@ -1262,8 +1262,11 @@ struct AssistantOnboardingView: View {
     private var voiceView: some View {
         LiveVoicePanel(entries: transcript.entries, inputVolume: captureManager.volume,
                        outputVolume: captureManager.outputVolume,
+                       inputPitch: captureManager.inputPitch,
                        isActive: assistantVisible && voiceSceneIsActive,
                        microphoneMuted: microphoneMuted,
+                       isListening: canForwardAudio,
+                       isSpeaking: captureManager.isAssistantSpeaking || captureManager.isReadingSecureField,
                        onToggleMicrophone: {
                            microphoneMuted.toggle()
                            if microphoneMuted { pauseVoiceCapture() }

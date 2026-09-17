@@ -37,10 +37,71 @@ final class GeminiLiveTests: XCTestCase {
             })
     }
 
+    func testOrbTransitionRemainsContinuousWhenReversed() {
+        var transition = OrbTransition()
+        transition.set(.listening, at: 100, animated: false)
+        transition.set(.speaking, at: 101, animated: true)
+        XCTAssertEqual(transition.value(at: 101).speaking, 0, accuracy: 0.00001)
+        let halfway = transition.value(at: 101.35)
+        XCTAssertEqual(halfway.speaking, 0.5, accuracy: 0.00001)
+        XCTAssertEqual(halfway.listening, 0.5, accuracy: 0.00001)
+        transition.set(.listening, at: 101.35, animated: true)
+        XCTAssertEqual(transition.value(at: 101.35).speaking, halfway.speaking, accuracy: 0.00001)
+        XCTAssertEqual(transition.value(at: 102.1).speaking, 0, accuracy: 0.00001)
+        XCTAssertEqual(transition.value(at: 102.1).listening, 1, accuracy: 0.00001)
+        transition.set(.speaking, at: 103, animated: false)
+        XCTAssertEqual(transition.value(at: 103).speaking, 1)
+    }
+
+    private func pitchTone(_ frequency: Double, amplitude: Double = 0.2) -> Data {
+        var data = Data()
+        for index in 0..<2048 {
+            let phase = 2 * Double.pi * frequency * Double(index) / 16000
+            // Fundamental plus harmonics approximates voiced sound more closely than a pure tone.
+            var sample = Int16((amplitude * (sin(phase) + 0.35 * sin(phase * 2)) * 32767).rounded()).littleEndian
+            withUnsafeBytes(of: &sample) { data.append(contentsOf: $0) }
+        }
+        return data
+    }
+
+    func testPitchTrackerRecognizesLowAndHighVoicedTones() throws {
+        for expected in [90.0, 160.0, 320.0, 440.0] {
+            let tracker = LivePitchTracker(), token = UUID()
+            let detected = try XCTUnwrap(tracker.consume(pitchTone(expected), token: token))
+            XCTAssertEqual(Double(detected), expected, accuracy: 4)
+            let quieter = try XCTUnwrap(tracker.consume(pitchTone(expected, amplitude: 0.04), token: token))
+            XCTAssertEqual(Double(quieter), expected, accuracy: 4, "Pitch should not be confused with loudness")
+        }
+    }
+
+    func testPitchTrackerRejectsSilenceNoiseAndResetsAfterMute() {
+        let tracker = LivePitchTracker(), token = UUID()
+        XCTAssertNotNil(tracker.consume(pitchTone(160), token: token))
+        XCTAssertNil(tracker.consume(Data(repeating: 0, count: 128), token: UUID()), "A new capture token must clear previous speech")
+        XCTAssertNil(tracker.consume(Data(repeating: 0, count: 4096), token: token))
+        var noise = Data(), seed: UInt32 = 42
+        for _ in 0..<2048 {
+            seed = seed &* 1664525 &+ 1013904223
+            var sample = Int16(truncatingIfNeeded: seed >> 16).littleEndian
+            withUnsafeBytes(of: &sample) { noise.append(contentsOf: $0) }
+        }
+        XCTAssertNil(tracker.consume(noise, token: token))
+    }
+
     func testOrbRenderForVisualReview() throws {
-        for (name, time, energy) in [("orb-rest", 0.0, 0.0), ("orb-speaking", 4.0, 0.8)] {
+        for (name, time, energy, activity, reducedMotion) in [
+            ("orb-rest", 0.0, 0.0, OrbActivity.idle, false),
+            ("orb-listening", 4.0, 0.25, OrbActivity.listening, false),
+            ("orb-speaking", 4.0, 0.8, OrbActivity.speaking, false),
+            ("orb-speaking-wave", 4.4, 0.5, OrbActivity.speaking, false),
+            ("orb-mid-transition", 4.0, 0.5, OrbActivity.speaking, false),
+            ("orb-reduced-motion", 0.0, 0.0, OrbActivity.speaking, true)
+        ] {
             let view = Canvas { context, size in
-                PulsingOrbView.draw(context: &context, size: size, time: time, energy: energy)
+                PulsingOrbView.draw(context: &context, size: size, time: time, energy: energy,
+                                   activity: activity, reduceMotion: reducedMotion,
+                                   blend: name == "orb-mid-transition" ? OrbTransition.Blend(speaking: 0.5, listening: 0.5) : nil,
+                                   pitch: activity == .listening ? 0.7 : 0)
             }.frame(width: 360, height: 360).background(Color.black)
             let renderer = ImageRenderer(content: view)
             renderer.scale = 2
