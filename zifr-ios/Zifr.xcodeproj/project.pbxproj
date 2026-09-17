@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A17092700000000000000001 /* AppShortcuts.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A17092700000000000000002 /* AppShortcuts.xcstrings */; };
 		A129D950061147F0A0000001 /* PortfolioQueryEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */; };
 		040C1B465BBF9CDEDF000CCD /* ActivityLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C022DD3ABEFB2F9B7AD38355 /* ActivityLogsView.swift */; };
 		07549C6F481951A912F9ECEC /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C594CA72D48122B0D50169 /* ActivityLog.swift */; };
@@ -154,6 +155,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A17092700000000000000002 /* AppShortcuts.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AppShortcuts.xcstrings; sourceTree = "<group>"; };
 		A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioQueryEngine.swift; sourceTree = "<group>"; };
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
 		032520FD864A3B1FF73C81A0 /* AdminSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSettingsView.swift; sourceTree = "<group>"; };
@@ -584,6 +586,7 @@
 				AC3CC8DCAA09EB5F037AA043 /* .svg */,
 				71651E9BD50563BBC43440CD /* Assets.xcassets */,
 				DCADE3750A4CFA0353D88977 /* Info.plist */,
+				A17092700000000000000002 /* AppShortcuts.xcstrings */,
 				A30C0D3A0000000000000002 /* PrivacyInfo.xcprivacy */,
 				06F23A18826AE30784B43EF1 /* logo.png */,
 				2F29D9FCB918B70318DBED51 /* make_symbol.py */,
@@ -727,6 +730,7 @@
 			files = (
 				9F8AB0B20BB460B7A553892B /* Assets.xcassets in Resources */,
 				A30C0D3A0000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
+				A17092700000000000000001 /* AppShortcuts.xcstrings in Resources */,
 				B32A5DEDA68DB7F2A6A8D593 /* logo.png in Resources */,
 				1220409E829B6826E5F98B62 /* make_symbol.py in Resources */,
 				35D7AD052A31B0416172216F /* miloom.console.svg in Resources */,

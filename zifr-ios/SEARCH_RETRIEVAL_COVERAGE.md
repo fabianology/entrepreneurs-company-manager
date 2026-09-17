@@ -71,3 +71,12 @@ Actual Siri invocation, cold/locked-device behavior, physical-device responsiven
 - Inspected six synthetic search render states, including calculated answers and large accessibility text. Final calculation layout is captured in `/private/tmp/miloom-query-polish-images`.
 - Implementation branch: `feature/universal-search`; only native iOS files changed. No signing configuration or entitlements were edited; normal simulator signing was used for authenticated verification.
 - Authenticated Gemini integration: **passed**, no skips (`/private/tmp/miloom-query-integration-final-verified.log`). Verified real REST query planning, the $85 bill-only answer (excluding the $20 subscription), Live tool execution, audible output, and the Archive transaction at $1,400. All evidence was synthetic. An earlier Live run omitted the merchant; explicit merchant/company fields and clearer instructions corrected the tested response. This is one integration scenario, not a guarantee of all model responses.
+
+
+## Siri phrase recognition follow-up
+
+The device reported unsupported Siri requests and offered other banking apps. Inspection found that the prior simulator build included `extract.actionsdata` with the correct actions and phrase templates, but no compiled App Shortcuts phrase catalog or SSU phrase assets. This is a concrete build gap; the screenshots alone do not establish the installed phone version or prove it is the only cause.
+
+Added `Zifr/AppShortcuts.xcstrings` to the app's Resources build phase with the four existing English trigger phrases. This enables `AppShortcutsStringsMetadata` and `AppIntentsSSUTraining`. Verified that the build now includes `en.lproj/AppShortcuts.strings` and `Metadata.appintents/root.ssu.yaml`, and the training log identifies Miloom and both actions. No entitlement, signing, minimum OS, credential handling, or query behavior changed.
+
+Verification: Xcode 26.4 iPhone 17 Pro simulator build succeeded; `/private/tmp/miloom-siri-catalog-build.log`. Actual voice recognition on the user's physical phone remains unverified. Install this branch's new build on the phone, launch it once, confirm Ask Miloom and Search Miloom are discoverable in Shortcuts, then test Siri's exact trigger before entering the question. “Ask Miloom how much money is in my 401k” is not a registered free-form single-utterance template.
