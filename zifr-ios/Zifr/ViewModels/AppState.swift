@@ -13,14 +13,16 @@ final class AppState {
     var transactions: [Transaction] = [] { didSet { searchRevision &+= 1 } }
     var transactionOverrides: [TransactionOverride] = [] { didSet { searchRevision &+= 1 } }
     var transactionCategoryRules: [TransactionCategoryRule] = [] { didSet { searchRevision &+= 1 } }
-    var businessExpenseReviews: [BusinessExpenseReview] = []
-    var businessExpenseSettings = BusinessExpenseSettings()
-    var businessExpenseProfiles: [BusinessExpenseProfile] = []
-    var businessExpenseAccounts: [BusinessExpenseAccount] = []
-    var businessExpenseJob: BusinessExpenseJob?
-    var businessExpenseLoadError: String?
+    var businessExpenseReviews: [BusinessExpenseReview] = [] { didSet { searchRevision &+= 1 } }
+    var businessExpenseUserID: UUID? { didSet { searchRevision &+= 1 } }
+    var businessExpenseSettings = BusinessExpenseSettings() { didSet { searchRevision &+= 1 } }
+    var businessExpenseProfiles: [BusinessExpenseProfile] = [] { didSet { searchRevision &+= 1 } }
+    var businessExpenseAccounts: [BusinessExpenseAccount] = [] { didSet { searchRevision &+= 1 } }
+    var businessExpenseJob: BusinessExpenseJob? { didSet { searchRevision &+= 1 } }
+    var businessExpenseLoadError: String? { didSet { searchRevision &+= 1 } }
 
     func clearBusinessExpenses() {
+        businessExpenseUserID = nil
         businessExpenseReviews = []
         businessExpenseSettings = BusinessExpenseSettings()
         businessExpenseProfiles = []
@@ -39,10 +41,10 @@ final class AppState {
         return transactions.filter { !ignoredIDs.contains($0.id) }
     }
     var resourceShares: [ResourceShare] = [] { didSet { searchRevision &+= 1 } }
-    var activityLogs: [ActivityLog] = []
-    var notifications: [AppNotification] = []
-    var userPreferences: UserPreferences? = nil
-    var alertRules: [AlertRule] = []
+    var activityLogs: [ActivityLog] = [] { didSet { searchRevision &+= 1 } }
+    var notifications: [AppNotification] = [] { didSet { searchRevision &+= 1 } }
+    var userPreferences: UserPreferences? = nil { didSet { searchRevision &+= 1 } }
+    var alertRules: [AlertRule] = [] { didSet { searchRevision &+= 1 } }
     var plaidItems: [PlaidItemSummary] = []
     var entitlementSnapshot: AccessSnapshot = .free
     var resourceConnections: [ResourceConnection] = [] { didSet { searchRevision &+= 1 } }
@@ -59,7 +61,7 @@ final class AppState {
     var portfolioUserID: UUID? { didSet { searchRevision &+= 1 } }
     var searchRevision: UInt64 = 0
     var searchDocumentPages: [SearchDocumentPage] = [] { didSet { searchRevision &+= 1 } }
-    var searchDocumentStatus = "Document contents have not been indexed"
+    var searchDocumentStatus = "Document contents have not been indexed" { didSet { searchRevision &+= 1 } }
     var searchDocumentRevision: String {
         "\(portfolioUserID?.uuidString ?? "")|\(hasLoadedPortfolio)|" + documents.map { "\($0.id):\($0.url ?? ""):\($0.visibility ?? "")" }.joined(separator: "|") + "|\(resourceShares.hashValue)"
     }

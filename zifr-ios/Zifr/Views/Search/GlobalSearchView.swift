@@ -16,6 +16,8 @@ struct GlobalSearchView: View {
     @State private var answer: String?
     @State private var answering = false
     @State private var answerError: String?
+    @State private var submitTask: Task<Void, Never>?
+    @State private var previousQuery: PortfolioQuery?
     @State private var answerTask: Task<Void, Never>?
 
     private enum SheetRoute: Identifiable {
@@ -38,7 +40,6 @@ struct GlobalSearchView: View {
 
     @State private var searchPresented = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @ScaledMetric(relativeTo: .subheadline) private var filterHeight = 44.0
 
     private var hasQuery: Bool { !vm.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || related != nil }
     private var visibleHits: [SearchHit] { Array(response.hits.prefix(visibleLimit)) }
@@ -69,28 +70,23 @@ struct GlobalSearchView: View {
                         Button { dismiss() } label: { Image(systemName: "xmark") }
                             .accessibilityLabel("Close search")
                     }
-                    ToolbarItem(placement: .primaryAction) {
-                        if hasQuery && !response.isCredentialRequest {
-                            Menu {
-                                Button { ask(useGemini: true) } label: { Label("Ask Gemini", systemImage: "sparkles") }
-                                if SearchAnswerService.onDeviceAvailable {
-                                    Button { ask(useGemini: false) } label: { Label("Ask on device", systemImage: "iphone") }
-                                }
-                            } label: { Label("Ask", systemImage: "sparkles") }
-                            .disabled(searching || answering || !appState.hasLoadedPortfolio)
-                            .accessibilityLabel("Ask about these search results")
-                        }
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { endEditing(); presentation = .coverage } label: { Image(systemName: "info.circle") }
-                            .accessibilityLabel("Search coverage and document indexing")
-                    }
+
                 }
         }
         .modifier(SearchFieldConfiguration(query: $vm.searchQuery, presented: $searchPresented, focus: $searchFocused))
         .autocorrectionDisabled()
         .textInputAutocapitalization(.never)
-        .onSubmit(of: .search) { endEditing() }
+        .onSubmit(of: .search) {
+            endEditing()
+            submitTask?.cancel()
+            let key = taskKey
+            submitTask = Task { @MainActor in
+                await search()
+                guard !Task.isCancelled, key == taskKey else { return }
+                previousQuery = PortfolioQuery.interpret(vm.searchQuery, previous: previousQuery)
+                if response.hits.isEmpty && response.metrics.isEmpty && response.answerSummary == nil && vm.searchQuery.split(separator: " ").count > 3 && !response.isCredentialRequest { ask(useGemini: true) }
+            }
+        }
         .tint(Color.zifrGold)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -100,6 +96,7 @@ struct GlobalSearchView: View {
         .onChange(of: vm.searchQuery) { _, _ in related = nil }
         .onDisappear {
             answerTask?.cancel()
+            submitTask?.cancel()
             if presentation == nil { vm.searchQuery = "" }
         }
     }
@@ -131,16 +128,33 @@ struct GlobalSearchView: View {
                         .font(.subheadline).foregroundStyle(.orange)
                         .listRowBackground(Color.zifrCard)
                 }
-                if !response.totals.isEmpty { totals }
+                if !response.metrics.isEmpty {
+                    Section {
+                        ForEach(response.metrics) { metric in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(metric.label).font(.subheadline).foregroundStyle(.secondary)
+                                Text(metric.formatted).font(.title2.weight(.semibold)).monospacedDigit()
+                            }.padding(.vertical, 4)
+                        }
+                        answerDetails
+                    } header: { Text("Answer").textCase(nil) }.listRowBackground(Color.zifrCard)
+                }
+                if response.metrics.isEmpty && response.totals.isEmpty, let summary = response.answerSummary, !summary.isEmpty {
+                    Section("Answer") {
+                        Text(summary)
+                        answerDetails
+                    }.listRowBackground(Color.zifrCard)
+                }
+                if response.metrics.isEmpty && !response.totals.isEmpty { totals }
                 if answering || answer != nil || answerError != nil { answerSection }
                 if searching && response.hits.isEmpty {
                     HStack { Spacer(); ProgressView("Searching…"); Spacer() }
                         .padding(.vertical, 24).listRowBackground(Color.clear)
-                } else if response.hits.isEmpty && !searching {
+                } else if response.hits.isEmpty && !searching && response.metrics.isEmpty && response.answerSummary == nil {
                     ContentUnavailableView {
                         Label("No results for “\(vm.searchQuery)”", systemImage: "magnifyingglass")
                     } description: {
-                        Text("Try a name or card ending, or choose fewer filters.")
+                        Text(vm.searchQuery.split(separator: " ").count > 3 ? "Press Search to ask Gemini to interpret this question, or try fewer filters." : "Try a name or card ending, or choose fewer filters.")
                     } actions: {
                         if filters != SearchFilters() { Button("Clear filters") { filters = .init() }.frame(minHeight: 44) }
                     }
@@ -164,7 +178,7 @@ struct GlobalSearchView: View {
                     Button("Show more results (\(response.hits.count - visibleLimit))") { visibleLimit += 40 }
                         .frame(maxWidth: .infinity, minHeight: 44).listRowBackground(Color.zifrCard)
                 }
-                if !response.interpretation.isEmpty && response.interpretation != "Best matches" {
+                if response.metrics.isEmpty && response.answerSummary == nil && !response.interpretation.isEmpty && response.interpretation != "Best matches" {
                     Text(response.interpretation).font(.footnote).foregroundStyle(.secondary)
                         .listRowBackground(Color.clear)
                 }
@@ -173,7 +187,14 @@ struct GlobalSearchView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(Color.zifrCard.opacity(0.65))
-        .scrollDismissesKeyboard(.interactively)
+        .scrollDismissesKeyboard(.immediately)
+    }
+
+    private var answerDetails: some View {
+        DisclosureGroup("About this answer") {
+            Text(response.interpretation).font(.footnote).foregroundStyle(.secondary)
+            Text(response.coverage).font(.footnote).foregroundStyle(.secondary)
+        }.font(.subheadline)
     }
 
     private func resultHeading(_ title: String, count: Int) -> some View {
@@ -187,43 +208,55 @@ struct GlobalSearchView: View {
     }
 
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        VStack(spacing: 4) {
             SearchGlassControls {
-                HStack(spacing: 10) {
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(spacing: 8))
+                    : AnyLayout(HStackLayout(spacing: 8))
+                layout {
                     Menu {
                         Picker("Company", selection: $filters.companyID) {
                             Text("All companies").tag(nil as UUID?)
                             ForEach(appState.companies) { company in Text(company.name).tag(Optional(company.id)) }
                         }
-                    } label: { SearchFilterLabel(title: companyTitle, icon: "building.2", selected: filters.companyID != nil) }
+                    } label: { SearchFilterLabel(title: filters.companyID == nil ? "Company" : companyTitle, selected: filters.companyID != nil) }
                     .accessibilityLabel("Company filter").accessibilityValue(companyTitle)
                     Menu {
-                        Button { filters.kind = nil; filters.credentialsOnly = false } label: {
+                        Button { filters.kind = nil; filters.serviceType = nil; filters.credentialsOnly = false } label: {
                             Label("All types", systemImage: filters.kind == nil && !filters.credentialsOnly ? "checkmark" : "square.grid.2x2")
                         }
-                        Button { filters.kind = nil; filters.credentialsOnly = true } label: {
+                        Button { filters.kind = nil; filters.serviceType = nil; filters.credentialsOnly = true } label: {
                             Label("Saved logins", systemImage: filters.credentialsOnly ? "checkmark" : "key")
                         }
+                        ForEach(["bill", "subscription"], id: \.self) { type in
+                            Button { filters.kind = .subscription; filters.serviceType = type; filters.credentialsOnly = false } label: {
+                                Label(type == "bill" ? "Bills" : "Subscriptions", systemImage: filters.serviceType == type ? "checkmark" : "repeat")
+                            }
+                        }
                         ForEach(SearchRecord.Kind.allCases, id: \.self) { kind in
-                            Button { filters.kind = kind; filters.credentialsOnly = false } label: {
+                            Button { filters.kind = kind; filters.serviceType = nil; filters.credentialsOnly = false } label: {
                                 Label(kind.label, systemImage: filters.kind == kind ? "checkmark" : kind.icon)
                             }
                         }
-                    } label: { SearchFilterLabel(title: filters.credentialsOnly ? "Saved logins" : filters.kind?.label ?? "All types", icon: "line.3.horizontal.decrease", selected: filters.kind != nil || filters.credentialsOnly) }
+                    } label: { SearchFilterLabel(title: filters.credentialsOnly ? "Saved logins" : (filters.serviceType.map { $0 == "bill" ? "Bills" : "Subscriptions" } ?? filters.kind?.label ?? "Type"), selected: filters.kind != nil || filters.credentialsOnly) }
                     .accessibilityLabel("Record type filter")
+                    .accessibilityValue(filters.credentialsOnly ? "Saved logins" : (filters.serviceType.map { $0 == "bill" ? "Bills" : "Subscriptions" } ?? filters.kind?.label ?? "All types"))
                     Menu {
                         Picker("Date", selection: $filters.period) {
                             ForEach(SearchFilters.Period.allCases, id: \.self) { period in Text(period.rawValue).tag(period) }
                         }
-                    } label: { SearchFilterLabel(title: filters.period.rawValue, icon: "calendar", selected: filters.period != .all) }
+                    } label: { SearchFilterLabel(title: filters.period == .all ? "Date" : filters.period.rawValue, selected: filters.period != .all) }
                     .accessibilityLabel("Date filter").accessibilityValue(filters.period.rawValue)
-                    if filters != SearchFilters() {
-                        Button { filters = .init() } label: { SearchFilterLabel(title: "Reset", icon: "arrow.counterclockwise", selected: false, showsChevron: false) }
-                    }
                 }
-            }.buttonStyle(.plain).padding(.horizontal, 20).padding(.vertical, 10)
+            }.buttonStyle(.plain)
+            if filters != SearchFilters() {
+                Button("Reset filters") { filters = .init() }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
+            }
         }
-        .frame(height: filterHeight + 20)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 
     private var suggestions: some View {
@@ -392,8 +425,9 @@ struct GlobalSearchView: View {
 
     private func endEditing() {
         searchFocused = false
-        // iOS 17 doesn't have searchFocused. Resign focus without cancelling/clearing the query.
-        if #unavailable(iOS 18.0) { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+        // Resign the native search field too, including systems where search focus lags UIKit.
+        // Ending search presentation would clear the query, so leave it active.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     private func open(_ record: SearchRecord) {
         endEditing()
@@ -407,6 +441,7 @@ struct GlobalSearchView: View {
         searching = true
         do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
         let index = appState.searchIndex(for: userID)
+        let request = PortfolioQuery.interpret(vm.searchQuery, previous: previousQuery)
         let query = vm.searchQuery, selectedFilters = filters, drill = related
         let result = await Task.detached(priority: .userInitiated) {
             if let drill {
@@ -415,7 +450,7 @@ struct GlobalSearchView: View {
                 let subset = UniversalSearchIndex(records: records)
                 return subset.search(drill.kind == .transaction ? "Transactions" : "Services", filters: selectedFilters)
             }
-            return index.search(query, filters: selectedFilters)
+            return index.execute(request, filters: selectedFilters)
         }.value
         guard !Task.isCancelled, auth.currentUser?.id == userID else { return }
         response = result; searching = false
@@ -432,10 +467,10 @@ struct GlobalSearchView: View {
             do {
                 var found = originalResponse
                 if related == nil && (found.hits.isEmpty || query.split(separator: " ").count > 6) {
-                    let rewritten = try await SearchAnswerService.searchQuery(for: query, useGemini: useGemini)
+                    let rewritten = try await SearchAnswerService.queryRequest(for: query, useGemini: useGemini)
                     guard !Task.isCancelled, key == taskKey else { return }
-                    found = index.search(rewritten, filters: selectedFilters)
-                    found.interpretation = "Interpreted as ‘\(rewritten)’ · " + found.interpretation
+                    found = index.execute(rewritten, filters: selectedFilters)
+                    found.interpretation = "Interpreted question · " + found.interpretation
                     response = found
                 }
                 if found.isCredentialRequest { return }
@@ -477,9 +512,8 @@ private struct SearchGlassControls<Content: View>: View {
 
 private struct SearchFilterLabel: View {
     let title: String
-    let icon: String
     let selected: Bool
-    var showsChevron = true
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var body: some View {
         if reduceTransparency {
@@ -490,13 +524,14 @@ private struct SearchFilterLabel: View {
     }
     private var label: some View {
         HStack(spacing: 6) {
-            Image(systemName: icon)
-            Text(title).lineLimit(1)
-            if showsChevron { Image(systemName: "chevron.down").font(.caption2.weight(.semibold)) }
+            Text(title).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+            Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
         }
         .font(.subheadline.weight(.medium))
         .foregroundStyle(selected ? Color.zifrGold : Color.primary)
-        .padding(.horizontal, 14).padding(.vertical, 8).frame(minHeight: 44)
+        .padding(.horizontal, 10).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .contentShape(Capsule())
     }
 }
 
@@ -537,7 +572,21 @@ struct SearchRecordDestinationView: View {
                         if let page = record.page { SearchDocumentViewer(document: doc, page: page) }
                         else { EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: appState.companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC") }
                     }
-                default: ContentUnavailableView("Open from portfolio", systemImage: record.kind.icon)
+                case .expenseReview:
+                    if let review = appState.businessExpenseReviews.first(where: { $0.id == id }) { BusinessExpenseReviewSheet(initialReview: review) }
+                case .settings, .alert: AdminSettingsView(vm: vm)
+                case .activity: ActivityLogsView(vm: vm)
+                default:
+                    NavigationStack {
+                        List {
+                            Text(record.title).font(.headline)
+                            Text(record.detail)
+                            ForEach(record.safeDetails.keys.sorted(), id: \.self) { key in
+                                VStack(alignment: .leading) { Text(SearchText.fieldLabel(key)).font(.caption).foregroundStyle(.secondary); Text(record.safeDetails[key] ?? "") }
+                            }
+                        }.navigationTitle(record.kind.label)
+                    }
+
                 }
             }
         }

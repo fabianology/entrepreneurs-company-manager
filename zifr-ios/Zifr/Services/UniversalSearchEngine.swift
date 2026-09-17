@@ -4,11 +4,12 @@ import Foundation
 /// This same projection feeds the search UI, Siri routing and assistant retrieval.
 struct SearchRecord: Identifiable, Hashable, Sendable {
     enum Kind: String, CaseIterable, Codable, Sendable {
-        case company, subscription, card, institution, account, loan, payment, transaction, document, obligation
+        case company, subscription, card, institution, account, loan, payment, transaction, document, obligation, expenseReview, notification, activity, settings, alert, sharing
         var label: String {
             switch self {
             case .subscription: return "Service"
             case .institution: return "Bank"
+            case .expenseReview: return "Expense review"
             default: return rawValue.capitalized
             }
         }
@@ -22,6 +23,11 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
             case .payment, .transaction: return "arrow.left.arrow.right"
             case .document: return "doc.text"
             case .obligation: return "calendar.badge.clock"
+            case .expenseReview: return "receipt"
+            case .notification, .alert: return "bell"
+            case .activity: return "clock"
+            case .settings: return "gearshape"
+            case .sharing: return "person.2"
             }
         }
     }
@@ -53,6 +59,11 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
     var flow: String = ""
     var pending = false
     var monthlyCost: Decimal?
+    var serviceType: String?
+    var parentServiceID: String?
+    var category = ""
+    var accountName = ""
+    var safeDetails: [String: String] = [:]
     var activeService = false
     var page: Int?
     var destinationID: UUID?
@@ -106,11 +117,14 @@ struct SearchResponse: Sendable {
     var interpretation: String = ""
     var coverage: String = ""
     var isCredentialRequest = false
+    var metrics: [SearchMetric] = []
+    var answerSummary: String? = nil
+    var includesDetails = false
 
     /// Include allowlisted financial facts and safe excerpts; omit logins, notes and credentials.
     /// Evidence is bounded; totals are calculated from ALL matching records before truncation.
     func assistantEvidence(limit: Int = 12, offset: Int = 0) -> String {
-        let offset = min(max(0, offset), hits.count)
+        let offset = min(max(0, offset), max(hits.count, metrics.count, totals.count))
         let limit = min(max(1, limit), 12)
         let formatter = ISO8601DateFormatter()
         let records: [[String: Any]] = hits.dropFirst(offset).prefix(limit).map { hit in
@@ -118,7 +132,14 @@ struct SearchResponse: Sendable {
             var result: [String: Any] = ["sourceID": hit.id, "kind": record.kind.rawValue,
                 "title": String(record.title.prefix(100)), "company": String(record.company.prefix(100)),
                 "detail": String(record.detail.prefix(250)), "match": String(hit.reason.prefix(150))]
-            result["excerpt"] = record.kind == .document ? (hit.snippet ?? "") : ""
+            result["excerpt"] = record.kind == .document ? (includesDetails ? String(record.text.prefix(6000)) : (hit.snippet ?? "")) : ""
+            result["excerptTruncated"] = record.kind == .document && includesDetails && record.text.count > 6000
+            result["serviceType"] = record.serviceType
+            result["category"] = record.category
+            result["account"] = record.accountName
+            result["page"] = record.page
+            result["details"] = record.safeDetails.filter { includesDetails || !["notes", "message", "linkedEmails", "context", "description"].contains($0.key) }.mapValues { String($0.prefix(includesDetails ? 1000 : 250)) }
+            result["hasMoreDetails"] = !record.safeDetails.isEmpty
             result["financialFacts"] = record.financialFacts.mapValues { String($0.prefix(200)) }
             result["currency"] = record.currency
             result["balanceIdentity"] = record.balanceIdentity ?? hit.id
@@ -128,13 +149,26 @@ struct SearchResponse: Sendable {
             result["dueDate"] = record.dueDate.map(formatter.string(from:)) ?? ""
             return result
         }
-        let sums: [[String: Any]] = totals.map {
+        let sums: [[String: Any]] = totals.dropFirst(totals.count > limit ? offset : 0).prefix(limit).map {
             ["label": $0.label, "currency": $0.currency, "amount": NSDecimalNumber(decimal: $0.amount).stringValue,
              "sourceCount": $0.sourceIDs.count, "sourceIDs": Array($0.sourceIDs.prefix(12)), "sourceIDsTruncated": $0.sourceIDs.count > 12]
         }
-        let payload: [String: Any] = ["records": records, "matchingRecordCount": hits.count,
+        let calculations: [[String: Any]] = metrics.dropFirst(offset).prefix(limit).map { metric in
+            var item: [String: Any] = ["label": metric.label, "value": NSDecimalNumber(decimal: metric.value).stringValue, "formatted": metric.formatted, "sourceCount": metric.sourceIDs.count, "sourceIDs": Array(metric.sourceIDs.prefix(12)), "sourceIDsTruncated": metric.sourceIDs.count > 12]
+            item["currency"] = metric.currency
+            item["previousValue"] = metric.previousValue.map { NSDecimalNumber(decimal: $0).stringValue }
+            if metric.sourceIDs.count == 1, let source = hits.first(where: { $0.id == metric.sourceIDs[0] })?.record {
+                item["recordTitle"] = source.title
+                item["company"] = source.company
+                item["date"] = SearchText.day(source.date)
+                item["account"] = source.accountName
+                item["flow"] = source.flow
+            }
+            return item
+        }
+        let payload: [String: Any] = ["calculationCount": metrics.count, "hasMoreCalculations": max(metrics.count, totals.count) > offset + limit, "calculations": calculations, "answer": answerSummary ?? "", "records": records, "matchingRecordCount": hits.count,
             "totals": sums, "interpretation": interpretation, "coverage": coverage,
-            "credentialRequest": isCredentialRequest, "returnedRecordCount": records.count, "hasMoreRecords": hits.count > offset + records.count, "offset": offset, "nextOffset": offset + records.count]
+            "credentialRequest": isCredentialRequest, "returnedRecordCount": records.count, "hasMoreRecords": hits.count > offset + records.count, "offset": offset, "nextOffset": min(offset + limit, max(hits.count, metrics.count, totals.count))]
         guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else { return "{}" }
         return json
@@ -144,6 +178,7 @@ struct SearchResponse: Sendable {
 struct SearchFilters: Equatable, Sendable {
     var companyID: UUID?
     var kind: SearchRecord.Kind?
+    var serviceType: String?
     var credentialsOnly = false
     var period: Period = .all
     enum Period: String, CaseIterable, Sendable {
@@ -159,6 +194,10 @@ struct SearchDocumentPage: Hashable, Sendable {
 }
 
 enum SearchText {
+    static func fieldLabel(_ key: String) -> String {
+        let labels = ["aprPercent": "APR (%)", "apyPercent": "APY (%)", "storedMonthlyPayment": "Saved monthly payment", "nextRenewal": "Next renewal", "expirationDate": "Expiration date", "paymentDue": "Payment due", "currentBalance": "Current balance", "creditLimit": "Credit limit", "storedInterestRate": "Interest rate", "currencyBasis": "Currency basis"]
+        return labels[key] ?? key.replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression).replacingOccurrences(of: "_", with: " ").capitalized
+    }
     static func normalize(_ text: String) -> String {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
             .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
@@ -172,7 +211,10 @@ enum SearchText {
     static func date(_ string: String, calendar: Calendar = .current) -> Date? {
         let pieces = string.prefix(10).split(separator: "-").compactMap { Int($0) }
         guard pieces.count == 3 else { return nil }
-        return calendar.date(from: DateComponents(year: pieces[0], month: pieces[1], day: pieces[2]))
+        guard let date = calendar.date(from: DateComponents(year: pieces[0], month: pieces[1], day: pieces[2])) else { return nil }
+        let actual = calendar.dateComponents([.year, .month, .day], from: date)
+        guard actual.year == pieces[0], actual.month == pieces[1], actual.day == pieces[2] else { return nil }
+        return date
     }
     static func decimal(_ value: Double?) -> Decimal? {
         guard let value, value.isFinite else { return nil }
@@ -181,9 +223,10 @@ enum SearchText {
     static func number(_ value: Double?) -> String {
         decimal(value).map { NSDecimalNumber(decimal: $0).stringValue } ?? "Unavailable"
     }
-    static func day(_ date: Date?) -> String {
+    static func day(_ date: Date?, calendar: Calendar = .current) -> String {
         guard let date else { return "Unavailable" }
         let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar; formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: date)
     }
@@ -212,7 +255,7 @@ struct SearchRedactor {
         var result = text
         for value in values { result = result.replacingOccurrences(of: value, with: "[protected]", options: .caseInsensitive) }
         // Free-form notes/documents can contain credentials too. Do not index labelled values or full PANs.
-        result = result.replacingOccurrences(of: #"(?im)\b(password|passwd|passcode|secret|api[_ -]?key|routing number|account number)\s*[:=]\s*[^\n]+"#, with: "$1: [protected]", options: .regularExpression)
+        result = result.replacingOccurrences(of: #"(?im)\b(password|passwd|passcode|secret|api[_ -]?key|access[_ -]?token|refresh[_ -]?token|cvv|cvc|pin|routing number|account number)\s*[:=]\s*[^\n]+"#, with: "$1: [protected]", options: .regularExpression)
         result = result.replacingOccurrences(of: #"\b(?:\d[ -]?){12,18}\d\b"#, with: "[protected]", options: .regularExpression)
         return result
     }
@@ -253,8 +296,9 @@ struct UniversalSearchIndex: Sendable {
         }
         func key(_ kind: SearchRecord.Kind, _ id: UUID) -> String { "\(kind.rawValue):\(id.uuidString)" }
         for company in companies {
-            records.append(make(.company, company.id, company.id, company.name, company.structure,
-                                [company.companyDescription, company.website].compactMap { $0 }.joined(separator: " ")))
+            var record = make(.company, company.id, company.id, company.name, company.structure, [company.companyDescription, company.website].compactMap { $0 }.joined(separator: " "))
+            record.safeDetails = ["description": redactor.clean(company.companyDescription ?? ""), "website": redactor.clean(company.website ?? ""), "structure": redactor.clean(company.structure)]
+            records.append(record)
         }
         let cards = appState.cards.filter { allowed($0.id, $0.userId, $0.companyId) }.map { c in
             var c = c; c.companyId = companyID(c.id, c.companyId); return c
@@ -307,6 +351,7 @@ struct UniversalSearchIndex: Sendable {
             }
             r.financialFacts["paymentDue"] = redactor.clean(card.paidOn ?? "Unavailable")
             r.financialFacts["autopay"] = redactor.clean(card.autopay)
+            r.safeDetails = ["notes": redactor.clean(card.notes ?? ""), "cardHolder": redactor.clean(card.cardHolder ?? ""), "expirationDate": SearchText.day(card.expiresAt), "paidFrom": redactor.clean(card.paidFrom ?? "")]
             records.append(r); aliases([card.id.uuidString, card.plaidAccountId], r.id)
         }
         for institution in institutions {
@@ -346,20 +391,35 @@ struct UniversalSearchIndex: Sendable {
             let text = [sub.loginId, sub.website, sub.notes, sub.paymentMethod].compactMap { $0 }.joined(separator: " ")
                 + " " + sub.linkedEmails.map { "\($0.email) \($0.provider) \($0.usedFor)" }.joined(separator: " ")
                 + " " + sub.subServices.map { "\($0.name) \($0.purpose)" }.joined(separator: " ")
-            var r = make(.subscription, sub.id, cid, sub.name, detail, text)
+            var r = make(.subscription, sub.id, cid, sub.name, "\(sub.resolvedServiceType.rawValue.capitalized) · " + detail, text)
+            r.serviceType = sub.resolvedServiceType.rawValue
+            r.safeDetails = ["website": redactor.clean(sub.website ?? ""), "notes": redactor.clean(sub.notes ?? ""), "paymentMethod": redactor.clean(sub.paymentMethod ?? "")]
             r.login = redactor.clean(sub.loginId ?? ""); r.credential = credential(sub.password)
-            r.date = sub.nextRenewalAt ?? sub.nextRenewal.flatMap { SearchText.date($0) }
+            r.date = sub.nextRenewalAt ?? sub.nextRenewal.flatMap { SearchText.date($0) }; r.dueDate = r.date
             r.activeService = !["cancelled", "canceled", "paused"].contains(sub.status.lowercased())
-            if let base = ExecutiveBriefingSnapshot.monthlyCost(sub), base.isFinite {
-                r.monthlyCost = Decimal(base) + sub.subServices.filter { $0.status == .active }.reduce(Decimal.zero) {
-                    $0 + Decimal($1.cost) / ($1.billingCycle == .yearly ? 12 : 1)
-                }
-            }
+            if let base = ExecutiveBriefingSnapshot.monthlyCost(sub), base.isFinite { r.monthlyCost = SearchText.decimal(base) }
             r.currency = ExecutiveBriefingSnapshot.currency(sub.currency)
+            r.safeDetails["classificationSource"] = sub.serviceType == .automatic ? "Automatic classification" : "User-selected classification"
+            r.safeDetails["renewalMode"] = redactor.clean(sub.renew)
+            r.safeDetails["pricingModel"] = redactor.clean(sub.pricingModel)
+            r.safeDetails["linkedEmails"] = redactor.clean(sub.linkedEmails.map { "\($0.email): \($0.usedFor)" }.joined(separator: "; "))
             r.financialFacts = ["billingAmount": SearchText.number(sub.cost), "billingCycle": redactor.clean(sub.billingCycle),
                 "nextRenewal": SearchText.day(r.date), "status": redactor.clean(sub.status)]
-            if let monthly = r.monthlyCost { r.financialFacts["monthlyEquivalentIncludingActiveAddOns"] = NSDecimalNumber(decimal: monthly).stringValue }
+            if let monthly = r.monthlyCost { r.financialFacts["monthlyEquivalent"] = NSDecimalNumber(decimal: monthly).stringValue }
             records.append(r)
+            for addon in sub.subServices {
+                var child = make(.subscription, sub.id, cid, addon.name, "\(addon.resolvedServiceType.rawValue.capitalized) · Add-on to \(sub.name) · \(SearchText.money(Decimal(addon.cost), currency: r.currency)) / \(addon.billingCycle.rawValue)", addon.purpose, suffix: ":addon:\(addon.id)")
+                child.parentServiceID = r.id; child.serviceType = addon.resolvedServiceType.rawValue
+                child.activeService = r.activeService && addon.status == .active
+                child.monthlyCost = SearchText.decimal(addon.cost).map { $0 / (addon.billingCycle == .yearly ? 12 : 1) }
+                child.currency = r.currency; child.date = addon.renewsOn; child.dueDate = addon.renewsOn
+                child.financialFacts = ["billingAmount": SearchText.number(addon.cost), "billingCycle": addon.billingCycle.rawValue, "status": addon.status.rawValue]
+                child.safeDetails = ["purpose": redactor.clean(addon.purpose), "parentService": redactor.clean(sub.name)]
+                records.append(child); link(child.id, r.id)
+                if let paymentID = addon.paymentMethodId ?? sub.paymentMethodId {
+                    for target in records where target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(child.id, target.id) }
+                }
+            }
             if let paymentID = sub.paymentMethodId {
                 for target in records where target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(r.id, target.id) }
                 for target in accountAliases[paymentID.uuidString] ?? [] { link(r.id, target) }
@@ -385,6 +445,7 @@ struct UniversalSearchIndex: Sendable {
                 "storedMonthlyPayment": SearchText.number(loan.monthlyPayment), "paymentFrequency": redactor.clean(loan.scheduleFrequency),
                 "nextPayment": SearchText.day(loan.nextPaymentAt), "maturityDate": SearchText.day(loan.maturityDate),
                 "currencyBasis": "USD app default; loan has no currency field"]
+            r.safeDetails = ["notes": redactor.clean(loan.notes ?? ""), "lender": redactor.clean(loan.lender ?? ""), "term": redactor.clean(loan.term), "startDate": SearchText.day(loan.startDate), "paidOffDate": SearchText.day(loan.paidOffDate)]
             records.append(r)
             for payment in loan.payments ?? [] {
                 var p = make(.payment, payment.id, cid, "\(loan.name) payment", "\(payment.date.formatted(date: .abbreviated, time: .omitted)) · \(payment.amount.formatted(.number.precision(.fractionLength(2))))", payment.source ?? "")
@@ -421,10 +482,12 @@ struct UniversalSearchIndex: Sendable {
         for doc in visibleDocuments {
             let cid = companyID(doc.id, doc.companyId)
             var r = make(.document, doc.id, cid, doc.name, doc.type, doc.notes ?? "")
+            r.safeDetails = ["notes": redactor.clean(doc.notes ?? ""), "documentType": redactor.clean(doc.type), "expirationDate": SearchText.day(doc.expiresAt)]
+            for (key, value) in doc.renewalMetadata { r.safeDetails[redactor.clean(key)] = redactor.clean(value) }
             r.date = doc.uploadDate.flatMap { SearchText.date($0) }; r.dueDate = doc.expiresAt; records.append(r)
             for page in documentPages where page.documentID == doc.id && page.sourceURL == doc.url {
                 var p = make(.document, doc.id, cid, doc.name, "\(doc.type) · Page \(page.page)", page.text, suffix: ":page:\(page.page)")
-                p.page = page.page; p.date = r.date; p.dueDate = doc.expiresAt; records.append(p)
+                p.page = page.page; p.date = r.date; p.dueDate = doc.expiresAt; records.append(p); link(p.id, r.id)
             }
         }
         let transactions = appState.transactions.filter { t in
@@ -437,15 +500,20 @@ struct UniversalSearchIndex: Sendable {
             let aliasesForTransaction = [t.accountId, t.sourceAccountId, t.canonicalAccountId].compactMap { $0 }
             let targets = aliasesForTransaction.reduce(into: Set<String>()) { $0.formUnion(accountAliases[$1] ?? []) }
             let linkedAccounts = targets.compactMap { accountRecordsByID[$0] }
+            // Opaque Plaid IDs are not account numbers; never present their suffix as a card ending.
+            let accountName = linkedAccounts.isEmpty && resolved.accountName == "Account •••• \(t.accountId.suffix(4))" ? "Unassigned account" : resolved.accountName
             let linkedCompanyIDs = Set(linkedAccounts.compactMap(\.companyID))
             // A local reassignment also moves the related transaction in search.
             let cid = linkedCompanyIDs.count == 1 ? linkedCompanyIDs.first : resolved.companyId
-            let amount = t.amount.flatMap { $0.isFinite ? Decimal(abs($0)) : nil }
+            let amount = t.amount.flatMap { SearchText.decimal(abs($0)) }
             let value = amount.map { SearchText.money($0, currency: t.currency) } ?? "Amount unavailable"
             let flow = TransactionIntelligence.effectiveFlow(for: resolved).rawValue
             var r = make(.transaction, t.id, cid, TransactionIntelligence.displayName(for: resolved),
-                "\(value) · \(t.date) · \(resolved.accountName)\(linkedAccounts.first.map { $0.last4.isEmpty ? "" : " •••• \($0.last4)" } ?? "") · \(t.pending == true ? "Pending" : flow.capitalized)",
+                "\(value) · \(t.date) · \(accountName)\(linkedAccounts.first.map { $0.last4.isEmpty ? "" : " •••• \($0.last4)" } ?? "") · \(t.pending == true ? "Pending" : flow.capitalized)",
                 "\(resolved.institutionName) \(TransactionIntelligence.categoryPrimary(for: resolved) ?? "") \(resolved.override?.note ?? "")")
+            r.category = redactor.clean(TransactionIntelligence.categoryPrimary(for: resolved) ?? "Uncategorized")
+            r.accountName = redactor.clean(accountName)
+            r.safeDetails = ["notes": redactor.clean(resolved.override?.note ?? ""), "institution": redactor.clean(resolved.institutionName)]
             r.amount = amount; r.currency = ExecutiveBriefingSnapshot.currency(t.currency); r.date = SearchText.date(t.date); r.flow = flow; r.pending = t.pending == true
             r.financialFacts = ["transactionAmount": amount.map { NSDecimalNumber(decimal: $0).stringValue } ?? "Unavailable", "flow": flow, "pending": r.pending ? "Yes" : "No"]
             records.append(r)
@@ -457,18 +525,85 @@ struct UniversalSearchIndex: Sendable {
             link("\(edge.sourceType.rawValue):\(edge.sourceId.uuidString)", "\(edge.targetType.rawValue):\(edge.targetId.uuidString)")
         }
         let sourceRecords = Dictionary(records.filter { $0.page == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        for obligation in appState.obligations where obligation.state == .open {
+        for obligation in appState.obligations {
             let sourceID = "\(obligation.sourceType.rawValue):\(obligation.sourceId.uuidString)"
             guard let source = sourceRecords[sourceID] else { continue }
             var r = make(.obligation, obligation.id, source.companyID, obligation.title, obligation.severity.rawValue.capitalized, obligation.summary)
-            r.date = obligation.dueAt; r.destinationID = source.modelID; r.destinationKind = source.kind
+            r.safeDetails = ["state": obligation.state.rawValue, "summary": redactor.clean(obligation.summary), "snoozedUntil": SearchText.day(obligation.snoozedUntil)]
+            r.date = obligation.dueAt; r.dueDate = obligation.dueAt; r.destinationID = source.modelID; r.destinationKind = source.kind
             records.append(r); link(r.id, sourceID)
+        }
+        // Supplement the primary records with the other user-visible portfolio areas.
+        let authorizedIDs = Set(records.map(\.modelID))
+        for review in appState.businessExpenseReviews where appState.businessExpenseUserID == userID {
+            // Reviews have no owner field. Require the underlying authorized transaction;
+            // manual reviews require an owned company, not merely a shared-company membership.
+            let cid = review.allocation?.companyId ?? review.source.sourceCompanyId
+            let sourceAllowed = review.transactionId.map(authorizedIDs.contains) ?? companies.contains { $0.id == cid && $0.userId == userID }
+            guard sourceAllowed else { continue }
+            var r = make(.expenseReview, review.id, cid, review.source.merchant, "Expense review · " + review.decision,
+                [review.allocation?.purpose, review.allocation?.notes, review.allocation?.context, review.allocation?.category].compactMap { $0 }.joined(separator: " ") + " " + review.missing.joined(separator: " "))
+            r.amount = review.businessAmount; r.currency = ExecutiveBriefingSnapshot.currency(review.source.currency ?? "USD")
+            r.date = SearchText.date(review.source.date); r.accountName = redactor.clean(review.source.accountName)
+            r.category = redactor.clean(review.allocation?.category ?? "")
+            r.safeDetails = ["decision": redactor.clean(review.decision), "missing": redactor.clean(review.missing.joined(separator: ", ")), "purpose": redactor.clean(review.allocation?.purpose ?? ""), "notes": redactor.clean(review.allocation?.notes ?? ""), "receiptCount": String(review.documents.count)]
+            records.append(r)
+            if let id = review.transactionId { link(r.id, key(.transaction, id)) }
+        }
+        for notice in appState.notifications where notice.userId == userID {
+            var r = make(.notification, notice.id, nil, notice.title, notice.isRead ? "Read notification" : "Unread notification", notice.body)
+            r.date = notice.createdAt; r.safeDetails = ["message": redactor.clean(notice.body)]
+            records.append(r)
+        }
+        for event in appState.activityLogs where event.userId == userID {
+            var r = make(.activity, event.id, nil, event.actionType, event.message)
+            r.date = event.createdAt; records.append(r)
+        }
+        for share in appState.resourceShares where share.userId == userID && authorizedIDs.contains(share.resourceId) {
+            let source = records.first { $0.modelID == share.resourceId }
+            var r = make(.sharing, share.id, source?.companyID, source?.title ?? "Shared record", "Your access: " + share.role, share.senderDisplayName ?? "")
+            r.safeDetails = ["role": redactor.clean(share.role), "sharedBy": redactor.clean(share.senderDisplayName ?? "")]
+            records.append(r)
+            if let source { link(r.id, source.id) }
+        }
+        if let preferences = appState.userPreferences, preferences.userId == userID {
+            var r = make(.settings, userID, nil, "Notification settings", "Reminders, messages, briefing and alerts", "preferences settings timezone")
+            r.safeDetails = ["remindersEnabled": String(preferences.remindersEnabled), "messagesEnabled": String(preferences.messagesEnabled), "weeklyBriefingEnabled": preferences.weeklyBriefingEnabled.map(String.init) ?? "Not configured", "criticalAlertsEnabled": preferences.criticalAlertsEnabled.map(String.init) ?? "Not configured", "timeZone": redactor.clean(preferences.timezone ?? "Not configured")]
+            records.append(r)
+        }
+        for rule in appState.alertRules where rule.userId == userID {
+            var r = make(.alert, userID, nil, rule.ruleType.rawValue, rule.enabled ? "Alert enabled" : "Alert disabled", suffix: ":\(rule.ruleType.rawValue)")
+            r.safeDetails = ["enabled": String(rule.enabled), "thresholdAmount": SearchText.number(rule.thresholdAmount), "thresholdPercent": SearchText.number(rule.thresholdPercent), "lookbackDays": rule.lookbackDays.map(String.init) ?? "Not configured", "leadDays": rule.leadDays.map(String.init) ?? "Not configured"]
+            records.append(r)
+        }
+        // Index the same safe fields exposed by detail retrieval, including statuses and amounts.
+        records = records.map { original in
+            var record = original
+            let fields = (record.safeDetails.keys.sorted().map { "\($0) \(record.safeDetails[$0]!)" } + record.financialFacts.keys.sorted().map { "\($0) \(record.financialFacts[$0]!)" }).joined(separator: " ")
+            record.normalizedText = SearchText.normalize(record.normalizedText + " " + fields)
+            record.words = Set(record.normalizedText.split(separator: " ").map(String.init))
+            return record
+        }
+        if appState.businessExpenseUserID == userID {
+            var settings = make(.settings, userID, nil, "Business expense settings", "Expense analysis and business profiles", "tax receipts scanning", suffix: ":business-expenses")
+            settings.safeDetails = ["enabled": String(appState.businessExpenseSettings.enabled), "excludedAccounts": redactor.clean(appState.businessExpenseAccounts.filter { appState.businessExpenseSettings.excludedAccountIds.contains($0.exclusionKey) }.compactMap(\.name).joined(separator: ", "))]
+            if let job = appState.businessExpenseJob {
+                settings.safeDetails.merge(["latestScan": redactor.clean(job.state), "scannedCount": String(job.scanned), "suggestedCount": String(job.suggested), "dateFrom": job.dateFrom, "dateTo": job.dateTo], uniquingKeysWith: { a, _ in a })
+            }
+            records.append(settings)
+            for profile in appState.businessExpenseProfiles where allowedCompanies.contains(profile.companyId) {
+                var r = make(.settings, profile.companyId, profile.companyId, "Business profile", profile.activity, suffix: ":business-profile")
+                r.safeDetails = ["activity": redactor.clean(profile.activity), "enabled": String(profile.enabled)]
+                records.append(r)
+            }
         }
         let validIDs = Set(records.map(\.id))
         links = links.filter { validIDs.contains($0.key) }.mapValues { $0.intersection(validIDs) }
         let indexedDocs = Set(documentPages.map(\.documentID)).intersection(Set(visibleDocuments.map(\.id))).count
         coverage = "Loaded portfolio · \(transactions.count) transactions · document text \(indexedDocs)/\(visibleDocuments.count)"
-        if appState.portfolioLoadIssue != nil { coverage += " · Refresh incomplete" }
+        if appState.portfolioLoadIssue != nil { coverage += " · Refresh incomplete: answers may be partial" }
+        if appState.businessExpenseLoadError != nil || appState.businessExpenseUserID != userID { coverage += " · Expense reviews unavailable or not yet loaded" }
+        coverage += " · " + redactor.clean(appState.searchDocumentStatus)
         if institutions.contains(where: \.isDisconnected) { coverage += " · A bank connection needs attention" }
     }
 
@@ -481,16 +616,17 @@ struct UniversalSearchIndex: Sendable {
         links[a, default: []].insert(b); links[b, default: []].insert(a)
     }
 
-    func search(_ query: String, filters: SearchFilters = .init(), now: Date = Date(), calendar: Calendar = .current) -> SearchResponse {
+    func matching(_ query: String, filters: SearchFilters = .init(), now: Date = Date(), calendar: Calendar = .current) -> SearchResponse {
         let plan = SearchQuery(query, filters: filters, now: now, calendar: calendar)
         var response = SearchResponse(interpretation: plan.description, coverage: coverage, isCredentialRequest: plan.credentials)
         guard isLoaded, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !plan.tokens.isEmpty || plan.kind != nil || plan.credentials || plan.renewals || plan.financial else { return response }
+              !plan.tokens.isEmpty || query == "all records" || plan.kind != nil || plan.credentials || plan.renewals || plan.financial else { return response }
         if plan.balanceQuery, plan.dates != nil {
             response.interpretation = "Historical balances are unavailable. Search without a date for the latest saved balance."
             return response
         }
         func inScope(_ r: SearchRecord, checkKind: Bool = true) -> Bool {
+            if let serviceType = filters.serviceType, r.serviceType != serviceType { return false }
             if let cid = filters.companyID, r.companyID != cid { return false }
             if let kind = filters.kind, kind != r.kind { return false }
             if checkKind, let kind = plan.kind, kind != r.kind {
@@ -616,7 +752,7 @@ struct SearchQuery {
         var words = normalized.split(separator: " ").map(String.init)
         let set = Set(words)
         credentials = filters.credentialsOnly || !set.isDisjoint(with: ["password", "passwords", "login", "logins", "username", "credentials"])
-        relationships = !set.isDisjoint(with: ["uses", "linked", "connected", "pays", "paid"])
+        relationships = !set.isDisjoint(with: ["uses", "linked", "connected", "pays", "pay", "paid"])
         renewals = !set.isDisjoint(with: ["renew", "renews", "renewal", "renewals", "renewing", "due", "expires", "expiring"])
         balanceQuery = !credentials && (!set.isDisjoint(with: ["balance", "balances", "owe", "owed", "debt", "debts", "available"])
             || (!set.isDisjoint(with: ["money", "cash", "funds"]) && !set.isDisjoint(with: ["much", "have", "total"])))
@@ -628,11 +764,11 @@ struct SearchQuery {
         cashOnly = financial && !set.isDisjoint(with: ["cash", "money", "funds"])
         if financial && !set.isDisjoint(with: ["payment", "payments"]) { renewals = false }
         groupByCompany = normalized.contains("per company") || normalized.contains("by company")
-        monthlySpend = !set.isDisjoint(with: ["subscriptions", "subscription", "services"]) && !set.isDisjoint(with: ["spend", "cost", "total", "spending"])
+        monthlySpend = !set.isDisjoint(with: ["subscriptions", "subscription", "services", "bills", "bill"]) && !set.isDisjoint(with: ["spend", "cost", "total", "spending"])
         kind = filters.kind
-        let aliases: [(SearchRecord.Kind, Set<String>)] = [(.transaction, ["transaction", "transactions", "charge", "charges", "charged"]),
-            (.subscription, ["subscription", "subscriptions", "service", "services", "bills"]), (.card, ["card", "cards"]),
-            (.institution, ["bank", "banks"]), (.account, ["account", "accounts"]), (.payment, ["payment", "payments"]), (.loan, ["loan", "loans"]), (.document, ["document", "documents", "pdf", "file", "files"]), (.company, ["company", "companies", "entity", "entities"])]
+        let aliases: [(SearchRecord.Kind, Set<String>)] = [(.transaction, ["transaction", "transactions", "charge", "charges", "charged", "expense", "expenses", "income", "refunds", "transfers", "purchase", "purchases"]),
+            (.subscription, ["subscription", "subscriptions", "service", "services", "bill", "bills"]), (.card, ["card", "cards"]),
+            (.institution, ["bank", "banks"]), (.account, ["account", "accounts"]), (.payment, ["payment", "payments"]), (.loan, ["loan", "loans"]), (.document, ["document", "documents", "pdf", "file", "files"]), (.company, ["company", "companies", "entity", "entities"]), (.expenseReview, ["receipts", "receipt", "reviews", "expensereview"]), (.notification, ["notifications", "notification"]), (.activity, ["activity", "history"]), (.settings, ["settings", "preferences"]), (.alert, ["alerts", "alert"]), (.sharing, ["sharing", "shared"])]
         if !credentials, kind == nil { kind = aliases.first { !set.isDisjoint(with: $0.1) }?.0 }
         if monthlySpend { kind = .subscription }
         if financial && filters.kind == nil && [.payment, .company].contains(kind) { kind = nil }
@@ -660,12 +796,14 @@ struct SearchQuery {
                 }
             }
         }
-        let filler: Set<String> = ["what", "which", "where", "is", "are", "was", "were", "my", "the", "a", "an", "of", "for", "in", "on", "at", "from", "to", "with", "me", "show", "find", "search", "please", "how", "much", "do", "does", "i", "all", "and", "this", "that", "uses", "linked", "connected", "pays", "paid", "ending", "ends", "digits", "last", "credit", "debit", "password", "passwords", "login", "logins", "username", "credentials"]
+        let filler: Set<String> = ["what", "which", "where", "is", "are", "was", "were", "my", "the", "a", "an", "of", "for", "in", "on", "at", "from", "to", "with", "me", "show", "find", "search", "please", "how", "much", "do", "does", "i", "all", "and", "this", "that", "uses", "linked", "connected", "pays", "pay", "paid", "ending", "ends", "digits", "last", "credit", "debit", "password", "passwords", "login", "logins", "username", "credentials"]
         var ignored = filler
         aliases.forEach { ignored.formUnion($0.1) }
         if renewals { ignored.formUnion(["renew", "renews", "renewal", "renewals", "renewing", "due", "expires", "expiring"]) }
         if financial { ignored.formUnion(["balance", "balances", "owe", "owed", "debt", "debts", "available", "apr", "apy", "limit", "limits", "principal", "autopay", "interest", "rate", "rates", "payment", "payments", "monthly", "minimum", "next", "due", "total", "totals", "per", "by", "current", "currently", "have", "has", "remaining", "outstanding", "cash", "money", "funds", "today", "now", "right", "get", "give", "tell", "can", "you", "s"] ) }
+        ignored.formUnion(["website", "notes", "note", "when", "will", "expire", "expiration"])
         if monthlySpend { ignored.formUnion(["spend", "cost", "total", "spending", "per", "by", "monthly"]) }
+        if normalized == "all records" { ignored.formUnion(["records"]) }
         tokens = words.filter { !ignored.contains($0) }
         description = credentials ? "Choose a saved login to reveal or copy" : monthlySpend ? "Active services, normalized to a monthly equivalent" : financial ? "Saved financial details" : renewals ? "Renewals and due dates" : "Best matches"
         if let dates { description += " · \(dates.start.formatted(date: .abbreviated, time: .omitted))–\(calendar.date(byAdding: .day, value: -1, to: dates.end)!.formatted(date: .abbreviated, time: .omitted))" }

@@ -22,12 +22,12 @@ Scope: native `zifr-ios` only. This handoff accompanies the universal-search imp
 
 ## Search sheet design
 
-- Uses SwiftUI's native `searchable` field, navigation toolbar, grouped list and system sheet presentation. Search uses automatic platform placement on iOS 26+ and the standard navigation search drawer on older versions. Close remains available while typing.
+- Search keeps native keyboard dismissal on submit and immediate dismissal when scrolling results. The toolbar contains only Close; the keyboard, Ask, and info icons were removed at the owner’s request.
 - Uses the app's existing charcoal (`zifrCard`) and gold (`zifrGold`/`miloomGold`) palette. Liquid Glass is restricted to navigation/search controls and filter capsules; content rows use quieter solid surfaces. The sheet uses regular system material, with system-managed corner geometry.
 - Best matches and related records have distinct sections. Saved balances and available funds remain visible. Login, service/transaction navigation, and direct password reveal/copy remain accessible from result rows.
-- An explicit Ask menu in the toolbar offers Gemini and, where available, on-device answers. Coverage/indexing details live behind the info button; refresh issues remain visible in results.
+- The search toolbar contains only Close. Gemini remains available through the app’s assistant; refresh issues remain visible in results.
 - One child-sheet route handles records, saved logins, coverage, and upgrades. Its presenter is attached to the content inside the navigation stack. Attaching it to the outer navigation shell reproduced an iOS 17 presentation loop; the content anchor passes the real-sheet rendering check.
-- Uses semantic Dynamic Type fonts, 44-point action targets, vertically stacked password controls for accessibility text sizes, system separators, and a solid filter fallback for Reduce Transparency. Filter bar height scales with text and is bounded during sheet layout.
+- Uses semantic Dynamic Type fonts, 44-point action targets, vertically stacked password controls for accessibility text sizes, system separators, and a solid filter fallback for Reduce Transparency. Company, Type, and Date filters share the available width without horizontal scrolling, and stack at accessibility text sizes. Reset appears on a separate row when needed.
 - Design references: [Apple materials HIG](https://developer.apple.com/design/human-interface-guidelines/materials), [sheets HIG](https://developer.apple.com/design/human-interface-guidelines/sheets), [native search](https://developer.apple.com/documentation/swiftui/adding-a-search-interface-to-your-app), and [adopting Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass).
 - Installed tooling remains Xcode 26.4. Native Liquid Glass APIs are used where supported, with an iOS 17 fallback. No iOS 27-specific APIs or iOS 27 runtime verification are claimed.
 
@@ -78,3 +78,14 @@ This branch is implemented for review; the entire originally discussed feature i
 4. Run VoiceOver, large Dynamic Type and physical-device p95/index-build performance checks against a realistic portfolio and mixed PDF/scanned documents.
 5. iOS 27-specific search/Spotlight tools and Private Cloud Compute are **not implemented**. Only Xcode 26.4 is installed here. Adopting those APIs requires an iOS 27 SDK/device; Private Cloud Compute would additionally need approved entitlement/access changes. Existing App Intents and iOS 26 on-device functionality are already available without raising the app's minimum OS.
 6. Offline search covers records already loaded in this app session. The app has no durable offline portfolio cache; this change does not add one. Search cannot claim full coverage for unavailable bank history or unsupported/unloaded document contents.
+
+
+## Retrieval and calculation upgrade — September 17
+
+See [the data inventory and query contract](SEARCH_RETRIEVAL_COVERAGE.md) for current capabilities and limits. `PortfolioQueryEngine` now serves Search, Gemini text/Live and native Siri queries. It separates bill/subscription classifications and add-on costs, adds full-result ranking/aggregation/comparisons, validates scopes and dates, supports source details/relationships, and expands coverage to expense reviews, notifications, activity, preferences and alert rules.
+
+The current search toolbar remains Close-only. Bills and Subscriptions have separate Type choices. Questions receive native calculation cards; unresolved submitted questions can use Gemini interpretation without restoring the removed toolbar icons. The earlier references above to toolbar Ask/info actions describe historical iterations.
+
+`AskMiloomIntent` can return a shared-engine answer; `ReadMiloomRecordIntent` exposes authorized App Entities. Financial records are not donated to Spotlight. Siri returns an open/unlock fallback if the app session is not ready. Device-level Siri behavior still needs physical-device verification.
+
+Verification logs for this iteration are recorded in `SEARCH_RETRIEVAL_COVERAGE.md`: full simulator suite, iOS 17.5/26.4 search suites, and a passing authenticated Gemini text/Live synthetic-data scenario. Historical test counts above refer to their original builds. Broader model and physical Siri/VoiceOver checks remain open.

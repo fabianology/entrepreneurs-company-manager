@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A129D950061147F0A0000001 /* PortfolioQueryEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */; };
 		040C1B465BBF9CDEDF000CCD /* ActivityLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C022DD3ABEFB2F9B7AD38355 /* ActivityLogsView.swift */; };
 		07549C6F481951A912F9ECEC /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88C594CA72D48122B0D50169 /* ActivityLog.swift */; };
 		09BE6FE2E56BFD9B7C1144A2 /* InstitutionAccountHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4DFF2E12CA02748A1371FB /* InstitutionAccountHUD.swift */; };
@@ -153,6 +154,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioQueryEngine.swift; sourceTree = "<group>"; };
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
 		032520FD864A3B1FF73C81A0 /* AdminSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdminSettingsView.swift; sourceTree = "<group>"; };
 		035737E80A51990996AF6F2E /* AudioPlaybackManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackManager.swift; sourceTree = "<group>"; };
@@ -480,6 +482,7 @@
 				BF75CE575DD3FC8735C66778 /* PortfolioIntelligence.swift */,
 				E400F300CB45766A04AC1057 /* PushNotificationService.swift */,
 				E4CF15FE604668FE191E00BD /* UniversalSearchEngine.swift */,
+				A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */,
 				AEFE5D7D69FA9F6354C428FF /* SearchDocumentIndexer.swift */,
 				617623A9B7E9908F2B213768 /* SearchAnswerService.swift */,
 				A073E0EAB764025516746A36 /* SearchAppIntent.swift */,
@@ -871,6 +874,7 @@
 				1007F42E153C554AA4B2F44D /* ExecutiveBriefingModels.swift in Sources */,
 				3D8AB0A62301BB4198596D60 /* ExecutiveBriefingViews.swift in Sources */,
 				FCA35AF5B99CE0CFCD8E35C1 /* UniversalSearchEngine.swift in Sources */,
+				A129D950061147F0A0000001 /* PortfolioQueryEngine.swift in Sources */,
 				4DED2E7D5075E8F5E4236C7E /* SearchDocumentIndexer.swift in Sources */,
 				994377B0F05FF7A73B0AAAE3 /* SearchAnswerService.swift in Sources */,
 				B8075BCB4110DAD8EFEE19EB /* SearchAppIntent.swift in Sources */,

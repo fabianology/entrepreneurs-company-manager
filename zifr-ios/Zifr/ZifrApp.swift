@@ -61,6 +61,8 @@ struct ZifrApp: App {
             .environment(accessController)
             .environment(notificationRouter)
             .task {
+                SearchIntentSession.shared.appState = appState
+                SearchIntentSession.shared.auth = authViewModel
                 StoreService.shared.startListening(accessController: accessController)
                 await authViewModel.checkSession()
             }

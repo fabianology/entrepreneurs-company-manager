@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 import PDFKit
 import UIKit
 import SwiftUI
@@ -228,6 +229,7 @@ final class UniversalSearchTests: XCTestCase {
         var service = Subscription(userId: owner, companyId: a.id, name: "Figma", cost: 144)
         service.billingCycle = "Yearly"; service.paymentMethodId = first.id; service.loginId = "design@example.com"; service.password = "fixture-only"
         state.subscriptions = [service]
+        state.transactions = [transaction(a.id, amount: 1400)]
         let auth = AuthViewModel()
         auth.currentUser = User(id: owner, appMetadata: [:], userMetadata: [:], aud: "authenticated", createdAt: now, updatedAt: now)
         auth.isAuthenticated = true
@@ -237,7 +239,8 @@ final class UniversalSearchTests: XCTestCase {
             ("Figma", .large, "Service and password actions"),
             ("Figma", .accessibility3, "Large accessibility text"),
             ("No matching record", .large, "No results"),
-            ("", .large, "First open")
+            ("", .large, "First open"),
+            ("largest transaction", .large, "Calculated answer")
         ]
         for (query, size, label) in variants {
             let vm = AppViewModel(); vm.searchQuery = query
@@ -437,6 +440,231 @@ final class UniversalSearchTests: XCTestCase {
         }
         let extracted = try SearchDocumentIndexer.extract(try XCTUnwrap(image.pngData()), documentID: UUID(), sourceURL: "scan.png")
         XCTAssertTrue(extracted.pages.first?.text.lowercased().contains("sixty days") == true)
+    }
+
+    func testLargestAcrossFullHistoryNotFirstPageAndKeepsTiesAndCurrencies() throws {
+        let (state, a, _) = fixture()
+        state.transactions = (0..<1100).map { i in transaction(a.id, date: i == 1099 ? "2020-01-01" : "2026-09-10", amount: i == 1099 ? 9000 : 10) }
+        let winner = state.transactions.last!.id
+        var pending = transaction(a.id, amount: 50000); pending.pending = true
+        state.transactions.append(pending)
+        state.transactions.append(transaction(a.id, amount: 9000))
+        state.transactions.append(transaction(a.id, amount: 100, currency: "EUR"))
+        let response = state.searchIndex(for: owner).search("What is my biggest transaction?", now: now, calendar: calendar)
+        XCTAssertTrue(response.hits.contains { $0.record.modelID == winner })
+        XCTAssertFalse(response.hits.contains { $0.record.modelID == pending.id })
+        XCTAssertEqual(response.metrics.filter { $0.currency == "USD" }.map(\.value), [9000, 9000])
+        XCTAssertEqual(response.metrics.filter { $0.currency == "EUR" }.map(\.value), [100])
+        XCTAssertTrue(response.spokenAnswer.contains("9,000"))
+        let payload = try JSONSerialization.jsonObject(with: Data(response.assistantEvidence().utf8)) as! [String: Any]
+        XCTAssertEqual((payload["calculations"] as? [[String: Any]])?.count, 3)
+    }
+
+    func testBillSubscriptionClassificationAndMixedAddonsAreNeverCollapsed() throws {
+        let (state, a, _) = fixture()
+        var internet = Subscription(userId: owner, companyId: a.id, name: "Internet", cost: 100, serviceType: .bill)
+        internet.subServices = [SubService(name: "Streaming add-on", cost: 12, serviceType: .subscription)]
+        state.subscriptions = [internet, Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 20, serviceType: .subscription)]
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(index.search("How much are my bills each month?").totals.first?.amount, 100)
+        XCTAssertEqual(index.search("subscription spend").totals.first?.amount, 32)
+        XCTAssertEqual(index.search("services cost").totals.first?.amount, 132)
+        let payload = try JSONSerialization.jsonObject(with: Data(index.search("bills").assistantEvidence().utf8)) as! [String: Any]
+        XCTAssertEqual((payload["records"] as? [[String: Any]])?.first?["serviceType"] as? String, "bill")
+        state.subscriptions[0].serviceType = .subscription
+        XCTAssertTrue(state.searchIndex(for: owner).search("bills").hits.isEmpty)
+    }
+
+    func testTypedQueriesValidateDatesScopesAndSourceAccess() throws {
+        let (state, a, b) = fixture()
+        state.transactions = [transaction(a.id, date: "2026-08-01", amount: 10), transaction(a.id, date: "2026-08-31", amount: 30), transaction(b.id, amount: 900)]
+        var query = try JSONDecoder().decode(PortfolioQuery.self, from: Data("{\"query\":\"\",\"operation\":\"average\",\"kind\":\"transaction\",\"companyName\":\"North Studio\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-31\"}".utf8))
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(index.execute(query).metrics.first?.value, 20)
+        XCTAssertTrue(index.execute(query, filters: .init(companyID: b.id)).hits.isEmpty)
+        query.operation = .details; query.sourceID = "transaction:\(UUID())"
+        XCTAssertTrue(index.execute(query).hits.isEmpty)
+        query.operation = .sum; query.endDate = "bad-date"
+        XCTAssertTrue(index.execute(query).metrics.isEmpty)
+        query.endDate = "2026-08-31"; query.limit = 1000
+        XCTAssertTrue(index.execute(query).metrics.isEmpty)
+        XCTAssertThrowsError(try JSONDecoder().decode(PortfolioQuery.self, from: Data("{\"operation\":\"runSQL\"}".utf8)))
+    }
+
+    func testGroupedTotalsAndCalendarMonthComparisonUseAllMatches() {
+        let (state, a, _) = fixture()
+        state.transactions = [transaction(a.id, date: "2026-08-01", amount: 25), transaction(a.id, date: "2026-08-31", amount: 75), transaction(a.id, date: "2026-09-01", amount: 130)]
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(index.search("average expense last month", now: now, calendar: calendar).metrics.first?.value, 50)
+        XCTAssertEqual(index.search("how many transactions last month", now: now, calendar: calendar).metrics.first?.value, 2)
+        let compared = index.search("What increased since last month?", now: now, calendar: calendar)
+        XCTAssertEqual(compared.metrics.first?.value, 30)
+        XCTAssertEqual(compared.metrics.first?.previousValue, 100)
+        XCTAssertTrue(compared.interpretation.contains("2026-08-01"))
+    }
+
+    func testFollowUpsPreserveMetricAndReplacePeriod() {
+        let (state, a, b) = fixture()
+        state.transactions = [transaction(a.id, date: "2026-08-10", amount: 100), transaction(a.id, date: "2026-09-10", amount: 50), transaction(b.id, amount: 999)]
+        let first = PortfolioQuery.interpret("largest expense this month")
+        let second = PortfolioQuery.interpret("only North Studio", previous: first)
+        let third = PortfolioQuery.interpret("last month", previous: second)
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(index.execute(second, now: now, calendar: calendar).metrics.first?.value, 50)
+        XCTAssertEqual(index.execute(third, now: now, calendar: calendar).metrics.first?.value, 100)
+        XCTAssertEqual(third.operation, .largest)
+    }
+
+    func testAdditionalRecordsRespectOwnershipRefreshAndSecretRedaction() throws {
+        let (state, a, _) = fixture()
+        let password = "HIDDEN-CANARY-591"
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "App", password: password)]
+        let notice = AppNotification(id: UUID(), userId: owner, notificationType: "test", title: "Renewal notice", body: "Plan changed. Password: \(password)", isRead: false)
+        state.notifications = [notice, AppNotification(id: UUID(), userId: UUID(), notificationType: "test", title: "Other user", body: "Private", isRead: false)]
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(index.search("notifications").hits.count, 1)
+        XCTAssertFalse(index.search("notifications").assistantEvidence().contains(password))
+        state.notifications = []
+        XCTAssertTrue(state.searchIndex(for: owner).search("notifications").hits.isEmpty)
+        state.clearSearchSession()
+        XCTAssertTrue(state.searchIndex(for: owner).search("App").hits.isEmpty)
+    }
+
+    func testSourceDetailsAndRelatedQueriesUseAuthorizedIndexOnly() {
+        let (state, a, _) = fixture()
+        let card = FinancialCard(userId: owner, companyId: a.id, name: "Visa", last4: "1234")
+        var bill = Subscription(userId: owner, companyId: a.id, name: "Electricity", cost: 85, serviceType: .bill)
+        bill.paymentMethodId = card.id; bill.notes = "Customer reference sunshine"
+        state.cards = [card]; state.subscriptions = [bill]
+        let index = state.searchIndex(for: owner)
+        var query = PortfolioQuery(); query.operation = .related; query.sourceID = "card:\(card.id.uuidString)"; query.kind = .subscription
+        XCTAssertEqual(index.execute(query).hits.map(\.record.modelID), [bill.id])
+        query.operation = .details; query.sourceID = "subscription:\(bill.id.uuidString)"
+        XCTAssertTrue(index.execute(query).assistantEvidence().contains("sunshine"))
+        XCTAssertFalse(index.execute(query).assistantEvidence().contains("password"))
+    }
+
+    func testSiriBridgeRejectsLockedAndChangedSessions() {
+        let (state, _, _) = fixture()
+        let auth = AuthViewModel()
+        auth.currentUser = User(id: owner, appMetadata: [:], userMetadata: [:], aud: "authenticated", createdAt: now, updatedAt: now)
+        let bridge = SearchIntentSession(); bridge.appState = state; bridge.auth = auth
+        auth.isAuthenticated = false
+        XCTAssertNil(bridge.currentIndex())
+        auth.isAuthenticated = true
+        XCTAssertNotNil(bridge.currentIndex())
+        state.portfolioUserID = UUID()
+        XCTAssertNil(bridge.currentIndex())
+        XCTAssertFalse(SearchResponse(isCredentialRequest: true).spokenAnswer.contains("fixture-secret"))
+    }
+
+    func testCalculationPagesAreBoundedButTotalsAreComplete() throws {
+        let (state, a, _) = fixture()
+        state.transactions = (0..<30).map { i in
+            var t = transaction(a.id, amount: Double(i + 1)); t.name = "Merchant \(i)"; return t
+        }
+        var query = PortfolioQuery(); query.operation = .sum; query.kind = .transaction; query.groupBy = .merchant
+        let response = state.searchIndex(for: owner).execute(query)
+        XCTAssertEqual(response.metrics.count, 30)
+        XCTAssertEqual(response.metrics.reduce(Decimal.zero) { $0 + $1.value }, 465)
+        let page = try JSONSerialization.jsonObject(with: Data(response.assistantEvidence(offset: 12).utf8)) as! [String: Any]
+        XCTAssertEqual((page["calculations"] as? [[String: Any]])?.count, 12)
+        XCTAssertEqual(page["hasMoreCalculations"] as? Bool, true)
+    }
+
+    func testOptionalToolOperationPreservesExplicitFilters() throws {
+        let request = try PortfolioQuery.toolRequest(["query": AnyCodable(""), "kind": AnyCodable("subscription"), "serviceType": AnyCodable("bill"), "includePending": AnyCodable(true)])
+        XCTAssertEqual(request.kind, .subscription); XCTAssertEqual(request.serviceType, "bill")
+        XCTAssertTrue(request.includePending)
+        XCTAssertThrowsError(try PortfolioQuery.toolRequest(["kind": AnyCodable("invalid-kind")]))
+    }
+
+    func testFiltersAndInvalidCalendarDaysCannotBroadenQueries() {
+        let (state, a, _) = fixture()
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 20, serviceType: .subscription)]
+        XCTAssertTrue(state.searchIndex(for: owner).search("subscriptions", filters: .init(kind: .subscription, serviceType: "bill")).hits.isEmpty)
+        XCTAssertNil(SearchText.date("2026-02-31", calendar: calendar))
+        XCTAssertNil(SearchText.date("2026-13-01", calendar: calendar))
+        XCTAssertEqual(state.searchIndex(for: owner).search("North Studio").hits.first?.record.kind, .company)
+    }
+
+    func testMonthlyBillsPaidByCardCanBeCalculatedThroughSourceLink() {
+        let (state, a, _) = fixture()
+        let card = FinancialCard(userId: owner, companyId: a.id, name: "Visa", last4: "1234")
+        var bill = Subscription(userId: owner, companyId: a.id, name: "Electricity", cost: 85, serviceType: .bill)
+        bill.paymentMethodId = card.id
+        state.cards = [card]; state.subscriptions = [bill]
+        var query = PortfolioQuery(); query.operation = .sum; query.sourceID = "card:\(card.id.uuidString)"; query.kind = .subscription; query.serviceType = "bill"
+        XCTAssertEqual(state.searchIndex(for: owner).execute(query).metrics.first?.value, 85)
+    }
+
+    func testMissingReceiptLookupExcludesAlreadyDocumentedReviews() {
+        let (state, a, _) = fixture()
+        state.businessExpenseUserID = owner
+        let source = BusinessExpenseSource(merchant: "Office", date: "2026-09-01", amount: 100, currency: "USD", sourceCompanyId: a.id, accountName: "Visa", institutionName: "Bank")
+        let incomplete = BusinessExpenseReview(id: UUID(), decision: "confirmed", sourceState: "active", source: source, revision: 1, updatedAt: "2026-09-01", allocation: BusinessExpenseAllocation(companyId: a.id), suggestions: [], documents: [], missing: ["Receipt or missing-receipt explanation"])
+        var complete = incomplete; complete.id = UUID(); complete.missing = []
+        state.businessExpenseReviews = [incomplete, complete]
+        XCTAssertEqual(state.searchIndex(for: owner).search("Which expenses need receipts?").hits.map(\.record.modelID), [incomplete.id])
+    }
+
+    func testAuthenticatedTextAndLiveQueryToolsWhenOptedIn() async throws {
+        guard ProcessInfo.processInfo.environment["MILOOM_QUERY_INTEGRATION"] == "1" else { throw XCTSkip("Enable MILOOM_QUERY_INTEGRATION for metered Gemini query verification.") }
+        // Unsigned simulator builds may not persist Keychain sessions across test installation.
+        // Opt in to a UI sign-in window; credentials never enter the test or its environment.
+        if ProcessInfo.processInfo.environment["MILOOM_QUERY_WAIT_FOR_SIGN_IN"] == "1" {
+            for _ in 0..<120 {
+                if (try? await SupabaseService.shared.client.auth.session) != nil { break }
+                try await Task.sleep(for: .seconds(1))
+            }
+        }
+        guard (try? await SupabaseService.shared.client.auth.session) != nil else { throw XCTSkip("A signed-in simulator session is required for real Gemini text and voice verification.") }
+        let (state, a, _) = fixture()
+        var big = transaction(a.id, amount: 1400); big.name = "Archive"
+        state.transactions = [transaction(a.id, amount: 10), big]
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Internet", cost: 85, serviceType: .bill), Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 20, serviceType: .subscription)]
+        let index = state.searchIndex(for: owner)
+        let request = try await SearchAnswerService.queryRequest(for: "What is my biggest transaction?", useGemini: true)
+        let ranked = index.execute(request)
+        XCTAssertEqual(ranked.metrics.first?.value, 1400)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(ranked.assistantEvidence().utf8)) as? [String: Any])
+        let calculation = try XCTUnwrap((payload["calculations"] as? [[String: Any]])?.first)
+        XCTAssertEqual(calculation["recordTitle"] as? String, "Archive")
+        XCTAssertEqual(calculation["company"] as? String, "North Studio")
+        let textAnswer = try await SearchAnswerService.answer(question: "How much are my bills each month?", evidence: index.search("bills cost").assistantEvidence(), useGemini: true)
+        XCTAssertTrue(textAnswer.contains("85"))
+        let tools = [Tool(functionDeclarations: [FunctionDeclaration(name: "searchPortfolio", description: PortfolioQuery.assistantInstructions, parameters: Schema(type: "OBJECT", properties: PortfolioQuery.toolProperties, required: ["query"]))])]
+        let client = GeminiLiveClient(systemInstruction: PortfolioQuery.assistantInstructions + " Always call searchPortfolio before answering. Reply briefly in English.", tools: tools)
+        defer { client.disconnect() }
+        let answered = expectation(description: "Gemini Live retrieves and speaks the largest transaction")
+        var transcript = "", calls = 0, finished = false, heardAudio = false
+        let listener = client.events.sink { event in
+            switch event {
+            case .tools(let envelope):
+                for call in envelope.functionCalls {
+                    calls += 1
+                    guard calls <= 4 else { XCTFail("Exceeded query tool budget"); return }
+                    do {
+                        let query = try PortfolioQuery.toolRequest(call.args)
+                        let result = index.execute(query)
+                        client.sendToolResponse(response: FunctionResponse(id: call.id, name: call.name, response: ["success": AnyCodable(true), "evidence": AnyCodable(result.assistantEvidence())]))
+                    } catch { XCTFail("Invalid structured query from Live") }
+                }
+            case .outputTranscript(let value): transcript += value.text ?? ""
+            case .audio(let data): heardAudio = heardAudio || data.contains { $0 != 0 }
+            case .turnComplete where !finished: finished = true; answered.fulfill()
+            default: break
+            }
+        }
+        defer { listener.cancel() }
+        try await client.connect()
+        client.sendTextMessage("What is my biggest transaction?")
+        await fulfillment(of: [answered], timeout: 30)
+        XCTAssertGreaterThan(calls, 0)
+        XCTAssertTrue(heardAudio)
+        let spoken = XCTAttachment(string: transcript); spoken.name = "Synthetic Gemini Live answer"; spoken.lifetime = .keepAlways; add(spoken)
+        XCTAssertTrue(transcript.lowercased().contains("archive"), "Live should name the matching merchant")
+        XCTAssertTrue(transcript.contains("1,400") || transcript.contains("1400") || transcript.lowercased().contains("fourteen hundred") || transcript.lowercased().contains("one thousand four hundred"))
     }
 
 }

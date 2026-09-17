@@ -58,7 +58,7 @@ class DataRepository {
     
     private func searchLoad<T>(_ name: String, failures: PortfolioLoadFailures, operation: () async throws -> [T]) async -> [T] {
         do { return try await operation() }
-        catch { await failures.record(name); return [] }
+        catch { AppDiagnostics.failure("search", name, error: error); await failures.record(name); return [] }
     }
 
     // MARK: - Fetch All Data
@@ -175,9 +175,9 @@ class DataRepository {
         async let fLoanPayments: [LoanPayment] = measure("loan_payments") { await searchLoad("loan payments", failures: searchLoadFailures) { try await client.from("loan_payments").select().execute().value } }
         async let fDocuments: [CompanyDocument] = measure("documents") { await searchLoad("documents", failures: searchLoadFailures) { try await client.from("company_documents").select().execute().value } }
         async let fShares: [ResourceShare] = measure("shares") { await searchLoad("sharing permissions", failures: searchLoadFailures) { try await client.from("resource_shares").select().execute().value } }
-        async let fActivity: [ActivityLog] = measure("activity_logs") { (try? await client.from("activity_logs").select().order("created_at", ascending: false).execute().value) ?? [] }
-        async let fNotifications: [AppNotification] = measure("app_notifications") { (try? await client.from("app_notifications").select().order("created_at", ascending: false).execute().value) ?? [] }
-        async let fPrefs: [UserPreferences] = measure("user_preferences") { (try? await client.from("user_preferences").select().execute().value) ?? [] }
+        async let fActivity: [ActivityLog] = measure("activity_logs") { await searchLoad("activity", failures: searchLoadFailures) { try await client.from("activity_logs").select().order("created_at", ascending: false).execute().value } }
+        async let fNotifications: [AppNotification] = measure("app_notifications") { await searchLoad("notifications", failures: searchLoadFailures) { try await client.from("app_notifications").select().order("created_at", ascending: false).execute().value } }
+        async let fPrefs: [UserPreferences] = measure("user_preferences") { await searchLoad("preferences", failures: searchLoadFailures) { try await client.from("user_preferences").select().execute().value } }
         async let fAlertRules: [AlertRule] = measure("alert_rules") { await safeFetchAlertRules() }
         async let fPlaidItems: [PlaidItemSummary] = measure("plaid_items") {
             (try? await client
@@ -187,7 +187,7 @@ class DataRepository {
                 .value) ?? []
         }
         async let fConnections: [ResourceConnection] = measure("resource_connections") { await searchLoad("connections", failures: searchLoadFailures) { try await client.from("resource_connections").select().execute().value } }
-        async let fObligations: [PortfolioObligation] = measure("obligations") { (try? await client.from("obligations").select().order("due_at", ascending: true).execute().value) ?? [] }
+        async let fObligations: [PortfolioObligation] = measure("obligations") { await searchLoad("reminders", failures: searchLoadFailures) { try await client.from("obligations").select().order("due_at", ascending: true).execute().value } }
         async let fObligationRefresh = refreshMyObligations()
         async let fTransactions = measure("transactions") { await searchLoad("transactions", failures: searchLoadFailures) { try await fetchTransactions() } }
         async let fTransactionOverrides: [TransactionOverride] = measure("transaction_overrides") {

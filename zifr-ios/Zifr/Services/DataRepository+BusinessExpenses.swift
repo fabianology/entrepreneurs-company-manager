@@ -16,6 +16,7 @@ extension DataRepository {
         async let receipts: [CompanyDocument] = expenseClient.from("company_documents").select().eq("user_id", value: owner).eq("visibility", value: "owner_private").execute().value
         let fetched = try await (reviews, settings, profiles, jobs, taxObligations, accounts, receipts)
         guard (try? await expenseClient.auth.session.user.id) == owner else { return }
+        appState.businessExpenseUserID = owner
         appState.businessExpenseReviews = fetched.0
         appState.businessExpenseSettings = fetched.1.first ?? BusinessExpenseSettings()
         appState.businessExpenseProfiles = fetched.2
