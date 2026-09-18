@@ -9,6 +9,7 @@ struct GlobalSearchView: View {
     @FocusState private var searchFocused: Bool
     @State private var filters = SearchFilters()
     @State private var response = SearchResponse()
+    @State private var overviews: [SearchOverview] = []
     @State private var searching = false
     @State private var visibleLimit = 40
     @State private var presentation: SheetRoute?
@@ -43,8 +44,10 @@ struct GlobalSearchView: View {
 
     private var hasQuery: Bool { !vm.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || related != nil }
     private var visibleHits: [SearchHit] { Array(response.hits.prefix(visibleLimit)) }
-    private var directHits: [SearchHit] { visibleHits.filter { $0.score != -100 } }
-    private var relatedHits: [SearchHit] { visibleHits.filter { $0.score == -100 } }
+    private var visibleOverviews: [SearchOverview] { Array(overviews.prefix(visibleLimit)) }
+    private var representedIDs: Set<String> { visibleOverviews.reduce(into: Set<String>()) { $0.formUnion($1.representedIDs) } }
+    private var directHits: [SearchHit] { visibleHits.filter { $0.score != -100 && !representedIDs.contains($0.id) } }
+    private var relatedHits: [SearchHit] { visibleHits.filter { $0.score == -100 && !representedIDs.contains($0.id) } }
     private var companyTitle: String {
         filters.companyID.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All companies"
     }
@@ -160,18 +163,28 @@ struct GlobalSearchView: View {
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
+                if !visibleOverviews.isEmpty {
+                    Section {
+                        ForEach(visibleOverviews) { overview in
+                            SearchOverviewCard(overview: overview, open: open)
+                                .id(overview.id + "|" + vm.searchQuery)
+                                .listRowBackground(Color.zifrCard)
+                                .listRowSeparatorTint(Color.zifrBorder)
+                        }
+                    } header: { resultHeading("Best matches", count: overviews.count) }
+                }
                 if !directHits.isEmpty {
                     Section {
                         ForEach(directHits) { hit in resultRow(hit) }
                     } header: {
-                        resultHeading(related == nil ? "Best matches" : "Results", count: response.hits.filter { $0.score != -100 }.count)
+                        resultHeading(overviews.isEmpty ? (related == nil ? "Best matches" : "Results") : "More matches", count: response.hits.filter { $0.score != -100 && !representedIDs.contains($0.id) }.count)
                     }
                 }
                 if !relatedHits.isEmpty {
                     Section {
                         ForEach(relatedHits) { hit in resultRow(hit) }
                     } header: {
-                        resultHeading("Related records", count: response.hits.filter { $0.score == -100 }.count)
+                        resultHeading("Related records", count: response.hits.filter { $0.score == -100 && !representedIDs.contains($0.id) }.count)
                     }
                 }
                 if response.hits.count > visibleLimit {
@@ -331,11 +344,7 @@ struct GlobalSearchView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Button { open(r) } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: r.kind.icon)
-                        .font(.title3).foregroundStyle(Color.zifrGold)
-                        .frame(width: 42, height: 42)
-                        .background(Color.zifrGold.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                        .accessibilityHidden(true)
+                    SearchResultLogo(record: r)
                     VStack(alignment: .leading, spacing: 5) {
                         Text(r.title).font(.headline).foregroundStyle(.primary)
                         Text("\(r.company) · \(r.kind.label)").font(.subheadline).foregroundStyle(Color.zifrGold)
@@ -437,7 +446,7 @@ struct GlobalSearchView: View {
     }
     @MainActor private func search() async {
         answerTask?.cancel(); answer = nil; answerError = nil; answering = false; visibleLimit = 40
-        guard let userID = auth.currentUser?.id, auth.isAuthenticated else { response = .init(); return }
+        guard let userID = auth.currentUser?.id, auth.isAuthenticated else { response = .init(); overviews = []; return }
         searching = true
         do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
         let index = appState.searchIndex(for: userID)
@@ -448,12 +457,13 @@ struct GlobalSearchView: View {
                 let ids = index.links[drill.id] ?? []
                 let records = index.records.filter { ids.contains($0.id) && $0.kind == drill.kind }
                 let subset = UniversalSearchIndex(records: records)
-                return subset.search(drill.kind == .transaction ? "Transactions" : "Services", filters: selectedFilters)
+                return (subset.search(drill.kind == .transaction ? "Transactions" : "Services", filters: selectedFilters), [SearchOverview]())
             }
-            return index.execute(request, filters: selectedFilters)
+            let response = index.execute(request, filters: selectedFilters)
+            return (response, index.overviews(for: response, request: request, filters: selectedFilters))
         }.value
         guard !Task.isCancelled, auth.currentUser?.id == userID else { return }
-        response = result; searching = false
+        response = result.0; overviews = result.1; searching = false
     }
     private func ask(useGemini: Bool) {
         if useGemini && !access.request(.aiAction, source: "universal_search", appState: appState, userId: auth.currentUser?.id) { presentation = .premium; return }
@@ -472,6 +482,7 @@ struct GlobalSearchView: View {
                     found = index.execute(rewritten, filters: selectedFilters)
                     found.interpretation = "Interpreted question · " + found.interpretation
                     response = found
+                    overviews = index.overviews(for: found, request: rewritten, filters: selectedFilters)
                 }
                 if found.isCredentialRequest { return }
                 let result = try await SearchAnswerService.answer(question: query, evidence: found.assistantEvidence(limit: useGemini ? 12 : 8), useGemini: useGemini)

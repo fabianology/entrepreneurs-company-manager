@@ -68,6 +68,10 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
     var page: Int?
     var destinationID: UUID?
     var destinationKind: Kind?
+    // Presentation metadata is never included in assistant evidence.
+    var website: String?
+    var logoURL: String?
+    var brandName: String?
 
     init(kind: Kind, modelID: UUID, companyID: UUID?, company: String, title: String,
          detail: String, text: String = "", suffix: String = "") {
@@ -298,6 +302,7 @@ struct UniversalSearchIndex: Sendable {
         for company in companies {
             var record = make(.company, company.id, company.id, company.name, company.structure, [company.companyDescription, company.website].compactMap { $0 }.joined(separator: " "))
             record.safeDetails = ["description": redactor.clean(company.companyDescription ?? ""), "website": redactor.clean(company.website ?? ""), "structure": redactor.clean(company.structure)]
+            record.website = company.website.map(redactor.clean)
             records.append(record)
         }
         let cards = appState.cards.filter { allowed($0.id, $0.userId, $0.companyId) }.map { c in
@@ -329,6 +334,7 @@ struct UniversalSearchIndex: Sendable {
             } }
             // Currency/available balance can come from one explicitly linked account, never a name/ending guess.
             if linkedAccounts.count == 1, let (bank, account) = linkedAccounts.first {
+                r.website = bank.loginUrl.map(redactor.clean)
                 r.currency = ExecutiveBriefingSnapshot.currency(account.currency)
                 r.availableAmount = SearchText.decimal(account.availableBalance)
                 r.financialFacts["availableBalance"] = SearchText.number(account.availableBalance)
@@ -352,6 +358,7 @@ struct UniversalSearchIndex: Sendable {
             r.financialFacts["paymentDue"] = redactor.clean(card.paidOn ?? "Unavailable")
             r.financialFacts["autopay"] = redactor.clean(card.autopay)
             r.safeDetails = ["notes": redactor.clean(card.notes ?? ""), "cardHolder": redactor.clean(card.cardHolder ?? ""), "expirationDate": SearchText.day(card.expiresAt), "paidFrom": redactor.clean(card.paidFrom ?? "")]
+            r.brandName = redactor.clean(card.institutionName ?? card.name)
             records.append(r); aliases([card.id.uuidString, card.plaidAccountId], r.id)
         }
         for institution in institutions {
@@ -359,12 +366,14 @@ struct UniversalSearchIndex: Sendable {
                             institution.isDisconnected ? "Bank connection needs attention" : "Bank", [institution.username, institution.email, institution.loginUrl].compactMap { $0 }.joined(separator: " "))
             bank.login = redactor.clean(institution.username ?? institution.email ?? ""); bank.credential = credential(institution.password)
             bank.lastSyncedAt = institution.lastSyncedAt
+            bank.website = institution.loginUrl.map(redactor.clean)
             bank.financialFacts = ["accountCount": String(institution.accounts.count), "bankConnection": institution.isDisconnected ? "Needs attention" : "Connected"]
             records.append(bank)
             for account in institution.accounts {
                 var r = make(.account, institution.id, institution.companyId, account.name.isEmpty ? institution.name : account.name,
                     "\(institution.name) · \(account.type) · •••• \(account.last4)", "\(account.cardHolder) \(account.network)", suffix: ":\(account.id)")
                 r.last4 = String(account.last4.filter(\.isNumber).suffix(4)); r.login = bank.login; r.credential = bank.credential
+                r.website = bank.website; r.brandName = bank.title
                 r.amount = SearchText.decimal(account.balance); r.currency = ExecutiveBriefingSnapshot.currency(account.currency)
                 r.availableAmount = SearchText.decimal(account.availableBalance)
                 r.balanceCategory = SearchBalanceCategory.accountType(account.type)
@@ -393,6 +402,7 @@ struct UniversalSearchIndex: Sendable {
                 + " " + sub.subServices.map { "\($0.name) \($0.purpose)" }.joined(separator: " ")
             var r = make(.subscription, sub.id, cid, sub.name, "\(sub.resolvedServiceType.rawValue.capitalized) · " + detail, text)
             r.serviceType = sub.resolvedServiceType.rawValue
+            r.website = sub.website.map(redactor.clean)
             r.safeDetails = ["website": redactor.clean(sub.website ?? ""), "notes": redactor.clean(sub.notes ?? ""), "paymentMethod": redactor.clean(sub.paymentMethod ?? "")]
             r.login = redactor.clean(sub.loginId ?? ""); r.credential = credential(sub.password)
             r.date = sub.nextRenewalAt ?? sub.nextRenewal.flatMap { SearchText.date($0) }; r.dueDate = r.date
@@ -410,14 +420,21 @@ struct UniversalSearchIndex: Sendable {
             for addon in sub.subServices {
                 var child = make(.subscription, sub.id, cid, addon.name, "\(addon.resolvedServiceType.rawValue.capitalized) · Add-on to \(sub.name) · \(SearchText.money(Decimal(addon.cost), currency: r.currency)) / \(addon.billingCycle.rawValue)", addon.purpose, suffix: ":addon:\(addon.id)")
                 child.parentServiceID = r.id; child.serviceType = addon.resolvedServiceType.rawValue
+                child.website = r.website; child.brandName = r.title
                 child.activeService = r.activeService && addon.status == .active
                 child.monthlyCost = SearchText.decimal(addon.cost).map { $0 / (addon.billingCycle == .yearly ? 12 : 1) }
                 child.currency = r.currency; child.date = addon.renewsOn; child.dueDate = addon.renewsOn
                 child.financialFacts = ["billingAmount": SearchText.number(addon.cost), "billingCycle": addon.billingCycle.rawValue, "status": addon.status.rawValue]
-                child.safeDetails = ["purpose": redactor.clean(addon.purpose), "parentService": redactor.clean(sub.name)]
+                let inheritsPayment = addon.paymentMethodId == nil && addon.paymentMethod.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                child.safeDetails = ["purpose": redactor.clean(addon.purpose), "parentService": redactor.clean(sub.name),
+                    "paymentMethod": redactor.clean(inheritsPayment ? (sub.paymentMethod ?? "") : addon.paymentMethod), "renewalMode": addon.autoPay.rawValue]
                 records.append(child); link(child.id, r.id)
-                if let paymentID = addon.paymentMethodId ?? sub.paymentMethodId {
-                    for target in records where target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(child.id, target.id) }
+                if let paymentID = addon.paymentMethodId {
+                    for target in records where target.companyID == cid && target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(child.id, target.id) }
+                    for target in accountAliases[paymentID.uuidString] ?? [] { link(child.id, target) }
+                } else if !inheritsPayment {
+                    let candidates = records.filter { $0.companyID == cid && [.card, .account, .institution].contains($0.kind) && $0.normalizedTitle == SearchText.normalize(addon.paymentMethod) }
+                    if candidates.count == 1 { link(child.id, candidates[0].id) }
                 }
             }
             if let paymentID = sub.paymentMethodId {
@@ -429,6 +446,10 @@ struct UniversalSearchIndex: Sendable {
             } else if sub.paymentMethodId == nil, let name = sub.paymentMethod, !name.isEmpty {
                 let candidates = records.filter { $0.companyID == cid && [.card, .account, .institution].contains($0.kind) && $0.normalizedTitle == SearchText.normalize(name) }
                 if candidates.count == 1 { link(r.id, candidates[0].id) }
+            }
+            let parentPayments = (links[r.id] ?? []).filter { id in records.contains { $0.id == id && [.card, .account, .institution].contains($0.kind) } }
+            for addon in sub.subServices where addon.paymentMethodId == nil && addon.paymentMethod.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                for target in parentPayments { link(r.id + ":addon:" + addon.id, target) }
             }
         }
         for loan in appState.loans where allowed(loan.id, loan.userId, loan.companyId) {
@@ -512,6 +533,8 @@ struct UniversalSearchIndex: Sendable {
                 "\(value) · \(t.date) · \(accountName)\(linkedAccounts.first.map { $0.last4.isEmpty ? "" : " •••• \($0.last4)" } ?? "") · \(t.pending == true ? "Pending" : flow.capitalized)",
                 "\(resolved.institutionName) \(TransactionIntelligence.categoryPrimary(for: resolved) ?? "") \(resolved.override?.note ?? "")")
             r.category = redactor.clean(TransactionIntelligence.categoryPrimary(for: resolved) ?? "Uncategorized")
+            r.logoURL = t.merchantLogoURL
+            r.website = t.merchantWebsite.map(redactor.clean)
             r.accountName = redactor.clean(accountName)
             r.safeDetails = ["notes": redactor.clean(resolved.override?.note ?? ""), "institution": redactor.clean(resolved.institutionName)]
             r.amount = amount; r.currency = ExecutiveBriefingSnapshot.currency(t.currency); r.date = SearchText.date(t.date); r.flow = flow; r.pending = t.pending == true
@@ -595,6 +618,17 @@ struct UniversalSearchIndex: Sendable {
                 var r = make(.settings, profile.companyId, profile.companyId, "Business profile", profile.activity, suffix: ":business-profile")
                 r.safeDetails = ["activity": redactor.clean(profile.activity), "enabled": String(profile.enabled)]
                 records.append(r)
+            }
+        }
+        let ownedIDs = Set(appState.subscriptions.filter { $0.userId == userID }.map(\.id)
+            + appState.institutions.filter { $0.userId == userID }.map(\.id)
+            + appState.cards.filter { $0.userId == userID }.map(\.id))
+        for i in records.indices where [.subscription, .institution, .account, .card].contains(records[i].kind) {
+            let record = records[i]
+            if ownedIDs.contains(record.modelID) { records[i].safeDetails["yourAccess"] = "Owner" }
+            else if let share = appState.resourceShares.first(where: { $0.userId == userID && ($0.resourceId == record.modelID || $0.resourceId == record.companyID) }) {
+                records[i].safeDetails["yourAccess"] = redactor.clean(share.role.capitalized)
+                records[i].safeDetails["sharedBy"] = redactor.clean(share.senderDisplayName ?? "")
             }
         }
         let validIDs = Set(records.map(\.id))

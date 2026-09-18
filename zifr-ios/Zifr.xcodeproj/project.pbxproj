@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A17917200000000000000004 /* SearchOverviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17917200000000000000003 /* SearchOverviewCard.swift */; };
+		A17917200000000000000002 /* SearchOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17917200000000000000001 /* SearchOverview.swift */; };
 		A17092700000000000000001 /* AppShortcuts.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A17092700000000000000002 /* AppShortcuts.xcstrings */; };
 		A129D950061147F0A0000001 /* PortfolioQueryEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */; };
 		040C1B465BBF9CDEDF000CCD /* ActivityLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C022DD3ABEFB2F9B7AD38355 /* ActivityLogsView.swift */; };
@@ -155,6 +157,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A17917200000000000000003 /* SearchOverviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchOverviewCard.swift; sourceTree = "<group>"; };
+		A17917200000000000000001 /* SearchOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchOverview.swift; sourceTree = "<group>"; };
 		A17092700000000000000002 /* AppShortcuts.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AppShortcuts.xcstrings; sourceTree = "<group>"; };
 		A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioQueryEngine.swift; sourceTree = "<group>"; };
 		008FF13CD7DB43FB47297A75 /* Institution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Institution.swift; sourceTree = "<group>"; };
@@ -484,6 +488,7 @@
 				BF75CE575DD3FC8735C66778 /* PortfolioIntelligence.swift */,
 				E400F300CB45766A04AC1057 /* PushNotificationService.swift */,
 				E4CF15FE604668FE191E00BD /* UniversalSearchEngine.swift */,
+				A17917200000000000000001 /* SearchOverview.swift */,
 				A129D950061147F0A0000002 /* PortfolioQueryEngine.swift */,
 				AEFE5D7D69FA9F6354C428FF /* SearchDocumentIndexer.swift */,
 				617623A9B7E9908F2B213768 /* SearchAnswerService.swift */,
@@ -611,6 +616,7 @@
 			isa = PBXGroup;
 			children = (
 				E0616C7556254F7EE8C39FF3 /* GlobalSearchView.swift */,
+				A17917200000000000000003 /* SearchOverviewCard.swift */,
 				8A3308C5877EBC1947167184 /* CredentialSearchSheet.swift */,
 			);
 			path = Search;
@@ -811,6 +817,7 @@
 				69D91C3C7B5CDA51965F9B7C /* GeminiLiveModels.swift in Sources */,
 				F3D4FC31B24A27032848AF07 /* GeminiService.swift in Sources */,
 				7C8880D956CBD98BEEFA0F69 /* GlobalSearchView.swift in Sources */,
+				A17917200000000000000004 /* SearchOverviewCard.swift in Sources */,
 				E03225E193203FE61013AC61 /* HomeBillingTimeline.swift in Sources */,
 				9102B68AD2A515E65924160E /* HomeRenewalParser.swift in Sources */,
 				DEEB7F47CBCE5D07C0F17701 /* Institution.swift in Sources */,
@@ -878,6 +885,7 @@
 				1007F42E153C554AA4B2F44D /* ExecutiveBriefingModels.swift in Sources */,
 				3D8AB0A62301BB4198596D60 /* ExecutiveBriefingViews.swift in Sources */,
 				FCA35AF5B99CE0CFCD8E35C1 /* UniversalSearchEngine.swift in Sources */,
+				A17917200000000000000002 /* SearchOverview.swift in Sources */,
 				A129D950061147F0A0000001 /* PortfolioQueryEngine.swift in Sources */,
 				4DED2E7D5075E8F5E4236C7E /* SearchDocumentIndexer.swift in Sources */,
 				994377B0F05FF7A73B0AAAE3 /* SearchAnswerService.swift in Sources */,

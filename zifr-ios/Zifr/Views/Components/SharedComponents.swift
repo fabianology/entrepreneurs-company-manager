@@ -193,6 +193,7 @@ struct SectionHeader: View {
 struct FaviconImage: View {
     let website: String
     var size: CGFloat = 32
+    var fallbackInitial: String? = nil
 
     private var cleanDomain: String {
         var str = website.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -239,9 +240,13 @@ struct FaviconImage: View {
     private var globeFallback: some View {
         ZStack {
             Circle().fill(Color.white.opacity(0.08))
-            Image(systemName: "globe")
-                .font(.system(size: size * 0.55))
-                .foregroundStyle(Color.white.opacity(0.4))
+            if let fallbackInitial {
+                Text(fallbackInitial).font(.system(size: size * 0.45, weight: .semibold)).foregroundStyle(Color.zifrGold)
+            } else {
+                Image(systemName: "globe")
+                    .font(.system(size: size * 0.55))
+                    .foregroundStyle(Color.white.opacity(0.4))
+            }
         }
         .frame(width: size, height: size)
     }
