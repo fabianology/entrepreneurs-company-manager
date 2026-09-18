@@ -46,8 +46,10 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(all.count, 2)
         let card = try XCTUnwrap(all.first { $0.root.companyID == a.id })
         XCTAssertEqual(card.children.count, 4)
-        XCTAssertEqual(card.monthlyTotals.first?.amount, 230)
-        XCTAssertTrue(card.hasNonMonthlyCycle)
+        XCTAssertEqual(card.billingTotals.map(\.cycle), ["monthly", "yearly"])
+        XCTAssertEqual(card.billingTotals.map(\.amount), [220, 120])
+        XCTAssertEqual(card.billingTotals.map(\.suffix), ["mo", "yr"])
+        XCTAssertFalse(card.hasUnknownAmount)
         XCTAssertTrue(card.expandedChildIDs.isEmpty)
         XCTAssertEqual(card.children.first { $0.title == "Insurance" }?.serviceType, "bill")
         XCTAssertTrue(card.children.allSatisfy { $0.companyID == a.id })
@@ -115,7 +117,7 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertTrue(overviews(index, "1234").isEmpty, "Exact endings must not expand into sibling accounts")
     }
 
-    func testOverviewHistoryAndDocumentsRequireSavedLinks() throws {
+    func testOverviewCombinesMerchantHistoryWithSavedLinksWithoutDuplicates() throws {
         let cid = UUID()
         let service = SearchRecord(kind: .subscription, modelID: UUID(), companyID: cid, company: "Personal", title: "Tesla", detail: "")
         let sameName = SearchRecord(kind: .transaction, modelID: UUID(), companyID: cid, company: "Personal", title: "Tesla", detail: "")
@@ -123,9 +125,79 @@ final class UniversalSearchTests: XCTestCase {
         let document = SearchRecord(kind: .document, modelID: UUID(), companyID: cid, company: "Personal", title: "Statement", detail: "")
         let index = UniversalSearchIndex(records: [service, sameName, linked, document], links: [service.id: [linked.id, document.id]])
         let card = try XCTUnwrap(overviews(index, "Tesla").first)
-        XCTAssertEqual(card.transactions.map(\.id), [linked.id])
+        XCTAssertEqual(Set(card.transactions.map(\.id)), [linked.id, sameName.id])
         XCTAssertEqual(card.documents.map(\.id), [document.id])
-        XCTAssertFalse(card.representedIDs.contains(sameName.id))
+        XCTAssertTrue(card.representedIDs.contains(sameName.id), "Merchant history is removed from More matches")
+        XCTAssertEqual(card.merchantMatchedTransactionIDs, [sameName.id])
+    }
+
+    func testServiceMerchantHistoryScopesAccountsCompaniesAndAmbiguousServices() throws {
+        let (state, a, b) = fixture()
+        var first = FinancialCard(userId: owner, companyId: a.id, name: "Card one"); first.plaidAccountId = "one"
+        var second = FinancialCard(userId: owner, companyId: a.id, name: "Card two"); second.plaidAccountId = "two"
+        state.cards = [first, second]
+        let service = Subscription(userId: owner, companyId: a.id, name: "Netflix", paymentMethodId: first.id, website: "netflix.com")
+        state.subscriptions = [service]
+        var correct = transaction(a.id, card: first); correct.name = "NETFLIX.COM"
+        var wrongCard = transaction(a.id, card: second); wrongCard.name = "Netflix"
+        var otherCompany = transaction(b.id); otherCompany.name = "Netflix"
+        var incidental = transaction(a.id, card: first); incidental.name = "Other merchant"
+        var unrelatedName = transaction(a.id, card: first); unrelatedName.name = "Netflixish"
+        var website = transaction(a.id, card: first); website.name = "Streaming charge"; website.merchantWebsite = "https://www.netflix.com"
+        state.transactions = [correct, wrongCard, otherCompany, incidental, unrelatedName, website]
+        var index = state.searchIndex(for: owner)
+        let card = try XCTUnwrap(overviews(index, "Netflix").first)
+        XCTAssertEqual(Set(card.transactions.map(\.modelID)), [correct.id, website.id])
+        XCTAssertEqual(card.merchantMatchedTransactionIDs.count, 2)
+        XCTAssertFalse(index.links["subscription:\(service.id)"]?.contains("transaction:\(correct.id)") == true, "Presentation matches must not become saved links")
+        state.subscriptions.append(Subscription(userId: owner, companyId: a.id, name: "Netflix", paymentMethodId: first.id))
+        index = state.searchIndex(for: owner)
+        XCTAssertTrue(overviews(index, "Netflix").allSatisfy { $0.transactions.isEmpty }, "Duplicate service logins on the same payment card are ambiguous")
+    }
+
+    func testMerchantHistoryIncludesChildPaymentsWithoutGuessingEveryChild() throws {
+        let (state, a, _) = fixture()
+        var card = FinancialCard(userId: owner, companyId: a.id, name: "Card"); card.plaidAccountId = "tesla-funding"
+        state.cards = [card]
+        var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", paymentMethodId: card.id)
+        tesla.subServices = [SubService(name: "Insurance", cost: 100), SubService(name: "Connectivity", cost: 10)]
+        state.subscriptions = [tesla]
+        var insurance = transaction(a.id, card: card); insurance.name = "Tesla Insurance"
+        var generic = transaction(a.id, card: card); generic.name = "Tesla"
+        state.transactions = [insurance, generic]
+        let overview = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
+        XCTAssertEqual(overview.transactions.count, 2)
+        let insuranceRecord = try XCTUnwrap(overview.children.first { $0.title == "Insurance" })
+        let connectivity = try XCTUnwrap(overview.children.first { $0.title == "Connectivity" })
+        XCTAssertEqual(overview.linked(to: insuranceRecord, kinds: [.transaction]).map(\.modelID), [insurance.id])
+        XCTAssertTrue(overview.linked(to: connectivity, kinds: [.transaction]).isEmpty)
+    }
+
+    func testCredentialBoxesCopyCurrentValuesWithoutChangingVisibility() throws {
+        let oldItems = UIPasteboard.general.items
+        defer { UIPasteboard.general.items = oldItems }
+        let (state, a, _) = fixture()
+        var service = Subscription(userId: owner, companyId: a.id, name: "Service", loginId: "first@example.com", password: "test-copy-value")
+        state.subscriptions = [service]
+        let id = "subscription:\(service.id)"
+        let controls = SearchCredentialBoxState()
+        controls.copy(.password, recordID: id, appState: state, userID: owner)
+        XCTAssertEqual(UIPasteboard.general.string, "test-copy-value")
+        XCTAssertEqual(controls.copied, .password)
+        XCTAssertNil(controls.revealed, "Copy must not reveal the secret")
+        controls.togglePassword(recordID: id, appState: state, userID: owner)
+        XCTAssertEqual(controls.revealed, "test-copy-value")
+        service.loginId = "updated@example.com"; state.subscriptions = [service]
+        controls.copy(.login, recordID: id, appState: state, userID: owner)
+        XCTAssertEqual(UIPasteboard.general.string, "updated@example.com", "Copy resolves current authorized data")
+        XCTAssertEqual(controls.copied, .login)
+        controls.togglePassword(recordID: id, appState: state, userID: owner)
+        XCTAssertNil(controls.revealed)
+        XCTAssertEqual(UIPasteboard.general.string, "updated@example.com", "Eye must not copy")
+        state.subscriptions = []
+        controls.copy(.password, recordID: id, appState: state, userID: owner)
+        XCTAssertNotNil(controls.error); XCTAssertNil(controls.copied); XCTAssertNil(controls.revealed)
+        XCTAssertEqual(UIPasteboard.general.string, "updated@example.com", "Revoked access must not replace clipboard contents")
     }
 
     func testLogoSourcesUseSavedDomainsAndSafeFallbacks() {
@@ -336,22 +408,25 @@ final class UniversalSearchTests: XCTestCase {
     }
     func testSearchScreenRendersExactMatchesAndRelatedActions() async throws {
         let (state, a, b) = fixture()
-        let first = FinancialCard(userId: owner, companyId: a.id, name: "Travel Visa", password: "fixture-only", institutionName: "Chase", last4: "4242", limit: 10000, balance: 1234.56)
+        var first = FinancialCard(userId: owner, companyId: a.id, name: "Travel Visa", password: "fixture-only", institutionName: "Chase", last4: "4242", limit: 10000, balance: 1234.56)
         let second = FinancialCard(userId: owner, companyId: b.id, name: "Business Visa", institutionName: "Chase", last4: "4242")
+        first.plaidAccountId = "render-card"
         state.cards = [first, second]
         var service = Subscription(userId: owner, companyId: a.id, name: "Figma", cost: 144)
         service.billingCycle = "Yearly"; service.paymentMethodId = first.id; service.loginId = "design@example.com"; service.password = "fixture-only"
         service.website = "https://figma.com"
         var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", paymentMethodId: first.id,
             website: "https://tesla.com", loginId: "driver@example.com", password: "fixture-only")
-        tesla.subServices = [SubService(name: "Premium Connectivity", cost: 10, renewsOn: now),
-            SubService(name: "Full Self-Driving", cost: 100, renewsOn: now),
+        tesla.subServices = [SubService(name: "Premium Connectivity", cost: 120, billingCycle: .yearly, renewsOn: now),
+            SubService(name: "Full Self-Driving", cost: 548, renewsOn: now),
             SubService(name: "Insurance", cost: 120, renewsOn: now, serviceType: .bill)]
         state.subscriptions = [service, tesla]
         var checking = InstitutionAccount(); checking.name = "Checking"; checking.last4 = "1234"; checking.balance = 4250
         var savings = InstitutionAccount(); savings.name = "Savings"; savings.last4 = "5678"; savings.balance = 12800; savings.type = "Savings"
         state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", loginUrl: "https://sofi.com", username: "owner@example.com", password: "fixture-only", accounts: [checking, savings])]
-        state.transactions = [transaction(a.id, amount: 1400)]
+        var charge = transaction(a.id, card: first, amount: 144); charge.name = "Figma"
+        var insuranceCharge = transaction(a.id, card: first, amount: 120); insuranceCharge.name = "Tesla Insurance"
+        state.transactions = [transaction(a.id, amount: 1400), charge, insuranceCharge]
         let auth = AuthViewModel()
         auth.currentUser = User(id: owner, appMetadata: [:], userMetadata: [:], aud: "authenticated", createdAt: now, updatedAt: now)
         auth.isAuthenticated = true
@@ -361,6 +436,7 @@ final class UniversalSearchTests: XCTestCase {
             ("Figma", .large, "Service and password actions"),
             ("Figma", .accessibility3, "Large accessibility text"),
             ("Tesla", .large, "Grouped Tesla services"),
+            ("Tesla", .accessibility3, "Large mixed billing"),
             ("Tesla insurance", .large, "Expanded Tesla insurance"),
             ("SoFi", .large, "Bank overview"),
             ("No matching record", .large, "No results"),

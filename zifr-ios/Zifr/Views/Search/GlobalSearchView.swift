@@ -43,7 +43,8 @@ struct GlobalSearchView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var hasQuery: Bool { !vm.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || related != nil }
-    private var visibleHits: [SearchHit] { Array(response.hits.prefix(visibleLimit)) }
+    private var remainingHits: [SearchHit] { response.hits.filter { !representedIDs.contains($0.id) } }
+    private var visibleHits: [SearchHit] { Array(remainingHits.prefix(visibleLimit)) }
     private var visibleOverviews: [SearchOverview] { Array(overviews.prefix(visibleLimit)) }
     private var representedIDs: Set<String> { visibleOverviews.reduce(into: Set<String>()) { $0.formUnion($1.representedIDs) } }
     private var directHits: [SearchHit] { visibleHits.filter { $0.score != -100 && !representedIDs.contains($0.id) } }
@@ -171,24 +172,25 @@ struct GlobalSearchView: View {
                                 .listRowBackground(Color.zifrCard)
                                 .listRowSeparatorTint(Color.zifrBorder)
                         }
-                    } header: { resultHeading("Best matches", count: overviews.count) }
+                    }
                 }
                 if !directHits.isEmpty {
                     Section {
                         ForEach(directHits) { hit in resultRow(hit) }
                     } header: {
-                        resultHeading(overviews.isEmpty ? (related == nil ? "Best matches" : "Results") : "More matches", count: response.hits.filter { $0.score != -100 && !representedIDs.contains($0.id) }.count)
+                        if !overviews.isEmpty { resultHeading("More matches") }
+                        else if related != nil { resultHeading("Results") }
                     }
                 }
                 if !relatedHits.isEmpty {
                     Section {
                         ForEach(relatedHits) { hit in resultRow(hit) }
                     } header: {
-                        resultHeading("Related records", count: response.hits.filter { $0.score == -100 && !representedIDs.contains($0.id) }.count)
+                        resultHeading("Related records")
                     }
                 }
-                if response.hits.count > visibleLimit {
-                    Button("Show more results (\(response.hits.count - visibleLimit))") { visibleLimit += 40 }
+                if remainingHits.count > visibleLimit || overviews.count > visibleLimit {
+                    Button("Show more results") { visibleLimit += 40 }
                         .frame(maxWidth: .infinity, minHeight: 44).listRowBackground(Color.zifrCard)
                 }
                 if response.metrics.isEmpty && response.answerSummary == nil && !response.interpretation.isEmpty && response.interpretation != "Best matches" {
@@ -210,13 +212,12 @@ struct GlobalSearchView: View {
         }.font(.subheadline)
     }
 
-    private func resultHeading(_ title: String, count: Int) -> some View {
+    private func resultHeading(_ title: String) -> some View {
         HStack {
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
             if searching { ProgressView().controlSize(.small).accessibilityLabel("Updating results") }
-            else { Text(count.formatted()).font(.subheadline).monospacedDigit().foregroundStyle(.secondary).fixedSize() }
         }.textCase(nil).accessibilityElement(children: .combine)
     }
 
@@ -342,58 +343,53 @@ struct GlobalSearchView: View {
     private func resultRow(_ hit: SearchHit) -> some View {
         let r = hit.record
         return VStack(alignment: .leading, spacing: 10) {
-            Button { open(r) } label: {
-                HStack(alignment: .top, spacing: 12) {
-                    SearchResultLogo(record: r)
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(r.title).font(.headline).foregroundStyle(.primary)
-                        Text("\(r.company) · \(r.kind.label)").font(.subheadline).foregroundStyle(Color.zifrGold)
-                        Text(r.detail).font(.subheadline).foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 16) {
+                SearchResultLogo(record: r, size: 40).frame(width: 56, height: 56).padding(.top, 5)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 2) {
+                        Button { open(r) } label: {
+                            Text(r.title).font(.headline).foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true).frame(minHeight: 44, alignment: .leading)
+                        }.buttonStyle(.plain).accessibilityHint(r.page.map { "Opens page \($0)" } ?? "Opens this record")
+                        SearchWebsiteButton(record: r)
+                        Spacer(minLength: 0)
+                    }
+                    SearchRecordSummary(record: r, paymentSources: paymentSources(for: r), open: open)
+                    Text("\(r.company) · \(r.kind == .subscription ? r.serviceType?.capitalized ?? "Service" : r.kind.label)")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    if r.kind != .subscription {
+                        Text(r.detail).font(.callout).foregroundStyle(.secondary)
                             .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary).padding(.top, 4)
-                        .accessibilityHidden(true)
-                }.frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).contentShape(Rectangle())
-            }.buttonStyle(.plain).accessibilityHint(r.page.map { "Opens page \($0)" } ?? "Opens this record")
-            if let balance = r.amount, r.balanceCategory != nil {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(SearchText.money(balance, currency: r.currency)).font(.title3.weight(.semibold)).monospacedDigit()
-                        .accessibilityLabel("Balance, " + SearchText.money(balance, currency: r.currency))
-                    if let available = r.availableAmount {
-                        Text((r.balanceCategory == .credit ? "Available credit " : "Available ") + SearchText.money(available, currency: r.currency))
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else { Text("Saved balance").font(.caption).foregroundStyle(.secondary) }
                 }
             }
             if hit.score == -100 || hit.reason == "Similar spelling" {
                 Label(hit.reason, systemImage: hit.score == -100 ? "link" : "text.magnifyingglass")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(.secondary)
             }
-            if let snippet = hit.snippet { Text(snippet).font(.subheadline).foregroundStyle(.secondary).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3) }
-            if !r.login.isEmpty {
-                Text(r.login).font(.subheadline).foregroundStyle(.secondary).textSelection(.enabled)
-            }
-            if !r.login.isEmpty || [.card, .account, .institution].contains(r.kind) {
+            if let snippet = hit.snippet { Text(snippet).font(.callout).foregroundStyle(.secondary).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3) }
+            SearchCredentialBoxes(record: r)
+            if [.card, .account, .institution].contains(r.kind) {
                 Group {
                     if dynamicTypeSize.isAccessibilitySize { VStack(alignment: .leading, spacing: 8) { recordActionButtons(r) } }
                     else { HStack(spacing: 8) { recordActionButtons(r) } }
                 }.font(.caption.weight(.semibold)).buttonStyle(.borderless)
             }
-            if r.credential == .available { SearchPasswordControls(recordID: r.id) }
-            else if r.credential == .locked { Label(SecurityService.lockedValueLabel, systemImage: "lock").font(.caption).foregroundStyle(.secondary) }
         }
         .padding(.vertical, 10)
         .listRowBackground(Color.zifrCard)
         .listRowSeparatorTint(Color.zifrBorder)
     }
 
+    private func paymentSources(for record: SearchRecord) -> [SearchRecord] {
+        guard record.kind == .subscription, let userID = auth.currentUser?.id else { return [] }
+        let index = appState.searchIndex(for: userID)
+        let ids = index.links[record.id] ?? []
+        let linked = index.records.filter { ids.contains($0.id) && $0.companyID == record.companyID }
+        return SearchOverview(root: record, connections: [record.id: linked]).paymentSources(for: record)
+    }
+
     @ViewBuilder private func recordActionButtons(_ r: SearchRecord) -> some View {
-        if !r.login.isEmpty {
-            Button { SearchCredentialAccess.copy(r.login) } label: {
-                Label("Copy login", systemImage: "person.crop.circle").frame(maxWidth: .infinity, minHeight: 44)
-            }
-        }
         if [.card, .account, .institution].contains(r.kind) {
             Button {
                 filters.kind = nil
