@@ -265,6 +265,71 @@ struct SearchRedactor {
     }
 }
 
+/// Immutable value copies captured on the main actor. Index construction reads
+/// only this snapshot, never the live observable AppState from a background task.
+struct SearchIndexSnapshot: Sendable {
+    let activityLogs: [ActivityLog]
+    let alertRules: [AlertRule]
+    let businessExpenseAccounts: [BusinessExpenseAccount]
+    let businessExpenseJob: BusinessExpenseJob?
+    let businessExpenseLoadError: String?
+    let businessExpenseProfiles: [BusinessExpenseProfile]
+    let businessExpenseReviews: [BusinessExpenseReview]
+    let businessExpenseSettings: BusinessExpenseSettings
+    let businessExpenseUserID: UUID?
+    let cards: [FinancialCard]
+    let companies: [Company]
+    let documents: [CompanyDocument]
+    let hasLoadedPortfolio: Bool
+    let institutions: [Institution]
+    let loans: [Loan]
+    let localCompanyOverrides: [String: UUID]
+    let notifications: [AppNotification]
+    let obligations: [PortfolioObligation]
+    let portfolioLoadIssue: String?
+    let portfolioUserID: UUID?
+    let resourceConnections: [ResourceConnection]
+    let resourceShares: [ResourceShare]
+    let searchDocumentPages: [SearchDocumentPage]
+    let searchDocumentStatus: String
+    let subscriptions: [Subscription]
+    let transactionCategoryRules: [TransactionCategoryRule]
+    let transactionOverrides: [TransactionOverride]
+    let transactions: [Transaction]
+    let userPreferences: UserPreferences?
+    @MainActor init(_ state: AppState) {
+        activityLogs = state.activityLogs
+        alertRules = state.alertRules
+        businessExpenseAccounts = state.businessExpenseAccounts
+        businessExpenseJob = state.businessExpenseJob
+        businessExpenseLoadError = state.businessExpenseLoadError
+        businessExpenseProfiles = state.businessExpenseProfiles
+        businessExpenseReviews = state.businessExpenseReviews
+        businessExpenseSettings = state.businessExpenseSettings
+        businessExpenseUserID = state.businessExpenseUserID
+        cards = state.cards
+        companies = state.companies
+        documents = state.documents
+        hasLoadedPortfolio = state.hasLoadedPortfolio
+        institutions = state.institutions
+        loans = state.loans
+        localCompanyOverrides = state.localCompanyOverrides
+        notifications = state.notifications
+        obligations = state.obligations
+        portfolioLoadIssue = state.portfolioLoadIssue
+        portfolioUserID = state.portfolioUserID
+        resourceConnections = state.resourceConnections
+        resourceShares = state.resourceShares
+        searchDocumentPages = state.searchDocumentPages
+        searchDocumentStatus = state.searchDocumentStatus
+        subscriptions = state.subscriptions
+        transactionCategoryRules = state.transactionCategoryRules
+        transactionOverrides = state.transactionOverrides
+        transactions = state.transactions
+        userPreferences = state.userPreferences
+    }
+}
+
 struct UniversalSearchIndex: Sendable {
     var records: [SearchRecord] = []
     var links: [String: Set<String>] = [:]
@@ -273,7 +338,11 @@ struct UniversalSearchIndex: Sendable {
 
     @MainActor
     init(appState: AppState, userID: UUID, documentPages: [SearchDocumentPage] = []) {
-        guard appState.hasLoadedPortfolio, appState.portfolioUserID == userID else { return }
+        self.init(snapshot: SearchIndexSnapshot(appState), userID: userID, documentPages: documentPages)
+    }
+
+    init(snapshot appState: SearchIndexSnapshot, userID: UUID, documentPages: [SearchDocumentPage] = []) {
+        guard !Task.isCancelled, appState.hasLoadedPortfolio, appState.portfolioUserID == userID else { return }
         isLoaded = true
         let shared = Set(appState.resourceShares.filter { $0.userId == userID }.map(\.resourceId))
         let companies = appState.companies.filter { $0.userId == userID || shared.contains($0.id) }
@@ -517,6 +586,7 @@ struct UniversalSearchIndex: Sendable {
         let accountRecordsByID = Dictionary(records.filter { [.card, .account].contains($0.kind) }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         for resolved in TransactionIntelligence.resolveAll(transactions, companies: companies, institutions: institutions, cards: cards,
             overrides: appState.transactionOverrides.filter { $0.userId == userID }, categoryRules: appState.transactionCategoryRules.filter { $0.userId == userID }) {
+            if Task.isCancelled { records = []; links = [:]; isLoaded = false; return }
             let t = resolved.transaction
             let aliasesForTransaction = [t.accountId, t.sourceAccountId, t.canonicalAccountId].compactMap { $0 }
             let targets = aliasesForTransaction.reduce(into: Set<String>()) { $0.formUnion(accountAliases[$1] ?? []) }
@@ -680,7 +750,7 @@ struct UniversalSearchIndex: Sendable {
             return true
         }
         let direct = records.compactMap { r -> SearchHit? in
-            guard inScope(r) else { return nil }
+            guard !Task.isCancelled, inScope(r) else { return nil }
             var score = 0, fuzzy = false
             for token in plan.tokens {
                 if token.count == 4, token.allSatisfy(\.isNumber), r.last4 == token { score += 1500 }
@@ -696,6 +766,7 @@ struct UniversalSearchIndex: Sendable {
             let reason = exactEnding ? "Exact card/account ending" : fuzzy ? "Similar spelling" : plan.credentials ? "Saved login" : r.page != nil ? "Document contents" : "Matching \(r.kind.label.lowercased())"
             return SearchHit(record: r, score: score, reason: reason, snippet: snippet(r.text, tokens: plan.tokens))
         }
+        guard !Task.isCancelled else { return response }
         var hits = Dictionary(direct.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         // One hop only, so a four-digit query cannot fan out through a bank to unrelated accounts.
         if !plan.credentials && plan.dates == nil && (plan.relationships || direct.contains { $0.reason == "Exact card/account ending" }) {

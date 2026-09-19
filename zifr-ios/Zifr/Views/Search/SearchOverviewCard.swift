@@ -231,6 +231,8 @@ struct SearchOverviewCard: View {
         .tint(Color.zifrGold)
         .buttonStyle(.borderless)
         .accessibilityIdentifier("search-overview-" + root.id)
+        .onChange(of: overview.expandedChildIDs) { _, ids in expanded = ids }
+
     }
 
     private var header: some View {

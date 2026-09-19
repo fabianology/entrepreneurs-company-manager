@@ -72,6 +72,29 @@ struct SearchOverview: Identifiable, Sendable {
     }
 }
 
+/// Build once per render, never inside a hit predicate. A service may represent
+/// thousands of charges, so rebuilding its ID set for every hit is quadratic.
+struct SearchResultPage {
+    let overviews: [SearchOverview]
+    let directHits: [SearchHit]
+    let relatedHits: [SearchHit]
+    let hasMore: Bool
+
+    init(response: SearchResponse, overviews: [SearchOverview], limit: Int) {
+        self.overviews = Array(overviews.prefix(limit))
+        let represented = self.overviews.reduce(into: Set<String>()) { $0.formUnion($1.representedIDs) }
+        var direct: [SearchHit] = [], related: [SearchHit] = []
+        var count = 0
+        for hit in response.hits where !represented.contains(hit.id) {
+            count += 1
+            guard count <= limit else { break }
+            if hit.score == -100 { related.append(hit) } else { direct.append(hit) }
+        }
+        directHits = direct; relatedHits = related
+        hasMore = count > limit || overviews.count > limit
+    }
+}
+
 extension UniversalSearchIndex {
     func overviews(for response: SearchResponse, request: PortfolioQuery, filters: SearchFilters) -> [SearchOverview] {
         // Explicit calculations, history, date and type filters retain their precise result list.
@@ -82,7 +105,6 @@ extension UniversalSearchIndex {
               plan.kind == nil || [.subscription, .institution].contains(plan.kind!),
               !plan.tokens.isEmpty, !plan.tokens.contains(where: { $0.allSatisfy(\.isNumber) }) else { return [] }
         let byID = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let merchantHistory = serviceMerchantHistory()
         func linked(_ record: SearchRecord) -> [SearchRecord] {
             (links[record.id] ?? []).compactMap { byID[$0] }.filter { $0.companyID == record.companyID }
                 .sorted { $0.id < $1.id }
@@ -101,6 +123,9 @@ extension UniversalSearchIndex {
             let score = max(roots[rootID]?.1 ?? 0, hit.score)
             roots[rootID] = (root, score)
         }
+        guard !roots.isEmpty, !Task.isCancelled else { return [] }
+        let merchantHistory = roots.values.contains { $0.0.kind == .subscription } ? serviceMerchantHistory() : [:]
+        guard !Task.isCancelled else { return [] }
         return roots.values.map { root, score in
             var overview = SearchOverview(root: root, score: score)
             let directlyLinked = linked(root)
@@ -173,6 +198,20 @@ extension UniversalSearchIndex {
         }
     }
 
+    func searchPaymentSources(for hits: [SearchHit]) -> [String: [SearchRecord]] {
+        let services = hits.filter { $0.record.kind == .subscription }
+        guard !services.isEmpty, !Task.isCancelled else { return [:] }
+        let byID = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var result: [String: [SearchRecord]] = [:]
+        for hit in services {
+            if Task.isCancelled { return [:] }
+            let record = hit.record
+            let linked = (links[record.id] ?? []).compactMap { byID[$0] }.filter { $0.companyID == record.companyID }
+            result[record.id] = SearchOverview(root: record, connections: [record.id: linked]).paymentSources(for: record)
+        }
+        return result
+    }
+
     /// Exact merchant/domain matches within one company. Known funding accounts must
     /// agree; duplicate service accounts are assigned only when the match is unique.
     private func serviceMerchantHistory() -> [String: [SearchRecord]] {
@@ -207,6 +246,7 @@ extension UniversalSearchIndex {
         }
         var result: [String: [SearchRecord]] = [:]
         for transaction in records where transaction.kind == .transaction && !["income", "transfer", "ignored"].contains(transaction.flow) {
+            if Task.isCancelled { return [:] }
             guard transaction.companyID != nil else { continue }
             if (links[transaction.id] ?? []).contains(where: { byID[$0]?.kind == .subscription }) { continue }
             let accountKeys = paymentKeys(transaction)

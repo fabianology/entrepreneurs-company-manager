@@ -10,6 +10,7 @@ struct GlobalSearchView: View {
     @State private var filters = SearchFilters()
     @State private var response = SearchResponse()
     @State private var overviews: [SearchOverview] = []
+    @State private var fundingSources: [String: [SearchRecord]] = [:]
     @State private var searching = false
     @State private var visibleLimit = 40
     @State private var presentation: SheetRoute?
@@ -43,12 +44,6 @@ struct GlobalSearchView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var hasQuery: Bool { !vm.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || related != nil }
-    private var remainingHits: [SearchHit] { response.hits.filter { !representedIDs.contains($0.id) } }
-    private var visibleHits: [SearchHit] { Array(remainingHits.prefix(visibleLimit)) }
-    private var visibleOverviews: [SearchOverview] { Array(overviews.prefix(visibleLimit)) }
-    private var representedIDs: Set<String> { visibleOverviews.reduce(into: Set<String>()) { $0.formUnion($1.representedIDs) } }
-    private var directHits: [SearchHit] { visibleHits.filter { $0.score != -100 && !representedIDs.contains($0.id) } }
-    private var relatedHits: [SearchHit] { visibleHits.filter { $0.score == -100 && !representedIDs.contains($0.id) } }
     private var companyTitle: String {
         filters.companyID.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All companies"
     }
@@ -110,7 +105,8 @@ struct GlobalSearchView: View {
     }
 
     private var resultsList: some View {
-        List {
+        let page = SearchResultPage(response: response, overviews: overviews, limit: visibleLimit)
+        return List {
             if !appState.hasLoadedPortfolio {
                 ContentUnavailableView("Loading your portfolio", systemImage: "arrow.triangle.2.circlepath",
                     description: Text("Your results will appear when your records are ready."))
@@ -164,32 +160,31 @@ struct GlobalSearchView: View {
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
-                if !visibleOverviews.isEmpty {
+                if !page.overviews.isEmpty {
                     Section {
-                        ForEach(visibleOverviews) { overview in
+                        ForEach(page.overviews) { overview in
                             SearchOverviewCard(overview: overview, open: open)
-                                .id(overview.id + "|" + vm.searchQuery)
                                 .listRowBackground(Color.zifrCard)
                                 .listRowSeparatorTint(Color.zifrBorder)
                         }
                     }
                 }
-                if !directHits.isEmpty {
+                if !page.directHits.isEmpty {
                     Section {
-                        ForEach(directHits) { hit in resultRow(hit) }
+                        ForEach(page.directHits) { hit in resultRow(hit) }
                     } header: {
                         if !overviews.isEmpty { resultHeading("More matches") }
                         else if related != nil { resultHeading("Results") }
                     }
                 }
-                if !relatedHits.isEmpty {
+                if !page.relatedHits.isEmpty {
                     Section {
-                        ForEach(relatedHits) { hit in resultRow(hit) }
+                        ForEach(page.relatedHits) { hit in resultRow(hit) }
                     } header: {
                         resultHeading("Related records")
                     }
                 }
-                if remainingHits.count > visibleLimit || overviews.count > visibleLimit {
+                if page.hasMore {
                     Button("Show more results") { visibleLimit += 40 }
                         .frame(maxWidth: .infinity, minHeight: 44).listRowBackground(Color.zifrCard)
                 }
@@ -354,7 +349,7 @@ struct GlobalSearchView: View {
                         SearchWebsiteButton(record: r)
                         Spacer(minLength: 0)
                     }
-                    SearchRecordSummary(record: r, paymentSources: paymentSources(for: r), open: open)
+                    SearchRecordSummary(record: r, paymentSources: fundingSources[r.id] ?? [], open: open)
                     Text("\(r.company) · \(r.kind == .subscription ? r.serviceType?.capitalized ?? "Service" : r.kind.label)")
                         .font(.footnote).foregroundStyle(.secondary)
                     if r.kind != .subscription {
@@ -379,14 +374,6 @@ struct GlobalSearchView: View {
         .padding(.vertical, 10)
         .listRowBackground(Color.zifrCard)
         .listRowSeparatorTint(Color.zifrBorder)
-    }
-
-    private func paymentSources(for record: SearchRecord) -> [SearchRecord] {
-        guard record.kind == .subscription, let userID = auth.currentUser?.id else { return [] }
-        let index = appState.searchIndex(for: userID)
-        let ids = index.links[record.id] ?? []
-        let linked = index.records.filter { ids.contains($0.id) && $0.companyID == record.companyID }
-        return SearchOverview(root: record, connections: [record.id: linked]).paymentSources(for: record)
     }
 
     @ViewBuilder private func recordActionButtons(_ r: SearchRecord) -> some View {
@@ -442,43 +429,55 @@ struct GlobalSearchView: View {
     }
     @MainActor private func search() async {
         answerTask?.cancel(); answer = nil; answerError = nil; answering = false; visibleLimit = 40
-        guard let userID = auth.currentUser?.id, auth.isAuthenticated else { response = .init(); overviews = []; return }
+        guard let userID = auth.currentUser?.id, auth.isAuthenticated else { response = .init(); overviews = []; fundingSources = [:]; return }
+        let key = taskKey
         searching = true
         do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
-        let index = appState.searchIndex(for: userID)
+        guard let index = try? await appState.searchIndexInBackground(for: userID), !Task.isCancelled, key == taskKey else { return }
         let request = PortfolioQuery.interpret(vm.searchQuery, previous: previousQuery)
-        let query = vm.searchQuery, selectedFilters = filters, drill = related
-        let result = await Task.detached(priority: .userInitiated) {
+        let selectedFilters = filters, drill = related
+        let work = Task.detached(priority: .userInitiated) {
             if let drill {
                 let ids = index.links[drill.id] ?? []
                 let records = index.records.filter { ids.contains($0.id) && $0.kind == drill.kind }
                 let subset = UniversalSearchIndex(records: records)
-                return (subset.search(drill.kind == .transaction ? "Transactions" : "Services", filters: selectedFilters), [SearchOverview]())
+                let found = subset.search(drill.kind == .transaction ? "Transactions" : "Services", filters: selectedFilters)
+                return (found, [SearchOverview](), index.searchPaymentSources(for: found.hits))
             }
             let response = index.execute(request, filters: selectedFilters)
-            return (response, index.overviews(for: response, request: request, filters: selectedFilters))
-        }.value
-        guard !Task.isCancelled, auth.currentUser?.id == userID else { return }
-        response = result.0; overviews = result.1; searching = false
+            return (response, index.overviews(for: response, request: request, filters: selectedFilters), index.searchPaymentSources(for: response.hits))
+        }
+        let result = await withTaskCancellationHandler {
+            await work.value
+        } onCancel: { work.cancel() }
+        guard !Task.isCancelled, key == taskKey, auth.isAuthenticated, auth.currentUser?.id == userID else { return }
+        response = result.0; overviews = result.1; fundingSources = result.2; searching = false
     }
     private func ask(useGemini: Bool) {
         if useGemini && !access.request(.aiAction, source: "universal_search", appState: appState, userId: auth.currentUser?.id) { presentation = .premium; return }
         endEditing(); answering = true; answerError = nil
         guard let userID = auth.currentUser?.id else { answering = false; return }
         let query = appState.searchRedactor().clean(vm.searchQuery), key = taskKey
-        let index = appState.searchIndex(for: userID), selectedFilters = filters
+        let selectedFilters = filters
         let originalResponse = response
         answerTask = Task { @MainActor in
             defer { if key == taskKey { answering = false } }
             do {
+                let index = try await appState.searchIndexInBackground(for: userID)
+                guard !Task.isCancelled, key == taskKey else { return }
                 var found = originalResponse
                 if related == nil && (found.hits.isEmpty || query.split(separator: " ").count > 6) {
                     let rewritten = try await SearchAnswerService.queryRequest(for: query, useGemini: useGemini)
                     guard !Task.isCancelled, key == taskKey else { return }
-                    found = index.execute(rewritten, filters: selectedFilters)
+                    let work = Task.detached(priority: .userInitiated) {
+                        let result = index.execute(rewritten, filters: selectedFilters)
+                        return (result, index.overviews(for: result, request: rewritten, filters: selectedFilters), index.searchPaymentSources(for: result.hits))
+                    }
+                    let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+                    guard !Task.isCancelled, key == taskKey, auth.isAuthenticated, auth.currentUser?.id == userID else { return }
+                    found = result.0
                     found.interpretation = "Interpreted question · " + found.interpretation
-                    response = found
-                    overviews = index.overviews(for: found, request: rewritten, filters: selectedFilters)
+                    response = found; overviews = result.1; fundingSources = result.2
                 }
                 if found.isCredentialRequest { return }
                 let result = try await SearchAnswerService.answer(question: query, evidence: found.assistantEvidence(limit: useGemini ? 12 : 8), useGemini: useGemini)

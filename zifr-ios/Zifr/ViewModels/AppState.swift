@@ -66,6 +66,7 @@ final class AppState {
         "\(portfolioUserID?.uuidString ?? "")|\(hasLoadedPortfolio)|" + documents.map { "\($0.id):\($0.url ?? ""):\($0.visibility ?? "")" }.joined(separator: "|") + "|\(resourceShares.hashValue)"
     }
     @ObservationIgnored private var cachedSearch: (user: UUID, revision: UInt64, index: UniversalSearchIndex)?
+    @ObservationIgnored private var pendingSearch: (user: UUID, revision: UInt64, token: UUID, task: Task<UniversalSearchIndex, Never>)?
 
     func searchRedactor() -> SearchRedactor {
         var values = subscriptions.map(\.password) + cards.map(\.password) + institutions.map(\.password)
@@ -82,6 +83,37 @@ final class AppState {
         return index
     }
 
+    /// Reuse one background build while queries change. Publish only to the same
+    /// user/revision; an old refresh must never replace the current session cache.
+    @MainActor
+    func searchIndexInBackground(for userID: UUID) async throws -> UniversalSearchIndex {
+        try Task.checkCancellation()
+        guard portfolioUserID == userID, hasLoadedPortfolio else { throw CancellationError() }
+        let revision = searchRevision
+        if let cachedSearch, cachedSearch.user == userID, cachedSearch.revision == revision { return cachedSearch.index }
+        let work: Task<UniversalSearchIndex, Never>
+        let token: UUID
+        if let pendingSearch, pendingSearch.user == userID, pendingSearch.revision == revision {
+            work = pendingSearch.task; token = pendingSearch.token
+        } else {
+            pendingSearch?.task.cancel()
+            let snapshot = SearchIndexSnapshot(self)
+            token = UUID()
+            work = Task.detached(priority: .userInitiated) {
+                UniversalSearchIndex(snapshot: snapshot, userID: userID, documentPages: snapshot.searchDocumentPages)
+            }
+            pendingSearch = (userID, revision, token, work)
+        }
+        let index = await work.value
+        guard portfolioUserID == userID, hasLoadedPortfolio, searchRevision == revision, !work.isCancelled else { throw CancellationError() }
+        if pendingSearch?.token == token {
+            cachedSearch = (userID, revision, index)
+            pendingSearch = nil
+        }
+        try Task.checkCancellation()
+        return index
+    }
+
     func clearSearchSession() {
         portfolioLoadID = UUID()
         portfolioLoadingUserID = nil
@@ -91,6 +123,8 @@ final class AppState {
         searchDocumentPages = []
         searchDocumentStatus = "Document contents have not been indexed"
         cachedSearch = nil
+        pendingSearch?.task.cancel()
+        pendingSearch = nil
     }
 
     // Local Overrides: resourceId -> companyId

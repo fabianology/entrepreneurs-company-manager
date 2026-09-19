@@ -406,6 +406,100 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(response.hits.count, 10_000)
         XCTAssertLessThan(elapsed, 1.0, "Simulator regression ceiling; physical-device p95 is a separate release check")
     }
+    func testGroupedHistoryPagingKeepsRemainingMatchesAndScales() {
+        let company = UUID()
+        let root = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Fixture", title: "Adobe", detail: "")
+        let records = (0..<10_000).map { i in
+            SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Fixture", title: "Adobe \(i)", detail: "")
+        }
+        var response = SearchResponse()
+        response.hits = records.enumerated().map { SearchHit(record: $0.element, score: $0.offset % 2 == 0 ? 100 : -100, reason: "Fixture") }
+        let overview = SearchOverview(root: root, representedIDs: Set(records.prefix(9_900).map(\.id)))
+        var timings: [Double] = []
+        for _ in 0..<20 {
+            let start = CFAbsoluteTimeGetCurrent()
+            let page = SearchResultPage(response: response, overviews: [overview], limit: 40)
+            timings.append(CFAbsoluteTimeGetCurrent() - start)
+            XCTAssertEqual(page.directHits.count, 20)
+            XCTAssertEqual(page.relatedHits.count, 20)
+            XCTAssertEqual(page.directHits.first?.id, records[9_900].id)
+            XCTAssertTrue(page.hasMore)
+        }
+        let p95 = timings.sorted()[18]
+        print("Grouped 10,000-hit page p95: \(p95 * 1_000) ms")
+        XCTAssertLessThan(p95, 0.1, "Grouping must not rebuild the represented-ID set for every hit")
+        let all = SearchResultPage(response: response, overviews: [overview], limit: 100)
+        XCTAssertEqual(all.directHits.count + all.relatedHits.count, 100)
+        XCTAssertFalse(all.hasMore)
+        let hidden = SearchResultPage(response: response, overviews: [overview], limit: 0)
+        XCTAssertTrue(hidden.hasMore)
+    }
+
+    func testCancelledSearchSkipsRankingAndOverviewHistory() async {
+        let record = SearchRecord(kind: .subscription, modelID: UUID(), companyID: UUID(), company: "Fixture", title: "Adobe", detail: "")
+        let index = UniversalSearchIndex(records: [record])
+        let work = Task.detached {
+            while !Task.isCancelled { await Task.yield() }
+            let request = PortfolioQuery.interpret("Adobe")
+            let response = index.execute(request)
+            return (response.hits.count, index.overviews(for: response, request: request, filters: .init()).count)
+        }
+        work.cancel()
+        let result = await work.value
+        XCTAssertEqual(result.0, 0)
+        XCTAssertEqual(result.1, 0)
+    }
+
+    func testBackgroundIndexMatchesProjectionAndRejectsChangedSessions() async throws {
+        let (state, a, _) = fixture()
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Adobe", cost: 20)]
+        state.transactions = (0..<1_000).map { _ in transaction(a.id) }
+        let expected = UniversalSearchIndex(appState: state, userID: owner)
+        let background = try await state.searchIndexInBackground(for: owner)
+        XCTAssertEqual(background.records, expected.records)
+        XCTAssertEqual(background.links, expected.links)
+        state.subscriptions[0].name = "Renamed service"
+        let refreshed = try await state.searchIndexInBackground(for: owner)
+        XCTAssertTrue(refreshed.records.contains { $0.title == "Renamed service" })
+        let snapshot = SearchIndexSnapshot(state)
+        state.clearSearchSession()
+        let old = UniversalSearchIndex(snapshot: snapshot, userID: owner)
+        XCTAssertTrue(old.isLoaded, "Value snapshot remains internally consistent")
+        do {
+            _ = try await state.searchIndexInBackground(for: owner)
+            XCTFail("A cleared session must not return the old snapshot")
+        } catch is CancellationError { } catch { XCTFail("Unexpected error: \(error)") }
+        XCTAssertFalse(state.searchIndex(for: owner).isLoaded)
+    }
+
+    func testTypingWithLargeGroupedHistoryDoesNotBlockMainActor() async throws {
+        let (state, a, _) = fixture()
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Adobe", cost: 20)]
+        state.transactions = (0..<10_000).map { _ in transaction(a.id) }
+        // Include the initial background build as well as repeated query updates.
+        let auth = AuthViewModel()
+        auth.currentUser = User(id: owner, appMetadata: [:], userMetadata: [:], aud: "authenticated", createdAt: now, updatedAt: now)
+        auth.isAuthenticated = true
+        let vm = AppViewModel(); vm.searchQuery = "Adobe"
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let previous = scene.windows.first { $0.isKeyWindow }
+        let window = UIWindow(windowScene: scene)
+        let controller = UIHostingController(rootView: SearchSheetTestHost(content: GlobalSearchView(vm: vm).environment(state).environment(auth).environment(AccessController())))
+        window.frame = scene.coordinateSpace.bounds; window.rootViewController = controller; window.makeKeyAndVisible()
+        defer { controller.dismiss(animated: false); window.isHidden = true; window.rootViewController = nil; previous?.makeKey() }
+        var delays: [Double] = []
+        for query in ["Adob", "Adobe", "Ado", "Adob", "Adobe", "A", "Ad", "Ado", "Adob", "Adobe", "Adob", "Adobe", "Ado", "Adobe", "Adobe", "Adobe", "Adobe", "Adobe", "Adobe", "Adobe"] {
+            let start = CFAbsoluteTimeGetCurrent()
+            vm.searchQuery = query
+            try await Task.sleep(for: .milliseconds(150))
+            delays.append(CFAbsoluteTimeGetCurrent() - start - 0.15)
+        }
+        let worst = delays.max() ?? 0
+        print("10,000-charge typing: worst main-actor scheduling delay \(worst * 1_000) ms")
+        XCTAssertLessThan(worst, 0.5, "Typing must not stall while existing grouped cards are rendered")
+        XCTAssertEqual(vm.searchQuery, "Adobe")
+    }
+
     func testSearchScreenRendersExactMatchesAndRelatedActions() async throws {
         let (state, a, b) = fixture()
         var first = FinancialCard(userId: owner, companyId: a.id, name: "Travel Visa", password: "fixture-only", institutionName: "Chase", last4: "4242", limit: 10000, balance: 1234.56)
