@@ -238,7 +238,6 @@ struct SearchOverviewCard: View {
                     } else {
                         SearchPaymentDetails(sources: overview.paymentSources(for: root),
                             fallback: root.safeDetails["paymentMethod"] ?? "", open: open)
-                        schedule(root)
                         SearchPastCharges(records: overview.transactions, title: "Past transactions", open: open)
                     }
                 }
@@ -292,8 +291,14 @@ struct SearchOverviewCard: View {
                             Text("Free").font(.headline)
                         } else if overview.billingTotals.isEmpty {
                             Text(overview.hasUnknownAmount ? "Amount unavailable" : "No active charges").font(.headline)
+                            if !hasSubservices && overview.hasUnknownAmount {
+                                standaloneSchedule
+                            }
                         } else {
                             SearchBillingAmounts(totals: overview.billingTotals)
+                            if !hasSubservices {
+                                standaloneSchedule
+                            }
                         }
                     } else {
                         bankCountsText.font(.footnote.weight(.medium))
@@ -306,10 +311,12 @@ struct SearchOverviewCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
             if isService {
-                serviceCountsText.font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.zifrGold)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel(overview.serviceCountsLabel)
+                if hasSubservices {
+                    serviceCountsText.font(.footnote.weight(.medium))
+                        .foregroundStyle(Color.zifrGold)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel(overview.serviceCountsLabel)
+                }
                 if overview.hasUnknownAmount {
                     Text("Partial total · an amount is not saved").font(.footnote).foregroundStyle(.secondary)
                 }
@@ -326,6 +333,13 @@ struct SearchOverviewCard: View {
     private var bankCountsText: Text {
         let counts = overview.bankCounts
         return Text("\(Text(counts.accounts, format: .number).foregroundColor(.white)) \(counts.accounts == 1 ? "Account" : "Accounts") | \(Text(counts.cards, format: .number).foregroundColor(.white)) \(counts.cards == 1 ? "Card" : "Cards") | \(Text(counts.loans, format: .number).foregroundColor(.white)) \(counts.loans == 1 ? "Loan" : "Loans")")
+    }
+
+    private var standaloneSchedule: some View {
+        Text(SearchScheduleLabel.header(root))
+            .font(.footnote.weight(.medium))
+            .foregroundStyle(Color.zifrGold)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var serviceCountsText: Text {
