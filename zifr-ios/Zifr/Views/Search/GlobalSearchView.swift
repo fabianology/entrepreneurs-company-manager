@@ -161,11 +161,16 @@ struct GlobalSearchView: View {
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
                 if !page.overviews.isEmpty {
-                    Section {
-                        ForEach(page.overviews) { overview in
+                    ForEach(page.overviews) { overview in
+                        Section {
                             SearchOverviewCard(overview: overview, open: open)
-                                .listRowBackground(Color.zifrCard)
-                                .listRowSeparatorTint(Color.zifrBorder)
+                                .listRowInsets(EdgeInsets())
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        } header: {
+                            Text(overview.root.company.uppercased() + " • " + (overview.root.kind == .institution ? "BANK" : "SERVICE"))
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -195,6 +200,7 @@ struct GlobalSearchView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .disclosureGroupStyle(SearchDisclosureStyle())
         .scrollContentBackground(.hidden)
         .background(Color.zifrCard.opacity(0.65))
         .scrollDismissesKeyboard(.immediately)

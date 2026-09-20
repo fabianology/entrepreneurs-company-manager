@@ -1,5 +1,88 @@
 import Foundation
 
+
+/// Search-only presentation facts. No balances, passwords or provider IDs enter assistant evidence.
+struct SearchFundingCoverage: Hashable, Sendable {
+    enum Status: String, Sendable { case covered = "Covered", atRisk = "At risk", unknown = "Coverage unknown" }
+    let status: Status
+    let reason: String?
+
+    static func normalized(_ original: Subscription, now: Date, calendar: Calendar) -> Subscription {
+        var value = original
+        switch value.billingCycle.lowercased() {
+        case "monthly": value.billingCycle = "Monthly"
+        case "yearly", "annual", "annually": value.billingCycle = "Yearly"
+        default: return value
+        }
+        return SubscriptionRenewalScheduler.normalized(value, now: now, calendar: calendar)
+    }
+
+    static func project(subscriptions: [Subscription], institutions: [Institution], cards: [FinancialCard],
+                        plaidItems: [PlaidItemSummary], now: Date, calendar: Calendar,
+                        incomplete: Bool = false) -> [String: Self] {
+        let supported = subscriptions.filter { ["Monthly", "Yearly"].contains($0.billingCycle) }
+        let projection = UpcomingCoverageEngine.project(subscriptions: supported, institutions: institutions,
+            cards: cards, plaidItems: plaidItems, now: now, days: 30, calendar: calendar)
+        let partial = incomplete || projection.unscheduledCount > 0
+            || subscriptions.contains { $0.status == "Active" && !["Monthly", "Yearly"].contains($0.billingCycle) }
+        var result: [String: Self] = [:]
+        for group in projection.groups {
+            let status: Status = group.status == .covered ? (partial ? .unknown : .covered)
+                : (group.status == .atRisk ? .atRisk : .unknown)
+            let reason = group.reason ?? (partial ? "Some scheduled charges or portfolio data are unavailable." : nil)
+            for charge in group.charges { result[charge.id] = Self(status: status, reason: reason) }
+        }
+        return result
+    }
+}
+
+struct SearchChargeSummary: Sendable {
+    var latest: SearchRecord?
+    var firstDate: Date?
+    var elapsedMonths = 0
+    var observedIncreases: Int?
+
+    init(record: SearchRecord, transactions: [SearchRecord], now: Date = Date(), calendar: Calendar = .current) {
+        var seen = Set<String>()
+        let posted = transactions.filter {
+            $0.companyID == record.companyID && $0.currency == record.currency && !$0.pending
+                && $0.flow == "expense" && ($0.amount ?? 0) > 0 && $0.date != nil
+                && $0.date! <= now && seen.insert($0.id).inserted
+        }.sorted { ($0.date!, $0.id) < ($1.date!, $1.id) }
+        latest = posted.last
+        firstDate = posted.first?.date
+        if let firstDate { elapsedMonths = max(0, calendar.dateComponents([.month], from: firstDate, to: now).month ?? 0) }
+        let cycle = record.financialFacts["billingCycle"]?.lowercased() ?? ""
+        let component: Calendar.Component
+        switch cycle {
+        case "monthly": component = .month
+        case "yearly", "annual", "annually": component = .year
+        default: return
+        }
+        // A duplicate in a billing period invalidates that period, even if it used another source.
+        let periods = Dictionary(grouping: posted) { calendar.dateInterval(of: component, for: $0.date!)!.start }
+        let starts = periods.keys.sorted()
+        var comparisons = 0
+        var increases = 0
+        let formatter = NumberFormatter(); formatter.numberStyle = .currency; formatter.currencyCode = record.currency
+        func rounded(_ amount: Decimal) -> Decimal {
+            var input = amount, output = Decimal()
+            NSDecimalRound(&output, &input, formatter.maximumFractionDigits, .plain)
+            return output
+        }
+        for (previous, current) in zip(starts, starts.dropFirst()) {
+            guard calendar.date(byAdding: component, value: 1, to: previous) == current,
+                  let before = periods[previous], before.count == 1,
+                  let after = periods[current], after.count == 1,
+                  let source = before[0].transactionSourceIdentity,
+                  source == after[0].transactionSourceIdentity else { continue }
+            comparisons += 1
+            if rounded(after[0].amount!) > rounded(before[0].amount!) { increases += 1 }
+        }
+        if comparisons > 0 { observedIncreases = increases }
+    }
+}
+
 /// Saved billing amounts grouped by their actual cycle, without annualization.
 struct SearchBillingTotal: Identifiable, Sendable {
     var currency: String
@@ -35,12 +118,34 @@ struct SearchBillingTotal: Identifiable, Sendable {
     }
 }
 
+struct SearchBankCounts: Sendable {
+    var accounts = 0
+    var cards = 0
+    var loans = 0
+
+    init(records: [SearchRecord] = []) {
+        accounts = Set(records.filter { $0.kind == .account }.map(\.id)).count
+        // A synced credit/loan account and its saved card/loan represent one product.
+        cards = Set(records.filter {
+            $0.kind == .card || ($0.kind == .account && $0.isCardAccount)
+        }.map { $0.balanceIdentity ?? $0.id }).count
+        loans = Set(records.filter {
+            $0.kind == .loan || ($0.kind == .account && $0.balanceCategory == .loan)
+        }.map { $0.balanceIdentity ?? $0.id }).count
+    }
+
+    var label: String {
+        "\(accounts) \(accounts == 1 ? "Account" : "Accounts") • \(cards) \(cards == 1 ? "Card" : "Cards") • \(loans) \(loans == 1 ? "Loan" : "Loans")"
+    }
+}
+
 /// A local, authorized overview. Saved relationships are preserved; merchant history
 /// is matched separately and never persisted as a confirmed relationship.
 struct SearchOverview: Identifiable, Sendable {
     var root: SearchRecord
     var children: [SearchRecord] = []
     var balances: [SearchRecord] = []
+    var bankCounts = SearchBankCounts()
     var paidServices: [SearchRecord] = []
     var transactions: [SearchRecord] = []
     var merchantMatchedTransactionIDs: Set<String> = []
@@ -49,8 +154,30 @@ struct SearchOverview: Identifiable, Sendable {
     var connections: [String: [SearchRecord]] = [:]
     var expandedChildIDs: Set<String> = []
     var representedIDs: Set<String> = []
+    var chargeSummaries: [String: SearchChargeSummary] = [:]
+    var serviceTransactions: [String: [SearchRecord]] = [:]
     var score: Int = 0
     var id: String { root.id }
+
+    var serviceRows: [SearchRecord] {
+        let paidBase = root.safeDetails["pricingModel"] != "free"
+            && (root.financialFacts["billingAmount"].flatMap { Decimal(string: $0) } ?? 0) > 0
+        return (paidBase ? [root] : []) + children
+    }
+    var serviceCountsLabel: String {
+        let active = serviceRows.filter { $0.activeService }
+        let bills = active.filter { $0.serviceType == "bill" }.count
+        let subscriptions = active.filter { $0.serviceType != "bill" }.count
+        var sources = Set<String>()
+        for record in active {
+            let linked = paymentSources(for: record)
+            for source in linked { sources.insert(source.balanceIdentity ?? source.id) }
+            if linked.isEmpty, let label = record.safeDetails["paymentMethod"], !label.isEmpty {
+                sources.insert("label:" + SearchText.normalize(label))
+            }
+        }
+        return "\(bills) \(bills == 1 ? "Bill" : "Bills") • \(subscriptions) \(subscriptions == 1 ? "Subscription" : "Subscriptions") • \(sources.count) \(sources.count == 1 ? "Payment source" : "Payment sources")"
+    }
 
     var billingTotals: [SearchBillingTotal] {
         SearchBillingTotal.totals(for: ([root] + children).filter { $0.activeService }).filter { $0.amount != 0 }
@@ -151,6 +278,7 @@ extension UniversalSearchIndex {
                     $0.companyID == root.companyID && $0.balanceIdentity.map(aliases.contains) == true
                 }
                 let candidates = accounts + directlyLinked.filter { [.card, .loan].contains($0.kind) } + linkedBalances
+                overview.bankCounts = SearchBankCounts(records: candidates)
                 var seen = Set<String>()
                 overview.balances = candidates.sorted {
                     if ($0.kind == .account) != ($1.kind == .account) { return $0.kind == .account }
@@ -184,6 +312,22 @@ extension UniversalSearchIndex {
             for member in unique(members + overview.paidServices) { overview.connections[member.id] = linked(member) }
             for child in overview.children {
                 overview.connections[child.id] = unique((overview.connections[child.id] ?? []) + (merchantHistory[child.id] ?? []))
+            }
+            if root.kind == .subscription {
+                let childTransactionIDs = Set(overview.children.flatMap { overview.linked(to: $0, kinds: [.transaction]) }.map(\.id))
+                for member in [root] + overview.children {
+                    let history: [SearchRecord]
+                    if member.id == root.id {
+                        // A generic merchant charge can belong to any add-on. Only confirmed base
+                        // links may populate the paid base row; the account-wide list retains all.
+                        history = overview.children.isEmpty ? overview.transactions
+                            : directlyLinked.filter { $0.kind == .transaction && !childTransactionIDs.contains($0.id) }
+                    } else {
+                        history = overview.linked(to: member, kinds: [.transaction])
+                    }
+                    overview.serviceTransactions[member.id] = history.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    overview.chargeSummaries[member.id] = SearchChargeSummary(record: member, transactions: history)
+                }
             }
             overview.representedIDs = Set((members + overview.balances + overview.transactions + overview.documents + (root.kind == .institution ? services : [])).map(\.id))
             // Funding accounts are navigation links, not additional search cards for the same match.

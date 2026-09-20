@@ -118,65 +118,70 @@ struct SearchCredentialBoxes: View {
         }
     }
     private var loginBox: some View {
-        Button { copy(.login) } label: {
-            VStack(alignment: .leading, spacing: 5) {
-                fieldLabel("Login", copied: state.copied == .login)
+        VStack(alignment: .leading, spacing: 6) {
+            fieldLabel("LOGIN ID", copied: state.copied == .login)
+            Button { copy(.login) } label: {
                 Text(record.login.isEmpty ? "Not saved" : record.login)
-                    .font(.caption.weight(.medium)).foregroundStyle(.primary)
-                    .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+                    .font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .minimumScaleFactor(0.75).allowsTightening(true)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(14).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                    .contentShape(RoundedRectangle(cornerRadius: 14))
             }
-            .padding(12).frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-            .contentShape(RoundedRectangle(cornerRadius: 14))
-        }
-        .buttonStyle(.plain).disabled(record.login.isEmpty)
-        .background(boxBackground(copied: state.copied == .login))
-        .accessibilityLabel("Copy login")
-        .accessibilityValue(record.login)
-        .accessibilityHint("Copies the saved login")
-        .accessibilityIdentifier("search-copy-login-" + record.id)
+            .buttonStyle(.plain).disabled(record.login.isEmpty)
+            .background(boxBackground(copied: state.copied == .login))
+            .accessibilityLabel("Copy login")
+            .accessibilityValue(record.login)
+            .accessibilityHint("Copies the saved login")
+            .accessibilityIdentifier("search-copy-login-" + record.id)
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private var passwordBox: some View {
-        HStack(spacing: 0) {
-            Button { copy(.password) } label: {
-                VStack(alignment: .leading, spacing: 5) {
-                    fieldLabel("Password", copied: state.copied == .password)
+        VStack(alignment: .leading, spacing: 6) {
+            fieldLabel("PASSWORD", copied: state.copied == .password)
+            HStack(spacing: 0) {
+                Button { copy(.password) } label: {
                     Text(visiblePassword ?? (record.credential == .none ? "Not saved" : "••••••••"))
-                        .font(.system(.caption, design: .monospaced).weight(.medium))
+                        .font(.subheadline.weight(.medium))
                         .foregroundStyle(.primary).lineLimit(nil).fixedSize(horizontal: false, vertical: true)
                         .privacySensitive()
+                        .padding(.vertical, 14).padding(.leading, 14)
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
-                .padding(.vertical, 12).padding(.leading, 12)
-                .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain).disabled(record.credential != .available)
+                .accessibilityLabel("Copy password")
+                .accessibilityValue(visiblePassword == nil ? "Hidden" : "Visible")
+                .accessibilityHint("Copies the password without changing visibility")
+                .accessibilityIdentifier("search-copy-password-" + record.id)
+                Button {
+                    guard auth.isAuthenticated, let userID = auth.currentUser?.id else { state.clear(); return }
+                    state.togglePassword(recordID: record.id, appState: appState, userID: userID)
+                } label: {
+                    Image(systemName: visiblePassword == nil ? "eye" : "eye.slash")
+                        .font(.body).foregroundStyle(Color(white: 0.62))
+                        .frame(width: 44, height: 52).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain).disabled(record.credential != .available)
+                .accessibilityLabel(visiblePassword == nil ? "Reveal password" : "Hide password")
+                .accessibilityIdentifier("search-toggle-password-" + record.id)
             }
-            .buttonStyle(.plain).disabled(record.credential != .available)
-            .accessibilityLabel("Copy password")
-            .accessibilityValue(visiblePassword == nil ? "Hidden" : "Visible")
-            .accessibilityHint("Copies the password without changing visibility")
-            .accessibilityIdentifier("search-copy-password-" + record.id)
-            Button {
-                guard auth.isAuthenticated, let userID = auth.currentUser?.id else { state.clear(); return }
-                state.togglePassword(recordID: record.id, appState: appState, userID: userID)
-            } label: {
-                Image(systemName: visiblePassword == nil ? "eye" : "eye.slash")
-                    .font(.body).foregroundStyle(Color(white: 0.72))
-                    .frame(width: 44, height: 70).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain).disabled(record.credential != .available)
-            .accessibilityLabel(visiblePassword == nil ? "Reveal password" : "Hide password")
-            .accessibilityIdentifier("search-toggle-password-" + record.id)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(boxBackground(copied: state.copied == .password))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(boxBackground(copied: state.copied == .password))
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private func fieldLabel(_ text: String, copied: Bool) -> some View {
         HStack(spacing: 4) {
             if copied { Image(systemName: "checkmark.circle.fill") }
-            Text(copied ? "Copied" : text)
-        }.font(.caption.weight(.semibold)).foregroundStyle(Color.zifrGold)
+            Text(copied ? "COPIED" : text)
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(copied ? Color.zifrGold : Color.secondary)
+        .padding(.horizontal, 10)
     }
     private func boxBackground(copied: Bool) -> some View {
-        RoundedRectangle(cornerRadius: 14).fill(Color.zifrGold.opacity(copied ? 0.2 : 0.09))
+        RoundedRectangle(cornerRadius: 14).fill(copied ? Color.zifrGold.opacity(0.2) : Color.white.opacity(0.05))
             .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.zifrGold.opacity(copied ? 0.8 : 0), lineWidth: 1))
     }
     private func copy(_ field: SearchCredentialBoxState.Field) {

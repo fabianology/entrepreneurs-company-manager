@@ -72,6 +72,10 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
     var website: String?
     var logoURL: String?
     var brandName: String?
+    var isCardAccount = false
+    var fundingCoverage: SearchFundingCoverage?
+    var transactionSourceIdentity: String?
+    var scheduledDueDate: Date?
 
     init(kind: Kind, modelID: UUID, companyID: UUID?, company: String, title: String,
          detail: String, text: String = "", suffix: String = "") {
@@ -282,6 +286,7 @@ struct SearchIndexSnapshot: Sendable {
     let documents: [CompanyDocument]
     let hasLoadedPortfolio: Bool
     let institutions: [Institution]
+    let plaidItems: [PlaidItemSummary]
     let loans: [Loan]
     let localCompanyOverrides: [String: UUID]
     let notifications: [AppNotification]
@@ -312,6 +317,7 @@ struct SearchIndexSnapshot: Sendable {
         documents = state.documents
         hasLoadedPortfolio = state.hasLoadedPortfolio
         institutions = state.institutions
+        plaidItems = state.plaidItems
         loans = state.loans
         localCompanyOverrides = state.localCompanyOverrides
         notifications = state.notifications
@@ -341,7 +347,7 @@ struct UniversalSearchIndex: Sendable {
         self.init(snapshot: SearchIndexSnapshot(appState), userID: userID, documentPages: documentPages)
     }
 
-    init(snapshot appState: SearchIndexSnapshot, userID: UUID, documentPages: [SearchDocumentPage] = []) {
+    init(snapshot appState: SearchIndexSnapshot, userID: UUID, documentPages: [SearchDocumentPage] = [], now: Date = Date(), calendar: Calendar = .current) {
         guard !Task.isCancelled, appState.hasLoadedPortfolio, appState.portfolioUserID == userID else { return }
         isLoaded = true
         let shared = Set(appState.resourceShares.filter { $0.userId == userID }.map(\.resourceId))
@@ -446,6 +452,7 @@ struct UniversalSearchIndex: Sendable {
                 r.amount = SearchText.decimal(account.balance); r.currency = ExecutiveBriefingSnapshot.currency(account.currency)
                 r.availableAmount = SearchText.decimal(account.availableBalance)
                 r.balanceCategory = SearchBalanceCategory.accountType(account.type)
+                r.isCardAccount = account.isCard
                 r.balanceAliases = ["account:\(account.id)"]
                 if let plaid = account.plaidAccountId, !plaid.isEmpty { r.balanceAliases.insert("plaid:\(plaid)") }
                 if let persistentID = account.persistentAccountId, !persistentID.isEmpty { r.balanceAliases.insert("persistent:\(persistentID)") }
@@ -463,7 +470,16 @@ struct UniversalSearchIndex: Sendable {
                 if let cardID = account.linkedCardId.flatMap(UUID.init(uuidString:)) { link(r.id, key(.card, cardID)) }
             }
         }
-        for sub in appState.subscriptions where allowed(sub.id, sub.userId, sub.companyId) {
+        let authorizedServices = appState.subscriptions.filter { allowed($0.id, $0.userId, $0.companyId) }
+        let scheduledServices = authorizedServices.map { SearchFundingCoverage.normalized($0, now: now, calendar: calendar) }
+        let schedules = Dictionary(scheduledServices.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let authorizedBanks = appState.institutions.filter { allowed($0.id, $0.userId, $0.companyId) }
+        let authorizedCards = appState.cards.filter { allowed($0.id, $0.userId, $0.companyId) }
+        let bankIDs = Set(authorizedBanks.map(\.id))
+        let funding = SearchFundingCoverage.project(subscriptions: scheduledServices, institutions: authorizedBanks,
+            cards: authorizedCards, plaidItems: appState.plaidItems.filter { $0.institutionId.map(bankIDs.contains) ?? false },
+            now: now, calendar: calendar, incomplete: appState.portfolioLoadIssue != nil)
+        for sub in authorizedServices {
             let cid = companyID(sub.id, sub.companyId)
             let detail = "\(SearchText.money(Decimal(sub.cost), currency: sub.currency)) / \(sub.billingCycle) · \(sub.status)"
             let text = [sub.loginId, sub.website, sub.notes, sub.paymentMethod].compactMap { $0 }.joined(separator: " ")
@@ -481,6 +497,8 @@ struct UniversalSearchIndex: Sendable {
             r.safeDetails["classificationSource"] = sub.serviceType == .automatic ? "Automatic classification" : "User-selected classification"
             r.safeDetails["renewalMode"] = redactor.clean(sub.renew)
             r.safeDetails["pricingModel"] = redactor.clean(sub.pricingModel)
+            r.fundingCoverage = funding["service:\(sub.id)"]
+            r.scheduledDueDate = schedules[sub.id]?.nextRenewalAt
             r.safeDetails["linkedEmails"] = redactor.clean(sub.linkedEmails.map { "\($0.email): \($0.usedFor)" }.joined(separator: "; "))
             r.financialFacts = ["billingAmount": SearchText.number(sub.cost), "billingCycle": redactor.clean(sub.billingCycle),
                 "nextRenewal": SearchText.day(r.date), "status": redactor.clean(sub.status)]
@@ -497,6 +515,8 @@ struct UniversalSearchIndex: Sendable {
                 let inheritsPayment = addon.paymentMethodId == nil && addon.paymentMethod.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 child.safeDetails = ["purpose": redactor.clean(addon.purpose), "parentService": redactor.clean(sub.name),
                     "paymentMethod": redactor.clean(inheritsPayment ? (sub.paymentMethod ?? "") : addon.paymentMethod), "renewalMode": addon.autoPay.rawValue]
+                child.fundingCoverage = funding["service:\(sub.id):addon:\(addon.id)"]
+                child.scheduledDueDate = schedules[sub.id]?.subServices.first { $0.id == addon.id }?.renewsOn
                 records.append(child); link(child.id, r.id)
                 if let paymentID = addon.paymentMethodId {
                     for target in records where target.companyID == cid && target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(child.id, target.id) }
@@ -606,6 +626,8 @@ struct UniversalSearchIndex: Sendable {
             r.logoURL = t.merchantLogoURL
             r.website = t.merchantWebsite.map(redactor.clean)
             r.accountName = redactor.clean(accountName)
+            r.transactionSourceIdentity = linkedAccounts.compactMap(\.balanceIdentity).sorted().first
+                ?? aliasesForTransaction.first(where: { !$0.isEmpty && $0 != "unassigned" })
             r.safeDetails = ["notes": redactor.clean(resolved.override?.note ?? ""), "institution": redactor.clean(resolved.institutionName)]
             r.amount = amount; r.currency = ExecutiveBriefingSnapshot.currency(t.currency); r.date = SearchText.date(t.date); r.flow = flow; r.pending = t.pending == true
             r.financialFacts = ["transactionAmount": amount.map { NSDecimalNumber(decimal: $0).stringValue } ?? "Unavailable", "flow": flow, "pending": r.pending ? "Yes" : "No"]

@@ -34,6 +34,119 @@ final class UniversalSearchTests: XCTestCase {
         return index.overviews(for: index.execute(request, filters: filters), request: request, filters: filters)
     }
 
+    func testSearchChargeSummaryUsesPostedComparablePeriods() throws {
+        let company = UUID()
+        var service = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Test", title: "Netflix", detail: "")
+        service.financialFacts["billingCycle"] = "Monthly"
+        func charge(_ day: String, _ amount: Decimal, source: String = "card-a", flow: String = "expense", pending: Bool = false, currency: String = "USD") -> SearchRecord {
+            var record = SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Test", title: "Netflix", detail: "")
+            record.date = SearchText.date(day, calendar: calendar); record.amount = amount
+            record.transactionSourceIdentity = source; record.flow = flow; record.pending = pending; record.currency = currency
+            return record
+        }
+        let june = charge("2026-06-10", 20)
+        let july = charge("2026-07-10", 22)
+        let august = charge("2026-08-10", 22)
+        let noise = [charge("2026-09-10", 99, flow: "refund"), charge("2026-09-11", 999, pending: true),
+                     charge("2026-09-12", 999, flow: "transfer"), charge("2026-09-13", 999, flow: "ignored"),
+                     charge("2026-09-14", 99, currency: "EUR")]
+        let summary = SearchChargeSummary(record: service, transactions: [june, july, august, june] + noise, now: now, calendar: calendar)
+        XCTAssertEqual(summary.latest?.id, august.id)
+        XCTAssertEqual(summary.firstDate, june.date)
+        XCTAssertEqual(summary.elapsedMonths, 3)
+        XCTAssertEqual(summary.observedIncreases, 1)
+        XCTAssertNil(SearchChargeSummary(record: service, transactions: [june, august], now: now, calendar: calendar).observedIncreases, "Missing billing periods cannot establish a price change")
+        XCTAssertNil(SearchChargeSummary(record: service, transactions: [june, july, charge("2026-07-12", 3)], now: now, calendar: calendar).observedIncreases)
+        XCTAssertNil(SearchChargeSummary(record: service, transactions: [june, charge("2026-07-10", 30, source: "card-b")], now: now, calendar: calendar).observedIncreases)
+        XCTAssertEqual(SearchChargeSummary(record: service, transactions: [june, charge("2026-07-10", Decimal(string: "20.004")!)], now: now, calendar: calendar).observedIncreases, 0)
+        service.financialFacts["billingCycle"] = "Yearly"
+        XCTAssertEqual(SearchChargeSummary(record: service, transactions: [charge("2025-07-10", 100), charge("2026-07-10", 120)], now: now, calendar: calendar).observedIncreases, 1)
+    }
+
+    func testSearchCoverageIncludesOtherServicesDespiteSearchFilter() throws {
+        let (state, a, b) = fixture()
+        var card = FinancialCard(userId: owner, companyId: a.id, name: "Citi", limit: 100, balance: 0)
+        card.plaidAccountId = "funding"
+        var netflix = Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 60, paymentMethodId: card.id)
+        netflix.nextRenewalAt = now
+        var second = Subscription(userId: owner, companyId: a.id, name: "Other service", cost: 60, paymentMethodId: card.id)
+        second.nextRenewalAt = now
+        var unauthorized = Subscription(userId: UUID(), companyId: UUID(), name: "Private", cost: 999, paymentMethodId: card.id)
+        unauthorized.nextRenewalAt = now
+        state.cards = [card]; state.subscriptions = [netflix, second, unauthorized]
+        func index() -> UniversalSearchIndex { UniversalSearchIndex(snapshot: SearchIndexSnapshot(state), userID: owner, now: now, calendar: calendar) }
+        let result = try XCTUnwrap(overviews(index(), "Netflix", filters: .init(companyID: a.id)).first)
+        XCTAssertEqual(result.root.fundingCoverage?.status, .atRisk)
+        state.cards[0].limit = 120
+        XCTAssertEqual(try XCTUnwrap(overviews(index(), "Netflix").first).root.fundingCoverage?.status, .covered)
+        state.portfolioLoadIssue = "Incomplete fixture"
+        XCTAssertEqual(try XCTUnwrap(overviews(index(), "Netflix").first).root.fundingCoverage?.status, .unknown)
+        state.portfolioLoadIssue = nil
+        state.subscriptions[0].billingCycle = "Yearly"
+        state.subscriptions[0].nextRenewalAt = calendar.date(byAdding: .day, value: 60, to: now)
+        XCTAssertNil(try XCTUnwrap(overviews(index(), "Netflix").first).root.fundingCoverage)
+        XCTAssertTrue(overviews(index(), "Netflix", filters: .init(companyID: b.id)).isEmpty)
+    }
+
+    func testSearchCoverageHandlesStaleMissingAndInsufficientFunding() throws {
+        let (state, a, _) = fixture()
+        var account = InstitutionAccount(); account.name = "Checking"; account.balance = 100
+        let bank = Institution(userId: owner, companyId: a.id, name: "Bank", accounts: [account])
+        var sub = Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 20, paymentMethodId: bank.id)
+        sub.nextRenewalAt = now
+        state.institutions = [bank]; state.subscriptions = [sub]
+        func coverage() throws -> SearchFundingCoverage? {
+            let index = UniversalSearchIndex(snapshot: SearchIndexSnapshot(state), userID: owner, now: now, calendar: calendar)
+            return try XCTUnwrap(overviews(index, "Netflix").first).root.fundingCoverage
+        }
+        XCTAssertEqual(try coverage()?.status, .covered)
+        state.institutions[0].accounts[0].balance = 10
+        XCTAssertEqual(try coverage()?.status, .atRisk)
+        state.institutions[0].accounts[0].plaidAccountId = "stale-account"
+        state.institutions[0].lastSyncedAt = calendar.date(byAdding: .day, value: -8, to: now)
+        XCTAssertEqual(try coverage()?.status, .unknown)
+        XCTAssertEqual(try coverage()?.reason, "Connected balance is out of date")
+        state.institutions = []
+        XCTAssertEqual(try coverage()?.status, .unknown)
+    }
+
+    func testPaidBaseRowsAndAmbiguousAccountHistoryStaySeparate() throws {
+        let (state, a, _) = fixture()
+        var source = FinancialCard(userId: owner, companyId: a.id, name: "Citi")
+        source.plaidAccountId = "citi"
+        var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", cost: 30, paymentMethodId: source.id)
+        tesla.subServices = [SubService(name: "Driving", cost: 100), SubService(name: "Insurance", cost: 120, serviceType: .bill)]
+        var generic = transaction(a.id, card: source); generic.name = "Tesla"
+        var child = transaction(a.id, card: source); child.name = "Tesla Insurance"
+        state.cards = [source]; state.subscriptions = [tesla]; state.transactions = [generic, child]
+        var result = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
+        XCTAssertEqual(result.serviceRows.count, 3)
+        XCTAssertEqual(result.serviceRows.first?.id, result.root.id)
+        XCTAssertEqual(result.serviceCountsLabel, "1 Bill • 2 Subscriptions • 1 Payment source")
+        XCTAssertEqual(result.transactions.count, 2)
+        XCTAssertTrue(result.serviceTransactions[result.root.id]?.isEmpty == true)
+        let insurance = try XCTUnwrap(result.children.first { $0.title == "Insurance" })
+        XCTAssertEqual(result.serviceTransactions[insurance.id]?.map(\.modelID), [child.id])
+        state.subscriptions[0].cost = 0
+        result = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
+        XCTAssertEqual(result.serviceRows.count, 2)
+        XCTAssertEqual(result.serviceCountsLabel, "1 Bill • 1 Subscription • 1 Payment source")
+    }
+
+    func testPastChargesStartsClosedAndShowsAllWithoutAffectingSibling() {
+        var first = SearchHistoryDisplayState()
+        let second = SearchHistoryDisplayState()
+        XCTAssertEqual(first.visibleCount(12), 0)
+        first.expanded = true
+        XCTAssertEqual(first.visibleCount(12), 3)
+        XCTAssertEqual(first.visibleCount(2), 2)
+        first.showsAll = true
+        XCTAssertEqual(first.visibleCount(12), 12)
+        XCTAssertEqual(second.visibleCount(12), 0)
+        first.expanded = false
+        XCTAssertEqual(first.visibleCount(12), 0)
+    }
+
     func testServiceOverviewGroupsSavedChildrenAndCountsActiveCostsOnce() throws {
         let (state, a, b) = fixture()
         var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", cost: 0, website: "https://tesla.com", loginId: "driver@example.com", password: "test-only-secret")
@@ -107,6 +220,9 @@ final class UniversalSearchTests: XCTestCase {
         let index = state.searchIndex(for: owner)
         let card = try XCTUnwrap(overviews(index, "SoFi").first { $0.root.companyID == a.id })
         XCTAssertEqual(card.balances.count, 2)
+        XCTAssertEqual(card.bankCounts.label, "2 Accounts • 1 Card • 0 Loans")
+        let otherBank = try XCTUnwrap(overviews(index, "SoFi").first { $0.root.companyID == b.id })
+        XCTAssertEqual(otherBank.bankCounts.label, "1 Account • 0 Cards • 0 Loans")
         XCTAssertEqual(card.balances.first { $0.balanceCategory == .credit }?.amount, 640)
         XCTAssertEqual(card.paidServices.map(\.title), ["Netflix"])
         XCTAssertEqual(card.additionalLogins.map(\.modelID), [mirror.id])
@@ -115,6 +231,24 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(card.root.safeDetails["yourAccess"], "Owner")
         XCTAssertNil(card.root.safeDetails["sharedBy"])
         XCTAssertTrue(overviews(index, "1234").isEmpty, "Exact endings must not expand into sibling accounts")
+    }
+
+    func testBankHeaderCountsDeduplicateMirroredCardsAndLoans() throws {
+        let (state, a, b) = fixture()
+        var credit = InstitutionAccount(); credit.name = "Credit"; credit.type = "Credit Card"; credit.plaidAccountId = "credit"
+        var mortgage = InstitutionAccount(); mortgage.name = "Mortgage"; mortgage.type = "Loan"; mortgage.plaidAccountId = "mortgage"
+        var debit = InstitutionAccount(); debit.name = "Debit"; debit.type = "Debit (Linked)"; debit.plaidAccountId = "debit"
+        var card = FinancialCard(userId: owner, companyId: a.id, name: "Bank credit card")
+        card.plaidAccountId = "credit"; credit.linkedCardId = card.id.uuidString
+        var loan = Loan(userId: owner, companyId: a.id, name: "Mortgage"); loan.plaidAccountId = "mortgage"
+        state.cards = [card]; state.loans = [loan]
+        state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", accounts: [credit, mortgage, debit]),
+            Institution(userId: owner, companyId: b.id, name: "SoFi")]
+        let results = overviews(state.searchIndex(for: owner), "SoFi")
+        let bank = try XCTUnwrap(results.first { $0.root.companyID == a.id })
+        XCTAssertEqual(bank.bankCounts.label, "3 Accounts • 2 Cards • 1 Loan")
+        XCTAssertEqual(bank.balances.count, 3)
+        XCTAssertEqual(results.first { $0.root.companyID == b.id }?.bankCounts.label, "0 Accounts • 0 Cards • 0 Loans")
     }
 
     func testOverviewCombinesMerchantHistoryWithSavedLinksWithoutDuplicates() throws {
@@ -514,13 +648,25 @@ final class UniversalSearchTests: XCTestCase {
         tesla.subServices = [SubService(name: "Premium Connectivity", cost: 120, billingCycle: .yearly, renewsOn: now),
             SubService(name: "Full Self-Driving", cost: 548, renewsOn: now),
             SubService(name: "Insurance", cost: 120, renewsOn: now, serviceType: .bill)]
-        state.subscriptions = [service, tesla]
+        tesla.cost = 283; tesla.serviceType = .bill; tesla.nextRenewalAt = Date().addingTimeInterval(86400 * 11)
+        var netflix = Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 26.99, paymentMethodId: first.id,
+            website: "https://netflix.com", loginId: "viewer@example.com", password: "fixture-only")
+        netflix.nextRenewalAt = Date().addingTimeInterval(86400 * 11)
+        var secondNetflix = netflix; secondNetflix.id = UUID(); secondNetflix.companyId = b.id; secondNetflix.paymentMethodId = second.id
+        state.subscriptions = [service, tesla, netflix, secondNetflix]
         var checking = InstitutionAccount(); checking.name = "Checking"; checking.last4 = "1234"; checking.balance = 4250
         var savings = InstitutionAccount(); savings.name = "Savings"; savings.last4 = "5678"; savings.balance = 12800; savings.type = "Savings"
-        state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", loginUrl: "https://sofi.com", username: "owner@example.com", password: "fixture-only", accounts: [checking, savings])]
+        var credit = InstitutionAccount(); credit.name = "Credit Card"; credit.type = "Credit Card"; credit.last4 = "9012"; credit.balance = 640
+        var loan = InstitutionAccount(); loan.name = "Auto Loan"; loan.type = "Loan"; loan.last4 = "2345"; loan.balance = 15200
+        state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", loginUrl: "https://sofi.com", username: "owner@example.com", password: "fixture-only", accounts: [checking, savings, credit, loan])]
+        state.institutions.append(Institution(userId: owner, companyId: b.id, name: "SoFi", loginUrl: "https://sofi.com", accounts: [checking]))
         var charge = transaction(a.id, card: first, amount: 144); charge.name = "Figma"
         var insuranceCharge = transaction(a.id, card: first, amount: 120); insuranceCharge.name = "Tesla Insurance"
         state.transactions = [transaction(a.id, amount: 1400), charge, insuranceCharge]
+        for month in 4...8 {
+            var payment = transaction(a.id, card: first, date: "2026-0\(month)-23", amount: month < 6 ? 24.99 : 26.99)
+            payment.name = "Netflix"; state.transactions.append(payment)
+        }
         let auth = AuthViewModel()
         auth.currentUser = User(id: owner, appMetadata: [:], userMetadata: [:], aud: "authenticated", createdAt: now, updatedAt: now)
         auth.isAuthenticated = true
@@ -528,11 +674,14 @@ final class UniversalSearchTests: XCTestCase {
         let variants: [(String, DynamicTypeSize, String)] = [
             ("4242", .large, "Exact ending"),
             ("Figma", .large, "Service and password actions"),
+            ("Netflix", .large, "Netflix separate entity cards"),
+            ("Netflix", .accessibility3, "Netflix accessibility"),
             ("Figma", .accessibility3, "Large accessibility text"),
             ("Tesla", .large, "Grouped Tesla services"),
             ("Tesla", .accessibility3, "Large mixed billing"),
             ("Tesla insurance", .large, "Expanded Tesla insurance"),
             ("SoFi", .large, "Bank overview"),
+            ("SoFi", .accessibility3, "Bank accessibility"),
             ("No matching record", .large, "No results"),
             ("", .large, "First open"),
             ("largest transaction", .large, "Calculated answer")
@@ -541,6 +690,8 @@ final class UniversalSearchTests: XCTestCase {
             let vm = AppViewModel(); vm.searchQuery = query
             let search = GlobalSearchView(vm: vm).environment(state).environment(auth).environment(AccessController())
                 .environment(\.dynamicTypeSize, size)
+                // A standalone UIHostingController does not inherit WindowGroup's active phase.
+                .environment(\.scenePhase, .active)
             let host = SearchSheetTestHost(content: search)
             let controller = UIHostingController(rootView: host)
             controller.overrideUserInterfaceStyle = .dark
@@ -555,6 +706,13 @@ final class UniversalSearchTests: XCTestCase {
             let image = renderer.image { _ in XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)) }
             let attachment = XCTAttachment(image: image); attachment.name = "Search sheet – " + label; attachment.lifetime = .keepAlways; add(attachment)
             XCTAssertEqual(vm.searchQuery, query, "Prefilled queries must survive sheet presentation and layout")
+            // Optional simulator-only window for inspecting real taps with this synthetic portfolio.
+            // TEST_RUNNER_MILOOM_SEARCH_DESIGN_REVIEW=1 enables it when invoking xcodebuild.
+            if query == "Netflix", size == .large,
+               ProcessInfo.processInfo.environment["MILOOM_SEARCH_DESIGN_REVIEW"] == "1" {
+                print("Search design fixture ready for interactive review")
+                try await Task.sleep(for: .seconds(90))
+            }
             controller.dismiss(animated: false)
             window.isHidden = true; window.rootViewController = nil; previous?.makeKey()
         }

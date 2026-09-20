@@ -51,7 +51,8 @@ struct SearchPaymentDetails: View {
             } else {
                 ForEach(sources) { source in
                     Button { open(source) } label: {
-                        HStack(spacing: 5) {
+                        HStack(spacing: 6) {
+                            SearchResultLogo(record: source, size: 22)
                             Text("Paid with: " + source.title + (source.last4.isEmpty ? "" : " ••" + source.last4))
                                 .fixedSize(horizontal: false, vertical: true)
                             Image(systemName: "chevron.right").font(.caption2)
@@ -128,43 +129,258 @@ struct SearchResultLogo: View {
     }
 }
 
+/// Animate the occupied height while keeping the content at its natural size and
+/// anchored at the top. Clipping reveals it downward instead of fading or scaling.
+private struct SearchAccordionLayout: Layout {
+    var fraction: CGFloat
+    var animatableData: CGFloat {
+        get { fraction }
+        set { fraction = newValue }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        let size = content.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: size.width, height: size.height * min(1, max(0, fraction)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                             proposal: ProposedViewSize(width: bounds.width, height: nil))
+    }
+}
+
+private struct SearchAccordionContent<Content: View>: View {
+    let isExpanded: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        SearchAccordionLayout(fraction: isExpanded ? 1 : 0) { content }
+            .clipped()
+            .allowsHitTesting(isExpanded)
+            .accessibilityElement(children: .contain)
+            .accessibilityHidden(!isExpanded)
+    }
+}
+
+/// Touch-sized disclosure rows, retaining SwiftUI's independent expansion state.
+/// Uses the same trailing chevrons and separators as the app's institution accordions.
+struct SearchDisclosureStyle: DisclosureGroupStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider().overlay(Color.white.opacity(0.06))
+            Button {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) {
+                    configuration.isExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    configuration.label
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(configuration.isExpanded ? -180 : 0))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.zifrGold)
+                        .accessibilityHidden(true)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.vertical, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(configuration.isExpanded ? "Expanded" : "Collapsed")
+            .accessibilityHint(configuration.isExpanded ? "Hides details" : "Shows details")
+            SearchAccordionContent(isExpanded: configuration.isExpanded) {
+                VStack(alignment: .leading, spacing: 12) { configuration.content }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 12)
+            }
+        }
+    }
+}
+
 struct SearchOverviewCard: View {
     let overview: SearchOverview
     var open: (SearchRecord) -> Void
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var expanded: Set<String>
-    @State private var historyLimit = 3
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     init(overview: SearchOverview, open: @escaping (SearchRecord) -> Void) {
         self.overview = overview; self.open = open
         _expanded = State(initialValue: overview.expandedChildIDs)
     }
     private var root: SearchRecord { overview.root }
+    private var grouped: Bool { root.kind == .subscription && !overview.children.isEmpty }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 22) {
             header
-            SearchCredentialBoxes(record: root)
-            ForEach(overview.additionalLogins) { record in
-                DisclosureGroup("Saved login · " + record.title) {
-                    SearchCredentialBoxes(record: record).padding(.vertical, 8)
-                }.font(.subheadline)
-            }
-            if root.kind == .subscription {
-                ForEach(overview.children.prefix(3)) { child in childRow(child) }
-                if overview.children.count > 3 {
-                    DisclosureGroup("More subservices (\(overview.children.count - 3))") {
-                        ForEach(overview.children.dropFirst(3)) { child in childRow(child) }
+            VStack(alignment: .leading, spacing: 24) {
+                SearchCredentialBoxes(record: root)
+                ForEach(overview.additionalLogins) { record in
+                    DisclosureGroup("Saved login · " + record.title) {
+                        SearchCredentialBoxes(record: record).padding(.vertical, 8)
                     }.font(.subheadline)
                 }
-            }
-            if !overview.balances.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(overview.balances.prefix(3)) { balance in balanceRow(balance) }
-                    if overview.balances.count > 3 {
-                        DisclosureGroup("All accounts (\(overview.balances.count))") {
-                            ForEach(overview.balances.dropFirst(3)) { balance in balanceRow(balance) }
-                        }.font(.subheadline)
+                if grouped {
+                    ForEach(overview.serviceRows) { service in serviceRow(service) }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Account Charge History").font(.subheadline.weight(.medium))
+                        SearchPastCharges(records: overview.transactions, open: open)
+                        if !overview.merchantMatchedTransactionIDs.isEmpty {
+                            Text("Includes matching merchant charges for this entity. Unassigned charges remain in account history.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                } else if root.kind == .subscription {
+                    chargeDetails(root)
+                }
+                if root.kind == .institution { bankDetails }
+                supportingDetails
+                Button("All " + (root.kind == .institution ? "bank" : "service") + " details") { open(root) }
+                    .font(.subheadline.weight(.medium)).frame(minHeight: 44)
+            }.padding(.horizontal, 4)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(white: 0.075), in: RoundedRectangle(cornerRadius: 26))
+        .tint(Color.zifrGold)
+        .buttonStyle(.borderless)
+        .disclosureGroupStyle(SearchDisclosureStyle())
+        .accessibilityIdentifier("search-overview-" + root.id)
+        .onChange(of: overview.expandedChildIDs) { _, ids in expanded = ids }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 14) {
+                SearchResultLogo(record: root, size: 48)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top, spacing: 2) {
+                        Button { open(root) } label: {
+                            Text(root.title).font(.title3.weight(.semibold)).foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }.buttonStyle(.plain)
+                        // Keep the website's 44-point touch target without making the title row taller.
+                        if SearchBrand.websiteURL(root.website) != nil {
+                            Color.clear.frame(width: 44, height: 24)
+                                .overlay { SearchWebsiteButton(record: root) }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    if root.kind == .subscription {
+                        if grouped {
+                            if overview.billingTotals.isEmpty {
+                                Text(overview.hasUnknownAmount ? "Amount unavailable" : "No active charges").font(.headline)
+                            } else { SearchBillingAmounts(totals: overview.billingTotals) }
+                        } else if root.safeDetails["pricingModel"] == "free" {
+                            Text("Free").font(.headline)
+                        } else { SearchBillingAmounts(totals: SearchBillingTotal.totals(for: [root])) }
+                    } else {
+                        Text(overview.bankCounts.label).font(.footnote.weight(.medium))
+                            .foregroundStyle(Color.zifrGold)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                .frame(minHeight: 48, alignment: .top)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            if root.kind == .subscription && !grouped {
+                Text(SearchScheduleLabel.header(root)).font(.footnote).foregroundStyle(Color.zifrGold)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 62)
+            }
+            if grouped {
+                Text(overview.serviceCountsLabel).font(.footnote.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                if overview.hasUnknownAmount {
+                    Text("Partial total · an amount is not saved").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            if let status = root.financialFacts["status"], status != "Active" {
+                Text(status).font(.footnote).foregroundStyle(.secondary)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.black, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func serviceRow(_ record: SearchRecord) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) {
+                    if expanded.contains(record.id) { expanded.remove(record.id) }
+                    else { expanded.insert(record.id) }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    SearchResultLogo(record: record, size: 30)
+                    Text(record.title).font(.title3.weight(.medium)).foregroundStyle(.primary)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.down")
+                        .rotationEffect(.degrees(expanded.contains(record.id) ? -180 : 0))
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }.frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityValue(expanded.contains(record.id) ? "Expanded" : "Collapsed")
+            .accessibilityHint(expanded.contains(record.id) ? "Hides charge history" : "Shows charge history")
+            .accessibilityIdentifier("search-subservice-" + record.id)
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 5))
+            layout {
+                HStack(spacing: 5) {
+                    Circle().fill(record.activeService ? Color.zifrGreen : Color.secondary).frame(width: 4, height: 4)
+                    Text((record.serviceType?.capitalized ?? "Service") + (dynamicTypeSize.isAccessibilitySize ? "" : " •"))
+                        .font(.subheadline)
+                }
+                if record.safeDetails["pricingModel"] == "free" { Text("Free").font(.subheadline) }
+                else { SearchBillingAmounts(totals: SearchBillingTotal.totals(for: [record])) }
+            }
+            SearchPaymentDetails(sources: overview.paymentSources(for: record),
+                fallback: record.safeDetails["paymentMethod"] ?? "", open: open)
+            schedule(record)
+            if let purpose = record.safeDetails["purpose"], !purpose.isEmpty {
+                Text("Purpose: " + purpose).font(.subheadline).fixedSize(horizontal: false, vertical: true)
+            }
+            if !record.activeService {
+                Text(record.financialFacts["status"] ?? "Inactive").font(.footnote).foregroundStyle(.secondary)
+            }
+            SearchAccordionContent(isExpanded: expanded.contains(record.id)) {
+                VStack(alignment: .leading, spacing: 4) {
+                    chargeDetails(record).padding(.top, 12)
+                    Button("Service details") { open(record) }.font(.subheadline).frame(minHeight: 44)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func schedule(_ record: SearchRecord) -> some View {
+        Text(SearchScheduleLabel.text(record)).font(.footnote).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func chargeDetails(_ record: SearchRecord) -> some View {
+        SearchChargeDetails(record: record, summary: overview.chargeSummaries[record.id],
+            sources: overview.paymentSources(for: record), transactions: overview.serviceTransactions[record.id] ?? [], open: open)
+            .id(record.id)
+    }
+
+    private var bankDetails: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(overview.balances.prefix(3)) { balance in balanceRow(balance) }
+            if overview.balances.count > 3 {
+                DisclosureGroup("All accounts (\(overview.balances.count))") {
+                    ForEach(overview.balances.dropFirst(3)) { balance in balanceRow(balance) }
+                }.font(.subheadline)
             }
             if root.financialFacts["bankConnection"] == "Needs attention" {
                 Label("Bank connection needs attention", systemImage: "exclamationmark.triangle")
@@ -176,10 +392,8 @@ struct SearchOverviewCard: View {
                         Button { open(service) } label: {
                             HStack(spacing: 10) {
                                 SearchResultLogo(record: service, size: 28)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(service.parentServiceID == nil ? service.title : (service.safeDetails["parentService"] ?? "Service") + " · " + service.title).foregroundStyle(.primary)
-                                    Text((service.serviceType?.capitalized ?? "Service") + " · " + billingLabel(service)).font(.callout).foregroundStyle(.secondary)
-                                }
+                                Text(service.parentServiceID == nil ? service.title : (service.safeDetails["parentService"] ?? "Service") + " · " + service.title)
+                                    .foregroundStyle(.primary)
                                 Spacer(minLength: 0)
                                 Image(systemName: "chevron.right").font(.caption)
                             }.font(.subheadline).frame(minHeight: 44)
@@ -187,128 +401,33 @@ struct SearchOverviewCard: View {
                     }
                 }.font(.subheadline)
             }
-            if let role = root.safeDetails["yourAccess"] {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Miloom access · " + role).font(.callout).foregroundStyle(.secondary)
+            SearchPastCharges(records: overview.transactions, title: "Transactions", open: open)
+            Text(root.lastSyncedAt.map { "Bank updated " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Saved balances · bank update time unavailable")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var supportingDetails: some View {
+        if !overview.documents.isEmpty || root.safeDetails["yourAccess"] != nil {
+            DisclosureGroup("More details") {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let role = root.safeDetails["yourAccess"] {
+                        Text("Miloom access · " + role).font(.footnote).foregroundStyle(.secondary)
+                    }
                     if let sender = root.safeDetails["sharedBy"], !sender.isEmpty {
                         Text("Shared by " + sender).font(.footnote).foregroundStyle(.secondary)
                     }
-                }
-            }
-            Divider().overlay(Color.zifrBorder)
-            DisclosureGroup {
-                history(overview.transactions)
-                if !overview.merchantMatchedTransactionIDs.isEmpty {
-                    Text("Includes matching merchant charges for this company.").font(.footnote).foregroundStyle(.secondary)
-                }
-                if overview.transactions.count > historyLimit {
-                    Button("Show more transactions (\(overview.transactions.count - historyLimit))") { historyLimit += 10 }
-                        .font(.subheadline).frame(minHeight: 44)
-                }
-            } label: {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(root.kind == .institution ? "Transactions" : "Charge history").font(.subheadline.weight(.medium))
-                    if let latest = overview.transactions.first {
-                        Text("Latest: " + transactionLabel(latest)).font(.footnote).foregroundStyle(.secondary)
-                    }
-                }.frame(minHeight: 44, alignment: .leading)
-            }
-            if !overview.documents.isEmpty {
-                DisclosureGroup("Documents (\(overview.documents.count))") {
                     ForEach(overview.documents) { document in
-                        Button(document.title) { open(document) }.frame(minHeight: 44).font(.subheadline)
+                        Button(document.title) { open(document) }.font(.subheadline).frame(minHeight: 44)
                     }
-                }.font(.subheadline)
-            }
-            Button("All " + (root.kind == .institution ? "bank" : "service") + " details") { open(root) }
-                .font(.subheadline.weight(.medium)).frame(minHeight: 44)
-            if root.kind == .institution {
-                Text(root.lastSyncedAt.map { "Bank updated " + $0.formatted(date: .abbreviated, time: .shortened) } ?? "Saved balances · bank update time unavailable")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
+                }
+            }.font(.subheadline)
         }
-        .padding(.vertical, 10)
-        .tint(Color.zifrGold)
-        .buttonStyle(.borderless)
-        .accessibilityIdentifier("search-overview-" + root.id)
-        .onChange(of: overview.expandedChildIDs) { _, ids in expanded = ids }
-
+        if root.kind == .subscription && !overview.balances.isEmpty {
+            DisclosureGroup("Linked loans") { ForEach(overview.balances) { balanceRow($0) } }.font(.subheadline)
+        }
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
-            SearchResultLogo(record: root, size: 40).frame(width: 56, height: 56).padding(.top, 5)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 2) {
-                    Button { open(root) } label: {
-                        Text(root.title).font(.headline).foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true).frame(minHeight: 44, alignment: .leading)
-                    }.buttonStyle(.plain)
-                    SearchWebsiteButton(record: root)
-                    Spacer(minLength: 0)
-                }
-                if root.kind == .subscription && !overview.children.isEmpty {
-                    if !overview.billingTotals.isEmpty { SearchBillingAmounts(totals: overview.billingTotals) }
-                    else { Text(overview.hasUnknownAmount ? "Amount unavailable" : "No active charges").font(.headline) }
-                    SearchPaymentDetails(sources: headerPaymentSources, fallback: root.safeDetails["paymentMethod"] ?? "", open: open)
-                    SearchPaymentSchedule(date: ([root] + overview.children).filter { $0.activeService }.compactMap(\.dueDate).min())
-                    Text("\(overview.children.count) subservices" + (billingAmount(root) > 0 ? " + base service" : ""))
-                        .font(.footnote).foregroundStyle(.secondary)
-                    if overview.hasUnknownAmount { Text("Partial total · an amount is not saved").font(.footnote).foregroundStyle(.secondary) }
-                } else { SearchRecordSummary(record: root, paymentSources: overview.paymentSources(for: root), open: open) }
-                Text(root.company + " · " + (root.kind == .institution ? "Bank" : (overview.children.isEmpty ? root.serviceType?.capitalized ?? "Service" : "Service account")))
-                    .font(.footnote).foregroundStyle(.secondary)
-                if let status = root.financialFacts["status"], status != "Active" {
-                    Text(status).font(.footnote).foregroundStyle(.secondary)
-                }
-            }.fixedSize(horizontal: false, vertical: true)
-        }.fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var headerPaymentSources: [SearchRecord] {
-        var seen = Set<String>()
-        return ([root] + overview.children).filter { $0.activeService && billingAmount($0) > 0 }
-            .flatMap { overview.paymentSources(for: $0) }
-            .filter { seen.insert($0.balanceIdentity ?? $0.id).inserted }
-    }
-
-    private func childRow(_ child: SearchRecord) -> some View {
-        DisclosureGroup(isExpanded: Binding(get: { expanded.contains(child.id) }, set: { value in
-            if value { expanded.insert(child.id) } else { expanded.remove(child.id) }
-        })) {
-            VStack(alignment: .leading, spacing: 10) {
-                if let purpose = child.safeDetails["purpose"], !purpose.isEmpty { Text(purpose).font(.callout).foregroundStyle(.secondary) }
-                if let renewal = child.safeDetails["renewalMode"] { Text("Payment mode · " + renewal).font(.footnote).foregroundStyle(.secondary) }
-                ForEach(overview.paymentSources(for: child)) { source in
-                    Button("Open " + paymentName(source)) { open(source) }.font(.footnote).frame(minHeight: 44)
-                }
-                let transactions = overview.linked(to: child, kinds: [.transaction]).sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                history(transactions)
-                if transactions.count > historyLimit {
-                    Button("Show more transactions") { historyLimit += 10 }.font(.subheadline).frame(minHeight: 44)
-                }
-                Button("Service details") { open(child) }.font(.subheadline).frame(minHeight: 44)
-            }.padding(.top, 8)
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 10) {
-                    SearchResultLogo(record: child, size: 28)
-                    Text(child.title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
-                }
-                Text((child.serviceType?.capitalized ?? "Service") + " · " + billingLabel(child))
-                    .font(.subheadline).foregroundStyle(.primary)
-                paymentSummary(child)
-                schedule(child)
-                if child.financialFacts["status"] != "Active" { Text(child.financialFacts["status"] ?? "").font(.footnote).foregroundStyle(.secondary) }
-            }.padding(.vertical, 6)
-        }.accessibilityIdentifier("search-subservice-" + child.id)
-    }
-    private func schedule(_ record: SearchRecord) -> some View { SearchPaymentSchedule(date: record.dueDate) }
-    private func paymentSummary(_ record: SearchRecord) -> some View {
-        let sources = overview.paymentSources(for: record)
-        let text = sources.isEmpty ? record.safeDetails["paymentMethod"] ?? "" : sources.map(paymentName).joined(separator: ", ")
-        return Text(text.isEmpty ? "Payment method not saved" : "Paid with: " + text).font(.footnote).foregroundStyle(Color.zifrGold)
-    }
     private func balanceRow(_ record: SearchRecord) -> some View {
         Button { open(record) } label: {
             VStack(alignment: .leading, spacing: 4) {
@@ -342,32 +461,119 @@ struct SearchOverviewCard: View {
         switch record.balanceCategory { case .credit: return " owed"; case .loan: return " remaining"; case .receivable: return " receivable"; default: return "" }
     }
     private func paymentName(_ record: SearchRecord) -> String { record.title + (record.last4.isEmpty ? "" : " ••" + record.last4) }
-    private func billingAmount(_ record: SearchRecord) -> Decimal { record.financialFacts["billingAmount"].flatMap { Decimal(string: $0) } ?? 0 }
-    private func billingLabel(_ record: SearchRecord) -> String {
-        if record.safeDetails["pricingModel"] == "free" { return "Free" }
-        guard let value = record.financialFacts["billingAmount"], let amount = Decimal(string: value) else { return "Amount unavailable" }
-        let cycle = record.financialFacts["billingCycle"]?.lowercased() ?? "unknown billing cycle"
-        let unit = ["monthly": "month", "yearly": "year", "annual": "year", "annually": "year", "weekly": "week", "quarterly": "quarter"][cycle] ?? cycle
-        return SearchText.money(amount, currency: record.currency) + " / " + unit
+}
+
+enum SearchScheduleLabel {
+    private static func autopay(_ record: SearchRecord) -> String {
+        let mode = record.safeDetails["renewalMode"]?.lowercased()
+        if mode == "auto" || mode == "automatic" { return " • Auto pay on" }
+        return mode == "manual" ? " • Auto pay off" : ""
     }
-    private func transactionLabel(_ record: SearchRecord) -> String {
-        let amount = record.amount.map { SearchText.money($0, currency: record.currency) } ?? "Amount unavailable"
-        return amount + (record.date.map { " · " + $0.formatted(date: .abbreviated, time: .omitted) } ?? " · Date unavailable") + (record.pending ? " · Pending" : (record.flow.isEmpty ? "" : " · " + record.flow.capitalized))
+    static func header(_ record: SearchRecord) -> String {
+        guard let date = record.scheduledDueDate ?? record.dueDate else { return text(record) }
+        let cycle = record.financialFacts["billingCycle"]?.lowercased() ?? ""
+        let formatter = NumberFormatter(); formatter.numberStyle = .ordinal
+        let day = Calendar.current.component(.day, from: date)
+        let ordinal = formatter.string(from: NSNumber(value: day)) ?? String(day)
+        if cycle == "monthly" { return "Due " + ordinal + " every month" + autopay(record) }
+        return text(record)
     }
-    @ViewBuilder private func history(_ records: [SearchRecord]) -> some View {
-        if records.isEmpty { Text("No matching charges found in your loaded transactions.").font(.footnote).foregroundStyle(.secondary).padding(.vertical, 8) }
-        else {
-            ForEach(records.prefix(historyLimit)) { record in
-                Button { open(record) } label: {
-                    HStack(spacing: 10) {
-                        SearchResultLogo(record: record, size: 28)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(record.title).foregroundStyle(.primary)
-                            Text(transactionLabel(record)).font(.callout).foregroundStyle(.secondary)
-                        }.font(.subheadline)
-                    }.frame(minHeight: 44)
-                }.buttonStyle(.plain)
-            }
+    static func text(_ record: SearchRecord) -> String {
+        let due = (record.scheduledDueDate ?? record.dueDate).map { "Next payment: " + $0.formatted(date: .abbreviated, time: .omitted) }
+            ?? "Next payment date not saved"
+        return due + autopay(record)
+    }
+}
+
+struct SearchChargeDetails: View {
+    let record: SearchRecord
+    let summary: SearchChargeSummary?
+    let sources: [SearchRecord]
+    let transactions: [SearchRecord]
+    var open: (SearchRecord) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Charge History").font(.subheadline.weight(.medium))
+            SearchPaymentDetails(sources: sources, fallback: record.safeDetails["paymentMethod"] ?? "", open: open)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(dueLabel + " • " + (record.fundingCoverage?.status.rawValue ?? "Coverage unavailable"))
+                if let latest = summary?.latest {
+                    Text("Last: " + SearchPastCharges.transactionLabel(latest))
+                } else { Text("No posted charges found") }
+                if let first = summary?.firstDate {
+                    let months = summary?.elapsedMonths ?? 0
+                    Text("Charge history since " + first.formatted(date: .abbreviated, time: .omitted)
+                        + (months > 0 ? " (\(months) \(months == 1 ? "month" : "months"))" : ""))
+                }
+                if let count = summary?.observedIncreases {
+                    Text(count == 0 ? "No charge increases observed" : "\(count) charge \(count == 1 ? "increase" : "increases") observed")
+                } else { Text("Not enough history to compare charges") }
+            }.font(.subheadline).fixedSize(horizontal: false, vertical: true)
+            DisclosureGroup("Coverage details") {
+                Text(record.fundingCoverage?.reason ?? (record.fundingCoverage == nil
+                    ? "Coverage is unavailable for inactive services, missing dates, or payments outside the next 30 days."
+                    : "Based on recorded available funds or credit for all known charges sharing this payment source in the next 30 days."))
+                    .font(.footnote).foregroundStyle(.secondary)
+                if record.fundingCoverage?.reason != nil {
+                    Text("Coverage considers all known charges sharing this payment source in the next 30 days.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }.font(.footnote).padding(.top, 4)
+            SearchPastCharges(records: transactions, open: open)
         }
+    }
+    private var dueLabel: String {
+        guard let date = record.scheduledDueDate ?? record.dueDate else { return "Due date not saved" }
+        let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: date)).day ?? 0
+        if days == 0 { return "Due today" }
+        if days < 0 { return "Overdue by \(-days) days" }
+        return "Due in \(days) \(days == 1 ? "day" : "days")"
+    }
+}
+
+struct SearchHistoryDisplayState {
+    var expanded = false
+    var showsAll = false
+    func visibleCount(_ count: Int) -> Int { expanded ? (showsAll ? count : min(3, count)) : 0 }
+}
+
+struct SearchPastCharges: View {
+    let records: [SearchRecord]
+    var title = "Past charges"
+    var open: (SearchRecord) -> Void
+    @State private var display = SearchHistoryDisplayState()
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $display.expanded) {
+            if records.isEmpty {
+                Text("No matching charges found in your loaded transactions.")
+                    .font(.footnote).foregroundStyle(.secondary).padding(.vertical, 8)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    // Retain the content's height while the accordion closes; its
+                    // wrapper clips and hides collapsed rows from interaction/AX.
+                    ForEach(records.prefix(display.showsAll ? records.count : 3)) { record in
+                        Button { open(record) } label: {
+                            HStack(spacing: 10) {
+                                SearchResultLogo(record: record, size: 28)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(record.title).foregroundStyle(.primary)
+                                    Text(Self.transactionLabel(record)).font(.footnote).foregroundStyle(.secondary)
+                                }.font(.subheadline)
+                            }.frame(minHeight: 44)
+                        }.buttonStyle(.plain)
+                    }
+                }
+                if !display.showsAll && records.count > 3 {
+                    Button("More (\(records.count - 3))") { display.showsAll = true }.frame(minHeight: 44)
+                }
+            }
+        } label: { Text(title).font(.subheadline).frame(minHeight: 44, alignment: .leading) }
+    }
+    static func transactionLabel(_ record: SearchRecord) -> String {
+        let amount = record.amount.map { SearchText.money($0, currency: record.currency) } ?? "Amount unavailable"
+        return amount + (record.date.map { " • " + $0.formatted(date: .abbreviated, time: .omitted) } ?? " • Date unavailable")
+            + (record.pending ? " • Pending" : (record.flow.isEmpty || record.flow == "expense" ? "" : " • " + record.flow.capitalized))
     }
 }

@@ -45,7 +45,7 @@ final class AppState {
     var notifications: [AppNotification] = [] { didSet { searchRevision &+= 1 } }
     var userPreferences: UserPreferences? = nil { didSet { searchRevision &+= 1 } }
     var alertRules: [AlertRule] = [] { didSet { searchRevision &+= 1 } }
-    var plaidItems: [PlaidItemSummary] = []
+    var plaidItems: [PlaidItemSummary] = [] { didSet { searchRevision &+= 1 } }
     var entitlementSnapshot: AccessSnapshot = .free
     var resourceConnections: [ResourceConnection] = [] { didSet { searchRevision &+= 1 } }
     var obligations: [PortfolioObligation] = [] { didSet { searchRevision &+= 1 } }
