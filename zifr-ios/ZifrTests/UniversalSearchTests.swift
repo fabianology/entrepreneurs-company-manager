@@ -1190,3 +1190,238 @@ private struct SearchSheetTestHost<Content: View>: View {
             }
     }
 }
+
+// Regression coverage for the September 19 search audit.
+extension UniversalSearchTests {
+    func testRegressionLiteralNamesAndAccountsRemainSearches() {
+        let (state, a, _) = fixture()
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Topgolf", cost: 50)]
+        XCTAssertEqual(PortfolioQuery.interpret("Topgolf").operation, .search)
+        XCTAssertEqual(PortfolioQuery.interpret("accounts").operation, .search)
+        XCTAssertEqual(state.searchIndex(for: owner).search("Topgolf").hits.count, 1)
+    }
+    func testRegressionServiceNameContainingPaymentFindsParent() {
+        let (state, a, _) = fixture()
+        var service = Subscription(userId: owner, companyId: a.id, name: "Tesla")
+        service.subServices = [SubService(name: "Car Payment", cost: 283, serviceType: .bill)]
+        state.subscriptions = [service]
+        let result = overviews(state.searchIndex(for: owner), "Tesla Car Payment")
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.expandedChildIDs, Set(result.first?.children.map(\.id) ?? []))
+        XCTAssertFalse(result.first?.expandedChildIDs.isEmpty ?? true)
+        XCTAssertTrue(overviews(state.searchIndex(for: owner), "Tesla").first?.expandedChildIDs.isEmpty ?? false)
+    }
+    func testRegressionPendingAndExcludedPendingTransactionQueries() {
+        let (state, a, _) = fixture()
+        let posted = transaction(a.id)
+        var pending = transaction(a.id); pending.pending = true
+        state.transactions = [posted, pending]
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(index.search("pending transactions").hits.map(\.record.modelID), [pending.id])
+        XCTAssertEqual(index.search("exclude pending transactions").hits.map(\.record.modelID), [posted.id])
+    }
+    func testRegressionFilteredBalanceSumUsesFilteredRecords() {
+        let (state, a, _) = fixture()
+        var first = InstitutionAccount(); first.name = "Checking"; first.balance = 50
+        var second = InstitutionAccount(); second.name = "Savings"; second.balance = 150
+        state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", accounts: [first, second])]
+        var request = PortfolioQuery(); request.query = "balances"; request.operation = .sum; request.minAmount = "100"
+        let response = state.searchIndex(for: owner).execute(request)
+        XCTAssertEqual(response.hits.count, 1)
+        XCTAssertEqual(response.totals.reduce(Decimal.zero) { $0 + $1.amount }, 150)
+    }
+    func testRegressionNextServicePaymentQueryKeepsSubscription() {
+        let (state, a, _) = fixture()
+        var service = Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 26.99)
+        service.nextRenewalAt = now.addingTimeInterval(86400)
+        state.subscriptions = [service]
+        XCTAssertEqual(state.searchIndex(for: owner).search("Netflix next payment").hits.map(\.record.modelID), [service.id])
+    }
+    func testRegressionSharedChargeDoesNotBecomeTwoServiceSummaries() throws {
+        let company = UUID()
+        let parent = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Personal", title: "Tesla", detail: "")
+        var first = SearchRecord(kind: .subscription, modelID: parent.modelID, companyID: company, company: "Personal", title: "Insurance", detail: "", suffix: ":one")
+        first.parentServiceID = parent.id
+        var second = SearchRecord(kind: .subscription, modelID: parent.modelID, companyID: company, company: "Personal", title: "Driving", detail: "", suffix: ":two")
+        second.parentServiceID = parent.id
+        var charge = SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Personal", title: "Combined Tesla charge", detail: "")
+        charge.date = now; charge.amount = 100; charge.flow = "expense"
+        let index = UniversalSearchIndex(records: [parent, first, second, charge], links: [parent.id: [first.id, second.id], first.id: [parent.id, charge.id], second.id: [parent.id, charge.id], charge.id: [first.id, second.id]])
+        let result = try XCTUnwrap(overviews(index, "Tesla").first)
+        XCTAssertEqual(result.transactions.count, 1)
+        XCTAssertNil(result.chargeSummaries[first.id]?.latest)
+        XCTAssertNil(result.chargeSummaries[second.id]?.latest)
+    }
+}
+
+extension UniversalSearchTests {
+    func testCommandWordsRequireBoundariesAndRespectSavedNames() throws {
+        let (state, a, _) = fixture()
+        state.subscriptions = ["Topgolf", "Discount Tire", "Total Wine", "Bill", "Next Payment"].map {
+            Subscription(userId: owner, companyId: a.id, name: $0, cost: 10)
+        }
+        let index = state.searchIndex(for: owner)
+        for name in state.subscriptions.map(\.name) {
+            XCTAssertEqual(index.search(name).hits.first?.record.title, name, name)
+            XCTAssertEqual(overviews(index, name).first?.root.title, name, name)
+        }
+        XCTAssertEqual(PortfolioQuery.interpret("top 5 services").operation, .largest)
+        XCTAssertEqual(PortfolioQuery.interpret("top 5 services").limit, 5)
+        XCTAssertEqual(PortfolioQuery.interpret("how many accounts").operation, .count)
+        var explicit = PortfolioQuery(); explicit.query = "Total Wine"; explicit.operation = .count; explicit.kind = .subscription
+        XCTAssertEqual(index.execute(explicit).metrics.first?.value, 1, "An explicit tool operation is never replaced by literal search")
+    }
+
+    func testPendingStateAppliesToSearchCalculationsAndTools() throws {
+        let (state, a, _) = fixture()
+        var posted = transaction(a.id); posted.amount = 10
+        var pending = transaction(a.id); pending.pending = true; pending.amount = 20
+        state.transactions = [posted, pending]
+        let index = state.searchIndex(for: owner)
+        for phrase in ["only pending transactions", "pending transactions"] {
+            XCTAssertEqual(index.search(phrase).hits.map(\.record.modelID), [pending.id], phrase)
+        }
+        for phrase in ["posted transactions", "excluding pending transactions", "transactions without pending"] {
+            XCTAssertEqual(index.search(phrase).hits.map(\.record.modelID), [posted.id], phrase)
+        }
+        for phrase in ["transactions", "transactions including pending", "transactions with pending"] {
+            XCTAssertEqual(index.search(phrase).hits.count, 2, phrase)
+        }
+        for (phrase, amount) in [("sum transactions", 10), ("sum pending transactions", 20), ("sum transactions including pending", 30)] {
+            XCTAssertEqual(index.search(phrase).metrics.first?.value, Decimal(amount), phrase)
+        }
+        let decoded = try JSONDecoder().decode(PortfolioQuery.self, from: Data(#"{"query":"transactions","operation":"sum","transactionState":"pending"}"#.utf8))
+        XCTAssertEqual(index.execute(decoded).metrics.first?.value, 20)
+        let followUp = PortfolioQuery.interpret("only North Studio", previous: .interpret("pending transactions"))
+        XCTAssertEqual(followUp.transactionState, .pending)
+    }
+
+    func testFilteredBalanceTotalsKeepCurrencyAndCanonicalSources() throws {
+        let (state, a, _) = fixture()
+        var card = FinancialCard(userId: owner, companyId: a.id, name: "Mirror", balance: 150)
+        card.plaidAccountId = "mirror-account"
+        var credit = InstitutionAccount(); credit.type = "Credit Card"; credit.balance = 150; credit.plaidAccountId = card.plaidAccountId
+        var cash = InstitutionAccount(); cash.balance = 50
+        var euro = InstitutionAccount(); euro.balance = 200; euro.currency = "EUR"
+        state.cards = [card]
+        state.institutions = [Institution(userId: owner, companyId: a.id, name: "Test Bank", accounts: [credit, cash, euro])]
+        var request = PortfolioQuery(); request.query = "balances"; request.operation = .sum; request.minAmount = "100"
+        let response = state.searchIndex(for: owner).execute(request)
+        XCTAssertEqual(response.totals.count, 2)
+        XCTAssertEqual(response.totals.first { $0.currency == "USD" }?.amount, 150)
+        XCTAssertEqual(response.totals.first { $0.currency == "EUR" }?.amount, 200)
+        let eligible = Set(response.hits.map(\.id))
+        XCTAssertTrue(response.totals.allSatisfy { Set($0.sourceIDs).isSubset(of: eligible) })
+        XCTAssertEqual(response.totals.flatMap(\.sourceIDs).count, 2)
+    }
+
+    func testInstitutionAndSearchShareEntityIdentityAndAmbiguityRules() throws {
+        let (state, a, b) = fixture()
+        let first = Institution(userId: owner, companyId: a.id, name: "Citibank Online")
+        let second = Institution(userId: owner, companyId: b.id, name: "Citibank Online")
+        var synced = InstitutionAccount(); synced.type = "Credit Card"; synced.plaidAccountId = "synced-card"
+        let actual = Institution(userId: owner, companyId: a.id, name: "Actual Bank", accounts: [synced])
+        var card = FinancialCard(userId: owner, companyId: a.id, name: "Card", institutionName: " Citibank Online ")
+        let other = FinancialCard(userId: owner, companyId: b.id, name: "Other Card", institutionName: "citibank online")
+        let loan = Loan(userId: owner, companyId: a.id, lender: "Citibank Online", name: "Loan")
+        state.institutions = [first, second, actual]; state.cards = [card, other]; state.loans = [loan]
+        func verify(_ expected: Set<UUID>) {
+            let deck = InstitutionRelationships(institutions: state.institutions, cards: state.cards, loans: state.loans, connections: state.resourceConnections)
+            XCTAssertEqual(deck.banks(for: .card, id: card.id), expected)
+            let search = state.searchIndex(for: owner).institutionProductAssociations()
+            XCTAssertEqual(Set(search.filter { $0.value.contains { $0.modelID == card.id } }.keys), expected)
+            XCTAssertEqual(deck.banks(for: .card, id: other.id), [second.id])
+            XCTAssertEqual(deck.banks(for: .loan, id: loan.id), [first.id])
+        }
+        verify([first.id])
+        card.plaidAccountId = "synced-card"; state.cards[0] = card
+        verify([actual.id])
+        card.plaidAccountId = nil; state.cards[0] = card
+        state.resourceConnections = [ResourceConnection(ownerUserId: owner, sourceType: .card, sourceId: card.id,
+            targetType: .institution, targetId: actual.id, relationshipType: .connectedAccount,
+            origin: .manual, confidence: 1, state: .confirmed)]
+        verify([actual.id])
+        state.resourceConnections[0].state = .suggested
+        verify([first.id])
+        state.resourceConnections = []
+        state.institutions.append(Institution(userId: owner, companyId: a.id, name: "Citibank Online"))
+        let deck = InstitutionRelationships(institutions: state.institutions, cards: state.cards, loans: state.loans, connections: [])
+        XCTAssertTrue(deck.banks(for: .card, id: card.id).isEmpty)
+        XCTAssertFalse(state.searchIndex(for: owner).institutionProductAssociations().values.contains { $0.contains { $0.modelID == card.id } })
+    }
+
+    func testParentChildSharedChargeRemainsOnlyInAccountHistory() throws {
+        let company = UUID()
+        let parent = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Personal", title: "Tesla", detail: "")
+        var child = SearchRecord(kind: .subscription, modelID: parent.modelID, companyID: company, company: "Personal", title: "Insurance", detail: "", suffix: ":one")
+        child.parentServiceID = parent.id
+        var charge = SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Personal", title: "Combined", detail: "")
+        charge.date = now; charge.amount = 100; charge.flow = "expense"
+        let index = UniversalSearchIndex(records: [parent, child, charge], links: [parent.id: [child.id, charge.id], child.id: [parent.id, charge.id]])
+        let result = try XCTUnwrap(overviews(index, "Tesla").first)
+        XCTAssertEqual(result.transactions.count, 1)
+        XCTAssertTrue(result.serviceTransactions[parent.id]?.isEmpty ?? false)
+        XCTAssertTrue(result.serviceTransactions[child.id]?.isEmpty ?? false)
+        XCTAssertNil(result.chargeSummaries[child.id]?.latest)
+    }
+}
+
+extension UniversalSearchTests {
+    func testLiteralNameFollowUpRetainsCompanyConstraint() {
+        let (state, a, b) = fixture()
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 10),
+                               Subscription(userId: owner, companyId: b.id, name: "Netflix", cost: 20)]
+        let request = PortfolioQuery.interpret("only North Studio", previous: .interpret("Netflix"))
+        let response = state.searchIndex(for: owner).execute(request)
+        XCTAssertEqual(response.hits.count, 1)
+        XCTAssertEqual(response.hits.first?.record.companyID, a.id)
+    }
+
+    func testServiceScheduleIntentAndExplicitTypeBoundary() {
+        let (state, a, _) = fixture()
+        var service = Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 26.99)
+        service.nextRenewalAt = now.addingTimeInterval(86400)
+        state.subscriptions = [service]
+        let index = state.searchIndex(for: owner)
+        for phrase in ["Netflix next payment", "when is my Netflix next payment", "Netflix autopay"] {
+            XCTAssertEqual(index.search(phrase).hits.map(\.record.modelID), [service.id], phrase)
+        }
+        XCTAssertTrue(index.search("Netflix next payment").answerSummary?.contains(SearchText.day(service.nextRenewalAt)) ?? false)
+        XCTAssertTrue(index.search("Netflix next payment", filters: .init(kind: .payment)).hits.isEmpty)
+        XCTAssertTrue(index.search("Netflix minimum payment").hits.isEmpty, "Service billing is not a bank minimum due")
+    }
+
+    func testChargeSharedAcrossParentServicesDoesNotEstablishSummaryFacts() throws {
+        let company = UUID()
+        let first = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Personal", title: "Tesla", detail: "")
+        let second = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Personal", title: "Insurance", detail: "")
+        var charge = SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Personal", title: "Combined", detail: "")
+        charge.date = now; charge.amount = 100; charge.flow = "expense"
+        let index = UniversalSearchIndex(records: [first, second, charge], links: [first.id: [charge.id], second.id: [charge.id]])
+        let result = try XCTUnwrap(overviews(index, "Tesla").first)
+        XCTAssertEqual(result.transactions.count, 1)
+        XCTAssertTrue(result.serviceTransactions[first.id]?.isEmpty ?? false)
+        XCTAssertNil(result.chargeSummaries[first.id]?.latest)
+    }
+}
+
+extension UniversalSearchTests {
+    func testInstitutionAssociationHonorsOverridesAndUnavailableExplicitBanks() {
+        let (state, a, b) = fixture()
+        let bank = Institution(userId: owner, companyId: b.id, name: "Bank")
+        let card = FinancialCard(userId: owner, companyId: a.id, name: "Card", institutionName: "Bank")
+        state.institutions = [bank]; state.cards = [card]
+        state.localCompanyOverrides = [card.id.uuidString: b.id]
+        func associated() -> (Set<UUID>, Set<UUID>) {
+            let deck = InstitutionRelationships(institutions: state.institutions, cards: state.cards, loans: [],
+                connections: state.resourceConnections, companyOverrides: state.localCompanyOverrides)
+            let search = state.searchIndex(for: owner).institutionProductAssociations()
+            return (deck.banks(for: .card, id: card.id), Set(search.keys))
+        }
+        XCTAssertEqual(associated().0, [bank.id]); XCTAssertEqual(associated().1, [bank.id])
+        state.resourceConnections = [ResourceConnection(ownerUserId: owner, sourceType: .card, sourceId: card.id,
+            targetType: .institution, targetId: UUID(), relationshipType: .connectedAccount,
+            origin: .manual, confidence: 1, state: .confirmed)]
+        XCTAssertTrue(associated().0.isEmpty); XCTAssertTrue(associated().1.isEmpty)
+    }
+}

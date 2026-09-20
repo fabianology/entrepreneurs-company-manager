@@ -234,8 +234,10 @@ struct FinancialView: View {
                         }
                         
                         // Remaining standalone accounts block
-                        let standaloneCards = cards.filter { c in !institutions.contains { ($0.name ?? "").lowercased() == (c.institutionName ?? "").lowercased() } }
-                        let standaloneLoans = loans.filter { l in !institutions.contains { ($0.name ?? "").lowercased() == (l.lender ?? "").lowercased() } }
+                        let relationships = InstitutionRelationships(institutions: institutions, cards: cards, loans: loans,
+                            connections: appState.resourceConnections, companyOverrides: appState.localCompanyOverrides)
+                        let standaloneCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
+                        let standaloneLoans = loans.filter { relationships.banks(for: .loan, id: $0.id).isEmpty }
                         let activeStandaloneLoans = standaloneLoans
                             .filter { !isLoanPaidOff($0) }
                             .sorted { ($0.maturityDate ?? .distantFuture) < ($1.maturityDate ?? .distantFuture) }

@@ -42,11 +42,18 @@ struct EditInstitutionSheet: View {
         return snap != currentSnapshot
     }
 
+    private var institutionRelationships: InstitutionRelationships {
+        InstitutionRelationships(institutions: institutions, cards: cards, loans: loans,
+            connections: appState.resourceConnections, companyOverrides: appState.localCompanyOverrides)
+    }
+
     private var instCards: [FinancialCard] {
-        cards.filter { ($0.institutionName ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
+        let relationships = institutionRelationships
+        return cards.filter { relationships.banks(for: .card, id: $0.id).contains(institution.id) }
     }
     private var instLoans: [Loan] {
-        loans.filter { ($0.lender ?? "").lowercased() == (institution.name ?? "").lowercased() && !(institution.name ?? "").isEmpty }
+        let relationships = institutionRelationships
+        return loans.filter { relationships.banks(for: .loan, id: $0.id).contains(institution.id) }
     }
 
     private struct SyncHealthPresentation {

@@ -11,6 +11,7 @@ struct StackedInstitutionDeckView: View {
     let institutions: [Institution]
     let cards: [FinancialCard]
     let loans: [Loan]
+    @Environment(AppState.self) private var appState
     @Bindable var vm: AppViewModel
     let onEditInst: (Institution) -> Void
     let onEditCard: (FinancialCard) -> Void
@@ -32,6 +33,21 @@ struct StackedInstitutionDeckView: View {
     private let projectedDragCommitDistance: CGFloat = 64
     private let maximumDragPreview: CGFloat = 28
     
+    private var relationships: InstitutionRelationships {
+        InstitutionRelationships(institutions: institutions, cards: cards, loans: loans,
+            connections: appState.resourceConnections, companyOverrides: appState.localCompanyOverrides)
+    }
+
+    private func associatedCards(for institution: Institution) -> [FinancialCard] {
+        let resolved = relationships
+        return cards.filter { resolved.banks(for: .card, id: $0.id).contains(institution.id) }
+    }
+
+    private func associatedLoans(for institution: Institution) -> [Loan] {
+        let resolved = relationships
+        return loans.filter { resolved.banks(for: .loan, id: $0.id).contains(institution.id) }
+    }
+
     private var totalStackHeight: CGFloat {
         guard !institutions.isEmpty else { return 0 }
         let lastIndex = institutions.count - 1
@@ -41,7 +57,7 @@ struct StackedInstitutionDeckView: View {
         
         let lastHeight: CGFloat
         if isExpanded || isBottomMostDefault {
-            let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == lastInst.name.lowercased() }
+            let instCards = associatedCards(for: lastInst)
             let showPhysicalCards = isExpanded
             let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
             lastHeight = (institutionHeights[lastInst.id] ?? collapsedHeight) + cardPeekHeight
@@ -106,8 +122,8 @@ struct StackedInstitutionDeckView: View {
         let showFullCard = isExpanded || isBottomMostDefault
         let showPhysicalCards = isExpanded
         
-        let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == inst.name.lowercased() }
-        let instLoans = loans.filter { ($0.lender ?? "").lowercased() == inst.name.lowercased() }
+        let instCards = associatedCards(for: inst)
+        let instLoans = associatedLoans(for: inst)
         let yOffset = calculateYOffset(for: index)
         let cardPeekHeight: CGFloat = (!showPhysicalCards || instCards.isEmpty) ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
         
@@ -134,7 +150,7 @@ struct StackedInstitutionDeckView: View {
         for i in 0..<index {
             let inst = institutions[i]
             if expandedInstId == inst.id {
-                let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == inst.name.lowercased() }
+                let instCards = associatedCards(for: inst)
                 let cardPeekHeight: CGFloat = instCards.isEmpty ? 0 : (20.0 + CGFloat(instCards.count - 1) * 40.0 + 16.0)
                 // Start from the compact header height, then animate to the
                 // measured content height. A large guessed fallback caused the

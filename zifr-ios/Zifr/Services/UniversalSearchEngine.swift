@@ -72,6 +72,7 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
     var website: String?
     var logoURL: String?
     var brandName: String?
+    var hasExplicitBankAssociation = false
     var savedBankName: String?
     var isCardAccount = false
     var fundingCoverage: SearchFundingCoverage?
@@ -726,6 +727,13 @@ struct UniversalSearchIndex: Sendable {
                 records[i].safeDetails["sharedBy"] = redactor.clean(share.senderDisplayName ?? "")
             }
         }
+        // Keep only a presence flag for unavailable explicit banks; never expose their IDs.
+        // Pruning inaccessible graph nodes must not enable a contradictory name fallback.
+        for i in records.indices where [.card, .loan].contains(records[i].kind) {
+            records[i].hasExplicitBankAssociation = (links[records[i].id] ?? []).contains {
+                $0.hasPrefix("institution:") || $0.hasPrefix("account:")
+            }
+        }
         let validIDs = Set(records.map(\.id))
         links = links.filter { validIDs.contains($0.key) }.mapValues { $0.intersection(validIDs) }
         let indexedDocs = Set(documentPages.map(\.documentID)).intersection(Set(visibleDocuments.map(\.id))).count
@@ -745,8 +753,63 @@ struct UniversalSearchIndex: Sendable {
         links[a, default: []].insert(b); links[b, default: []].insert(a)
     }
 
-    func matching(_ query: String, filters: SearchFilters = .init(), now: Date = Date(), calendar: Calendar = .current) -> SearchResponse {
-        let plan = SearchQuery(query, filters: filters, now: now, calendar: calendar)
+    /// Same association policy used by the institution deck; no inferred graph edges.
+    func institutionProductAssociations() -> [UUID: [SearchRecord]] {
+        let accounts = records.filter { $0.kind == .account }
+        let banks = records.filter { $0.kind == .institution }.map { bank in
+            InstitutionRelationships.Bank(id: bank.modelID, companyID: bank.companyID, name: bank.title,
+                accountAliases: accounts.filter { $0.modelID == bank.modelID && $0.companyID == bank.companyID }
+                    .reduce(into: Set<String>()) { $0.formUnion($1.balanceAliases) })
+        }
+        let byID = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        var result: [UUID: [SearchRecord]] = [:]
+        for product in records where [.card, .loan].contains(product.kind) {
+            let explicit = Set((links[product.id] ?? []).compactMap { id -> UUID? in
+                if let target = byID[id], [.institution, .account].contains(target.kind) { return target.modelID }
+                if id.hasPrefix("institution:") { return UUID(uuidString: String(id.dropFirst("institution:".count))) }
+                return nil
+            })
+            let ids = InstitutionRelationships.bankIDs(companyID: product.companyID, savedName: product.savedBankName,
+                aliases: product.balanceAliases, explicitBankIDs: explicit, banks: banks,
+                hasExplicitAssociation: product.hasExplicitBankAssociation)
+            for id in ids { result[id, default: []].append(product) }
+        }
+        return result
+    }
+
+    /// Saved names take precedence over inferred kind words within those names.
+    /// Explicit UI/tool type constraints still win.
+    func queryPlan(_ query: String, filters: SearchFilters, now: Date, calendar: Calendar) -> SearchQuery {
+        var plan = SearchQuery(query, filters: filters, now: now, calendar: calendar)
+        guard filters.kind == nil, !plan.credentials else { return plan }
+        let normalized = SearchText.normalize(query)
+        let eligible = records.filter { filters.companyID == nil || $0.companyID == filters.companyID }
+        let parents = Dictionary(eligible.filter { $0.kind == .subscription && $0.parentServiceID == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let literal = eligible.contains { record in
+            record.normalizedTitle == normalized || record.parentServiceID.flatMap { parents[$0] }.map {
+                $0.normalizedTitle + " " + record.normalizedTitle == normalized
+            } == true
+        }
+        if literal {
+            plan = SearchQuery("all records", filters: filters, now: now, calendar: calendar)
+            plan.tokens = normalized.split(separator: " ").map(String.init)
+            return plan
+        }
+        let schedulePhrases = ["next payment", "next payments", "autopay", "auto pay"]
+        for phrase in schedulePhrases {
+            guard SearchText.containsPhrase(phrase, in: normalized),
+                  eligible.contains(where: { $0.kind == .subscription && $0.normalizedTitle == plan.tokens.joined(separator: " ") }) else { continue }
+            plan.kind = .subscription
+            plan.financial = false
+            plan.renewals = true
+            plan.description = "Saved service payment schedule"
+            break
+        }
+        return plan
+    }
+
+    func matching(_ query: String, filters: SearchFilters = .init(), now: Date = Date(), calendar: Calendar = .current, calculateTotals: Bool = true) -> SearchResponse {
+        let plan = queryPlan(query, filters: filters, now: now, calendar: calendar)
         var response = SearchResponse(interpretation: plan.description, coverage: coverage, isCredentialRequest: plan.credentials)
         guard isLoaded, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               !plan.tokens.isEmpty || query == "all records" || plan.kind != nil || plan.credentials || plan.renewals || plan.financial else { return response }
@@ -809,6 +872,13 @@ struct UniversalSearchIndex: Sendable {
             if $0.record.title != $1.record.title { return $0.record.title.localizedStandardCompare($1.record.title) == .orderedAscending }
             return $0.id < $1.id
         }
+        if calculateTotals { updateTotals(&response, plan: plan) }
+        return response
+    }
+
+    /// Aggregate only the final eligible hits; structured filters must run first.
+    func updateTotals(_ response: inout SearchResponse, plan: SearchQuery) {
+        response.totals = []
         if plan.balanceQuery {
             let balances = response.hits.map(\.record).filter { $0.balanceCategory != nil }
             let groups = Dictionary(grouping: balances, by: { $0.balanceIdentity ?? $0.id })
@@ -848,7 +918,6 @@ struct UniversalSearchIndex: Sendable {
             if services.contains(where: { $0.monthlyCost == nil }) { response.interpretation += " · Unknown billing cycles excluded" }
         }
         response.totals.sort { $0.id < $1.id }
-        return response
     }
 
     private func snippet(_ text: String, tokens: [String]) -> String? {

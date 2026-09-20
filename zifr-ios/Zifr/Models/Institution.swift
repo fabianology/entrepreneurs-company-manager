@@ -124,3 +124,61 @@ struct Institution: Identifiable, Codable, Hashable {
         accounts.filter { !$0.isCard }
     }
 }
+
+/// Local presentation associations, never persisted or promoted to confirmed connections.
+/// Callers supply only the records visible in their authorized scope.
+struct InstitutionRelationships {
+    struct Bank {
+        var id: UUID
+        var companyID: UUID?
+        var name: String
+        var accountAliases: Set<String> = []
+    }
+
+    static func bankIDs(companyID: UUID?, savedName: String?, aliases: Set<String>,
+                        explicitBankIDs: Set<UUID>, banks: [Bank], hasExplicitAssociation: Bool = false) -> Set<UUID> {
+        let scoped = banks.filter { $0.companyID == companyID }
+        let durable = scoped.filter { explicitBankIDs.contains($0.id) || !$0.accountAliases.isDisjoint(with: aliases) }
+        if !durable.isEmpty { return Set(durable.map(\.id)) }
+        // Even an unavailable explicit bank must not fall back to a contradictory name.
+        guard explicitBankIDs.isEmpty, !hasExplicitAssociation else { return [] }
+        func name(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+        guard let savedName, !name(savedName).isEmpty else { return [] }
+        let matches = scoped.filter { name($0.name) == name(savedName) }
+        return matches.count == 1 ? Set(matches.map(\.id)) : []
+    }
+
+    private var associations: [String: Set<UUID>] = [:]
+
+    func banks(for kind: ResourceKind, id: UUID) -> Set<UUID> {
+        associations["\(kind.rawValue):\(id.uuidString)"] ?? []
+    }
+
+    init(institutions: [Institution], cards: [FinancialCard], loans: [Loan],
+         connections: [ResourceConnection], companyOverrides: [String: UUID] = [:]) {
+        func company(_ id: UUID, _ fallback: UUID) -> UUID { companyOverrides[id.uuidString] ?? fallback }
+        let banks = institutions.map { bank in
+            Bank(id: bank.id, companyID: company(bank.id, bank.companyId), name: bank.name,
+                 accountAliases: Set(bank.accounts.flatMap { account -> [String] in
+                     var aliases: [String] = []
+                     if let card = account.linkedCardId.flatMap(UUID.init(uuidString:)) { aliases.append("card:\(card.uuidString)") }
+                     if let plaid = account.plaidAccountId, !plaid.isEmpty { aliases.append("plaid:\(plaid)") }
+                     return aliases
+                 }))
+        }
+        func resolve(_ kind: ResourceKind, _ id: UUID, _ companyID: UUID, _ savedName: String?, _ plaid: String?) -> Set<UUID> {
+            var aliases: Set<String> = ["\(kind.rawValue):\(id.uuidString)"]
+            if let plaid, !plaid.isEmpty { aliases.insert("plaid:\(plaid)") }
+            let explicit = Set(connections.compactMap { edge -> UUID? in
+                guard edge.state == .confirmed, edge.relationshipType != .belongsTo else { return nil }
+                if edge.sourceType == kind, edge.sourceId == id, edge.targetType == .institution { return edge.targetId }
+                if edge.targetType == kind, edge.targetId == id, edge.sourceType == .institution { return edge.sourceId }
+                return nil
+            })
+            return Self.bankIDs(companyID: company(id, companyID), savedName: savedName, aliases: aliases,
+                                explicitBankIDs: explicit, banks: banks)
+        }
+        for card in cards { associations["card:\(card.id.uuidString)"] = resolve(.card, card.id, card.companyId, card.institutionName, card.plaidAccountId) }
+        for loan in loans { associations["loan:\(loan.id.uuidString)"] = resolve(.loan, loan.id, loan.companyId, loan.lender, loan.plaidAccountId) }
+    }
+}

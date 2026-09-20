@@ -24,6 +24,13 @@ struct EntityFinancialSection: View {
     @State private var showFinancialReceiptReport = false
     @Environment(OnboardingStateManager.self) private var onboardingState
     
+    @Environment(AppState.self) private var appState
+
+    private var institutionRelationships: InstitutionRelationships {
+        InstitutionRelationships(institutions: institutions, cards: cards, loans: loans,
+            connections: appState.resourceConnections, companyOverrides: appState.localCompanyOverrides)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             // Header
@@ -95,8 +102,9 @@ struct EntityFinancialSection: View {
                     institutionRow(inst)
                 }
                 // Orphaned cards
-                let orphanedCards = cards.filter { card in !institutions.contains { $0.name.lowercased() == (card.institutionName ?? "").lowercased() } }
-                let orphanedLoans = loans.filter { loan in loan.isLender && !institutions.contains { $0.name.lowercased() == (loan.lender ?? "").lowercased() } }
+                let relationships = institutionRelationships
+                let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
+                let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
                 
                 if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
                     let isOrphanedExpanded = expandedInstitutions.contains("orphaned")
@@ -314,8 +322,9 @@ struct EntityFinancialSection: View {
     
     private func institutionRow(_ inst: Institution) -> some View {
         let isExpanded = expandedInstitutions.contains(inst.id.uuidString)
-        let instCards = cards.filter { ($0.institutionName ?? "").lowercased() == (inst.name).lowercased() }
-        let instLoans = loans.filter { $0.isLender && ($0.lender ?? "").lowercased() == (inst.name).lowercased() }
+        let relationships = institutionRelationships
+        let instCards = cards.filter { relationships.banks(for: .card, id: $0.id).contains(inst.id) }
+        let instLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).contains(inst.id) }
         
         let instDebt = instLoans.reduce(0) { $0 + $1.remainingBalance } + instCards.reduce(0) { $0 + $1.balance }
         let instCredit = instCards.reduce(0) { $0 + $1.limit }

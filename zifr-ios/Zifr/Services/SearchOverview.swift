@@ -224,8 +224,9 @@ struct SearchResultPage {
 
 extension UniversalSearchIndex {
     func overviews(for response: SearchResponse, request: PortfolioQuery, filters: SearchFilters) -> [SearchOverview] {
+        let request = resolvedRequest(request, filters: filters)
         // Explicit calculations, history, date and type filters retain their precise result list.
-        let plan = SearchQuery(request.query, filters: filters, now: Date(), calendar: .current)
+        let plan = queryPlan(request.query, filters: filters, now: Date(), calendar: .current)
         guard request.operation == .search, request.startDate == nil, request.endDate == nil,
               filters.kind == nil, filters.serviceType == nil, filters.period == .all,
               request.serviceType == nil, plan.dates == nil,
@@ -251,29 +252,11 @@ extension UniversalSearchIndex {
             roots[rootID] = (root, score)
         }
         guard !roots.isEmpty, !Task.isCancelled else { return [] }
-        var productsBySavedBankName: [String: [SearchRecord]] = [:]
-        if roots.values.contains(where: { $0.0.kind == .institution }) {
-            let banks = records.filter { $0.kind == .institution }
-            let accountsByIdentity = Dictionary(grouping: records.filter {
-                $0.kind == .account && $0.balanceIdentity != nil
-            }, by: { $0.balanceIdentity! })
-            func bankName(_ value: String) -> String {
-                value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-            }
-            for product in records where [.card, .loan].contains(product.kind) {
-                // Match the saved bank/lender field used by institution cards, never
-                // a card title or fuzzy merchant name. Keep this presentation-only.
-                guard let savedName = product.savedBankName, !bankName(savedName).isEmpty else { continue }
-                let matches = banks.filter {
-                    $0.companyID == product.companyID && bankName($0.title) == bankName(savedName)
-                }
-                guard matches.count == 1, let bank = matches.first else { continue }
-                let explicitBanks = linked(product).filter { [.institution, .account].contains($0.kind) }
-                let syncedAccounts = product.balanceIdentity.map { accountsByIdentity[$0] ?? [] } ?? []
-                // Durable associations take precedence over an old saved bank name.
-                guard explicitBanks.isEmpty,
-                      !syncedAccounts.contains(where: { $0.companyID == product.companyID }) else { continue }
-                productsBySavedBankName[bank.id, default: []].append(product)
+        let institutionProducts = institutionProductAssociations()
+        var savedChargeOwners: [String: Set<String>] = [:]
+        for service in records where service.kind == .subscription {
+            for transaction in linked(service) where transaction.kind == .transaction {
+                savedChargeOwners[transaction.id, default: []].insert(service.id)
             }
         }
         let merchantHistory = roots.values.contains { $0.0.kind == .subscription } ? serviceMerchantHistory() : [:]
@@ -298,13 +281,7 @@ extension UniversalSearchIndex {
             var members = [root] + overview.children
             if root.kind == .institution {
                 let accounts = directlyLinked.filter { $0.kind == .account && $0.modelID == root.modelID }
-                let aliases = Set(accounts.compactMap(\.balanceIdentity))
-                let linkedBalances = records.filter {
-                    $0.companyID == root.companyID && $0.balanceIdentity.map(aliases.contains) == true
-                }
-                let accountProducts = accounts.flatMap(linked).filter { [.card, .loan].contains($0.kind) }
-                let candidates = accounts + directlyLinked.filter { [.card, .loan].contains($0.kind) }
-                    + accountProducts + linkedBalances + (productsBySavedBankName[root.id] ?? [])
+                let candidates = accounts + (institutionProducts[root.modelID] ?? [])
                 overview.bankCounts = SearchBankCounts(records: candidates)
                 var seen = Set<String>()
                 overview.balances = candidates.sorted {
@@ -341,6 +318,14 @@ extension UniversalSearchIndex {
                 overview.connections[child.id] = unique((overview.connections[child.id] ?? []) + (merchantHistory[child.id] ?? []))
             }
             if root.kind == .subscription {
+                // One saved charge cannot establish separate amounts for multiple services.
+                // Keep ambiguous ownership in account-wide history only.
+                var owners = savedChargeOwners
+                for member in [root] + overview.children {
+                    for transaction in overview.linked(to: member, kinds: [.transaction]) {
+                        owners[transaction.id, default: []].insert(member.id)
+                    }
+                }
                 let childTransactionIDs = Set(overview.children.flatMap { overview.linked(to: $0, kinds: [.transaction]) }.map(\.id))
                 for member in [root] + overview.children {
                     let history: [SearchRecord]
@@ -350,10 +335,11 @@ extension UniversalSearchIndex {
                         history = overview.children.isEmpty ? overview.transactions
                             : directlyLinked.filter { $0.kind == .transaction && !childTransactionIDs.contains($0.id) }
                     } else {
-                        history = overview.linked(to: member, kinds: [.transaction])
+                        history = overview.linked(to: member, kinds: [.transaction]).filter { owners[$0.id]?.count == 1 }
                     }
-                    overview.serviceTransactions[member.id] = history.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    overview.chargeSummaries[member.id] = SearchChargeSummary(record: member, transactions: history)
+                    let assigned = history.filter { (owners[$0.id]?.count ?? 0) <= 1 }
+                    overview.serviceTransactions[member.id] = assigned.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    overview.chargeSummaries[member.id] = SearchChargeSummary(record: member, transactions: assigned)
                 }
             }
             overview.representedIDs = Set((members + overview.balances + overview.transactions + overview.documents + (root.kind == .institution ? services : [])).map(\.id))
