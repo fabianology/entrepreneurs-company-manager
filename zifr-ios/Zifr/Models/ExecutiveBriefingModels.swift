@@ -293,6 +293,11 @@ struct UpcomingCoverageProjection {
 /// Cross-references scheduled recurring charges with their existing saved payment-source links.
 /// This is a read-only estimate and never changes a subscription, account, card, or connection.
 enum UpcomingCoverageEngine {
+    static func isBankBalanceStale(lastSyncedAt: Date, now: Date, calendar: Calendar) -> Bool {
+        guard let cutoff = calendar.date(byAdding: .day, value: -7, to: now) else { return false }
+        return lastSyncedAt < cutoff
+    }
+
     private struct ResolvedCharge {
         let key: String
         let sourceName: String
@@ -513,7 +518,7 @@ enum UpcomingCoverageEngine {
         } else if item?.isStale(referenceDate: now) == true {
             reason = "Connected balance is out of date"
         } else if isLinked, item == nil, let sync = source.institution.lastSyncedAt,
-                  let staleDate = calendar.date(byAdding: .day, value: -7, to: now), sync < staleDate {
+                  isBankBalanceStale(lastSyncedAt: sync, now: now, calendar: calendar) {
             reason = "Connected balance is out of date"
         } else if isLinked, item == nil, source.institution.lastSyncedAt == nil {
             reason = "Connected balance update time is unavailable"

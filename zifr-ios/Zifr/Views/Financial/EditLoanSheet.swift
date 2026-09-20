@@ -551,10 +551,9 @@ struct EditLoanSheet: View {
                                     .foregroundStyle(Color.white.opacity(0.6))
                                     .textCase(.uppercase)
                                     .tracking(1.5)
-                                Image(systemName: "chevron.down")
+                                DisclosureStateChevron(isExpanded: showAmortizationTable)
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(Color.white.opacity(0.6))
-                                    .rotationEffect(.degrees(showAmortizationTable ? 180 : 0))
                                 Spacer()
                             }
                             .frame(height: 36)

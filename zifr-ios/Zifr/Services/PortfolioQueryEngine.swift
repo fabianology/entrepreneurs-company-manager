@@ -77,8 +77,9 @@ struct PortfolioQuery: Codable, Equatable, Sendable {
         return request
     }
 
-    static func interpret(_ question: String, previous: PortfolioQuery? = nil) -> PortfolioQuery {
-        let normalized = SearchText.normalize(question)
+    static func interpret(_ question: String, previous: PortfolioQuery? = nil, protectedNames: [String] = []) -> PortfolioQuery {
+        let named = SearchNamedText(question, names: protectedNames)
+        let normalized = named.masked
         let words = Set(normalized.split(separator: " ").map(String.init))
         let followUp = ["only ", "just ", "exclude ", "excluding ", "what about ", "and ", "last month", "this month", "next month"].contains { normalized.hasPrefix($0) }
         var request = followUp ? previous ?? .init() : .init()
@@ -139,10 +140,11 @@ struct PortfolioQuery: Codable, Equatable, Sendable {
             }
             request.query = base + " " + text
         } else { request.query = text }
-        if request.operation == .search && !followUp && !request.missingReceipt && request.transactionState == nil { request.query = question }
+        if request.operation == .search && !followUp && !request.missingReceipt && request.transactionState == nil { request.query = named.masked }
         // Preserve the balance intent when removing conversational words would erase it.
         if !words.isDisjoint(with: ["money", "cash", "funds"]) && !words.isDisjoint(with: ["much", "have", "total"]) { request.query += " balances" }
         if !followUp { request.originalText = question }
+        request.query = named.restoring(request.query)
         return request
     }
 }
@@ -158,21 +160,38 @@ struct SearchMetric: Identifiable, Sendable {
 }
 
 extension UniversalSearchIndex {
+    func savedNames(filters: SearchFilters) -> [String] {
+        let eligible = records.filter {
+            (filters.companyID == nil || $0.companyID == filters.companyID) &&
+            [.company, .subscription, .institution, .account, .card, .loan].contains($0.kind)
+        }
+        let parents = Dictionary(eligible.map { ($0.id, $0.normalizedTitle) }, uniquingKeysWith: { a, _ in a })
+        return eligible.flatMap { record -> [String] in
+            var names = [record.normalizedTitle]
+            if let parent = record.parentServiceID.flatMap({ parents[$0] }) { names.append(parent + " " + record.normalizedTitle) }
+            return names
+        }
+    }
+
+    func interpretedRequest(_ question: String, previous: PortfolioQuery? = nil, filters: SearchFilters = .init()) -> PortfolioQuery {
+        let request = PortfolioQuery.interpret(question, previous: previous, protectedNames: savedNames(filters: filters))
+        return resolvedRequest(request, filters: filters)
+    }
+
     func resolvedRequest(_ request: PortfolioQuery, filters: SearchFilters) -> PortfolioQuery {
         guard let original = request.originalText else { return request }
-        let name = SearchText.normalize(original)
-        let literal = records.contains { record in
-            (filters.companyID == nil || record.companyID == filters.companyID) &&
-            (filters.kind == nil || record.kind == filters.kind) && record.normalizedTitle == name
+        let names = savedNames(filters: filters)
+        if names.contains(SearchText.normalize(original)) {
+            var result = PortfolioQuery(); result.query = original
+            return result
         }
-        guard literal else { return request }
-        var result = PortfolioQuery()
-        result.query = original
+        var result = PortfolioQuery.interpret(original, protectedNames: names)
+        result.originalText = nil
         return result
     }
 
     func search(_ question: String, filters: SearchFilters = .init(), now: Date = Date(), calendar: Calendar = .current) -> SearchResponse {
-        execute(.interpret(question), filters: filters, now: now, calendar: calendar)
+        execute(interpretedRequest(question, filters: filters), filters: filters, now: now, calendar: calendar)
     }
 
     func execute(_ request: PortfolioQuery, filters: SearchFilters = .init(), now: Date = Date(), calendar: Calendar = .current) -> SearchResponse {
@@ -192,17 +211,23 @@ extension UniversalSearchIndex {
         if let name = request.companyName, !name.isEmpty {
             let matches = companies.filter { $0.normalizedTitle == SearchText.normalize(name) }
             guard matches.count == 1, let id = matches.first?.companyID else { return unavailable("Choose an exact company name; that name is missing or ambiguous.") }
-            if let uiCompany = scoped.companyID, uiCompany != id { return unavailable("This question conflicts with your Company filter.") }
-            scoped.companyID = id
+            if !filters.ignoreInferredCompany {
+                if let uiCompany = scoped.companyID, uiCompany != id { return unavailable("This question conflicts with your Company filter.") }
+                scoped.companyID = id
+            }
         } else {
             // Match whole company names, never infer ownership from a merchant or an account ending.
-            let normalized = " " + SearchText.normalize(query) + " "
+            let protected = records.filter { $0.kind != .company && [.subscription, .institution, .account, .card, .loan].contains($0.kind) }.map(\.normalizedTitle)
+            let normalized = " " + SearchNamedText(query, names: protected).masked + " "
             let matches = companies.filter { normalized.contains(" " + $0.normalizedTitle + " ") }
             if matches.count == 1, let company = matches.first, SearchText.normalize(query) != company.normalizedTitle {
-                if let uiCompany = scoped.companyID, uiCompany != company.companyID { return unavailable("This question conflicts with your Company filter.") }
-                scoped.companyID = company.companyID
-                query = SearchText.normalize(query).replacingOccurrences(of: company.normalizedTitle, with: "")
-            } else if matches.count > 1 { return unavailable("Choose one company or ask across all companies.") }
+                if !filters.ignoreInferredCompany {
+                    if let uiCompany = scoped.companyID, uiCompany != company.companyID { return unavailable("This question conflicts with your Company filter.") }
+                    scoped.companyID = company.companyID
+                }
+                query = SearchText.removingPhrase(company.normalizedTitle, from: SearchText.normalize(query))
+                query = SearchText.removingPhrase("s", from: query)
+            } else if matches.count > 1 && !filters.ignoreInferredCompany { return unavailable("Choose one company or ask across all companies.") }
         }
         func validAmount(_ value: String?) -> Bool {
             guard let value else { return true }
@@ -212,15 +237,24 @@ extension UniversalSearchIndex {
         let minimum = request.minAmount.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
         let maximum = request.maxAmount.flatMap { Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX")) }
         guard (request.minAmount == nil || minimum != nil), (request.maxAmount == nil || maximum != nil), !(minimum != nil && maximum != nil && minimum! > maximum!) else { return unavailable("Choose valid decimal amount bounds.") }
-        let start = request.startDate.flatMap { SearchText.date($0, calendar: calendar) }
-        let end = request.endDate.flatMap { SearchText.date($0, calendar: calendar) }.flatMap { calendar.date(byAdding: .day, value: 1, to: $0) }
-        guard (request.startDate == nil || start != nil), (request.endDate == nil || end != nil), !(start != nil && end != nil && start! >= end!) else { return unavailable("Use a valid date range in YYYY-MM-DD format.") }
+        let requestedStart = request.startDate.flatMap { SearchText.date($0, calendar: calendar) }
+        let requestedEnd = request.endDate.flatMap { SearchText.date($0, calendar: calendar) }.flatMap { calendar.date(byAdding: .day, value: 1, to: $0) }
+        guard (request.startDate == nil || requestedStart != nil), (request.endDate == nil || requestedEnd != nil), !(requestedStart != nil && requestedEnd != nil && requestedStart! >= requestedEnd!) else { return unavailable("Use a valid date range in YYYY-MM-DD format.") }
+        let start = filters.ignoreInferredDate || filters.period != .all ? nil : requestedStart
+        let end = filters.ignoreInferredDate || filters.period != .all ? nil : requestedEnd
         if let serviceType = request.serviceType {
             if let selected = scoped.serviceType, selected != serviceType { return unavailable("This question conflicts with your service type filter.") }
             scoped.serviceType = serviceType
         }
         if query.trimmingCharacters(in: .whitespaces).isEmpty { query = scoped.kind?.rawValue ?? "all records" }
         var base = self
+        var historyName: String?
+        if request.sourceID == nil, let history = serviceHistorySelection(query, filters: scoped, now: now, calendar: calendar) {
+            base.records = records.filter { history.ids.contains($0.id) }
+            query = history.query
+            scoped.kind = .transaction
+            historyName = history.name
+        }
         if request.sourceID != nil || request.operation == .details || request.operation == .related {
             guard let id = request.sourceID, records.contains(where: { $0.id == id }) else { return unavailable("That source is unavailable in your current session.") }
             let ids = request.operation == .details ? Set([id]) : links[id] ?? []
@@ -228,7 +262,7 @@ extension UniversalSearchIndex {
             query = scoped.kind?.rawValue ?? "all records"
         }
         let searchPlan = queryPlan(query, filters: scoped, now: now, calendar: calendar)
-        let state = request.transactionState ?? ((request.operation == .search || request.operation == .details || request.operation == .related || request.includePending) ? .all : .posted)
+        let state = filters.transactionState ?? (filters.ignoreInferredState ? .all : request.transactionState) ?? ((request.operation == .search || request.operation == .details || request.operation == .related || request.includePending) ? .all : .posted)
         var response = base.matching(query, filters: scoped, now: now, calendar: calendar, calculateTotals: false)
         response.hits = response.hits.filter { hit in
             let r = hit.record
@@ -243,6 +277,24 @@ extension UniversalSearchIndex {
             return true
         }
         updateTotals(&response, plan: searchPlan)
+        if let historyName { response.interpretation = "Charge history · " + historyName + " · " + response.interpretation }
+        response.appliedFilters = []
+        if let id = scoped.companyID, let company = companies.first(where: { $0.companyID == id }) {
+            response.appliedFilters.append(.company(id, company.title))
+        }
+        if start != nil || end != nil {
+            let first = max(start ?? .distantPast, searchPlan.dates?.start ?? .distantPast)
+            let last = min(end ?? .distantFuture, searchPlan.dates?.end ?? .distantFuture)
+            if first < last {
+                let label = [start.map { "From " + day($0) }, end.map { "Through " + day(calendar.date(byAdding: .day, value: -1, to: $0)) }].compactMap { $0 }.joined(separator: " · ")
+                response.appliedFilters.append(.date(DateInterval(start: first, end: last), label))
+            }
+        } else if let dates = searchPlan.dates {
+            response.appliedFilters.append(.date(dates, searchPlan.dateLabel ?? "Date range"))
+        }
+        if (request.transactionState != nil && !filters.ignoreInferredState) || filters.transactionState != nil {
+            response.appliedFilters.append(.transactionState(state))
+        }
         response.coverage = coverage
         response.includesDetails = request.operation == .details || SearchText.normalize(request.query).contains("notes")
         if request.operation == .search || request.operation == .details || request.operation == .related {
@@ -327,7 +379,11 @@ extension UniversalSearchIndex {
             response.answerSummary = response.hits.map { "\($0.record.title): \(day($0.record.date)) · \($0.record.company)" }.joined(separator: "\n")
             return response
         }
-        if request.operation == .compare { return comparison(request, filters: scoped, now: now, calendar: calendar) }
+        if request.operation == .compare {
+            var compared = comparison(request, filters: scoped, now: now, calendar: calendar)
+            compared.appliedFilters = response.appliedFilters
+            return compared
+        }
         if request.operation != .count {
             let unknown = candidates.filter { amount($0.record) == nil }.count
             candidates = candidates.filter { amount($0.record) != nil }
@@ -381,7 +437,7 @@ extension UniversalSearchIndex {
     private func comparison(_ request: PortfolioQuery, filters: SearchFilters, now: Date, calendar: Calendar) -> SearchResponse {
         func day(_ date: Date?) -> String { SearchText.day(date, calendar: calendar) }
         var current = request; current.operation = .sum
-        let period = SearchQuery(request.query, filters: filters, now: now, calendar: calendar).dates ?? calendar.dateInterval(of: .month, for: now)!
+        let period = queryPlan(request.query, filters: filters, now: now, calendar: calendar).dates ?? calendar.dateInterval(of: .month, for: now)!
         let start = request.startDate.flatMap { SearchText.date($0, calendar: calendar) } ?? period.start
         let end = request.endDate.flatMap { SearchText.date($0, calendar: calendar) }.flatMap { calendar.date(byAdding: .day, value: 1, to: $0) } ?? period.end
         let days = calendar.dateComponents([.day], from: start, to: end).day ?? 0
@@ -457,5 +513,27 @@ extension SearchText {
     static func removingPhrase(_ phrase: String, from text: String) -> String {
         (" " + text + " ").replacingOccurrences(of: " " + phrase + " ", with: " ")
             .split(separator: " ").joined(separator: " ")
+    }
+}
+
+/// Protect complete saved names while parsing surrounding commands and dates.
+struct SearchNamedText {
+    let masked: String
+    private let replacements: [String: String]
+
+    init(_ text: String, names: [String]) {
+        var masked = SearchText.normalize(text)
+        var replacements: [String: String] = [:]
+        let names = Set(names.filter { !$0.isEmpty }).sorted { $0.count == $1.count ? $0 < $1 : $0.count > $1.count }
+        for name in names where SearchText.containsPhrase(name, in: masked) {
+            let token = "zifrprotectedname\(replacements.count)token"
+            masked = (" " + masked + " ").replacingOccurrences(of: " " + name + " ", with: " " + token + " ").trimmingCharacters(in: .whitespaces)
+            replacements[token] = name
+        }
+        self.masked = masked; self.replacements = replacements
+    }
+
+    func restoring(_ text: String) -> String {
+        text.split(separator: " ").map { replacements[String($0)] ?? String($0) }.joined(separator: " ")
     }
 }

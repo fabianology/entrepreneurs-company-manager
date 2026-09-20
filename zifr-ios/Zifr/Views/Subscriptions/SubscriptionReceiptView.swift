@@ -185,7 +185,7 @@ struct SubscriptionReceiptView: View {
                     HStack(spacing: 8) {
                         Text("SERVICES DETAILED · \(serviceCount)")
                         Spacer(minLength: 8)
-                        Image(systemName: showsServices ? "chevron.up" : "chevron.down")
+                        DisclosureStateChevron(isExpanded: showsServices)
                             .font(.caption.weight(.bold))
                     }
                     .font(.system(.caption, design: .monospaced).weight(.bold))

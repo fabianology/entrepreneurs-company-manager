@@ -805,10 +805,9 @@ struct LinkedAccountRow: View {
                     .buttonStyle(.plain)
                     .disabled(isUnlinking)
                     
-                    Image(systemName: "chevron.right")
+                    DisclosureStateChevron(isExpanded: isExpanded)
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(Color.white.opacity(0.4))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
             }
             .contentShape(Rectangle())
@@ -1354,10 +1353,9 @@ struct EntityCollaboratorsCard: View {
                         .background(Color(hex: "#4f46e5").opacity(0.15))
                         .clipShape(Capsule())
                     
-                    Image(systemName: "chevron.right")
+                    DisclosureStateChevron(isExpanded: isExpanded)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.5))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(16)
                 .contentShape(Rectangle())
@@ -1518,10 +1516,9 @@ struct CollaboratorSubAccordionHeader: View {
                     .background(Color.white.opacity(0.1))
                     .clipShape(Capsule())
                 
-                Image(systemName: "chevron.right")
+                DisclosureStateChevron(isExpanded: isExpanded)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Color.white.opacity(0.4))
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 12)
@@ -1650,10 +1647,9 @@ struct UncategorizedCollaboratorsCard: View {
                         .background(Color.white.opacity(0.1))
                         .clipShape(Capsule())
                     
-                    Image(systemName: "chevron.right")
+                    DisclosureStateChevron(isExpanded: isExpanded)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.white.opacity(0.5))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(16)
                 .contentShape(Rectangle())

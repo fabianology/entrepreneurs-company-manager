@@ -121,7 +121,21 @@ struct SearchTotal: Identifiable, Sendable {
     var formatted: String { SearchText.money(amount, currency: currency) }
 }
 
+enum SearchAppliedFilter: Identifiable, Equatable, Sendable {
+    case company(UUID, String), date(DateInterval, String), transactionState(PortfolioQuery.TransactionState)
+    var id: String {
+        switch self { case .company: return "company"; case .date: return "date"; case .transactionState: return "state" }
+    }
+    var label: String {
+        switch self {
+        case .company(_, let name), .date(_, let name): return name
+        case .transactionState(let state): return state == .all ? "Posted + pending" : state == .posted ? "Posted" : "Pending"
+        }
+    }
+}
+
 struct SearchResponse: Sendable {
+    var appliedFilters: [SearchAppliedFilter] = []
     var hits: [SearchHit] = []
     var totals: [SearchTotal] = []
     var interpretation: String = ""
@@ -191,6 +205,18 @@ struct SearchFilters: Equatable, Sendable {
     var serviceType: String?
     var credentialsOnly = false
     var period: Period = .all
+    var transactionState: PortfolioQuery.TransactionState?
+    var ignoreInferredCompany = false
+    var ignoreInferredDate = false
+    var ignoreInferredState = false
+
+    mutating func remove(_ filter: SearchAppliedFilter) {
+        switch filter {
+        case .company: companyID = nil; ignoreInferredCompany = true
+        case .date: period = .all; ignoreInferredDate = true
+        case .transactionState: transactionState = nil; ignoreInferredState = true
+        }
+    }
     enum Period: String, CaseIterable, Sendable {
         case all = "Any date", thisMonth = "This month", lastMonth = "Last month", nextMonth = "Next month"
     }
@@ -736,6 +762,32 @@ struct UniversalSearchIndex: Sendable {
         }
         let validIDs = Set(records.map(\.id))
         links = links.filter { validIDs.contains($0.key) }.mapValues { $0.intersection(validIDs) }
+        // Payment rows keep the card/account name for navigation, but their artwork
+        // represents the issuing bank. Resolve that identity with the same durable,
+        // entity-scoped relationship rules used by institution cards and Search.
+        let bankRecords = records.filter { $0.kind == .institution }
+        let accountRecords = records.filter { $0.kind == .account }
+        let bankDescriptors = bankRecords.map { bank in
+            InstitutionRelationships.Bank(id: bank.modelID, companyID: bank.companyID, name: bank.title,
+                accountAliases: accountRecords.filter { $0.modelID == bank.modelID && $0.companyID == bank.companyID }
+                    .reduce(into: Set<String>()) { $0.formUnion($1.balanceAliases) })
+        }
+        let relationshipRecords = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for index in records.indices where records[index].kind == .card {
+            let card = records[index]
+            let explicitBankIDs = Set((links[card.id] ?? []).compactMap { id -> UUID? in
+                guard let related = relationshipRecords[id], [.institution, .account].contains(related.kind) else { return nil }
+                return related.modelID
+            })
+            let resolved = InstitutionRelationships.bankIDs(companyID: card.companyID, savedName: card.savedBankName,
+                aliases: card.balanceAliases, explicitBankIDs: explicitBankIDs, banks: bankDescriptors,
+                hasExplicitAssociation: card.hasExplicitBankAssociation)
+            guard resolved.count == 1, let bankID = resolved.first,
+                  let bank = bankRecords.first(where: { $0.modelID == bankID && $0.companyID == card.companyID }) else { continue }
+            records[index].brandName = bank.title
+            records[index].website = bank.website
+            records[index].logoURL = bank.logoURL
+        }
         let indexedDocs = Set(documentPages.map(\.documentID)).intersection(Set(visibleDocuments.map(\.id))).count
         coverage = "Loaded portfolio · \(transactions.count) transactions · document text \(indexedDocs)/\(visibleDocuments.count)"
         if appState.portfolioLoadIssue != nil { coverage += " · Refresh incomplete: answers may be partial" }
@@ -780,7 +832,7 @@ struct UniversalSearchIndex: Sendable {
     /// Saved names take precedence over inferred kind words within those names.
     /// Explicit UI/tool type constraints still win.
     func queryPlan(_ query: String, filters: SearchFilters, now: Date, calendar: Calendar) -> SearchQuery {
-        var plan = SearchQuery(query, filters: filters, now: now, calendar: calendar)
+        var plan = SearchQuery(query, filters: filters, now: now, calendar: calendar, protectedNames: savedNames(filters: filters))
         guard filters.kind == nil, !plan.credentials else { return plan }
         let normalized = SearchText.normalize(query)
         let eligible = records.filter { filters.companyID == nil || $0.companyID == filters.companyID }
@@ -944,10 +996,12 @@ struct SearchQuery {
     var creditOnly: Bool
     var cashOnly: Bool
     var dates: DateInterval?
+    var dateLabel: String?
     var description: String
 
-    init(_ text: String, filters: SearchFilters, now: Date, calendar: Calendar) {
-        let normalized = SearchText.normalize(text)
+    init(_ text: String, filters: SearchFilters, now: Date, calendar: Calendar, protectedNames: [String] = []) {
+        let named = SearchNamedText(text, names: protectedNames)
+        let normalized = named.masked
         var words = normalized.split(separator: " ").map(String.init)
         let set = Set(words)
         credentials = filters.credentialsOnly || !set.isDisjoint(with: ["password", "passwords", "login", "logins", "username", "credentials"])
@@ -974,23 +1028,28 @@ struct SearchQuery {
         var period = filters.period
         let relative: [(String, SearchFilters.Period)] = [("last month", .lastMonth), ("this month", .thisMonth), ("next month", .nextMonth)]
         for (phrase, value) in relative where normalized.contains(phrase) {
-            if filters.period == .all { period = value }
+            if filters.period == .all && !filters.ignoreInferredDate { period = value }
             for word in phrase.split(separator: " ") { words.removeAll { $0 == word } }
         }
         if period != .all, let month = calendar.dateInterval(of: .month, for: now) {
             let offset = period == .lastMonth ? -1 : period == .nextMonth ? 1 : 0
             if let start = calendar.date(byAdding: .month, value: offset, to: month.start), let end = calendar.date(byAdding: .month, value: 1, to: start) {
                 dates = DateInterval(start: start, end: end)
+                dateLabel = period.rawValue
             }
         }
-        if dates == nil {
+        do {
             let formatter = DateFormatter(); formatter.locale = Locale(identifier: "en_US_POSIX")
             let months = formatter.monthSymbols ?? []
             for (offset, month) in months.enumerated() where words.contains(month.lowercased()) {
                 let yearToken = words.first { $0.count == 4 && Int($0).map { (2000...2100).contains($0) } == true }
                 let year = yearToken.flatMap(Int.init) ?? calendar.component(.year, from: now)
                 if let start = calendar.date(from: DateComponents(year: year, month: offset + 1, day: 1)), let end = calendar.date(byAdding: .month, value: 1, to: start) {
-                    dates = DateInterval(start: start, end: end)
+                    if dates == nil && !filters.ignoreInferredDate {
+                        dates = DateInterval(start: start, end: end)
+                        formatter.calendar = calendar; formatter.timeZone = calendar.timeZone; formatter.dateFormat = "MMMM yyyy"
+                        dateLabel = formatter.string(from: start)
+                    }
                     words.removeAll { $0 == month.lowercased() || $0 == yearToken }
                 }
             }
@@ -1003,7 +1062,7 @@ struct SearchQuery {
         ignored.formUnion(["website", "notes", "note", "when", "will", "expire", "expiration"])
         if monthlySpend { ignored.formUnion(["spend", "cost", "total", "spending", "per", "by", "monthly"]) }
         if normalized == "all records" { ignored.formUnion(["records"]) }
-        tokens = words.filter { !ignored.contains($0) }
+        tokens = named.restoring(words.filter { !ignored.contains($0) }.joined(separator: " ")).split(separator: " ").map(String.init)
         description = credentials ? "Choose a saved login to reveal or copy" : monthlySpend ? "Active services, normalized to a monthly equivalent" : financial ? "Saved financial details" : renewals ? "Renewals and due dates" : "Best matches"
         if let dates { description += " · \(dates.start.formatted(date: .abbreviated, time: .omitted))–\(calendar.date(byAdding: .day, value: -1, to: dates.end)!.formatted(date: .abbreviated, time: .omitted))" }
     }

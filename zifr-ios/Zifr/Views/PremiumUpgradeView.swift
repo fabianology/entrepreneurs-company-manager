@@ -332,7 +332,7 @@ private struct ConversionPaywallContent: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: isShowingAllBenefits ? "chevron.down" : "play.fill")
+                    DisclosureStateChevron(isExpanded: isShowingAllBenefits)
                         .font(.system(size: 8, weight: .bold))
                         .frame(width: 10)
                     Text("See everything included in Pro")

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GlobalSearchView: View {
     @Bindable var vm: AppViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var auth
@@ -13,6 +14,7 @@ struct GlobalSearchView: View {
     @State private var fundingSources: [String: [SearchRecord]] = [:]
     @State private var searching = false
     @State private var visibleLimit = 40
+    @State private var expandedMatchYears: Set<String> = []
     @State private var presentation: SheetRoute?
     @State private var related: RelatedSearch?
     @State private var answer: String?
@@ -20,6 +22,9 @@ struct GlobalSearchView: View {
     @State private var answerError: String?
     @State private var submitTask: Task<Void, Never>?
     @State private var previousQuery: PortfolioQuery?
+    @State private var lastExecutedQuery: PortfolioQuery?
+    @State private var projectionStamp: SearchProjectionStamp?
+    @State private var clockRevision = 0
     @State private var answerTask: Task<Void, Never>?
 
     private enum SheetRoute: Identifiable {
@@ -38,19 +43,27 @@ struct GlobalSearchView: View {
         var kind: SearchRecord.Kind
         var title: String
     }
-    private var taskKey: String { "\(vm.searchQuery)|\(filters)|\(appState.searchRevision)|\(auth.currentUser?.id.uuidString ?? "")|\(String(describing: related))" }
+    private var taskKey: String { "\(vm.searchQuery)|\(filters)|\(appState.searchRevision)|\(auth.currentUser?.id.uuidString ?? "")|\(String(describing: related))|\(clockRevision)" }
 
     @State private var searchPresented = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var hasQuery: Bool { !vm.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || related != nil }
+    private var displayedCompanyID: UUID? {
+        if let selected = filters.companyID { return selected }
+        guard !filters.ignoreInferredCompany else { return nil }
+        for filter in response.appliedFilters {
+            if case .company(let id, _) = filter { return id }
+        }
+        return nil
+    }
     private var companyTitle: String {
-        filters.companyID.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All companies"
+        displayedCompanyID.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All companies"
     }
 
     var body: some View {
         NavigationStack {
-            searchContent
+            resultsList
                 .navigationTitle("Search")
                 .navigationBarTitleDisplayMode(.inline)
                 // Anchor child sheets inside navigation; the outer shell is itself presented.
@@ -65,11 +78,9 @@ struct GlobalSearchView: View {
                     }
                 }
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button { dismiss() } label: { Image(systemName: "xmark") }
-                            .accessibilityLabel("Close search")
+                    ToolbarItem(placement: .topBarTrailing) {
+                        companyPicker
                     }
-
                 }
         }
         .modifier(SearchFieldConfiguration(query: $vm.searchQuery, presented: $searchPresented, focus: $searchFocused))
@@ -82,7 +93,7 @@ struct GlobalSearchView: View {
             submitTask = Task { @MainActor in
                 await search()
                 guard !Task.isCancelled, key == taskKey else { return }
-                previousQuery = PortfolioQuery.interpret(vm.searchQuery, previous: previousQuery)
+                previousQuery = lastExecutedQuery
                 if response.hits.isEmpty && response.metrics.isEmpty && response.answerSummary == nil && vm.searchQuery.split(separator: " ").count > 3 && !response.isCredentialRequest { ask(useGemini: true) }
             }
         }
@@ -92,16 +103,27 @@ struct GlobalSearchView: View {
         .presentationBackground(.regularMaterial)
         .task(id: taskKey) { await search() }
         .onAppear { if vm.searchQuery.isEmpty { searchPresented = true; searchFocused = true } }
-        .onChange(of: vm.searchQuery) { _, _ in related = nil }
+        .onChange(of: vm.searchQuery) { _, _ in
+            related = nil
+            expandedMatchYears = []
+            filters.ignoreInferredCompany = false
+            filters.ignoreInferredDate = false
+            filters.ignoreInferredState = false
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            while !Task.isCancelled {
+                refreshClock()
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in refreshClock() }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name.NSSystemTimeZoneDidChange)) { _ in refreshClock() }
         .onDisappear {
             answerTask?.cancel()
             submitTask?.cancel()
             if presentation == nil { vm.searchQuery = "" }
         }
-    }
-
-    private var searchContent: some View {
-        resultsList.safeAreaInset(edge: .top, spacing: 0) { filterBar }
     }
 
     private var resultsList: some View {
@@ -114,6 +136,12 @@ struct GlobalSearchView: View {
             } else if !hasQuery {
                 suggestions
             } else {
+                if !response.appliedFilters.isEmpty, related == nil {
+                    appliedFilterControls
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowSeparator(.hidden)
+                }
                 if let related {
                     Section {
                         Button { self.related = nil } label: {
@@ -156,7 +184,12 @@ struct GlobalSearchView: View {
                     } description: {
                         Text(vm.searchQuery.split(separator: " ").count > 3 ? "Press Search to ask Gemini to interpret this question, or try fewer filters." : "Try a name or card ending, or choose fewer filters.")
                     } actions: {
-                        if filters != SearchFilters() { Button("Clear filters") { filters = .init() }.frame(minHeight: 44) }
+                        if filters != SearchFilters() || !response.appliedFilters.isEmpty {
+                            Button("Clear filters") {
+                                filters = .init()
+                                for filter in response.appliedFilters { filters.remove(filter) }
+                            }.frame(minHeight: 44)
+                        }
                     }
                     .listRowBackground(Color.clear).listRowSeparator(.hidden)
                 }
@@ -176,7 +209,23 @@ struct GlobalSearchView: View {
                 }
                 if !page.directHits.isEmpty {
                     Section {
-                        ForEach(page.directHits) { hit in resultRow(hit) }
+                        if overviews.isEmpty {
+                            ForEach(page.directHits) { hit in resultRow(hit) }
+                        } else {
+                            ForEach(page.directHits.filter { $0.record.kind != .transaction }) { hit in resultRow(hit) }
+                            ForEach(SearchTransactionYearGroup.groups(page.directHits)) { group in
+                                DisclosureGroup(isExpanded: Binding(
+                                    get: { expandedMatchYears.contains(group.id) },
+                                    set: { if $0 { expandedMatchYears.insert(group.id) } else { expandedMatchYears.remove(group.id) } }
+                                )) {
+                                    ForEach(group.hits) { hit in resultRow(hit) }
+                                } label: {
+                                    Text(group.title).font(.headline)
+                                }
+                                .accessibilityIdentifier("search-more-matches-year-" + group.id)
+                                .listRowBackground(Color.zifrCard)
+                            }
+                        }
                     } header: {
                         if !overviews.isEmpty { resultHeading("More matches") }
                         else if related != nil { resultHeading("Results") }
@@ -201,9 +250,74 @@ struct GlobalSearchView: View {
         }
         .listStyle(.insetGrouped)
         .disclosureGroupStyle(SearchDisclosureStyle())
+        .contentMargins(.top, 8, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.zifrCard.opacity(0.65))
         .scrollDismissesKeyboard(.immediately)
+    }
+
+    private func refreshClock() {
+        let stamp = appState.searchProjectionStamp()
+        guard stamp != projectionStamp else { return }
+        projectionStamp = stamp
+        clockRevision &+= 1
+    }
+
+    private var appliedFilterControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Filters").font(.caption).foregroundStyle(.secondary)
+            SearchFilterFlowLayout { filterChips }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 4)
+    }
+
+    private var filterChips: some View {
+        ForEach(response.appliedFilters) { filter in
+            HStack(spacing: 0) {
+                Menu {
+                    switch filter {
+                    case .company:
+                        Button("All companies") { filters.remove(filter) }
+                        ForEach(appState.companies) { company in
+                            Button(company.name) {
+                                filters.companyID = company.id
+                                filters.ignoreInferredCompany = true
+                            }
+                        }
+                    case .date:
+                        ForEach(SearchFilters.Period.allCases, id: \.self) { period in
+                            Button(period.rawValue) { filters.period = period; filters.ignoreInferredDate = true }
+                        }
+                    case .transactionState:
+                        Button("Posted + pending") { filters.transactionState = .all; filters.ignoreInferredState = true }
+                        Button("Posted") { filters.transactionState = .posted; filters.ignoreInferredState = true }
+                        Button("Pending") { filters.transactionState = .pending; filters.ignoreInferredState = true }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(filter.label).fixedSize(horizontal: false, vertical: true)
+                        Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                    }
+                    .padding(.leading, 14)
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Change \(filter.id) filter: \(filter.label)")
+                .accessibilityIdentifier("search.filter.\(filter.id)")
+                Button { filters.remove(filter) } label: {
+                    Image(systemName: "xmark").font(.caption.weight(.semibold))
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .accessibilityLabel("Remove \(filter.label) filter")
+                .accessibilityIdentifier("search.filter.remove.\(filter.id)")
+            }
+            .font(.subheadline)
+            .foregroundStyle(Color.zifrGold)
+            .background(Color.white.opacity(0.07), in: Capsule())
+            .buttonStyle(.plain)
+            .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var answerDetails: some View {
@@ -222,56 +336,30 @@ struct GlobalSearchView: View {
         }.textCase(nil).accessibilityElement(children: .combine)
     }
 
-    private var filterBar: some View {
-        VStack(spacing: 4) {
-            SearchGlassControls {
-                let layout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(spacing: 8))
-                    : AnyLayout(HStackLayout(spacing: 8))
-                layout {
-                    Menu {
-                        Picker("Company", selection: $filters.companyID) {
-                            Text("All companies").tag(nil as UUID?)
-                            ForEach(appState.companies) { company in Text(company.name).tag(Optional(company.id)) }
-                        }
-                    } label: { SearchFilterLabel(title: filters.companyID == nil ? "Company" : companyTitle, selected: filters.companyID != nil) }
-                    .accessibilityLabel("Company filter").accessibilityValue(companyTitle)
-                    Menu {
-                        Button { filters.kind = nil; filters.serviceType = nil; filters.credentialsOnly = false } label: {
-                            Label("All types", systemImage: filters.kind == nil && !filters.credentialsOnly ? "checkmark" : "square.grid.2x2")
-                        }
-                        Button { filters.kind = nil; filters.serviceType = nil; filters.credentialsOnly = true } label: {
-                            Label("Saved logins", systemImage: filters.credentialsOnly ? "checkmark" : "key")
-                        }
-                        ForEach(["bill", "subscription"], id: \.self) { type in
-                            Button { filters.kind = .subscription; filters.serviceType = type; filters.credentialsOnly = false } label: {
-                                Label(type == "bill" ? "Bills" : "Subscriptions", systemImage: filters.serviceType == type ? "checkmark" : "repeat")
-                            }
-                        }
-                        ForEach(SearchRecord.Kind.allCases, id: \.self) { kind in
-                            Button { filters.kind = kind; filters.serviceType = nil; filters.credentialsOnly = false } label: {
-                                Label(kind.label, systemImage: filters.kind == kind ? "checkmark" : kind.icon)
-                            }
-                        }
-                    } label: { SearchFilterLabel(title: filters.credentialsOnly ? "Saved logins" : (filters.serviceType.map { $0 == "bill" ? "Bills" : "Subscriptions" } ?? filters.kind?.label ?? "Type"), selected: filters.kind != nil || filters.credentialsOnly) }
-                    .accessibilityLabel("Record type filter")
-                    .accessibilityValue(filters.credentialsOnly ? "Saved logins" : (filters.serviceType.map { $0 == "bill" ? "Bills" : "Subscriptions" } ?? filters.kind?.label ?? "All types"))
-                    Menu {
-                        Picker("Date", selection: $filters.period) {
-                            ForEach(SearchFilters.Period.allCases, id: \.self) { period in Text(period.rawValue).tag(period) }
-                        }
-                    } label: { SearchFilterLabel(title: filters.period == .all ? "Date" : filters.period.rawValue, selected: filters.period != .all) }
-                    .accessibilityLabel("Date filter").accessibilityValue(filters.period.rawValue)
+    private var companyPicker: some View {
+        Menu {
+            Picker("Company", selection: Binding(get: { displayedCompanyID }, set: {
+                filters.companyID = $0; filters.ignoreInferredCompany = true
+            })) {
+                Text("All").tag(nil as UUID?)
+                ForEach(appState.companies) { company in
+                    Text(company.name).tag(Optional(company.id))
                 }
-            }.buttonStyle(.plain)
-            if filters != SearchFilters() {
-                Button("Reset filters") { filters = .init() }
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
             }
+        } label: {
+            HStack(spacing: 4) {
+                Text(displayedCompanyID == nil ? "Companies" : companyTitle)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+            }
+            .frame(maxWidth: 160, minHeight: 44)
+            .foregroundStyle(.white)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .tint(.white)
+        .accessibilityLabel("Company filter")
+        .accessibilityValue(companyTitle)
     }
 
     private var suggestions: some View {
@@ -440,7 +528,7 @@ struct GlobalSearchView: View {
         searching = true
         do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
         guard let index = try? await appState.searchIndexInBackground(for: userID), !Task.isCancelled, key == taskKey else { return }
-        let request = PortfolioQuery.interpret(vm.searchQuery, previous: previousQuery)
+        let request = index.interpretedRequest(vm.searchQuery, previous: previousQuery, filters: filters)
         let selectedFilters = filters, drill = related
         let work = Task.detached(priority: .userInitiated) {
             if let drill {
@@ -457,7 +545,7 @@ struct GlobalSearchView: View {
             await work.value
         } onCancel: { work.cancel() }
         guard !Task.isCancelled, key == taskKey, auth.isAuthenticated, auth.currentUser?.id == userID else { return }
-        response = result.0; overviews = result.1; fundingSources = result.2; searching = false
+        response = result.0; overviews = result.1; fundingSources = result.2; lastExecutedQuery = request; searching = false
     }
     private func ask(useGemini: Bool) {
         if useGemini && !access.request(.aiAction, source: "universal_search", appState: appState, userId: auth.currentUser?.id) { presentation = .premium; return }
@@ -511,39 +599,6 @@ private struct SearchFieldConfiguration: ViewModifier {
         } else if #available(iOS 17.1, *) {
             field.searchPresentationToolbarBehavior(.avoidHidingContent)
         } else { field }
-    }
-}
-
-private struct SearchGlassControls<Content: View>: View {
-    @ViewBuilder var content: Content
-    var body: some View {
-        if #available(iOS 26.0, *) { GlassEffectContainer(spacing: 8) { content } }
-        else { content }
-    }
-}
-
-private struct SearchFilterLabel: View {
-    let title: String
-    let selected: Bool
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    var body: some View {
-        if reduceTransparency {
-            label.background(Color(uiColor: .secondarySystemGroupedBackground), in: Capsule())
-        } else if #available(iOS 26.0, *) {
-            label.glassEffect(selected ? .regular.tint(Color.zifrGold.opacity(0.16)).interactive() : .regular.interactive(), in: Capsule())
-        } else { label.background(.regularMaterial, in: Capsule()) }
-    }
-    private var label: some View {
-        HStack(spacing: 6) {
-            Text(title).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
-            Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
-        }
-        .font(.subheadline.weight(.medium))
-        .foregroundStyle(selected ? Color.zifrGold : Color.primary)
-        .padding(.horizontal, 10).padding(.vertical, 8)
-        .frame(maxWidth: .infinity, minHeight: 44)
-        .contentShape(Capsule())
     }
 }
 
@@ -601,6 +656,38 @@ struct SearchRecordDestinationView: View {
 
                 }
             }
+        }
+    }
+}
+
+/// Wrap native menu buttons without truncating names or shrinking accessibility text.
+private struct SearchFilterFlowLayout: Layout {
+    private let spacing: CGFloat = 8
+
+    private func measure(_ subviews: Subviews, width: CGFloat) -> (CGSize, [CGRect]) {
+        var x: CGFloat = 0, y: CGFloat = 0, rowHeight: CGFloat = 0
+        var frames: [CGRect] = []
+        for view in subviews {
+            let ideal = view.sizeThatFits(.unspecified)
+            let size = view.sizeThatFits(ProposedViewSize(width: min(width, ideal.width), height: nil))
+            if x > 0 && x + size.width > width {
+                x = 0; y += rowHeight + spacing; rowHeight = 0
+            }
+            frames.append(CGRect(origin: CGPoint(x: x, y: y), size: size))
+            x += size.width + spacing; rowHeight = max(rowHeight, size.height)
+        }
+        return (CGSize(width: width, height: y + rowHeight), frames)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        measure(subviews, width: proposal.width ?? 320).0
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let frames = measure(subviews, width: bounds.width).1
+        for (view, frame) in zip(subviews, frames) {
+            view.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                       anchor: .topLeading, proposal: ProposedViewSize(frame.size))
         }
     }
 }

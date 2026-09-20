@@ -948,9 +948,8 @@ struct ExpandableAccountCard: View {
                         Text("Balance").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         Text(formatCurrency(acc.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                    DisclosureStateChevron(isExpanded: isExpanded).font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color(hex: "#5ED6C1"))
-                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
             },
@@ -1014,9 +1013,8 @@ struct ExpandableCardRow: View {
                         Text("Balance").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         Text(formatCurrency(card.balance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                    DisclosureStateChevron(isExpanded: isExpanded).font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color(hex: "#5ED6C1"))
-                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
             },
@@ -1068,9 +1066,8 @@ struct ExpandableLoanRow: View {
                         Text("Remaining").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.white.opacity(0.4))
                         Text(formatCurrency(loan.remainingBalance)).font(.system(size: 13, weight: .semibold)).foregroundStyle(.white)
                     }
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold))
+                    DisclosureStateChevron(isExpanded: isExpanded).font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color(hex: "#5ED6C1"))
-                        .rotationEffect(.degrees(isExpanded ? -90 : 90))
                         .padding(.leading, 8)
                 }
             },

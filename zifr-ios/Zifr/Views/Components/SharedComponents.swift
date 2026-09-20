@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// One disclosure direction across the app: right when closed, down when open.
+struct DisclosureStateChevron: View {
+    let isExpanded: Bool
+
+    static func symbolName(isExpanded: Bool) -> String {
+        isExpanded ? "chevron.down" : "chevron.right"
+    }
+
+    var body: some View {
+        Image(systemName: Self.symbolName(isExpanded: isExpanded))
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - Stacked Card Drag Zone
 /// Reserves one small, invisible pull/push target so vertical drags everywhere
 /// else on a card remain available to the surrounding ScrollView.
@@ -1158,7 +1172,7 @@ struct MiloomAccordion<Content: View>: View {
                             .foregroundStyle(Color.white.opacity(0.5))
                     }
                     Spacer()
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    DisclosureStateChevron(isExpanded: expanded)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(Color(hex: "#227b5f"))
                 }

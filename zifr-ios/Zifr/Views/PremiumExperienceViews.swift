@@ -927,10 +927,9 @@ private struct BriefingAccordionHeader: View {
                     .padding(.vertical, 3)
                     .background(Color.white.opacity(0.08), in: Capsule())
                 Spacer()
-                Image(systemName: "chevron.down")
+                DisclosureStateChevron(isExpanded: !isCollapsed)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundStyle(Color.white.opacity(0.45))
-                    .rotationEffect(.degrees(isCollapsed ? -90 : 0))
             }
             .contentShape(Rectangle())
         }

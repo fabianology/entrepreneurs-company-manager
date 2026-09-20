@@ -573,9 +573,8 @@ private struct ExecutiveBriefingReceipt: View {
                         Spacer(minLength: 8)
                         Text(receiptAmounts(monthlyEquivalentTotals(for: services), empty: "—") + "/MO")
                             .multilineTextAlignment(.trailing)
-                        Image(systemName: "chevron.down")
+                        DisclosureStateChevron(isExpanded: isExpanded)
                             .font(.caption2.weight(.bold))
-                            .rotationEffect(.degrees(isExpanded ? 180 : 0))
                     }
                     .font(.system(.caption2, design: .monospaced).weight(.bold))
                     .foregroundStyle(BriefingReceiptTheme.ink)
@@ -1236,9 +1235,8 @@ private struct BriefingSpendingCategoriesReceipt: View {
                     Spacer(minLength: 8)
                     Text(money(category.amount, summary.currency))
                         .font(.system(.caption, design: .monospaced).weight(.bold))
-                    Image(systemName: "chevron.down")
+                    DisclosureStateChevron(isExpanded: expanded)
                         .font(.caption2.weight(.bold))
-                        .rotationEffect(.degrees(expanded ? 180 : 0))
                 }
                 .foregroundStyle(BriefingReceiptTheme.ink)
                 .frame(maxWidth: .infinity, minHeight: 44)

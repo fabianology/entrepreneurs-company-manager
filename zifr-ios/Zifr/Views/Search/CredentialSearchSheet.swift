@@ -101,7 +101,6 @@ struct SearchCredentialBoxes: View {
                     : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
                 layout { loginBox; passwordBox }
                 if let error = state.error { Text(error).font(.footnote).foregroundStyle(.secondary) }
-                if record.credential == .locked { Text(SecurityService.lockedValueLabel).font(.footnote).foregroundStyle(.secondary) }
             }
             .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: state.copied)
             .task(id: state.copySerial) {

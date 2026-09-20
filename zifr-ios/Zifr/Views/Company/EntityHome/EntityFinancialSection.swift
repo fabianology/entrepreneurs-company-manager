@@ -150,10 +150,9 @@ struct EntityFinancialSection: View {
                                         .font(.system(size: 13, weight: .semibold))
                                         .foregroundStyle(.white)
                                 }
-                                Image(systemName: "chevron.up")
+                                DisclosureStateChevron(isExpanded: isOrphanedExpanded)
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(Color.white.opacity(0.3))
-                                    .rotationEffect(.degrees(isOrphanedExpanded ? 0 : 180))
                                     .padding(.leading, 8)
                             }
                         },
@@ -202,10 +201,9 @@ struct EntityFinancialSection: View {
                                                         .font(.system(size: 13, weight: .semibold))
                                                         .foregroundStyle(.white)
                                                 }
-                                                Image(systemName: "chevron.up")
+                                                DisclosureStateChevron(isExpanded: isAccExpanded)
                                                     .font(.system(size: 12, weight: .bold))
                                                     .foregroundStyle(Color.white.opacity(0.3))
-                                                    .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
                                                     .padding(.leading, 8)
                                             }
                                         },
@@ -272,10 +270,9 @@ struct EntityFinancialSection: View {
                                                         .font(.system(size: 13, weight: .semibold))
                                                         .foregroundStyle(.white)
                                                 }
-                                                Image(systemName: "chevron.up")
+                                                DisclosureStateChevron(isExpanded: isAccExpanded)
                                                     .font(.system(size: 12, weight: .bold))
                                                     .foregroundStyle(Color.white.opacity(0.3))
-                                                    .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
                                                     .padding(.leading, 8)
                                             }
                                         },
@@ -368,10 +365,9 @@ struct EntityFinancialSection: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white)
                     }
-                    Image(systemName: "chevron.up")
+                    DisclosureStateChevron(isExpanded: isExpanded)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color.white.opacity(0.3))
-                        .rotationEffect(.degrees(isExpanded ? 0 : 180))
                         .padding(.leading, 8)
                 }
             },
@@ -422,10 +418,9 @@ struct EntityFinancialSection: View {
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(.white)
                                     }
-                                    Image(systemName: "chevron.up")
+                                    DisclosureStateChevron(isExpanded: isAccExpanded)
                                         .font(.system(size: 12, weight: .bold))
                                         .foregroundStyle(Color.white.opacity(0.3))
-                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
                                         .padding(.leading, 8)
                                 }
                             },
@@ -503,10 +498,9 @@ struct EntityFinancialSection: View {
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(.white)
                                     }
-                                    Image(systemName: "chevron.up")
+                                    DisclosureStateChevron(isExpanded: isAccExpanded)
                                         .font(.system(size: 12, weight: .bold))
                                         .foregroundStyle(Color.white.opacity(0.3))
-                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
                                         .padding(.leading, 8)
                                 }
                             },
@@ -576,10 +570,9 @@ struct EntityFinancialSection: View {
                                             .font(.system(size: 13, weight: .semibold))
                                             .foregroundStyle(.white)
                                     }
-                                    Image(systemName: "chevron.up")
+                                    DisclosureStateChevron(isExpanded: isAccExpanded)
                                         .font(.system(size: 12, weight: .bold))
                                         .foregroundStyle(Color.white.opacity(0.3))
-                                        .rotationEffect(.degrees(isAccExpanded ? 0 : 180))
                                         .padding(.leading, 8)
                                 }
                             },

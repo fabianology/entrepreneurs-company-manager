@@ -65,8 +65,8 @@ final class AppState {
     var searchDocumentRevision: String {
         "\(portfolioUserID?.uuidString ?? "")|\(hasLoadedPortfolio)|" + documents.map { "\($0.id):\($0.url ?? ""):\($0.visibility ?? "")" }.joined(separator: "|") + "|\(resourceShares.hashValue)"
     }
-    @ObservationIgnored private var cachedSearch: (user: UUID, revision: UInt64, index: UniversalSearchIndex)?
-    @ObservationIgnored private var pendingSearch: (user: UUID, revision: UInt64, token: UUID, task: Task<UniversalSearchIndex, Never>)?
+    @ObservationIgnored private var cachedSearch: (user: UUID, revision: UInt64, stamp: SearchProjectionStamp, index: UniversalSearchIndex)?
+    @ObservationIgnored private var pendingSearch: (user: UUID, revision: UInt64, stamp: SearchProjectionStamp, token: UUID, task: Task<UniversalSearchIndex, Never>)?
 
     func searchRedactor() -> SearchRedactor {
         var values = subscriptions.map(\.password) + cards.map(\.password) + institutions.map(\.password)
@@ -75,39 +75,46 @@ final class AppState {
         return SearchRedactor(values: values)
     }
 
+    func searchProjectionStamp(now: Date = Date(), calendar: Calendar = .current) -> SearchProjectionStamp {
+        SearchProjectionStamp(institutions: institutions, items: plaidItems, now: now, calendar: calendar)
+    }
+
     @MainActor
-    func searchIndex(for userID: UUID) -> UniversalSearchIndex {
-        if let cachedSearch, cachedSearch.user == userID, cachedSearch.revision == searchRevision { return cachedSearch.index }
-        let index = UniversalSearchIndex(appState: self, userID: userID, documentPages: searchDocumentPages)
-        cachedSearch = (userID, searchRevision, index)
+    func searchIndex(for userID: UUID, now: Date = Date(), calendar: Calendar = .current) -> UniversalSearchIndex {
+        let stamp = searchProjectionStamp(now: now, calendar: calendar)
+        if let cachedSearch, cachedSearch.user == userID, cachedSearch.revision == searchRevision, cachedSearch.stamp == stamp { return cachedSearch.index }
+        let index = UniversalSearchIndex(snapshot: SearchIndexSnapshot(self), userID: userID, documentPages: searchDocumentPages, now: now, calendar: calendar)
+        cachedSearch = (userID, searchRevision, stamp, index)
         return index
     }
 
     /// Reuse one background build while queries change. Publish only to the same
     /// user/revision; an old refresh must never replace the current session cache.
     @MainActor
-    func searchIndexInBackground(for userID: UUID) async throws -> UniversalSearchIndex {
+    func searchIndexInBackground(for userID: UUID, now: Date? = nil, calendar: Calendar = .current) async throws -> UniversalSearchIndex {
+        let reference = now ?? Date()
+        let stamp = searchProjectionStamp(now: reference, calendar: calendar)
         try Task.checkCancellation()
         guard portfolioUserID == userID, hasLoadedPortfolio else { throw CancellationError() }
         let revision = searchRevision
-        if let cachedSearch, cachedSearch.user == userID, cachedSearch.revision == revision { return cachedSearch.index }
+        if let cachedSearch, cachedSearch.user == userID, cachedSearch.revision == revision, cachedSearch.stamp == stamp { return cachedSearch.index }
         let work: Task<UniversalSearchIndex, Never>
         let token: UUID
-        if let pendingSearch, pendingSearch.user == userID, pendingSearch.revision == revision {
+        if let pendingSearch, pendingSearch.user == userID, pendingSearch.revision == revision, pendingSearch.stamp == stamp {
             work = pendingSearch.task; token = pendingSearch.token
         } else {
             pendingSearch?.task.cancel()
             let snapshot = SearchIndexSnapshot(self)
             token = UUID()
             work = Task.detached(priority: .userInitiated) {
-                UniversalSearchIndex(snapshot: snapshot, userID: userID, documentPages: snapshot.searchDocumentPages)
+                UniversalSearchIndex(snapshot: snapshot, userID: userID, documentPages: snapshot.searchDocumentPages, now: reference, calendar: calendar)
             }
-            pendingSearch = (userID, revision, token, work)
+            pendingSearch = (userID, revision, stamp, token, work)
         }
         let index = await work.value
-        guard portfolioUserID == userID, hasLoadedPortfolio, searchRevision == revision, !work.isCancelled else { throw CancellationError() }
+        guard portfolioUserID == userID, hasLoadedPortfolio, searchRevision == revision, searchProjectionStamp(now: now ?? Date(), calendar: calendar) == stamp, !work.isCancelled else { throw CancellationError() }
         if pendingSearch?.token == token {
-            cachedSearch = (userID, revision, index)
+            cachedSearch = (userID, revision, stamp, index)
             pendingSearch = nil
         }
         try Task.checkCancellation()

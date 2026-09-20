@@ -164,7 +164,7 @@ struct SearchOverview: Identifiable, Sendable {
             && (root.financialFacts["billingAmount"].flatMap { Decimal(string: $0) } ?? 0) > 0
         return (paidBase ? [root] : []) + children
     }
-    var serviceCountsLabel: String {
+    var serviceCounts: (bills: Int, subscriptions: Int, paymentSources: Int) {
         let active = serviceRows.filter { $0.activeService }
         let bills = active.filter { $0.serviceType == "bill" }.count
         let subscriptions = active.filter { $0.serviceType != "bill" }.count
@@ -176,7 +176,11 @@ struct SearchOverview: Identifiable, Sendable {
                 sources.insert("label:" + SearchText.normalize(label))
             }
         }
-        return "\(bills) \(bills == 1 ? "Bill" : "Bills") • \(subscriptions) \(subscriptions == 1 ? "Subscription" : "Subscriptions") • \(sources.count) \(sources.count == 1 ? "Payment source" : "Payment sources")"
+        return (bills, subscriptions, sources.count)
+    }
+    var serviceCountsLabel: String {
+        let counts = serviceCounts
+        return "\(counts.bills) \(counts.bills == 1 ? "Bill" : "Bills") | \(counts.subscriptions) \(counts.subscriptions == 1 ? "Subscription" : "Subscriptions") | \(counts.paymentSources) \(counts.paymentSources == 1 ? "Payment source" : "Payment sources")"
     }
 
     var billingTotals: [SearchBillingTotal] {
@@ -222,7 +226,58 @@ struct SearchResultPage {
     }
 }
 
+struct SearchTransactionYearGroup: Identifiable {
+    let year: Int?
+    let hits: [SearchHit]
+    var id: String { year.map(String.init) ?? "undated" }
+    var title: String { year.map(String.init) ?? "Date unavailable" }
+
+    static func groups(_ hits: [SearchHit], calendar: Calendar = .current) -> [Self] {
+        Dictionary(grouping: hits.filter { $0.record.kind == .transaction }) { hit in
+            hit.record.date.map { calendar.component(.year, from: $0) }
+        }.map { year, hits in
+            Self(year: year, hits: hits.sorted {
+                if $0.record.date != $1.record.date { return ($0.record.date ?? .distantPast) > ($1.record.date ?? .distantPast) }
+                return $0.id < $1.id
+            })
+        }.sorted { ($0.year ?? Int.min) > ($1.year ?? Int.min) }
+    }
+}
+
 extension UniversalSearchIndex {
+    /// Route service-history phrases through the same conservative attribution as overview history.
+    func serviceHistorySelection(_ query: String, filters: SearchFilters, now: Date, calendar: Calendar) -> (ids: Set<String>, query: String, name: String)? {
+        guard filters.kind == nil || filters.kind == .transaction else { return nil }
+        let named = SearchNamedText(query, names: savedNames(filters: filters))
+        let words = Set(named.masked.split(separator: " ").map(String.init))
+        guard words.contains("history") || (!words.isDisjoint(with: ["past", "previous"]) && !words.isDisjoint(with: ["charges", "payments"])) else { return nil }
+        let removed: Set<String> = ["history", "charge", "charges", "billing", "payment", "payments", "past", "previous"]
+        let remainder = named.restoring(named.masked.split(separator: " ").map(String.init).filter { !removed.contains($0) }.joined(separator: " "))
+        var nameFilters = filters; nameFilters.kind = nil
+        let plan = queryPlan(remainder, filters: nameFilters, now: now, calendar: calendar)
+        let name = plan.tokens.joined(separator: " ")
+        guard !name.isEmpty else { return nil }
+        let byID = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let services = records.filter { record in
+            guard record.kind == .subscription, filters.companyID == nil || record.companyID == filters.companyID else { return false }
+            if record.normalizedTitle == name { return true }
+            return record.parentServiceID.flatMap { byID[$0] }.map { $0.normalizedTitle + " " + record.normalizedTitle == name } == true
+        }
+        guard !services.isEmpty else { return nil }
+        var request = PortfolioQuery(); request.query = name
+        let response = SearchResponse(hits: services.map { SearchHit(record: $0, score: 700, reason: "Saved service name") })
+        let cards = overviews(for: response, request: request, filters: .init(companyID: filters.companyID))
+        var ids = Set<String>()
+        for service in services {
+            guard let overview = cards.first(where: { $0.root.id == (service.parentServiceID ?? service.id) }) else { continue }
+            let history = service.parentServiceID == nil ? overview.transactions : overview.serviceTransactions[service.id] ?? []
+            ids.formUnion(history.map(\.id))
+        }
+        // Remove only the recognized service name; retain date phrases for the precise transaction query.
+        let transactionQuery = SearchText.removingPhrase(name, from: SearchText.normalize(remainder)) + " transactions"
+        return (ids, transactionQuery, services.map(\.title).sorted().first ?? name)
+    }
+
     func overviews(for response: SearchResponse, request: PortfolioQuery, filters: SearchFilters) -> [SearchOverview] {
         let request = resolvedRequest(request, filters: filters)
         // Explicit calculations, history, date and type filters retain their precise result list.
@@ -239,7 +294,15 @@ extension UniversalSearchIndex {
         }
         func nameMatch(_ record: SearchRecord) -> Bool {
             let name = Set(record.normalizedTitle.split(separator: " ").map(String.init))
-            return plan.tokens.contains { token in name.contains { $0.hasPrefix(token) || SearchText.typo(token, $0) } }
+            let compactTitle = record.title.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+                .filter(\.isLetter)
+            let domain = SearchBrand.domain(for: record).map(SearchText.normalize) ?? ""
+            let domainWords = Set(domain.split(separator: " ").map(String.init))
+            return plan.tokens.contains { token in
+                name.contains { $0.hasPrefix(token) || SearchText.typo(token, $0) }
+                    || (token.count >= 3 && compactTitle.hasPrefix(token))
+                    || domainWords.contains { $0.hasPrefix(token) }
+            }
         }
         var roots: [String: (SearchRecord, Int)] = [:]
         let matched = Set(response.hits.filter { $0.score > 0 }.map(\.id))
@@ -259,7 +322,7 @@ extension UniversalSearchIndex {
                 savedChargeOwners[transaction.id, default: []].insert(service.id)
             }
         }
-        let merchantHistory = roots.values.contains { $0.0.kind == .subscription } ? serviceMerchantHistory() : [:]
+        let merchantHistory = roots.values.contains { $0.0.kind == .subscription } ? serviceMerchantHistory() : (accounts: [:], services: [:])
         guard !Task.isCancelled else { return [] }
         return roots.values.map { root, score in
             var overview = SearchOverview(root: root, score: score)
@@ -305,7 +368,7 @@ extension UniversalSearchIndex {
                 !(service.monthlyCost == 0 && services.contains { $0.parentServiceID == service.id })
             }.sorted { $0.title < $1.title } : []
             overview.additionalLogins = unique(members.filter { $0.kind == .card && (!$0.login.isEmpty || $0.credential != .none) })
-            let matchedHistory = root.kind == .subscription ? merchantHistory[root.id] ?? [] : []
+            let matchedHistory = root.kind == .subscription ? merchantHistory.accounts[root.id] ?? [] : []
             let confirmedIDs = Set(relatedRecords.filter { $0.kind == .transaction }.map(\.id))
             overview.merchantMatchedTransactionIDs = Set(matchedHistory.map(\.id)).subtracting(confirmedIDs)
             overview.transactions = unique(relatedRecords.filter { $0.kind == .transaction } + matchedHistory).sorted {
@@ -315,14 +378,14 @@ extension UniversalSearchIndex {
             overview.documents = unique(relatedRecords.filter { $0.kind == .document && $0.page == nil })
             for member in unique(members + overview.paidServices) { overview.connections[member.id] = linked(member) }
             for child in overview.children {
-                overview.connections[child.id] = unique((overview.connections[child.id] ?? []) + (merchantHistory[child.id] ?? []))
+                overview.connections[child.id] = unique((overview.connections[child.id] ?? []) + (merchantHistory.services[child.id] ?? []))
             }
             if root.kind == .subscription {
                 // One saved charge cannot establish separate amounts for multiple services.
                 // Keep ambiguous ownership in account-wide history only.
                 var owners = savedChargeOwners
                 for member in [root] + overview.children {
-                    for transaction in overview.linked(to: member, kinds: [.transaction]) {
+                    for transaction in overview.linked(to: member, kinds: [.transaction]) + (merchantHistory.services[member.id] ?? []) {
                         owners[transaction.id, default: []].insert(member.id)
                     }
                 }
@@ -333,7 +396,7 @@ extension UniversalSearchIndex {
                         // A generic merchant charge can belong to any add-on. Only confirmed base
                         // links may populate the paid base row; the account-wide list retains all.
                         history = overview.children.isEmpty ? overview.transactions
-                            : directlyLinked.filter { $0.kind == .transaction && !childTransactionIDs.contains($0.id) }
+                            : unique(directlyLinked.filter { $0.kind == .transaction && !childTransactionIDs.contains($0.id) } + (merchantHistory.services[root.id] ?? []))
                     } else {
                         history = overview.linked(to: member, kinds: [.transaction]).filter { owners[$0.id]?.count == 1 }
                     }
@@ -371,7 +434,7 @@ extension UniversalSearchIndex {
 
     /// Exact merchant/domain matches within one company. Known funding accounts must
     /// agree; duplicate service accounts are assigned only when the match is unique.
-    private func serviceMerchantHistory() -> [String: [SearchRecord]] {
+    private func serviceMerchantHistory() -> (accounts: [String: [SearchRecord]], services: [String: [SearchRecord]]) {
         let byID = Dictionary(records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let services = records.filter { $0.kind == .subscription && $0.parentServiceID == nil }
         let servicesByCompany = Dictionary(grouping: services, by: \.companyID)
@@ -380,11 +443,12 @@ extension UniversalSearchIndex {
             return (service.id, host.hasPrefix("www.") ? String(host.dropFirst(4)) : host)
         })
         let children = Dictionary(grouping: records.filter { $0.parentServiceID != nil }, by: { $0.parentServiceID! })
-        func paymentKeys(_ record: SearchRecord) -> Set<String> {
+        func paymentKeys(_ record: SearchRecord, precise: Bool = false) -> Set<String> {
             var keys = Set<String>()
             for id in links[record.id] ?? [] {
                 guard let source = byID[id], source.companyID == record.companyID,
-                      [.card, .account, .institution].contains(source.kind) else { continue }
+                      [.card, .account, .institution].contains(source.kind),
+                      !precise || source.kind != .institution else { continue }
                 keys.insert(source.id)
                 if let identity = source.balanceIdentity { keys.insert(identity) }
             }
@@ -393,6 +457,32 @@ extension UniversalSearchIndex {
         let funding = Dictionary(uniqueKeysWithValues: services.map { service in
             (service.id, ([service] + (children[service.id] ?? [])).reduce(into: Set<String>()) { $0.formUnion(paymentKeys($1)) })
         })
+        let allServices = records.filter { $0.kind == .subscription }
+        let preciseFunding = Dictionary(uniqueKeysWithValues: allServices.map { ($0.id, paymentKeys($0, precise: true)) })
+        let precision = Dictionary(uniqueKeysWithValues: Set(allServices.map(\.currency)).map { currency in
+            let formatter = NumberFormatter(); formatter.numberStyle = .currency; formatter.currencyCode = currency
+            return (currency, formatter.maximumFractionDigits)
+        })
+        func rounded(_ amount: Decimal, currency: String) -> Decimal {
+            var input = amount, output = Decimal()
+            NSDecimalRound(&output, &input, precision[currency] ?? 2, .plain)
+            return output
+        }
+        let billingAmounts = Dictionary(uniqueKeysWithValues: allServices.compactMap { service -> (String, Decimal)? in
+            guard service.safeDetails["pricingModel"] != "free",
+                  let text = service.financialFacts["billingAmount"], let amount = Decimal(string: text), amount > 0 else { return nil }
+            return (service.id, rounded(amount, currency: service.currency))
+        })
+        func amountMatches(_ transaction: SearchRecord, members: [SearchRecord]) -> [SearchRecord] {
+            // Amount-only attribution requires a known card/account, never merely the same bank.
+            guard !transaction.pending, transaction.flow == "expense", let amount = transaction.amount, amount > 0 else { return [] }
+            let sourceKeys = paymentKeys(transaction, precise: true)
+            guard !sourceKeys.isEmpty else { return [] }
+            return members.filter { service in
+                service.currency == transaction.currency && billingAmounts[service.id] == rounded(amount, currency: transaction.currency)
+                    && !(preciseFunding[service.id] ?? []).isDisjoint(with: sourceKeys)
+            }
+        }
         func merchantMatches(_ transaction: SearchRecord, _ service: SearchRecord, merchantHost: String?) -> Bool {
             let name = service.normalizedTitle
             if transaction.normalizedTitle == name || (name.count >= 3 && transaction.normalizedTitle.hasPrefix(name + " ")) { return true }
@@ -401,9 +491,9 @@ extension UniversalSearchIndex {
             guard let merchantHost else { return false }
             return merchantHost == domain || merchantHost.hasSuffix("." + domain)
         }
-        var result: [String: [SearchRecord]] = [:]
+        var result: (accounts: [String: [SearchRecord]], services: [String: [SearchRecord]]) = ([:], [:])
         for transaction in records where transaction.kind == .transaction && !["income", "transfer", "ignored"].contains(transaction.flow) {
-            if Task.isCancelled { return [:] }
+            if Task.isCancelled { return ([:], [:]) }
             guard transaction.companyID != nil else { continue }
             if (links[transaction.id] ?? []).contains(where: { byID[$0]?.kind == .subscription }) { continue }
             let accountKeys = paymentKeys(transaction)
@@ -418,15 +508,29 @@ extension UniversalSearchIndex {
             // Prefer a known account match over an otherwise indistinguishable unconfigured service.
             let accountMatches = candidates.filter { !(funding[$0.id] ?? []).isEmpty }
             let matches = accountMatches.isEmpty ? candidates : accountMatches
-            guard matches.count == 1, let service = matches.first else { continue }
-            result[service.id, default: []].append(transaction)
+            let service: SearchRecord
+            if matches.count == 1, let match = matches.first { service = match }
+            else {
+                let amounts = amountMatches(transaction, members: matches.flatMap { [$0] + (children[$0.id] ?? []) })
+                guard amounts.count == 1, let member = amounts.first,
+                      let parent = byID[member.parentServiceID ?? member.id] else { continue }
+                service = parent
+            }
+            result.accounts[service.id, default: []].append(transaction)
             let matchingChildren = (children[service.id] ?? []).filter { child in
                 let name = child.normalizedTitle
                 let title = " " + transaction.normalizedTitle + " "
                 let keys = paymentKeys(child)
                 return !name.isEmpty && title.contains(" " + name + " ") && (keys.isEmpty || !keys.isDisjoint(with: accountKeys))
             }
-            if matchingChildren.count == 1, let child = matchingChildren.first { result[child.id, default: []].append(transaction) }
+            if matchingChildren.count == 1, let child = matchingChildren.first {
+                result.services[child.id, default: []].append(transaction)
+            } else if matchingChildren.isEmpty {
+                let amounts = amountMatches(transaction, members: [service] + (children[service.id] ?? []))
+                if amounts.count == 1, let member = amounts.first {
+                    result.services[member.id, default: []].append(transaction)
+                }
+            }
         }
         return result
     }
@@ -460,5 +564,21 @@ enum SearchBrand {
             "capital one": "capitalone.com", "wells fargo": "wellsfargo.com", "fidelity": "fidelity.com",
             "vanguard": "vanguard.com", "cox": "cox.com", "cox internet": "cox.com", "spotify": "spotify.com"]
         return brands[SearchText.normalize(record.brandName ?? record.title)]
+    }
+}
+
+/// Cache identity includes every time-dependent coverage boundary, independently of edits.
+struct SearchProjectionStamp: Equatable, Sendable {
+    var day: Date
+    var calendar: Calendar
+    var staleBanks: Set<UUID>
+    var staleItems: Set<UUID>
+
+    init(institutions: [Institution], items: [PlaidItemSummary], now: Date, calendar: Calendar) {
+        day = calendar.startOfDay(for: now); self.calendar = calendar
+        staleBanks = Set(institutions.filter { bank in
+            bank.lastSyncedAt.map { UpcomingCoverageEngine.isBankBalanceStale(lastSyncedAt: $0, now: now, calendar: calendar) } ?? false
+        }.map(\.id))
+        staleItems = Set(items.filter { $0.isStale(referenceDate: now) }.map(\.id))
     }
 }

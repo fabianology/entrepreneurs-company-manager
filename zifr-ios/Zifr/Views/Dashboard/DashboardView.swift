@@ -1221,10 +1221,9 @@ struct MiloomFolderView: View {
                         .foregroundStyle(Color.white.opacity(0.4))
                         .padding(.trailing, 8)
                         
-                    Image(systemName: "chevron.right")
+                    DisclosureStateChevron(isExpanded: isExpanded)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Color.white.opacity(0.3))
-                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
                 }
                 .padding(16)
                 .background(Color(hex: "#1C1C1E"))
