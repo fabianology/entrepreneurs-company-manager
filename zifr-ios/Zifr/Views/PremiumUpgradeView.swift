@@ -5,6 +5,7 @@ import Observation
 struct PremiumUpgradeView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(AuthViewModel.self) private var authVM
     @Environment(AccessController.self) private var accessController
 
@@ -13,6 +14,7 @@ struct PremiumUpgradeView: View {
     @State private var isYearly = false
     @State private var isShowingAllBenefits = false
     @State private var introEligibleProductIDs: Set<Product.ID> = []
+    @State private var isLoadingProducts = true
     @State private var isPurchasing = false
     @State private var isRestoring = false
     @State private var errorMessage: String?
@@ -26,11 +28,12 @@ struct PremiumUpgradeView: View {
     var body: some View {
         ConversionPaywallContent(
             gate: gate,
-            isPro: accessController.isPro,
+            isPro: accessController.hasProSubscription,
             membershipSubtitle: accessController.membershipSubtitle,
             isYearly: $isYearly,
             isShowingAllBenefits: $isShowingAllBenefits,
-            isEligibleForTrial: selectedProduct.map { introEligibleProductIDs.contains($0.id) } ?? false,
+            isEligibleForIntroOffer: selectedProduct.map { introEligibleProductIDs.contains($0.id) } ?? false,
+            isLoadingProducts: isLoadingProducts,
             isPurchasing: isPurchasing,
             isRestoring: isRestoring,
             monthlyProduct: product(forYearly: false),
@@ -38,25 +41,43 @@ struct PremiumUpgradeView: View {
             loadError: store.loadError,
             dismiss: { dismiss() },
             purchase: { Task { await purchase() } },
-            restore: {
-                Task {
-                    guard !isRestoring else { return }
-                    isRestoring = true
-                    defer { isRestoring = false }
-                    do {
-                        let restored = try await store.restore(accessController: accessController)
-                        if !restored {
-                            errorMessage = "No active Miloom Pro subscription was found for this Apple ID."
-                        }
-                    }
-                    catch { errorMessage = error.localizedDescription }
-                }
-            },
+            restore: { Task { await restore() } },
+            retry: { Task { await loadProducts() } },
             manageSubscription: {
                 if let url = URL(string: "https://apps.apple.com/account/subscriptions") { openURL(url) }
             }
         )
-        .task { await loadProducts() }
+        .task {
+            if accessController.isBetaAccessActive {
+                accessController.pendingGate = nil
+                dismiss()
+                return
+            }
+            await loadProducts()
+            await store.retryUnfinishedTransactions(accessController: accessController)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, store.products.count < 2 else { return }
+            Task { await loadProducts() }
+        }
+        .onChange(of: accessController.hasProSubscription) { wasPro, isPro in
+            // An Ask to Buy approval can arrive while this paywall remains open.
+            if !wasPro, isPro, !isPurchasing, !isRestoring {
+                accessController.pendingGate = nil
+                dismiss()
+            }
+        }
+        .onChange(of: accessController.isBetaAccessActive) { _, hasBetaAccess in
+            if hasBetaAccess {
+                accessController.pendingGate = nil
+                dismiss()
+            }
+        }
+        .interactiveDismissDisabled(isPurchasing || isRestoring)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.hidden)
+        .presentationCornerRadius(36)
+        .presentationBackground(Color(hex: "#0B0D0C"))
         .alert("Miloom Pro", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -73,6 +94,9 @@ struct PremiumUpgradeView: View {
     }
 
     private func loadProducts() async {
+        isLoadingProducts = true
+        introEligibleProductIDs = []
+        defer { isLoadingProducts = false }
         await store.fetchProducts()
         if product(forYearly: true) == nil, product(forYearly: false) != nil {
             isYearly = false
@@ -81,8 +105,8 @@ struct PremiumUpgradeView: View {
         }
         var eligibleIDs: Set<Product.ID> = []
         for product in store.products {
-            guard product.subscription?.introductoryOffer?.paymentMode == .freeTrial,
-                  let subscription = product.subscription else { continue }
+            guard let subscription = product.subscription,
+                  subscription.introductoryOffer != nil else { continue }
             if await subscription.isEligibleForIntroOffer {
                 eligibleIDs.insert(product.id)
             }
@@ -91,8 +115,13 @@ struct PremiumUpgradeView: View {
     }
 
     private func purchase() async {
-        guard let product = selectedProduct, let userId = authVM.currentUser?.id else {
-            errorMessage = "App Store pricing is still loading. Please try again."
+        guard !isPurchasing, !isRestoring, !isLoadingProducts else { return }
+        guard let product = selectedProduct else {
+            errorMessage = "App Store pricing is unavailable. Please try again."
+            return
+        }
+        guard let userId = authVM.currentUser?.id else {
+            errorMessage = "Please sign in to your Miloom account before subscribing."
             return
         }
         isPurchasing = true
@@ -101,6 +130,7 @@ struct PremiumUpgradeView: View {
             let outcome = try await store.purchase(product, appAccountToken: userId, accessController: accessController)
             switch outcome {
             case .purchased:
+                accessController.pendingGate = nil
                 dismiss()
             case .pending:
                 errorMessage = "Your purchase is pending approval. Miloom Pro will unlock automatically when the App Store completes it."
@@ -110,6 +140,24 @@ struct PremiumUpgradeView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func restore() async {
+        guard !isPurchasing, !isRestoring else { return }
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            if try await store.restore(accessController: accessController) {
+                accessController.pendingGate = nil
+                dismiss()
+                return
+            } else {
+                errorMessage = "No active Miloom Pro subscription was found for this Apple ID."
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        await loadProducts()
     }
 }
 
@@ -142,15 +190,18 @@ private struct RaisedMiloomButtonStyle: ButtonStyle {
     }
 }
 
-private struct ConversionPaywallContent: View {
+struct ConversionPaywallContent: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let gate: PremiumGate?
     let isPro: Bool
     let membershipSubtitle: String
     @Binding var isYearly: Bool
     @Binding var isShowingAllBenefits: Bool
-    let isEligibleForTrial: Bool
+    let isEligibleForIntroOffer: Bool
+    let isLoadingProducts: Bool
     let isPurchasing: Bool
     let isRestoring: Bool
     let monthlyProduct: Product?
@@ -159,158 +210,185 @@ private struct ConversionPaywallContent: View {
     let dismiss: () -> Void
     let purchase: () -> Void
     let restore: () -> Void
+    let retry: () -> Void
     let manageSubscription: () -> Void
+    var reduceTransparencyOverride: Bool? = nil
 
     private var selectedProduct: Product? { isYearly ? yearlyProduct : monthlyProduct }
 
+    private var billing: PaywallBillingTerms? {
+        selectedProduct.map { PaywallBillingTerms(product: $0, isEligibleForIntroOffer: isEligibleForIntroOffer) }
+    }
+    private var isBusy: Bool { isPurchasing || isRestoring }
+
     var body: some View {
-        ZStack {
-            Color(hex: "#1A1B1A").ignoresSafeArea()
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                topBar.padding(.bottom, 11)
+                headline
+                productPreview.padding(.top, 14)
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    topBar
-                    headline.padding(.top, 4)
-                    productPreview.padding(.top, 14)
-
-                    if isPro {
-                        activeMembership.padding(.top, 18)
-                    } else {
-                        comparison.padding(.top, 16)
-                        allBenefits
-                        planSelector.padding(.top, 18)
-                        billingTimeline.padding(.top, 16)
-                        primaryAction.padding(.top, 12)
-                    }
-
-                    footer.padding(.top, 8).padding(.bottom, 24)
+                if isPro {
+                    activeMembership.padding(.top, 18)
+                } else {
+                    comparison.padding(.top, 14)
+                    allBenefits
+                    planSelector.padding(.top, 17)
+                    billingTimeline.padding(.top, 15)
+                    primaryAction.padding(.top, 11)
+                    continueFreeAction
                 }
-                .padding(.horizontal, 22)
+
+                footer.padding(.top, 3)
             }
-            .background(Color(hex: "#0B0D0C"))
-            .clipShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 36, style: .continuous)
-                    .stroke(Color(hex: "#35352E"), lineWidth: 1)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 22)
+            .padding(.top, 16)
+            .padding(.bottom, 10)
+            .frame(maxWidth: 440)
+            .frame(maxWidth: .infinity)
         }
-        .statusBarHidden(true)
+        .background(Color(hex: "#0B0D0C").ignoresSafeArea())
+        .preferredColorScheme(.dark)
+        .overlay(alignment: .topTrailing) {
+            closeButton
+                .padding(.top, 16)
+                .padding(.trailing, 22)
+        }
     }
 
     private var topBar: some View {
         HStack(spacing: 8) {
             Text("miloom")
-                .font(.system(size: 21, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .tracking(-0.7)
                 .foregroundStyle(Color.white.opacity(0.95))
 
             Text("PRO")
                 .font(.system(size: 10, weight: .bold))
-                .tracking(1.5)
-                .foregroundStyle(Color.miloomGold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(Color.miloomGold.opacity(0.09))
+                .tracking(1.7)
+                .foregroundStyle(Color.paywallGold)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(Color.paywallGold.opacity(0.09))
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .stroke(Color.miloomGold.opacity(0.30), lineWidth: 1)
+                        .stroke(Color.paywallGold.opacity(0.30), lineWidth: 1)
                 }
 
             Spacer()
 
-            Button(action: dismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .frame(width: 44, height: 44)
-                    .background(Color.white.opacity(0.045))
-                    .clipShape(Circle())
-                    .overlay { Circle().stroke(Color.white.opacity(0.12), lineWidth: 1) }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close")
+            Color.clear.frame(width: 44, height: 44)
         }
-        .padding(.top, 10)
+    }
+
+    private var closeButton: some View {
+        Button(action: dismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(Color.white.opacity(0.78))
+                .frame(width: 44, height: 44)
+                .background(Color(hex: "#151815").opacity(0.96))
+                .clipShape(Circle())
+                .overlay { Circle().stroke(Color.white.opacity(0.16), lineWidth: 1) }
+                .shadow(color: .black.opacity(0.32), radius: 10, y: 4)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Close and continue with Miloom Free")
+        .accessibilityIdentifier("paywall.close")
+        .disabled(isBusy)
     }
 
     private var headline: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
             (
                 Text(headlinePrimary).foregroundStyle(Color.white.opacity(0.96))
-                + Text("\n\(headlineAccent)").foregroundStyle(Color.miloomGold)
+                + Text("\n\(headlineAccent)").foregroundStyle(Color.paywallGold)
             )
             .font(.system(size: 34, weight: .semibold))
+            .lineSpacing(-4)
+            .fixedSize(horizontal: false, vertical: true)
             .tracking(-1.2)
 
             Text(headlineSubtitle)
-                .font(.system(size: 14))
-                .foregroundStyle(Color.white.opacity(0.66))
+                .font(.system(size: 13))
+                .foregroundStyle(Color(hex: "#B8BCB4"))
+                .frame(maxWidth: 315, alignment: .leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .lineSpacing(2)
         }
     }
 
     private var productPreview: some View {
-        ZStack {
-            Color(hex: "#1B2E2C")
-
-            Ellipse()
-                .fill(Color.miloomGold.opacity(0.08))
-                .overlay {
-                    Ellipse().stroke(Color.miloomGold.opacity(0.31), lineWidth: 20)
-                }
-                .frame(width: 220, height: 154)
-                .rotationEffect(.degrees(-25))
-                .offset(x: 116, y: -54)
-
-            VStack(alignment: .leading, spacing: 13) {
-                HStack(spacing: 8) {
-                    Image(systemName: "checklist.checked")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text("Owner Briefing")
-                        .font(.system(size: 13, weight: .semibold))
-                    Spacer()
-                    Text("EXAMPLE")
-                        .font(.system(size: 9, weight: .medium))
-                        .tracking(0.6)
-                        .foregroundStyle(Color.white.opacity(0.70))
-                }
-
-                HStack(spacing: 8) {
-                    Text("Software renewal")
-                        .font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    Text("Due tomorrow")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color(hex: "#E9E5BC"))
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "checklist")
+                    .font(.system(size: 15, weight: .semibold))
+                Text("Owner Briefing")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text("Example")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(hex: "#E1E6D9"))
             }
-            .foregroundStyle(Color.white.opacity(0.92))
-            .padding(.horizontal, 15)
-            .padding(.vertical, 14)
-            .background {
-                if reduceTransparency {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .fill(Color(hex: "#25382E"))
-                } else {
-                    RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                }
+            .frame(minHeight: 21)
+
+            HStack(spacing: 8) {
+                Text("Software renewal")
+                    .font(.system(size: 12))
+                Spacer()
+                Text("Due tomorrow")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(hex: "#E9E5BC"))
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .stroke(Color.white.opacity(0.32), lineWidth: 1)
-            }
-            .shadow(color: Color.black.opacity(0.26), radius: 16, y: 8)
-            .padding(12)
+            .frame(minHeight: 19)
         }
+        .foregroundStyle(Color.white.opacity(0.92))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minHeight: 80)
+        .background {
+            if reduceTransparencyOverride ?? reduceTransparency {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .fill(Color(hex: "#25382E"))
+            } else {
+                // Blur only the decorative backdrop, retaining the concept's clear tint on iOS 17.
+                previewBackdrop(inset: 12)
+                    .blur(radius: 7)
+                    .overlay {
+                        LinearGradient(colors: [.white.opacity(0.09), .clear], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(
+                    LinearGradient(colors: [.white.opacity(0.68), .white.opacity(0.38)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1
+                )
+        }
+        .shadow(color: Color.black.opacity(0.26), radius: 16, y: 8)
+        .padding(12)
         .frame(minHeight: 104)
+        .background { previewBackdrop() }
         .clipShape(RoundedRectangle(cornerRadius: 23, style: .continuous))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Owner Briefing example. Software renewal due tomorrow.")
+    }
+
+    private func previewBackdrop(inset: CGFloat = 0) -> some View {
+        Color(hex: "#1B2E2C")
+            .overlay(alignment: .topTrailing) {
+                Ellipse()
+                    .fill(Color(hex: "#C4B677").opacity(0.09))
+                    .overlay { Ellipse().strokeBorder(Color(hex: "#C4B677").opacity(0.45), lineWidth: 24) }
+                    // The reference's 230×165 content box includes a 24pt border on each side.
+                    .frame(width: 278, height: 213)
+                    .rotationEffect(.degrees(-28))
+                    .offset(x: 42 + inset, y: -46 - inset)
+            }
+            .clipped()
     }
 
     private var comparison: some View {
@@ -327,7 +405,7 @@ private struct ConversionPaywallContent: View {
     private var allBenefits: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     isShowingAllBenefits.toggle()
                 }
             } label: {
@@ -336,7 +414,7 @@ private struct ConversionPaywallContent: View {
                         .font(.system(size: 8, weight: .bold))
                         .frame(width: 10)
                     Text("See everything included in Pro")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11))
                     Spacer()
                 }
                 .foregroundStyle(Color.white.opacity(0.66))
@@ -344,6 +422,8 @@ private struct ConversionPaywallContent: View {
                 .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
+            .accessibilityValue(isShowingAllBenefits ? "Expanded" : "Collapsed")
+            .accessibilityIdentifier("paywall.benefits")
 
             if isShowingAllBenefits {
                 VStack(alignment: .leading, spacing: 9) {
@@ -362,17 +442,18 @@ private struct ConversionPaywallContent: View {
     }
 
     private var planSelector: some View {
-        HStack(spacing: 9) {
+        let layout = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(spacing: 16)) : AnyLayout(HStackLayout(spacing: 9))
+        return layout {
             ConversionPlanChoice(
                 title: "Yearly",
                 price: priceText(yearly: true),
                 detail: yearlyEquivalentText,
-                savings: annualSavingsText,
+                savings: PaywallBillingTerms.annualSavings(monthly: monthlyProduct, yearly: yearlyProduct),
                 isSelected: isYearly,
-                isAvailable: yearlyProduct != nil
+                isAvailable: yearlyProduct != nil && !isBusy && !isLoadingProducts
             ) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { isYearly = true }
+                withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) { isYearly = true }
             }
 
             ConversionPlanChoice(
@@ -381,52 +462,59 @@ private struct ConversionPaywallContent: View {
                 detail: "Billed monthly",
                 savings: nil,
                 isSelected: !isYearly,
-                isAvailable: monthlyProduct != nil
+                isAvailable: monthlyProduct != nil && !isBusy && !isLoadingProducts
             ) {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { isYearly = false }
+                withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.8)) { isYearly = false }
             }
         }
     }
 
     private var billingTimeline: some View {
-        VStack(spacing: 10) {
-            HStack(alignment: .top, spacing: 10) {
-                ConversionBillingStep(
-                    title: hasTrial ? "Today · \(zeroPrice)" : "Today · \(selectedProduct?.displayPrice ?? "App Store price")",
-                    detail: "Full Pro access"
-                )
-                ConversionBillingStep(
-                    title: hasTrial ? "In \(introductoryPeriodText)" : "In \(renewalPeriodText)",
-                    detail: "\(selectedProduct?.displayPrice ?? "App Store price"), then \(isYearly ? "yearly" : "monthly")"
-                )
+        VStack(spacing: 11) {
+            if let billing, !isLoadingProducts {
+                HStack(alignment: .top, spacing: 10) {
+                    ConversionBillingStep(title: billing.todayTitle, detail: billing.todayDetail)
+                    ConversionBillingStep(title: billing.nextTitle, detail: billing.nextDetail)
+                }
+                Text(billing.disclosure)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color(hex: "#ADB6A5"))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(2)
+            } else {
+                Text(isLoadingProducts ? "Loading App Store prices and offers…" : "Subscriptions aren’t available right now. Continue with Free or try loading prices again.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(hex: "#ADB6A5"))
+                    .frame(maxWidth: .infinity, minHeight: 62)
+                    .multilineTextAlignment(.center)
             }
-
-            Text(cancelDisclosure)
-                .font(.system(size: 11))
-                .foregroundStyle(Color.white.opacity(0.60))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(2)
         }
     }
 
     private var primaryAction: some View {
-        Button(action: purchase) {
+        let shouldRetry = !isLoadingProducts && selectedProduct == nil
+        return Button(action: shouldRetry ? retry : purchase) {
             HStack(spacing: 12) {
                 if isPurchasing {
                     ProgressView().tint(Color(hex: "#1B271A"))
                 }
-                Text(isPurchasing ? "Processing…" : purchaseButtonTitle)
-                    .font(.system(size: 16, weight: .bold))
+                Text(
+                    isPurchasing ? "Processing…"
+                    : isLoadingProducts ? "Loading…"
+                    : shouldRetry ? "Try loading prices again"
+                    : billing?.buttonTitle ?? "Subscribe to Pro"
+                )
+                    .font(.system(size: 15, weight: .semibold))
                 if !isPurchasing {
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 15, weight: .bold))
+                    Image(systemName: shouldRetry ? "arrow.clockwise" : "arrow.right")
+                        .font(.system(size: 17, weight: .regular))
                 }
             }
             .foregroundStyle(Color(hex: "#1B271A"))
             .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .frame(minHeight: 50)
             .background(
                 LinearGradient(
                     colors: [Color(hex: "#EEF0DF"), Color(hex: "#DBE1C7")],
@@ -439,15 +527,30 @@ private struct ConversionPaywallContent: View {
             .shadow(color: Color(hex: "#DBE1C7").opacity(0.12), radius: 18, y: 5)
         }
         .buttonStyle(ConversionCTAButtonStyle())
-        .disabled(isPurchasing || selectedProduct == nil)
-        .opacity(selectedProduct == nil ? 0.55 : 1)
+        .disabled(isBusy || isLoadingProducts)
+        .accessibilityIdentifier("paywall.purchase")
+        .opacity(isLoadingProducts ? 0.55 : 1)
+    }
+
+    private var continueFreeAction: some View {
+        Button(action: dismiss) {
+            Text("Continue with Free")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.78))
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isBusy)
+        .accessibilityHint("Closes this screen. You can upgrade later from Account.")
+        .accessibilityIdentifier("paywall.continue-free")
     }
 
     private var activeMembership: some View {
         VStack(spacing: 14) {
             Label(membershipSubtitle, systemImage: "checkmark.seal.fill")
                 .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(Color.miloomGold)
+                .foregroundStyle(Color.paywallGold)
 
             Button(action: manageSubscription) {
                 HStack(spacing: 10) {
@@ -494,9 +597,9 @@ private struct ConversionPaywallContent: View {
             .frame(minHeight: 44)
 
             if !isPro, loadError != nil {
-                Text("App Store pricing is unavailable. Check your connection and try again.")
+                Text("App Store pricing could not load. You can keep using Miloom Free and try again later.")
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.miloomGold.opacity(0.85))
+                    .foregroundStyle(Color.paywallGold.opacity(0.85))
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
             }
@@ -532,67 +635,18 @@ private struct ConversionPaywallContent: View {
         }
     }
 
-    private var hasTrial: Bool {
-        guard isEligibleForTrial,
-              let offer = selectedProduct?.subscription?.introductoryOffer else { return false }
-        return offer.paymentMode == .freeTrial
-    }
-
-    private var purchaseButtonTitle: String {
-        hasTrial ? "Start \(introductoryPeriodText) free trial" : "Subscribe to Pro"
-    }
-
-    private var introductoryPeriodText: String {
-        selectedProduct?.subscription?.introductoryOffer.map { periodText($0.period) } ?? "trial"
-    }
-
-    private var renewalPeriodText: String {
-        selectedProduct?.subscription.map { periodText($0.subscriptionPeriod) } ?? (isYearly ? "1 year" : "1 month")
-    }
-
-    private var zeroPrice: String {
-        guard let selectedProduct else { return "$0" }
-        return Decimal.zero.formatted(selectedProduct.priceFormatStyle)
-    }
-
-    private var cancelDisclosure: String {
-        if hasTrial {
-            return "Auto-renews. To avoid a charge, cancel in App Store settings at least 24 hours before your trial ends."
-        }
-        return "Auto-renews \(isYearly ? "yearly" : "monthly"). Cancel in App Store settings at least 24 hours before renewal."
-    }
-
     private func priceText(yearly: Bool) -> String {
-        let product = yearly ? yearlyProduct : monthlyProduct
-        guard let product else { return "Loading…" }
-        return product.displayPrice + (yearly ? "/year" : "/month")
+        guard let product = yearly ? yearlyProduct : monthlyProduct else {
+            return isLoadingProducts ? "Loading…" : "Unavailable"
+        }
+        return product.displayPrice + PaywallBillingTerms.priceSuffix(product)
     }
 
     private var yearlyEquivalentText: String {
-        guard let yearlyProduct else { return "App Store price" }
+        guard let yearlyProduct else { return "Billed yearly" }
         return "\((yearlyProduct.price / 12).formatted(yearlyProduct.priceFormatStyle))/mo equivalent"
     }
 
-    private var annualSavingsText: String? {
-        guard let yearlyProduct, let monthlyProduct else { return nil }
-        let monthlyAnnualized = NSDecimalNumber(decimal: monthlyProduct.price * 12).doubleValue
-        let annual = NSDecimalNumber(decimal: yearlyProduct.price).doubleValue
-        guard monthlyAnnualized > 0, annual < monthlyAnnualized else { return nil }
-        return "Save \(Int(((1 - annual / monthlyAnnualized) * 100).rounded()))%"
-    }
-
-    private func periodText(_ period: Product.SubscriptionPeriod) -> String {
-        let value = period.value
-        let unit: String
-        switch period.unit {
-        case .day: unit = value == 1 ? "day" : "days"
-        case .week: unit = value == 1 ? "week" : "weeks"
-        case .month: unit = value == 1 ? "month" : "months"
-        case .year: unit = value == 1 ? "year" : "years"
-        @unknown default: unit = "days"
-        }
-        return "\(value) \(unit)"
-    }
 }
 
 private struct ConversionComparisonRow: View {
@@ -608,13 +662,14 @@ private struct ConversionComparisonRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(free)
                 .foregroundStyle(Color.white.opacity(0.50))
-                .frame(width: 52, alignment: .center)
+                .frame(width: 48, alignment: .center)
             Text(pro)
-                .foregroundStyle(Color.miloomGold)
-                .frame(width: 88, alignment: .trailing)
+                .foregroundStyle(Color.paywallGold)
+                .frame(width: 90, alignment: .trailing)
         }
         .font(.system(size: isHeader ? 11 : 12, weight: isHeader ? .medium : .regular))
-        .padding(.vertical, isHeader ? 8 : 10)
+        .padding(.top, isHeader ? 0 : 9)
+        .padding(.bottom, isHeader ? 8 : 9)
         .overlay(alignment: .top) {
             if !isHeader {
                 Rectangle().fill(Color.white.opacity(0.10)).frame(height: 1)
@@ -629,7 +684,7 @@ private struct ConversionBenefitBullet: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             Circle()
-                .fill(Color.miloomGold)
+                .fill(Color.paywallGold)
                 .frame(width: 4, height: 4)
                 .padding(.top, 7)
             Text(text)
@@ -659,10 +714,10 @@ private struct ConversionPlanChoice: View {
                         Spacer()
                         ZStack {
                             Circle()
-                                .stroke(isSelected ? Color.miloomGold : Color.white.opacity(0.42), lineWidth: 1)
+                                .stroke(isSelected ? Color.paywallGold : Color.white.opacity(0.42), lineWidth: 1)
                                 .frame(width: 18, height: 18)
                             if isSelected {
-                                Circle().fill(Color.miloomGold).frame(width: 18, height: 18)
+                                Circle().fill(Color.paywallGold).frame(width: 18, height: 18)
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 9, weight: .black))
                                     .foregroundStyle(Color(hex: "#20251A"))
@@ -671,7 +726,7 @@ private struct ConversionPlanChoice: View {
                     }
 
                     Text(price)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 20, weight: .medium))
                         .tracking(-0.4)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -690,11 +745,13 @@ private struct ConversionPlanChoice: View {
                 .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
                 .overlay {
                     RoundedRectangle(cornerRadius: 17, style: .continuous)
-                        .stroke(isSelected ? Color.miloomGold : Color.white.opacity(0.16), lineWidth: 1)
+                        .stroke(isSelected ? Color.paywallGold : Color.white.opacity(0.16), lineWidth: 1)
                 }
             }
             .buttonStyle(.plain)
             .disabled(!isAvailable)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityIdentifier("paywall.plan.\(title.lowercased())")
             .opacity(isAvailable ? 1 : 0.55)
 
             if let savings {
@@ -703,7 +760,7 @@ private struct ConversionPlanChoice: View {
                     .foregroundStyle(Color(hex: "#22261B"))
                     .padding(.horizontal, 7)
                     .padding(.vertical, 4)
-                    .background(Color.miloomGold)
+                    .background(Color.paywallGold)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .offset(x: -11, y: -9)
             }
@@ -716,17 +773,19 @@ private struct ConversionBillingStep: View {
     let detail: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 0) {
             Rectangle()
                 .fill(Color.white.opacity(0.25))
                 .frame(height: 1)
                 .overlay(alignment: .leading) {
-                    Circle().fill(Color.miloomGold).frame(width: 7, height: 7)
+                    Circle().fill(Color.paywallGold).frame(width: 7, height: 7)
                 }
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .padding(.top, 12)
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.90))
             Text(detail)
+                .padding(.top, 4)
                 .font(.system(size: 11))
                 .foregroundStyle(Color.white.opacity(0.62))
                 .lineLimit(2)
@@ -745,6 +804,89 @@ private struct ConversionCTAButtonStyle: ButtonStyle {
     }
 }
 
+/// StoreKit is the single source of truth for every price and introductory-offer claim.
+struct PaywallBillingTerms {
+    let product: Product
+    let isEligibleForIntroOffer: Bool
+
+    private var offer: Product.SubscriptionOffer? {
+        isEligibleForIntroOffer ? product.subscription?.introductoryOffer : nil
+    }
+    var hasTrial: Bool { offer?.paymentMode == .freeTrial }
+    private var cadence: String {
+        guard let period = product.subscription?.subscriptionPeriod else { return "each billing period" }
+        switch (period.unit, period.value) {
+        case (.month, 1): return "monthly"
+        case (.year, 1): return "yearly"
+        case (.week, 1): return "weekly"
+        default: return "every \(Self.periodText(period))"
+        }
+    }
+    private var introDuration: String {
+        guard let offer else { return "" }
+        return Self.periodText(offer.period, count: offer.periodCount, expandWeeks: true)
+    }
+    var buttonTitle: String {
+        guard hasTrial else { return "Subscribe to Pro" }
+        let duration = introDuration.hasSuffix("s") ? String(introDuration.dropLast()) : introDuration
+        return "Start \(duration.replacingOccurrences(of: " ", with: "-")) free trial"
+    }
+    var todayTitle: String {
+        "Today · \(offer?.displayPrice ?? product.displayPrice)"
+    }
+    var todayDetail: String {
+        guard let offer, offer.paymentMode == .payAsYouGo else { return "Full Pro access" }
+        return "\(offer.displayPrice) every \(Self.periodText(offer.period)) for \(introDuration)"
+    }
+    var nextTitle: String {
+        if offer != nil { return "In \(introDuration)" }
+        guard let period = product.subscription?.subscriptionPeriod else { return "At renewal" }
+        return "In \(Self.periodText(period))"
+    }
+    var nextDetail: String { "\(product.displayPrice), then \(cadence)" }
+    var disclosure: String {
+        if hasTrial {
+            return "Auto-renews. To avoid a charge, cancel in App Store settings at least 24 hours before your trial ends."
+        }
+        if offer != nil {
+            return "Introductory price for \(introDuration), then \(product.displayPrice) \(cadence). Auto-renews. Cancel in App Store settings at least 24 hours before renewal."
+        }
+        return "Auto-renews \(cadence). Cancel in App Store settings at least 24 hours before renewal."
+    }
+
+    static func priceSuffix(_ product: Product) -> String {
+        guard let period = product.subscription?.subscriptionPeriod else { return "" }
+        return "/" + periodText(period, omitOne: true)
+    }
+
+    static func annualSavings(monthly: Product?, yearly: Product?) -> String? {
+        guard let monthly, let yearly,
+              monthly.priceFormatStyle.currencyCode == yearly.priceFormatStyle.currencyCode,
+              monthly.subscription?.subscriptionPeriod.value == 1,
+              monthly.subscription?.subscriptionPeriod.unit == .month,
+              yearly.subscription?.subscriptionPeriod.value == 1,
+              yearly.subscription?.subscriptionPeriod.unit == .year,
+              monthly.price > 0 else { return nil }
+        let savings = NSDecimalNumber(decimal: (1 - yearly.price / (monthly.price * 12)) * 100).doubleValue
+        let percent = Int(savings.rounded())
+        return percent > 0 ? "Save \(percent)%" : nil
+    }
+
+    private static func periodText(_ period: Product.SubscriptionPeriod, count: Int = 1, expandWeeks: Bool = false, omitOne: Bool = false) -> String {
+        let value = period.value * count * (expandWeeks && period.unit == .week ? 7 : 1)
+        let unit: String
+        switch period.unit {
+        case .day: unit = "day"
+        case .week: unit = expandWeeks ? "day" : "week"
+        case .month: unit = "month"
+        case .year: unit = "year"
+        @unknown default: return "billing period"
+        }
+        if omitOne && value == 1 { return unit }
+        return "\(value) \(unit)\(value == 1 ? "" : "s")"
+    }
+}
+
 enum StorePurchaseOutcome: Equatable {
     case purchased
     case cancelled
@@ -758,10 +900,23 @@ final class StoreService {
 
     var products: [Product] = []
     var loadError: String?
-    private var updatesTask: Task<Void, Never>?
+    private(set) var syncError: String?
+    @ObservationIgnored nonisolated(unsafe) private var updatesTask: Task<Void, Never>?
+    private let serverVerifier: (String) async throws -> AccessSnapshot?
     private let productIDs = ["com.miloom.premium.monthly", "com.miloom.premium.yearly"]
 
-    private init() {}
+    init(serverVerifier: @escaping (String) async throws -> AccessSnapshot? = StoreService.verifyOnServer) {
+        self.serverVerifier = serverVerifier
+    }
+
+    deinit { updatesTask?.cancel() }
+
+    private func isActive(_ transaction: StoreKit.Transaction) -> Bool {
+        productIDs.contains(transaction.productID)
+            && transaction.revocationDate == nil
+            && !transaction.isUpgraded
+            && (transaction.expirationDate.map { $0 > Date() } ?? false)
+    }
 
     func startListening(accessController: AccessController) {
         guard updatesTask == nil else { return }
@@ -770,11 +925,27 @@ final class StoreService {
                 guard let self else { return }
                 do {
                     let transaction = try self.checkVerified(update)
-                    try await self.sync(transactionResult: update, transaction: transaction, accessController: accessController)
-                    await transaction.finish()
+                    guard self.productIDs.contains(transaction.productID) else { continue }
+                    if await self.sync(transactionResult: update, transaction: transaction, accessController: accessController) {
+                        await transaction.finish()
+                    }
                 } catch {
-                    self.loadError = error.localizedDescription
+                    self.syncError = error.localizedDescription
                 }
+            }
+        }
+    }
+
+    func retryUnfinishedTransactions(accessController: AccessController) async {
+        for await result in StoreKit.Transaction.unfinished {
+            do {
+                let transaction = try checkVerified(result)
+                guard productIDs.contains(transaction.productID) else { continue }
+                if await sync(transactionResult: result, transaction: transaction, accessController: accessController) {
+                    await transaction.finish()
+                }
+            } catch {
+                syncError = error.localizedDescription
             }
         }
     }
@@ -782,8 +953,9 @@ final class StoreService {
     func fetchProducts() async {
         do {
             products = try await Product.products(for: productIDs).sorted { $0.price < $1.price }
-            loadError = products.isEmpty ? "No subscription products were returned by the App Store." : nil
+            loadError = products.count < productIDs.count ? "Some subscription products are unavailable from the App Store." : nil
         } catch {
+            products = []
             loadError = error.localizedDescription
         }
     }
@@ -793,8 +965,10 @@ final class StoreService {
         switch result {
         case .success(let verification):
             let transaction = try checkVerified(verification)
-            try await sync(transactionResult: verification, transaction: transaction, accessController: accessController)
-            await transaction.finish()
+            guard isActive(transaction) else { throw StoreError.inactiveSubscription }
+            if await sync(transactionResult: verification, transaction: transaction, accessController: accessController) {
+                await transaction.finish()
+            }
             return .purchased
         case .userCancelled: return .cancelled
         case .pending: return .pending
@@ -808,40 +982,61 @@ final class StoreService {
         var restored = false
         for await result in StoreKit.Transaction.currentEntitlements {
             let transaction = try checkVerified(result)
-            guard productIDs.contains(transaction.productID), transaction.revocationDate == nil else { continue }
-            try await sync(transactionResult: result, transaction: transaction, accessController: accessController)
+            guard isActive(transaction) else { continue }
+            if await sync(transactionResult: result, transaction: transaction, accessController: accessController) {
+                await transaction.finish()
+            }
             restored = true
         }
         if !restored { await accessController.refresh() }
         return restored
     }
 
+    /// Deliver verified access immediately. Leave unfinished transactions for retry if server sync fails.
     private func sync(
         transactionResult: VerificationResult<StoreKit.Transaction>,
         transaction: StoreKit.Transaction,
         accessController: AccessController
-    ) async throws {
-        accessController.applyLocallyVerified(
-            productID: transaction.productID,
-            expirationDate: transaction.expirationDate,
-            isTrial: false
-        )
+    ) async -> Bool {
+        if isActive(transaction) {
+            accessController.applyLocallyVerified(
+                productID: transaction.productID,
+                expirationDate: transaction.expirationDate,
+                isTrial: false // The server supplies the authoritative trial status on iOS 17.
+            )
+        } else {
+            accessController.removeLocallyVerified(productID: transaction.productID, revoked: transaction.revocationDate != nil)
+            // StoreKit's entitlement enumeration can lag the update that invalidated this transaction.
+            await accessController.refreshFromStoreKitIfNeeded(excludingTransactionID: transaction.id)
+        }
+        do {
+            guard let verified = try await serverVerifier(transactionResult.jwsRepresentation) else {
+                return false // Retry when the account session becomes available.
+            }
+            accessController.applyServerVerified(verified)
+            syncError = nil
+            return true
+        } catch {
+            syncError = error.localizedDescription
+            return false
+        }
+    }
 
-        guard let session = try? await SupabaseService.shared.client.auth.session else { return }
+    private static func verifyOnServer(_ signedTransaction: String) async throws -> AccessSnapshot? {
+        guard let session = try? await SupabaseService.shared.client.auth.session else { return nil }
         let url = URL(string: "\(SupabaseService.shared.urlString)/functions/v1/sync-entitlement")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["signedTransaction": transactionResult.jwsRepresentation])
+        request.httpBody = try JSONEncoder().encode(["signedTransaction": signedTransaction])
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse, 200..<300 ~= http.statusCode else {
-            let message = String(data: data, encoding: .utf8) ?? "Server verification failed."
-            throw StoreError.serverVerification(message)
+            throw StoreError.serverVerification("Your purchase is saved. Account synchronization will retry when the connection is available.")
         }
         var verified = try JSONDecoder().decode(AccessSnapshot.self, from: data)
         verified.validatedAt = Date()
-        accessController.applyServerVerified(verified)
+        return verified
     }
 
     private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
@@ -853,12 +1048,19 @@ final class StoreService {
 
     enum StoreError: LocalizedError {
         case failedVerification
+        case inactiveSubscription
         case serverVerification(String)
         var errorDescription: String? {
             switch self {
             case .failedVerification: return "The App Store transaction could not be verified."
+            case .inactiveSubscription: return "This subscription is no longer active. Please choose a plan again."
             case .serverVerification(let message): return message
             }
         }
     }
+}
+
+private extension Color {
+    // The final paywall uses a lighter champagne accent than the app's gold controls.
+    static let paywallGold = Color(hex: "#D8C79E")
 }

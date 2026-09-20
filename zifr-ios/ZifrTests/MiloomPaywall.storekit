@@ -1,0 +1,73 @@
+{
+  "identifier": "miloom-paywall-tests",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA"
+  },
+  "subscriptionGroups": [
+    {
+      "id": "miloom-pro-tests",
+      "localizations": [],
+      "name": "Miloom Pro Tests",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "12.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "monthly",
+          "introductoryOffer": {
+            "internalID": "intro-monthly",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1W"
+          },
+          "localizations": [
+            {
+              "description": "Miloom Pro Monthly test fixture",
+              "displayName": "Miloom Pro Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.miloom.premium.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Monthly",
+          "subscriptionGroupID": "miloom-pro-tests",
+          "type": "RecurringSubscription"
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "99.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "yearly",
+          "introductoryOffer": {
+            "internalID": "intro-yearly",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1W"
+          },
+          "localizations": [
+            {
+              "description": "Miloom Pro Yearly test fixture",
+              "displayName": "Miloom Pro Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.miloom.premium.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Yearly",
+          "subscriptionGroupID": "miloom-pro-tests",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

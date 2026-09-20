@@ -7,6 +7,7 @@ import Supabase
 @Observable
 final class AccessController {
     private(set) var snapshot: AccessSnapshot
+    private(set) var isBetaAccessActive: Bool
     var pendingGate: PremiumGate?
     var isLoading = false
     var lastError: String?
@@ -16,6 +17,7 @@ final class AccessController {
     private var debugOverrideActive = false
 
     init() {
+        isBetaAccessActive = Self.hasSandboxReceipt
         #if DEBUG
         if let debugSnapshot = Self.debugSnapshotFromLaunchArguments() {
             snapshot = debugSnapshot
@@ -32,9 +34,33 @@ final class AccessController {
         }
     }
 
-    var isPro: Bool { snapshot.hasProAccess }
+    /// The access state used by feature gates. TestFlight's sandbox receipt is kept
+    /// out of the cached server snapshot so it cannot survive into an App Store install.
+    var effectiveSnapshot: AccessSnapshot {
+        guard isBetaAccessActive else { return snapshot }
+        var betaSnapshot = snapshot
+        betaSnapshot.tier = .pro
+        betaSnapshot.status = .active
+        betaSnapshot.productId = "testflight-beta"
+        betaSnapshot.trialEndsAt = nil
+        betaSnapshot.renewsAt = nil
+        betaSnapshot.graceEndsAt = nil
+        betaSnapshot.limits = .pro
+        return betaSnapshot
+    }
+
+    var isPro: Bool { effectiveSnapshot.hasProAccess }
+
+    /// The development unlock permits features without pretending a subscription was purchased.
+    var hasProSubscription: Bool {
+        #if DEBUG
+        if snapshot.productId == "debug-unlocked" { return false }
+        #endif
+        return snapshot.hasProAccess
+    }
 
     func requiresDowngradeSelection(appState: AppState) -> Bool {
+        guard !isBetaAccessActive else { return false }
         guard snapshot.productId != nil,
               snapshot.status == .grace || snapshot.status == .expired || snapshot.status == .revoked else { return false }
         return (appState.companies.count > 1 && snapshot.selectedFreeCompanyId == nil)
@@ -42,6 +68,8 @@ final class AccessController {
     }
 
     var membershipSubtitle: String {
+        if isBetaAccessActive { return "Miloom Pro is included during TestFlight" }
+        guard hasProSubscription else { return "See every connection. Stay ahead of every detail." }
         switch snapshot.status {
         case .trial:
             return "Miloom Pro Trial — \(snapshot.trialDaysRemaining ?? 0) days remaining"
@@ -61,6 +89,14 @@ final class AccessController {
         guard !isLoading else { return }
         isLoading = true
         defer { isLoading = false }
+
+        isBetaAccessActive = await Self.hasVerifiedTestFlightAccess() || Self.hasSandboxReceipt
+        if isBetaAccessActive {
+            pendingGate = nil
+            lastError = nil
+            return
+        }
+
         do {
             var fetched: AccessSnapshot = try await SupabaseService.shared.client
                 .rpc("get_miloom_access_snapshot")
@@ -75,10 +111,12 @@ final class AccessController {
         }
     }
 
-    func refreshFromStoreKitIfNeeded() async {
+    func refreshFromStoreKitIfNeeded(excludingTransactionID: UInt64? = nil) async {
         for await result in StoreKit.Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
+                  transaction.id != excludingTransactionID,
                   transaction.revocationDate == nil,
+                  !transaction.isUpgraded,
                   ["com.miloom.premium.monthly", "com.miloom.premium.yearly"].contains(transaction.productID),
                   transaction.expirationDate.map({ $0 > Date() }) ?? true else { continue }
             applyLocallyVerified(
@@ -101,6 +139,17 @@ final class AccessController {
         ))
     }
 
+    func removeLocallyVerified(productID: String, revoked: Bool) {
+        guard snapshot.productId == productID else { return }
+        var updated = snapshot
+        updated.tier = .free
+        updated.status = revoked ? .revoked : .expired
+        updated.limits = .free
+        updated.trialEndsAt = nil
+        updated.validatedAt = Date()
+        apply(updated)
+    }
+
     func applyServerVerified(_ verifiedSnapshot: AccessSnapshot) {
         var snapshot = verifiedSnapshot
         snapshot.validatedAt = Date()
@@ -116,16 +165,17 @@ final class AccessController {
     }
 
     func permits(_ feature: PremiumFeature, appState: AppState, userId: UUID?) -> Bool {
+        let access = effectiveSnapshot
         if isPro {
             switch feature {
             case .plaidConnection:
-                return connectedPlaidCount(in: appState) < snapshot.limits.plaidItems
+                return connectedPlaidCount(in: appState) < access.limits.plaidItems
             case .documentUpload:
-                return appState.documents.filter { !($0.url ?? "").isEmpty }.count < snapshot.limits.documents
+                return appState.documents.filter { !($0.url ?? "").isEmpty }.count < access.limits.documents
             case .aiAction:
-                return snapshot.aiActions < snapshot.limits.aiActions
+                return access.aiActions < access.limits.aiActions
             case .liveVoice:
-                return snapshot.voiceSeconds < snapshot.limits.voiceSeconds
+                return access.voiceSeconds < access.limits.voiceSeconds
             default:
                 return true
             }
@@ -134,21 +184,25 @@ final class AccessController {
         switch feature {
         case .additionalCompany:
             guard let userId else { return appState.companies.isEmpty }
-            return appState.companies.filter { $0.userId == userId }.count < snapshot.limits.companies
+            return appState.companies.filter { $0.userId == userId }.count < access.limits.companies
         case .plaidConnection:
-            return connectedPlaidCount(in: appState) < snapshot.limits.plaidItems
+            return connectedPlaidCount(in: appState) < access.limits.plaidItems
         case .documentUpload:
-            return appState.documents.filter { !($0.url ?? "").isEmpty }.count < snapshot.limits.documents
+            return appState.documents.filter { !($0.url ?? "").isEmpty }.count < access.limits.documents
         case .aiAction:
-            return snapshot.aiActions < snapshot.limits.aiActions
+            return access.aiActions < access.limits.aiActions
         case .liveVoice:
-            return snapshot.voiceSeconds < snapshot.limits.voiceSeconds
+            return access.voiceSeconds < access.limits.voiceSeconds
         case .guestCollaboration, .connectedPortfolio, .ownerBriefing:
             return false
         }
     }
 
     func consume(_ feature: PremiumFeature, amount: Int = 1) async -> Bool {
+        // Beta access is an app-distribution entitlement rather than a paid server
+        // entitlement, so it should not be rejected by the production usage RPC.
+        if isBetaAccessActive { return true }
+
         let kind: String
         switch feature {
         case .aiAction: kind = "ai_actions"
@@ -213,6 +267,29 @@ final class AccessController {
     private func cache() {
         if let data = try? JSONEncoder().encode(snapshot) {
             UserDefaults.standard.set(data, forKey: cacheKey)
+        }
+    }
+
+    static func grantsBetaAccess(for environment: AppStore.Environment) -> Bool {
+        environment == .sandbox
+    }
+
+    private static var hasSandboxReceipt: Bool {
+        #if DEBUG
+        // Local StoreKit testing also uses a sandbox receipt. Debug builds keep
+        // the existing launch-argument states so the paywall remains testable.
+        return false
+        #else
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        #endif
+    }
+
+    private static func hasVerifiedTestFlightAccess() async -> Bool {
+        do {
+            guard case .verified(let transaction) = try await AppTransaction.shared else { return false }
+            return grantsBetaAccess(for: transaction.environment)
+        } catch {
+            return false
         }
     }
 

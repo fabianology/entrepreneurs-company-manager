@@ -79,7 +79,7 @@ struct ZifrApp: App {
                 await dataRefresh
                 try? await DataRepository.shared.refreshBusinessExpenses(appState: appState)
                 await accessRefresh
-                appState.entitlementSnapshot = accessController.snapshot
+                appState.entitlementSnapshot = accessController.effectiveSnapshot
                 await pushRegistration
             }
             .onChange(of: scenePhase) { _, newPhase in
@@ -89,7 +89,7 @@ struct ZifrApp: App {
                     if authViewModel.isAuthenticated {
                         Task {
                             await accessController.refresh()
-                            appState.entitlementSnapshot = accessController.snapshot
+                            appState.entitlementSnapshot = accessController.effectiveSnapshot
                             try? await DataRepository.shared.refreshNotifications(appState: appState)
                             try? await DataRepository.shared.refreshBusinessExpenses(appState: appState)
                         }
@@ -107,7 +107,7 @@ struct ZifrApp: App {
                     backgroundDate = nil
                 }
             }
-            .onChange(of: accessController.snapshot) { _, snapshot in
+            .onChange(of: accessController.effectiveSnapshot) { _, snapshot in
                 appState.entitlementSnapshot = snapshot
             }
             .onChange(of: authViewModel.isAuthenticated) { wasAuthenticated, isAuthenticated in

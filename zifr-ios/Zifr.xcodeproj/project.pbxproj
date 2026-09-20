@@ -101,6 +101,8 @@
 		A38A38A38A38A38A38A38003 /* GeminiSpokenQuestion.wav in Resources */ = {isa = PBXBuildFile; fileRef = A38A38A38A38A38A38A38004 /* GeminiSpokenQuestion.wav */; };
 		A6B2302D278D7081A58C3C68 /* InstitutionLoansSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A82B3A6CDCB537466084741 /* InstitutionLoansSection.swift */; };
 		AA347BC4FF41CCA325EC3B99 /* patch.py in Resources */ = {isa = PBXBuildFile; fileRef = 90DB2F263B4BBBE8096C1D54 /* patch.py */; };
+		AABBCCDDEEFF001100000001 /* PaywallStoreKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001100000002 /* PaywallStoreKitTests.swift */; };
+		AABBCCDDEEFF001100000003 /* MiloomPaywall.storekit in Resources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001100000004 /* MiloomPaywall.storekit */; };
 		ABA2C5C643E4E50FCA14EF7F /* EditSubscriptionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99D7628D8C499839405F0CB0 /* EditSubscriptionSheet.swift */; };
 		B32A5DEDA68DB7F2A6A8D593 /* logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 06F23A18826AE30784B43EF1 /* logo.png */; };
 		B3A8909C689D31BD31D17AE7 /* LoanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 206BF5A20D625639D22919AC /* LoanCardView.swift */; };
@@ -252,6 +254,8 @@
 		A38A38A38A38A38A38A38004 /* GeminiSpokenQuestion.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = Fixtures/GeminiSpokenQuestion.wav; sourceTree = "<group>"; };
 		A805E3AF7A5C2535E780EF24 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		AA11223344556677889900AA /* DetectedSubscriptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetectedSubscriptionsView.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001100000002 /* PaywallStoreKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallStoreKitTests.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001100000004 /* MiloomPaywall.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = MiloomPaywall.storekit; sourceTree = "<group>"; };
 		AC3CC8DCAA09EB5F037AA043 /* .svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = .svg; sourceTree = "<group>"; };
 		AE0F04DC776E814CFF7A687D /* LoanPaymentsLedgerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoanPaymentsLedgerView.swift; sourceTree = "<group>"; };
 		AEFE5D7D69FA9F6354C428FF /* SearchDocumentIndexer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SearchDocumentIndexer.swift; sourceTree = "<group>"; };
@@ -327,6 +331,8 @@
 				51478D5FCEE3293BF6A573BB /* PremiumEngineTests.swift */,
 				A38A38A38A38A38A38A38002 /* GeminiLiveTests.swift */,
 				A38A38A38A38A38A38A38004 /* GeminiSpokenQuestion.wav */,
+				AABBCCDDEEFF001100000002 /* PaywallStoreKitTests.swift */,
+				AABBCCDDEEFF001100000004 /* MiloomPaywall.storekit */,
 				19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */,
 				93C0F0D156C45236DF1E4478 /* UniversalSearchTests.swift */,
 			);
@@ -751,6 +757,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AABBCCDDEEFF001100000003 /* MiloomPaywall.storekit in Resources */,
 				A38A38A38A38A38A38A38003 /* GeminiSpokenQuestion.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -764,6 +771,7 @@
 			files = (
 				CB35D73769E288AA746CA7E7 /* PremiumEngineTests.swift in Sources */,
 				A38A38A38A38A38A38A38001 /* GeminiLiveTests.swift in Sources */,
+				AABBCCDDEEFF001100000001 /* PaywallStoreKitTests.swift in Sources */,
 				88974DA6FB57F4806E327280 /* BusinessExpenseTests.swift in Sources */,
 				404ADBE780A93BBCD99794FB /* ExecutiveBriefingTests.swift in Sources */,
 				6A1DA1706BC200944A4B817C /* UniversalSearchTests.swift in Sources */,

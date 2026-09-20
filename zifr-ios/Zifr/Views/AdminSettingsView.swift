@@ -184,20 +184,22 @@ struct AdminSettingsView: View {
                     // Premium Upgrade
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        showingPremiumUpgrade = true
+                        if !accessController.isBetaAccessActive {
+                            showingPremiumUpgrade = true
+                        }
                     } label: {
                         HStack(spacing: 14) {
                             ZStack {
                                 Circle()
                                     .fill(Color.black.opacity(0.12))
                                     .frame(width: 46, height: 46)
-                                Image(systemName: accessController.isPro ? "checkmark.seal.fill" : "star.fill")
+                                Image(systemName: (accessController.hasProSubscription || accessController.isBetaAccessActive) ? "checkmark.seal.fill" : "star.fill")
                                     .foregroundStyle(Color(hex: "#171914"))
                                     .font(.system(size: 19, weight: .bold))
                             }
                             
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(accessController.isPro ? "MANAGE MILOOM PRO" : "UPGRADE TO MILOOM PRO")
+                                Text(accessController.isBetaAccessActive ? "MILOOM PRO — BETA ACCESS" : (accessController.hasProSubscription ? "MANAGE MILOOM PRO" : "UPGRADE TO MILOOM PRO"))
                                     .font(.system(size: 16, weight: .bold))
                                     .foregroundStyle(Color(hex: "#171914"))
                                 Text(accessController.membershipSubtitle)
@@ -211,7 +213,7 @@ struct AdminSettingsView: View {
                                 Circle()
                                     .fill(Color.black.opacity(0.10))
                                     .frame(width: 34, height: 34)
-                                Image(systemName: "chevron.right")
+                                Image(systemName: accessController.isBetaAccessActive ? "checkmark" : "chevron.right")
                                     .font(.system(size: 13, weight: .black))
                                     .foregroundStyle(Color(hex: "#171914"))
                             }
