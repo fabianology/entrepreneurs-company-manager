@@ -52,6 +52,37 @@ final class AuthViewModel: NSObject {
 
     private var currentNonce: String?
     private var authorizationController: ASAuthorizationController?
+    private var authenticationAttemptID: UUID?
+
+    @MainActor
+    private func beginAuthenticationAttempt() -> UUID {
+        let attemptID = UUID()
+        authenticationAttemptID = attemptID
+        isLoading = true
+        authError = nil
+        AppDiagnostics.event("auth", "interactive_sign_in", status: "started")
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(20))
+            guard !Task.isCancelled,
+                  let self,
+                  self.authenticationAttemptID == attemptID else { return }
+            self.authenticationAttemptID = nil
+            self.isLoading = false
+            self.authError = "Sign in took too long. Check your connection and try again."
+            AppDiagnostics.failure("auth", "interactive_sign_in_timeout")
+        }
+        return attemptID
+    }
+
+    @MainActor
+    @discardableResult
+    private func finishAuthenticationAttempt(_ attemptID: UUID) -> Bool {
+        guard authenticationAttemptID == attemptID else { return false }
+        authenticationAttemptID = nil
+        isLoading = false
+        return true
+    }
 
     func checkBiometrics() {
         let context = LAContext()
@@ -78,30 +109,58 @@ final class AuthViewModel: NSObject {
 
     func checkSession() async {
         checkBiometrics()
-        do {
-            // `session` performs one SDK-managed refresh only when needed. Calling
-            // refreshSession() here races Supabase's automatic refresh and can rotate
-            // the same refresh token twice, leaving startup requests unauthorized.
-            let session = try await SupabaseService.shared.client.auth.session
-            let verifiedUser = try await SupabaseService.shared.client.auth.user(jwt: session.accessToken)
-            await MainActor.run {
-                self.session = session
-                self.currentUser = verifiedUser
-                self.hasCachedSession = true
-                if self.isBiometricEnabled && self.isBiometricsAvailable {
-                    self.isAuthenticated = false
-                } else {
-                    self.isAuthenticated = true
-                }
-            }
-        } catch {
+
+        // Use the stored session directly when it is still valid. Besides making
+        // launch instant, this avoids a redundant `/user` round trip and leaves
+        // the authentication client free for an interactive sign-in.
+        guard let cachedSession = SupabaseService.shared.client.auth.currentSession else {
             await MainActor.run {
                 self.session = nil
                 self.currentUser = nil
                 self.hasCachedSession = false
                 self.isAuthenticated = false
             }
+            return
         }
+
+        if !cachedSession.isExpired {
+            await MainActor.run {
+                self.applyRestoredSession(cachedSession)
+            }
+            AppDiagnostics.event("auth", "restore_cached_session", status: "success")
+            return
+        }
+
+        AppDiagnostics.event("auth", "refresh_cached_session", status: "started")
+        do {
+            // `session` re-reads the latest stored value and coalesces with the
+            // SDK's automatic refresh, preventing two uses of a rotating token.
+            let refreshedSession = try await SupabaseService.shared.client.auth.session
+            await MainActor.run {
+                // Never let a launch-time restore overwrite a sign-in that the
+                // user started while the refresh was in flight.
+                guard self.authenticationAttemptID == nil, !self.isAuthenticated else { return }
+                self.applyRestoredSession(refreshedSession)
+            }
+            AppDiagnostics.event("auth", "refresh_cached_session", status: "success")
+        } catch {
+            AppDiagnostics.failure("auth", "refresh_cached_session", error: error)
+            await MainActor.run {
+                guard self.authenticationAttemptID == nil, !self.isAuthenticated else { return }
+                self.session = nil
+                self.currentUser = nil
+                self.hasCachedSession = false
+                self.isAuthenticated = false
+            }
+        }
+    }
+
+    @MainActor
+    private func applyRestoredSession(_ session: Session) {
+        self.session = session
+        self.currentUser = session.user
+        self.hasCachedSession = true
+        self.isAuthenticated = !(self.isBiometricEnabled && self.isBiometricsAvailable)
     }
 
     func authenticateWithBiometrics() async {
@@ -217,16 +276,16 @@ final class AuthViewModel: NSObject {
     // MARK: - Email / Password Auth
     
     func signInWithEmail(email: String, password: String) async {
-        await MainActor.run { self.isLoading = true; self.authError = nil }
+        let attemptID = await beginAuthenticationAttempt()
         do {
             let response = try await SupabaseService.shared.client.auth.signIn(email: email, password: password)
             await MainActor.run {
+                guard self.finishAuthenticationAttempt(attemptID) else { return }
                 self.session = response
                 self.currentUser = response.user
                 self.isBiometricEnabled = true
                 self.hasCachedSession = true
                 self.isAuthenticated = true
-                self.isLoading = false
             }
             
             // Record new login security alert
@@ -259,21 +318,22 @@ final class AuthViewModel: NSObject {
         } catch {
             let errorMsg = error.localizedDescription
             await MainActor.run {
+                guard self.finishAuthenticationAttempt(attemptID) else { return }
                 if errorMsg.localizedCaseInsensitiveContains("confirm") || errorMsg.localizedCaseInsensitiveContains("verification") {
                     self.authError = "Please confirm your email address. We sent a verification link to your inbox. Tap the link to activate your account, then sign in."
                 } else {
                     self.authError = errorMsg
                 }
-                self.isLoading = false
             }
         }
     }
     
     func signUpWithEmail(email: String, password: String) async {
-        await MainActor.run { self.isLoading = true; self.authError = nil }
+        let attemptID = await beginAuthenticationAttempt()
         do {
             let response = try await SupabaseService.shared.client.auth.signUp(email: email, password: password)
             await MainActor.run {
+                guard self.finishAuthenticationAttempt(attemptID) else { return }
                 if let session = response.session {
                     self.session = session
                     self.currentUser = response.user
@@ -284,31 +344,27 @@ final class AuthViewModel: NSObject {
                     // Supabase requires email confirmation, so no session is returned yet.
                     self.authError = "Account created! Please check your email to verify your account before signing in."
                 }
-                self.isLoading = false
             }
         } catch {
             await MainActor.run {
+                guard self.finishAuthenticationAttempt(attemptID) else { return }
                 self.authError = error.localizedDescription
-                self.isLoading = false
             }
         }
     }
 
     func resetPassword(email: String) async -> Bool {
-        await MainActor.run { self.isLoading = true; self.authError = nil }
+        let attemptID = await beginAuthenticationAttempt()
         do {
             let redirectURL = URL(string: "miloom://reset-password")
             try await SupabaseService.shared.client.auth.resetPasswordForEmail(email, redirectTo: redirectURL)
-            await MainActor.run {
-                self.isLoading = false
-            }
-            return true
+            return await MainActor.run { self.finishAuthenticationAttempt(attemptID) }
         } catch {
-            await MainActor.run {
+            return await MainActor.run {
+                guard self.finishAuthenticationAttempt(attemptID) else { return false }
                 self.authError = error.localizedDescription
-                self.isLoading = false
+                return false
             }
-            return false
         }
     }
     
@@ -325,7 +381,7 @@ final class AuthViewModel: NSObject {
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
         
         Task {
-            await MainActor.run { self.isLoading = true; self.authError = nil }
+            let attemptID = await self.beginAuthenticationAttempt()
             do {
                 let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootViewController)
                 
@@ -338,15 +394,15 @@ final class AuthViewModel: NSObject {
                 )
                 
                 await MainActor.run {
+                    guard self.finishAuthenticationAttempt(attemptID) else { return }
                     self.session = response
                     self.currentUser = response.user
                     self.isAuthenticated = true
-                    self.isLoading = false
                 }
             } catch {
                 await MainActor.run {
+                    guard self.finishAuthenticationAttempt(attemptID) else { return }
                     self.authError = error.localizedDescription
-                    self.isLoading = false
                 }
                 AppDiagnostics.failure("auth", "google_sign_in", error: error)
             }
@@ -452,21 +508,21 @@ extension AuthViewModel: ASAuthorizationControllerDelegate {
             }
             
             Task {
-                await MainActor.run { self.isLoading = true }
+                let attemptID = self.beginAuthenticationAttempt()
                 do {
                     let response = try await SupabaseService.shared.client.auth.signInWithIdToken(
                         credentials: .init(provider: .apple, idToken: idTokenString, nonce: nonce)
                     )
                     await MainActor.run {
+                        guard self.finishAuthenticationAttempt(attemptID) else { return }
                         self.session = response
                         self.currentUser = response.user
                         self.isAuthenticated = true
-                        self.isLoading = false
                     }
                 } catch {
                     await MainActor.run {
+                        guard self.finishAuthenticationAttempt(attemptID) else { return }
                         self.authError = error.localizedDescription
-                        self.isLoading = false
                     }
                     AppDiagnostics.failure("auth", "apple_supabase_sign_in", error: error)
                 }

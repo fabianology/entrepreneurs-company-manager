@@ -50,13 +50,29 @@ class SupabaseService {
         #else
         let userAgent = "Miloom App (Mac)"
         #endif
+
+        // Supabase uses URLSession.shared by default, whose request timeout is long
+        // enough to leave authentication controls looking frozen on a weak or
+        // interrupted mobile connection. Keep a bounded session for all Supabase
+        // traffic so requests fail back to the UI and can be retried.
+        let sessionConfiguration = URLSessionConfiguration.default
+        sessionConfiguration.timeoutIntervalForRequest = 15
+        sessionConfiguration.timeoutIntervalForResource = 60
+        sessionConfiguration.waitsForConnectivity = false
+        let networkSession = URLSession(configuration: sessionConfiguration)
         
         self.client = SupabaseClient(
             supabaseURL: supabaseURL, 
             supabaseKey: supabaseKey,
             options: SupabaseClientOptions(
+                auth: SupabaseClientOptions.AuthOptions(
+                    // Emitting the cached value first prevents an auth-state
+                    // subscriber from synchronously waiting on token refresh.
+                    emitLocalSessionAsInitialSession: true
+                ),
                 global: SupabaseClientOptions.GlobalOptions(
-                    headers: ["User-Agent": userAgent]
+                    headers: ["User-Agent": userAgent],
+                    session: networkSession
                 )
             )
         )
