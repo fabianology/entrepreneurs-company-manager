@@ -41,6 +41,7 @@ struct SearchChargeSummary: Sendable {
     var firstDate: Date?
     var elapsedMonths = 0
     var observedIncreases: Int?
+    var inferredNextDueDate: Date?
 
     init(record: SearchRecord, transactions: [SearchRecord], now: Date = Date(), calendar: Calendar = .current) {
         var seen = Set<String>()
@@ -54,10 +55,17 @@ struct SearchChargeSummary: Sendable {
         if let firstDate { elapsedMonths = max(0, calendar.dateComponents([.month], from: firstDate, to: now).month ?? 0) }
         let cycle = record.financialFacts["billingCycle"]?.lowercased() ?? ""
         let component: Calendar.Component
+        let renewalCycle: SubscriptionRenewalScheduler.Cycle
         switch cycle {
-        case "monthly": component = .month
-        case "yearly", "annual", "annually": component = .year
+        case "monthly": component = .month; renewalCycle = .monthly
+        case "yearly", "annual", "annually": component = .year; renewalCycle = .yearly
         default: return
+        }
+        if let latestDate = latest?.date,
+           let followingPeriod = calendar.date(byAdding: component, value: 1, to: latestDate) {
+            inferredNextDueDate = SubscriptionRenewalScheduler.nextDueDate(
+                from: followingPeriod, cycle: renewalCycle, now: now, calendar: calendar
+            )
         }
         // A duplicate in a billing period invalidates that period, even if it used another source.
         let periods = Dictionary(grouping: posted) { calendar.dateInterval(of: component, for: $0.date!)!.start }
@@ -86,53 +94,48 @@ struct SearchChargeSummary: Sendable {
 /// Display-ready charge facts calculated outside SwiftUI. These labels only use
 /// posted expense history that survived the existing service-attribution rules.
 struct SearchChargeFacts: Equatable, Sendable {
-    let dueAndCoverage: String
-    let latestCharge: String
-    let historyDuration: String
-    let increases: String
-    let coverageExplanation: String
+    let due: String
+    let autoPay: String
+    let latestCharge: String?
+    let historyDuration: String?
+    let increases: String?
 
     init?(record: SearchRecord, summary: SearchChargeSummary?, now: Date = Date(), calendar: Calendar = .current) {
         let savedAmount = record.financialFacts["billingAmount"].flatMap { Decimal(string: $0) } ?? 0
-        guard savedAmount > 0 || summary?.latest != nil || record.fundingCoverage != nil else { return nil }
+        guard savedAmount > 0 || summary?.latest != nil else { return nil }
 
-        let due: String
         if let date = record.scheduledDueDate ?? record.dueDate {
             let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
                 to: calendar.startOfDay(for: date)).day ?? 0
-            if days == 0 { due = "Due today" }
-            else if days < 0 { due = "Overdue by \(-days) days" }
-            else { due = "Due in \(days) \(days == 1 ? "day" : "days")" }
+            if days == 0 { self.due = "Due today" }
+            else if days < 0 { self.due = "Overdue by \(-days) days" }
+            else { self.due = "Due in \(days) \(days == 1 ? "day" : "days")" }
         } else {
             due = "Due date not saved"
         }
-        dueAndCoverage = due + " • " + (record.fundingCoverage?.status.rawValue ?? "Coverage unavailable")
-        coverageExplanation = record.fundingCoverage?.reason
-            ?? (record.fundingCoverage == nil
-                ? "Coverage is unavailable for inactive services, missing dates, or payments outside the next 30 days."
-                : "Coverage considers all known charges sharing this payment source in the next 30 days.")
+        autoPay = SearchServiceScheduleText.autoPay(record)
 
         if let latest = summary?.latest {
             let amount = latest.amount.map { SearchText.money($0, currency: latest.currency) } ?? "Amount unavailable"
             latestCharge = "Last: " + amount
                 + (latest.date.map { " • " + Self.abbreviatedDate($0, calendar: calendar) } ?? " • Date unavailable")
         } else {
-            latestCharge = "No posted charges found"
+            latestCharge = nil
         }
 
         if let first = summary?.firstDate {
             let months = summary?.elapsedMonths ?? 0
-            historyDuration = "Charge history since " + Self.abbreviatedDate(first, calendar: calendar)
+            historyDuration = Self.abbreviatedDate(first, calendar: calendar)
                 + (months > 0 ? " (\(months) \(months == 1 ? "month" : "months"))" : "")
         } else {
-            historyDuration = "Charge history unavailable"
+            historyDuration = nil
         }
 
         if let count = summary?.observedIncreases {
             increases = count == 0 ? "No charge increases observed"
                 : "\(count) charge \(count == 1 ? "increase" : "increases") observed"
         } else {
-            increases = "Not enough history"
+            increases = nil
         }
     }
 
@@ -144,6 +147,33 @@ struct SearchChargeFacts: Equatable, Sendable {
         formatter.dateStyle = .medium
         formatter.timeStyle = .none
         return formatter.string(from: date)
+    }
+}
+
+enum SearchServiceScheduleText {
+    static func autoPay(_ record: SearchRecord) -> String {
+        switch record.safeDetails["renewalMode"]?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "auto", "automatic", "on", "yes": return "Auto pay on"
+        case "manual", "off", "no": return "Auto pay off"
+        default: return "Auto pay status not saved"
+        }
+    }
+
+    static func cadence(_ record: SearchRecord, calendar: Calendar = .current) -> String {
+        let saved = record.financialFacts["billingCycle"]?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        let cycle: String
+        switch saved {
+        case "annual", "annually": cycle = "yearly"
+        case "monthly", "yearly", "weekly", "quarterly": cycle = saved
+        default: cycle = saved.isEmpty ? "cycle not saved" : saved
+        }
+        let prefix = "/" + cycle
+        guard let date = record.scheduledDueDate ?? record.dueDate else { return prefix }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
+        let day = calendar.component(.day, from: date)
+        let ordinal = formatter.string(from: NSNumber(value: day)) ?? String(day)
+        return prefix + " on the " + ordinal
     }
 }
 
@@ -257,7 +287,9 @@ struct SearchOverview: Identifiable, Sendable {
         (connections[record.id] ?? []).filter { kinds.contains($0.kind) }
     }
     func paymentSources(for record: SearchRecord) -> [SearchRecord] {
-        let sources = linked(to: record, kinds: [.card, .account, .institution])
+        let sources = linked(to: record, kinds: [.card, .account, .institution]).filter {
+            record.savedPaymentSourceIDs?.contains($0.id) ?? true
+        }
         let accounts = sources.filter { $0.kind == .account }
         return sources.filter { source in
             if source.kind == .institution { return !accounts.contains { $0.modelID == source.modelID } }
@@ -466,7 +498,16 @@ extension UniversalSearchIndex {
                     }
                     let assigned = history.filter { (owners[$0.id]?.count ?? 0) <= 1 }
                     overview.serviceTransactions[member.id] = assigned.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    overview.chargeSummaries[member.id] = SearchChargeSummary(record: member, transactions: assigned)
+                    let summary = SearchChargeSummary(record: member, transactions: assigned)
+                    overview.chargeSummaries[member.id] = summary
+                    if member.scheduledDueDate == nil, member.dueDate == nil,
+                       let inferred = summary.inferredNextDueDate {
+                        if member.id == overview.root.id {
+                            overview.root.scheduledDueDate = inferred
+                        } else if let index = overview.children.firstIndex(where: { $0.id == member.id }) {
+                            overview.children[index].scheduledDueDate = inferred
+                        }
+                    }
                 }
             }
             overview.representedIDs = Set((members + overview.balances + overview.transactions + overview.documents + (root.kind == .institution ? services : [])).map(\.id))
@@ -510,6 +551,7 @@ extension UniversalSearchIndex {
         func paymentKeys(_ record: SearchRecord, precise: Bool = false) -> Set<String> {
             var keys = Set<String>()
             for id in links[record.id] ?? [] {
+                guard record.savedPaymentSourceIDs?.contains(id) ?? true else { continue }
                 guard let source = byID[id], source.companyID == record.companyID,
                       [.card, .account, .institution].contains(source.kind),
                       !precise || source.kind != .institution else { continue }
@@ -542,9 +584,21 @@ extension UniversalSearchIndex {
             guard !transaction.pending, transaction.flow == "expense", let amount = transaction.amount, amount > 0 else { return [] }
             let sourceKeys = paymentKeys(transaction, precise: true)
             guard !sourceKeys.isEmpty else { return [] }
-            return members.filter { service in
-                service.currency == transaction.currency && billingAmounts[service.id] == rounded(amount, currency: transaction.currency)
+            let transactionAmount = rounded(amount, currency: transaction.currency)
+            let sourceMatches = members.filter { service in
+                service.currency == transaction.currency && billingAmounts[service.id] != nil
                     && !(preciseFunding[service.id] ?? []).isDisjoint(with: sourceKeys)
+            }
+            let exact = sourceMatches.filter { billingAmounts[$0.id] == transactionAmount }
+            if !exact.isEmpty { return exact }
+
+            // Saved service prices can be rounded estimates. Permit a small difference
+            // only when the entity, merchant, currency, and precise payment source agree;
+            // the caller still requires one unambiguous service row.
+            return sourceMatches.filter { service in
+                guard let saved = billingAmounts[service.id] else { return false }
+                let difference = transactionAmount >= saved ? transactionAmount - saved : saved - transactionAmount
+                return difference <= saved * Decimal(string: "0.02")!
             }
         }
         func merchantMatches(_ transaction: SearchRecord, _ service: SearchRecord, merchantHost: String?) -> Bool {

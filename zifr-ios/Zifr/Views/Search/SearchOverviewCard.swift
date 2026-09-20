@@ -42,12 +42,22 @@ struct SearchBillingAmounts: View {
 struct SearchPaymentDetails: View {
     let sources: [SearchRecord]
     let fallback: String
+    let textFont: Font
     var open: (SearchRecord) -> Void
+
+    init(sources: [SearchRecord], fallback: String, textFont: Font = .footnote,
+         open: @escaping (SearchRecord) -> Void) {
+        self.sources = sources
+        self.fallback = fallback
+        self.textFont = textFont
+        self.open = open
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if sources.isEmpty {
                 Text(fallback.isEmpty ? "Payment method not saved" : "Paid with: " + fallback)
-                    .font(.footnote)
+                    .font(textFont)
             } else {
                 ForEach(sources) { source in
                     Button { open(source) } label: {
@@ -56,7 +66,7 @@ struct SearchPaymentDetails: View {
                             Text("Paid with: " + source.title + (source.last4.isEmpty ? "" : " ••" + source.last4))
                                 .fixedSize(horizontal: false, vertical: true)
                             Image(systemName: "chevron.right").font(.caption2)
-                        }.font(.footnote).frame(minHeight: 44, alignment: .leading)
+                        }.font(textFont).frame(minHeight: 44, alignment: .leading)
                     }.buttonStyle(.plain)
                 }
             }
@@ -70,16 +80,61 @@ struct SearchChargeFactsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("– " + facts.dueAndCoverage)
-                .accessibilityHint(facts.coverageExplanation)
-            Text("– " + facts.latestCharge)
-            Text("– " + facts.historyDuration)
-            Text("– " + facts.increases)
+            Text("– " + facts.due)
+            Text("– " + (facts.latestCharge ?? "No posted charges found"))
+            Text("– " + (facts.historyDuration.map { "Charge history since " + $0 } ?? "Charge history unavailable"))
+            Text("– " + (facts.increases ?? "Not enough history"))
         }
         .font(.subheadline)
         .foregroundStyle(.primary)
         .fixedSize(horizontal: false, vertical: true)
         .padding(.leading, 28)
+    }
+}
+
+/// Grouped base services and subservices share this compact fact list.
+struct SearchGroupedChargeFactsView: View {
+    let facts: SearchChargeFacts
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("– " + facts.due)
+            Text("– " + facts.autoPay)
+            if let latest = facts.latestCharge { Text("– " + latest) }
+            if let history = facts.historyDuration { Text("– Active since " + history) }
+            if let increases = facts.increases { Text("– " + increases) }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.primary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.leading, 28)
+    }
+}
+
+struct SearchGroupedBillingAmount: View {
+    let record: SearchRecord
+
+    var body: some View {
+        if record.safeDetails["pricingModel"] == "free" {
+            Text("Free").font(.headline)
+        } else if let total = SearchBillingTotal.totals(for: [record]).first {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) { amount(total); cadence }
+                VStack(alignment: .leading, spacing: 2) { amount(total); cadence }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text("Amount unavailable").font(.headline)
+        }
+    }
+
+    private func amount(_ total: SearchBillingTotal) -> some View {
+        Text(total.formatted).font(.headline).monospacedDigit().foregroundStyle(.primary)
+    }
+
+    private var cadence: some View {
+        Text(SearchServiceScheduleText.cadence(record))
+            .font(.subheadline.weight(.medium)).foregroundStyle(Color.zifrGold)
     }
 }
 
@@ -224,7 +279,6 @@ struct SearchOverviewCard: View {
     let overview: SearchOverview
     var open: (SearchRecord) -> Void
     @State private var expanded: Set<String>
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(overview: SearchOverview, open: @escaping (SearchRecord) -> Void) {
@@ -366,39 +420,40 @@ struct SearchOverviewCard: View {
     }
 
     private func serviceRow(_ record: SearchRecord) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) {
-                    if expanded.contains(record.id) { expanded.remove(record.id) }
-                    else { expanded.insert(record.id) }
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 10) {
+                Button { open(record) } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        SearchResultLogo(record: record, size: 30)
+                        VStack(alignment: .leading, spacing: 0) {
+                            groupedServiceName(record)
+                            groupedServiceType(record)
+                        }
+                    }
+                    .frame(minHeight: 44, alignment: .top)
+                    .contentShape(Rectangle())
                 }
-            } label: {
-                HStack(spacing: 10) {
-                    SearchResultLogo(record: record, size: 30)
-                    Text(record.title).font(.title3.weight(.medium)).foregroundStyle(.primary)
-                    Spacer(minLength: 4)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Open \(record.title) service")
+                .accessibilityHint("Shows service details")
+                .accessibilityIdentifier("search-service-open-" + record.id)
+
+                Spacer(minLength: 4)
+
+                Button { toggleServiceRow(record) } label: {
                     DisclosureStateChevron(isExpanded: expanded.contains(record.id))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(.secondary)
-                }.frame(minHeight: 44).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityValue(expanded.contains(record.id) ? "Expanded" : "Collapsed")
-            .accessibilityHint(expanded.contains(record.id) ? "Hides past transactions" : "Shows past transactions")
-            .accessibilityIdentifier("search-subservice-" + record.id)
-            let layout = dynamicTypeSize.isAccessibilitySize
-                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 5))
-            layout {
-                HStack(spacing: 5) {
-                    Circle().fill(record.activeService ? Color.zifrGreen : Color.secondary).frame(width: 4, height: 4)
-                    Text((record.serviceType?.capitalized ?? "Service") + (dynamicTypeSize.isAccessibilitySize ? "" : " •"))
-                        .font(.subheadline)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-                if record.safeDetails["pricingModel"] == "free" { Text("Free").font(.subheadline) }
-                else { SearchBillingAmounts(totals: SearchBillingTotal.totals(for: [record])) }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Past transactions for \(record.title)")
+                .accessibilityValue(expanded.contains(record.id) ? "Expanded" : "Collapsed")
+                .accessibilityHint(expanded.contains(record.id) ? "Hides past transactions" : "Shows past transactions")
+                .accessibilityIdentifier("search-subservice-" + record.id)
             }
-            paymentContext(record)
-            schedule(record)
+            SearchGroupedBillingAmount(record: record)
+            groupedPaymentContext(record)
             if let purpose = record.safeDetails["purpose"], !purpose.isEmpty {
                 Text("Purpose: " + purpose).font(.subheadline).fixedSize(horizontal: false, vertical: true)
             }
@@ -414,8 +469,22 @@ struct SearchOverviewCard: View {
         .padding(.vertical, 4)
     }
 
-    private func schedule(_ record: SearchRecord) -> some View {
-        Text(SearchScheduleLabel.text(record)).font(.footnote).fixedSize(horizontal: false, vertical: true)
+    private func toggleServiceRow(_ record: SearchRecord) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) {
+            if expanded.contains(record.id) { expanded.remove(record.id) }
+            else { expanded.insert(record.id) }
+        }
+    }
+
+    private func groupedServiceName(_ record: SearchRecord) -> some View {
+        Text(record.title).font(.title3.weight(.medium)).foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func groupedServiceType(_ record: SearchRecord) -> some View {
+        Text(record.serviceType?.capitalized ?? "Service")
+            .font(.caption).italic().foregroundStyle(Color.secondary)
+            .fixedSize(horizontal: true, vertical: true)
     }
 
     private func paymentContext(_ record: SearchRecord) -> some View {
@@ -424,6 +493,16 @@ struct SearchOverviewCard: View {
                 fallback: record.safeDetails["paymentMethod"] ?? "", open: open)
             if let facts = SearchChargeFacts(record: record, summary: overview.chargeSummaries[record.id]) {
                 SearchChargeFactsView(facts: facts)
+            }
+        }
+    }
+
+    private func groupedPaymentContext(_ record: SearchRecord) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SearchPaymentDetails(sources: overview.paymentSources(for: record),
+                fallback: record.safeDetails["paymentMethod"] ?? "", textFont: .subheadline, open: open)
+            if let facts = SearchChargeFacts(record: record, summary: overview.chargeSummaries[record.id]) {
+                SearchGroupedChargeFactsView(facts: facts)
             }
         }
     }
@@ -516,9 +595,8 @@ struct SearchOverviewCard: View {
 
 enum SearchScheduleLabel {
     private static func autopay(_ record: SearchRecord) -> String {
-        let mode = record.safeDetails["renewalMode"]?.lowercased()
-        if mode == "auto" || mode == "automatic" { return " • Auto pay on" }
-        return mode == "manual" ? " • Auto pay off" : ""
+        let label = SearchServiceScheduleText.autoPay(record)
+        return label == "Auto pay status not saved" ? "" : " • " + label
     }
     static func header(_ record: SearchRecord) -> String {
         guard let date = record.scheduledDueDate ?? record.dueDate else { return text(record) }

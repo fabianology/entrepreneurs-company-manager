@@ -43,8 +43,9 @@ final class UniversalSearchTests: XCTestCase {
         let (state, a, _) = fixture()
         var card = FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi"); card.plaidAccountId = "costco"
         state.cards = [card]
-        var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", cost: 283, paymentMethodId: card.id)
-        tesla.subServices = [SubService(name: "Full Self-Driving", cost: 106.67), SubService(name: "Insurance", cost: 120)]
+        var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", cost: 283, paymentMethodId: card.id,
+            notes: "Company vehicle and driver access")
+        tesla.subServices = [SubService(name: "Full Self-Driving", cost: 106), SubService(name: "Insurance", cost: 120)]
         state.subscriptions = [tesla]
         var driving = transaction(a.id, card: card, amount: 106.67); driving.name = "TESLA INC"
         var base = transaction(a.id, card: card, amount: 283); base.name = "Tesla"
@@ -54,16 +55,18 @@ final class UniversalSearchTests: XCTestCase {
         let child = try XCTUnwrap(overview.children.first { $0.title == "Full Self-Driving" })
         XCTAssertEqual(overview.serviceTransactions[child.id]?.map(\.modelID), [driving.id])
         XCTAssertEqual(overview.serviceTransactions[overview.root.id]?.map(\.modelID), [base.id])
+        XCTAssertNotNil(child.scheduledDueDate, "An attributed recurring charge supplies the next billing day")
+        XCTAssertEqual(overview.root.safeDetails["purpose"], "Company vehicle and driver access")
         XCTAssertTrue(overview.representedIDs.contains("transaction:\(driving.id)"))
         let history = index.execute(PortfolioQuery.interpret("Tesla Full Self-Driving history"))
         XCTAssertEqual(history.hits.filter { $0.record.kind == .transaction }.map(\.record.modelID), [driving.id])
         XCTAssertFalse(index.links[child.id]?.contains("transaction:\(driving.id)") == true, "Inferred ownership must not persist a relationship")
-        state.subscriptions[0].subServices.append(SubService(name: "Other package", cost: 106.67))
+        state.subscriptions[0].subServices.append(SubService(name: "Other package", cost: 106.5))
         let ambiguous = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
         XCTAssertTrue(ambiguous.serviceTransactions[child.id]?.isEmpty == true)
         XCTAssertEqual(ambiguous.transactions.count, 2)
         state.subscriptions[0].subServices.removeLast()
-        state.subscriptions[0].cost = 106.67
+        state.subscriptions[0].cost = 106
         let baseTie = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
         XCTAssertTrue(baseTie.serviceTransactions[child.id]?.isEmpty == true, "Paid base must participate in ambiguity checks")
         XCTAssertTrue(baseTie.serviceTransactions[baseTie.root.id]?.isEmpty == true)
@@ -93,7 +96,9 @@ final class UniversalSearchTests: XCTestCase {
         var noise = charge; noise.currency = "EUR"
         XCTAssertTrue(try assigned(noise, source: card).isEmpty)
         noise = charge; noise.amount = Decimal(string: "106.68")
-        XCTAssertTrue(try assigned(noise, source: card).isEmpty, "Do not guess a tax or price difference")
+        XCTAssertEqual(try assigned(noise, source: card).count, 1, "A small unique difference can reflect tax or a rounded estimate")
+        noise = charge; noise.amount = 120
+        XCTAssertTrue(try assigned(noise, source: card).isEmpty, "A material price difference still remains unassigned")
         noise = charge; noise.pending = true
         XCTAssertTrue(try assigned(noise, source: card).isEmpty)
         for flow in ["refund", "income", "transfer", "ignored"] {
@@ -173,13 +178,13 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(SearchChargeSummary(record: service, transactions: [charge("2025-07-10", 100), charge("2026-07-10", 120)], now: now, calendar: calendar).observedIncreases, 1)
     }
 
-    func testSearchChargeFactsUseCoverageAndConservativeHistoryWording() throws {
+    func testSearchChargeFactsProvideGroupedRowsAndOmitMissingHistory() throws {
         let company = UUID()
         var service = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Test", title: "Netflix", detail: "")
         service.financialFacts = ["billingAmount": "26.99", "billingCycle": "monthly"]
+        service.safeDetails["renewalMode"] = "Auto"
         service.currency = "USD"
         service.scheduledDueDate = calendar.date(byAdding: .day, value: 20, to: now)
-        service.fundingCoverage = SearchFundingCoverage(status: .covered, reason: nil)
         func charge(_ day: String, _ amount: Decimal) -> SearchRecord {
             var record = SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Test", title: "Netflix", detail: "")
             record.date = SearchText.date(day, calendar: calendar); record.amount = amount
@@ -191,15 +196,19 @@ final class UniversalSearchTests: XCTestCase {
             now: now, calendar: calendar)
         let facts = try XCTUnwrap(SearchChargeFacts(record: service, summary: summary, now: now, calendar: calendar))
 
-        XCTAssertEqual(facts.dueAndCoverage, "Due in 20 days • Covered")
+        XCTAssertEqual(facts.due, "Due in 20 days")
+        XCTAssertEqual(facts.autoPay, "Auto pay on")
         XCTAssertEqual(facts.latestCharge, "Last: $26.99 • Aug 23, 2026")
-        XCTAssertEqual(facts.historyDuration, "Charge history since Jun 10, 2026 (3 months)")
+        XCTAssertEqual(facts.historyDuration, "Jun 10, 2026 (3 months)")
         XCTAssertEqual(facts.increases, "1 charge increase observed")
-        XCTAssertFalse(facts.historyDuration.localizedCaseInsensitiveContains("active"))
-
-        service.fundingCoverage = nil
-        XCTAssertEqual(SearchChargeFacts(record: service, summary: summary, now: now, calendar: calendar)?.dueAndCoverage,
-            "Due in 20 days • Coverage unavailable")
+        XCTAssertFalse(([facts.due] + [facts.latestCharge, facts.historyDuration, facts.increases].compactMap { $0 })
+            .contains { $0.localizedCaseInsensitiveContains("coverage") })
+        service.scheduledDueDate = SearchText.date("2026-09-30", calendar: calendar)
+        XCTAssertEqual(SearchServiceScheduleText.cadence(service, calendar: calendar), "/monthly on the 30th")
+        let missing = try XCTUnwrap(SearchChargeFacts(record: service, summary: nil, now: now, calendar: calendar))
+        XCTAssertNil(missing.latestCharge)
+        XCTAssertNil(missing.historyDuration)
+        XCTAssertNil(missing.increases)
         service.financialFacts["billingAmount"] = "0"
         XCTAssertNil(SearchChargeFacts(record: service, summary: nil, now: now, calendar: calendar))
     }
@@ -357,11 +366,16 @@ final class UniversalSearchTests: XCTestCase {
         var citi = FinancialCard(userId: owner, companyId: a.id, name: "Citi", last4: "9225")
         citi.plaidAccountId = "citi-account"
         let sofi = FinancialCard(userId: owner, companyId: a.id, name: "SoFi", last4: "1234")
-        state.cards = [citi, sofi]
+        let bank = Institution(userId: owner, companyId: a.id, name: "Citibank Online", loginUrl: "citi.com")
+        let costco = FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi Card",
+            institutionName: bank.name, last4: "7788")
+        state.institutions = [bank]
+        state.cards = [citi, sofi, costco]
         var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", paymentMethodId: citi.id)
         tesla.subServices = [SubService(name: "Inherited", cost: 10),
             SubService(name: "Insurance", paymentMethodId: sofi.id, cost: 120),
             SubService(name: "Legacy name", paymentMethod: "SoFi", cost: 5),
+            SubService(name: "Legacy shortened name", paymentMethod: "Costco Citi", cost: 7),
             SubService(name: "Unknown", paymentMethod: "Unlinked card", cost: 3)]
         state.subscriptions = [tesla]; state.transactions = [transaction(a.id, card: citi)]
         let card = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
@@ -369,8 +383,112 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(payment("Inherited"), [citi.id])
         XCTAssertEqual(payment("Insurance"), [sofi.id])
         XCTAssertEqual(payment("Legacy name"), [sofi.id])
+        let shortened = try XCTUnwrap(card.paymentSources(for: try XCTUnwrap(card.children.first { $0.title == "Legacy shortened name" })).first)
+        XCTAssertEqual(shortened.modelID, costco.id)
+        XCTAssertEqual(shortened.brandName, bank.name)
+        XCTAssertEqual(SearchBrand.domain(for: shortened), "citi.com")
         XCTAssertTrue(payment("Unknown").isEmpty)
         XCTAssertTrue(card.transactions.isEmpty, "All charges on a funding card are not service charge history")
+
+        state.cards.append(FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi Rewards"))
+        let ambiguous = try XCTUnwrap(overviews(state.searchIndex(for: owner), "Tesla").first)
+        let ambiguousChild = try XCTUnwrap(ambiguous.children.first { $0.title == "Legacy shortened name" })
+        XCTAssertTrue(ambiguous.paymentSources(for: ambiguousChild).isEmpty,
+            "A shortened legacy label must not guess between multiple payment sources")
+    }
+
+    func testOverviewChoosesOneCurrentPaymentSourceWhenSavedIdentifiersConflict() throws {
+        let (state, company, _) = fixture()
+        var checking = InstitutionAccount(
+            id: "checking-account",
+            plaidAccountId: "checking-account",
+            name: "71 NEW CHECKING",
+            type: "Checking",
+            last4: "9716"
+        )
+        checking.balance = 2_000
+        let bank = Institution(
+            userId: owner,
+            companyId: company.id,
+            name: "Schools First FCU",
+            accounts: [checking]
+        )
+        var citi = FinancialCard(
+            userId: owner,
+            companyId: company.id,
+            name: "Costco Citi",
+            institutionName: "Citibank Online",
+            last4: "9225"
+        )
+        citi.plaidAccountId = "costco-card"
+        state.institutions = [bank]
+        state.cards = [citi]
+
+        // This is the conflicting legacy shape from the KIA screenshot: the visible
+        // saved name and Plaid account identify checking, while an older UUID still
+        // identifies the Costco card. Only checking is the current base-service source.
+        var kia = Subscription(
+            userId: owner,
+            companyId: company.id,
+            name: "KIA",
+            cost: 413.88,
+            paymentMethod: "71 NEW CHECKING",
+            paymentMethodId: citi.id,
+            plaidAccountId: "checking-account"
+        )
+        kia.subServices = [SubService(
+            name: "Premium Connectivity",
+            paymentMethod: "Costco Citi",
+            paymentMethodId: citi.id,
+            cost: 200,
+            billingCycle: .yearly
+        )]
+        state.subscriptions = [kia]
+
+        // General saved connections are imported after the service's own payment
+        // fields. An older parent-level card connection must not add the child's
+        // source back into the base row after the current source was resolved.
+        state.resourceConnections = [ResourceConnection(
+            ownerUserId: owner, sourceType: .subscription, sourceId: kia.id,
+            targetType: .card, targetId: citi.id, relationshipType: .paidBy,
+            origin: .manual, confidence: 1, state: .confirmed
+        )]
+
+        let overview = try XCTUnwrap(overviews(state.searchIndex(for: owner), "KIA").first)
+        let baseSources = overview.paymentSources(for: overview.root)
+        XCTAssertEqual(baseSources.map(\.title), ["71 NEW CHECKING"])
+        XCTAssertEqual(baseSources.map(\.last4), ["9716"])
+        let child = try XCTUnwrap(overview.children.first)
+        XCTAssertEqual(overview.paymentSources(for: child).map(\.modelID), [citi.id])
+        XCTAssertEqual(overview.serviceCounts.paymentSources, 2,
+            "The header still counts checking plus the child's legitimate Costco card")
+        XCTAssertTrue(overview.linked(to: overview.root, kinds: [.card]).contains { $0.modelID == citi.id },
+            "The general connection remains available without becoming another selected payment source")
+
+        // The inverse stale-field shape is also possible after a manual account edit.
+        state.subscriptions[0].paymentMethodId = bank.id
+        state.subscriptions[0].plaidAccountId = "costco-card"
+        let inverse = try XCTUnwrap(overviews(state.searchIndex(for: owner), "KIA").first)
+        XCTAssertEqual(inverse.paymentSources(for: inverse.root).map(\.title), ["71 NEW CHECKING"])
+
+        // Connections are undirected; reversing an old edge must not change the result.
+        state.resourceConnections[0].sourceType = .card
+        state.resourceConnections[0].sourceId = citi.id
+        state.resourceConnections[0].targetType = .subscription
+        state.resourceConnections[0].targetId = kia.id
+        state.subscriptions[0].subServices[0].paymentMethod = ""
+        state.subscriptions[0].subServices[0].paymentMethodId = nil
+        let inherited = try XCTUnwrap(overviews(state.searchIndex(for: owner), "KIA").first)
+        XCTAssertEqual(inherited.paymentSources(for: inherited.root).map(\.title), ["71 NEW CHECKING"])
+        XCTAssertEqual(inherited.paymentSources(for: try XCTUnwrap(inherited.children.first)).map(\.title), ["71 NEW CHECKING"])
+        XCTAssertEqual(inherited.serviceCounts.paymentSources, 1)
+
+        // A confirmed connection is still usable for a legacy service with no saved source.
+        state.subscriptions[0].paymentMethod = nil
+        state.subscriptions[0].paymentMethodId = nil
+        state.subscriptions[0].plaidAccountId = nil
+        let connectionOnly = try XCTUnwrap(overviews(state.searchIndex(for: owner), "KIA").first)
+        XCTAssertEqual(connectionOnly.paymentSources(for: connectionOnly.root).map(\.modelID), [citi.id])
     }
 
     func testBankOverviewPrefersCanonicalAccountsAndNeverCombinesOwners() throws {
@@ -863,9 +981,10 @@ final class UniversalSearchTests: XCTestCase {
         var tesla = Subscription(userId: owner, companyId: a.id, name: "Tesla", paymentMethodId: first.id,
             website: "https://tesla.com", loginId: "driver@example.com", password: "fixture-only")
         tesla.subServices = [SubService(name: "Premium Connectivity", cost: 120, billingCycle: .yearly, renewsOn: now),
-            SubService(name: "Full Self-Driving", cost: 548, renewsOn: now),
+            SubService(name: "Full Self-Driving", cost: 106),
             SubService(name: "Insurance", cost: 120, renewsOn: now, serviceType: .bill)]
         tesla.cost = 283; tesla.serviceType = .bill; tesla.nextRenewalAt = Date().addingTimeInterval(86400 * 11)
+        tesla.notes = "Model 3 company vehicle"
         var netflix = Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 26.99, paymentMethodId: first.id,
             website: "https://netflix.com", loginId: "viewer@example.com", password: "fixture-only")
         netflix.nextRenewalAt = Date().addingTimeInterval(86400 * 11)
@@ -885,13 +1004,24 @@ final class UniversalSearchTests: XCTestCase {
         // Saved bank-name associations can exist without a mirrored synced account.
         state.institutions.append(Institution(userId: owner, companyId: a.id, name: "Citibank Online", loginUrl: "https://citi.com"))
         let citiPayment = FinancialCard(userId: owner, companyId: a.id, name: "Visa", institutionName: "Citibank Online", last4: "9225", balance: 640)
-        state.cards.append(citiPayment)
+        var costcoPayment = FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi Card",
+            institutionName: "Citibank Online", last4: "7788", balance: 320)
+        costcoPayment.plaidAccountId = "costco-citi-account"
+        state.cards.append(contentsOf: [citiPayment, costcoPayment])
         if let index = state.subscriptions.firstIndex(where: { $0.id == att.id }) {
             state.subscriptions[index].paymentMethodId = citiPayment.id
         }
+        if let serviceIndex = state.subscriptions.firstIndex(where: { $0.id == tesla.id }),
+           let childIndex = state.subscriptions[serviceIndex].subServices.firstIndex(where: { $0.name == "Full Self-Driving" }) {
+            // Exercise the legacy shortened-name path and verify that a child row
+            // receives the card navigation plus the issuing bank's artwork.
+            state.subscriptions[serviceIndex].subServices[childIndex].paymentMethod = "Costco Citi"
+        }
         var charge = transaction(a.id, card: first, amount: 144); charge.name = "Figma"
         var insuranceCharge = transaction(a.id, card: first, amount: 120); insuranceCharge.name = "Tesla Insurance"
-        state.transactions = [transaction(a.id, amount: 1400), charge, insuranceCharge]
+        var drivingCharge = transaction(a.id, card: costcoPayment, date: "2026-08-23", amount: 106.67)
+        drivingCharge.name = "Tesla"
+        state.transactions = [transaction(a.id, amount: 1400), charge, insuranceCharge, drivingCharge]
         for date in ["2026-08-01", "2025-12-01", "2025-06-01", "2024-07-01"] {
             var unmatched = transaction(a.id, date: date, amount: 99); unmatched.name = "Tesla archived charge"
             state.transactions.append(unmatched)
@@ -914,6 +1044,7 @@ final class UniversalSearchTests: XCTestCase {
             ("Figma", .accessibility3, "Large accessibility text"),
             ("Tesla", .large, "Grouped Tesla services"),
             ("Tesla", .accessibility3, "Large mixed billing"),
+            ("Tesla Full Self-Driving", .large, "Expanded Tesla Full Self-Driving"),
             ("Tesla insurance", .large, "Expanded Tesla insurance"),
             ("Tesla", .large, "Tesla yearly more matches"),
             ("SoFi", .large, "Bank overview"),

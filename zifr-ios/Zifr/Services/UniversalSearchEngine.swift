@@ -61,6 +61,9 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
     var monthlyCost: Decimal?
     var serviceType: String?
     var parentServiceID: String?
+    // The service's selected funding sources are distinct from general graph
+    // connections, which can retain historical or parent-account relationships.
+    var savedPaymentSourceIDs: Set<String>?
     var category = ""
     var accountName = ""
     var safeDetails: [String: String] = [:]
@@ -508,6 +511,75 @@ struct UniversalSearchIndex: Sendable {
         let funding = SearchFundingCoverage.project(subscriptions: scheduledServices, institutions: authorizedBanks,
             cards: authorizedCards, plaidItems: appState.plaidItems.filter { $0.institutionId.map(bankIDs.contains) ?? false },
             now: now, calendar: calendar, incomplete: appState.portfolioLoadIssue != nil)
+        func legacyPaymentSources(named savedName: String, companyID: UUID) -> [SearchRecord] {
+            let saved = SearchText.normalize(savedName)
+            guard !saved.isEmpty else { return [] }
+            let candidates = records.filter {
+                $0.companyID == companyID && [.card, .account, .institution].contains($0.kind)
+            }
+            let exact = candidates.filter { $0.normalizedTitle == saved }
+            if exact.count == 1 { return exact }
+            if !exact.isEmpty { return [] }
+            // Older subservices stored only a shortened display label. Accept a
+            // whole-name prefix only when it identifies one source in this entity.
+            let compatible = candidates.filter {
+                $0.normalizedTitle.hasPrefix(saved + " ") || saved.hasPrefix($0.normalizedTitle + " ")
+            }
+            return compatible.count == 1 ? compatible : []
+        }
+        func paymentSources(
+            named savedName: String?,
+            paymentMethodID: UUID?,
+            plaidAccountID: String?,
+            companyID: UUID
+        ) -> [SearchRecord] {
+            let sourceKinds: Set<SearchRecord.Kind> = [.card, .account, .institution]
+            func recordsWithIDs(_ ids: Set<String>) -> [SearchRecord] {
+                records.filter { ids.contains($0.id) && $0.companyID == companyID && sourceKinds.contains($0.kind) }
+            }
+            func compatible(_ candidates: [SearchRecord], with normalizedName: String) -> [SearchRecord] {
+                candidates.filter {
+                    $0.normalizedTitle == normalizedName
+                        || $0.normalizedTitle.hasPrefix(normalizedName + " ")
+                        || normalizedName.hasPrefix($0.normalizedTitle + " ")
+                }
+            }
+
+            let normalizedName = SearchText.normalize(savedName ?? "")
+            var explicit: [SearchRecord] = []
+            if let paymentMethodID {
+                let identified = records.filter {
+                    $0.companyID == companyID && $0.modelID == paymentMethodID
+                        && sourceKinds.contains($0.kind)
+                }
+                let identifiedInstitutions = identified.filter { $0.kind == .institution }
+                if !identifiedInstitutions.isEmpty {
+                    let institutionAccounts = records.filter {
+                        $0.companyID == companyID && $0.kind == .account && $0.modelID == paymentMethodID
+                    }
+                    let namedAccounts = compatible(institutionAccounts, with: normalizedName)
+                    if namedAccounts.count == 1 { explicit = namedAccounts }
+                    else if institutionAccounts.count == 1 { explicit = institutionAccounts }
+                    else { explicit = identifiedInstitutions }
+                } else {
+                    let aliases = recordsWithIDs(accountAliases[paymentMethodID.uuidString] ?? [])
+                    explicit = aliases.isEmpty ? identified : aliases
+                }
+            }
+            let plaid = plaidAccountID.flatMap { accountAliases[$0] }.map(recordsWithIDs) ?? []
+
+            // Older edits could leave both durable fields populated with different sources.
+            // The saved label identifies which durable relationship is current; never show both.
+            if !normalizedName.isEmpty {
+                let namedExplicit = compatible(explicit, with: normalizedName)
+                if !namedExplicit.isEmpty { return namedExplicit }
+                let namedPlaid = compatible(plaid, with: normalizedName)
+                if !namedPlaid.isEmpty { return namedPlaid }
+            }
+            if !explicit.isEmpty { return explicit }
+            if !plaid.isEmpty { return plaid }
+            return savedName.map { legacyPaymentSources(named: $0, companyID: companyID) } ?? []
+        }
         for sub in authorizedServices {
             let cid = companyID(sub.id, sub.companyId)
             let detail = "\(SearchText.money(Decimal(sub.cost), currency: sub.currency)) / \(sub.billingCycle) · \(sub.status)"
@@ -517,7 +589,8 @@ struct UniversalSearchIndex: Sendable {
             var r = make(.subscription, sub.id, cid, sub.name, "\(sub.resolvedServiceType.rawValue.capitalized) · " + detail, text)
             r.serviceType = sub.resolvedServiceType.rawValue
             r.website = sub.website.map(redactor.clean)
-            r.safeDetails = ["website": redactor.clean(sub.website ?? ""), "notes": redactor.clean(sub.notes ?? ""), "paymentMethod": redactor.clean(sub.paymentMethod ?? "")]
+            r.safeDetails = ["website": redactor.clean(sub.website ?? ""), "notes": redactor.clean(sub.notes ?? ""),
+                "purpose": redactor.clean(sub.notes ?? ""), "paymentMethod": redactor.clean(sub.paymentMethod ?? "")]
             r.login = redactor.clean(sub.loginId ?? ""); r.credential = credential(sub.password)
             r.date = sub.nextRenewalAt ?? sub.nextRenewal.flatMap { SearchText.date($0) }; r.dueDate = r.date
             r.activeService = !["cancelled", "canceled", "paused"].contains(sub.status.lowercased())
@@ -532,6 +605,9 @@ struct UniversalSearchIndex: Sendable {
             r.financialFacts = ["billingAmount": SearchText.number(sub.cost), "billingCycle": redactor.clean(sub.billingCycle),
                 "nextRenewal": SearchText.day(r.date), "status": redactor.clean(sub.status)]
             if let monthly = r.monthlyCost { r.financialFacts["monthlyEquivalent"] = NSDecimalNumber(decimal: monthly).stringValue }
+            let basePayments = paymentSources(named: sub.paymentMethod, paymentMethodID: sub.paymentMethodId,
+                plaidAccountID: sub.plaidAccountId, companyID: cid)
+            if !basePayments.isEmpty { r.savedPaymentSourceIDs = Set(basePayments.map(\.id)) }
             records.append(r)
             for addon in sub.subServices {
                 var child = make(.subscription, sub.id, cid, addon.name, "\(addon.resolvedServiceType.rawValue.capitalized) · Add-on to \(sub.name) · \(SearchText.money(Decimal(addon.cost), currency: r.currency)) / \(addon.billingCycle.rawValue)", addon.purpose, suffix: ":addon:\(addon.id)")
@@ -546,29 +622,13 @@ struct UniversalSearchIndex: Sendable {
                     "paymentMethod": redactor.clean(inheritsPayment ? (sub.paymentMethod ?? "") : addon.paymentMethod), "renewalMode": addon.autoPay.rawValue]
                 child.fundingCoverage = funding["service:\(sub.id):addon:\(addon.id)"]
                 child.scheduledDueDate = schedules[sub.id]?.subServices.first { $0.id == addon.id }?.renewsOn
+                let childPayments = inheritsPayment ? basePayments : paymentSources(named: addon.paymentMethod,
+                    paymentMethodID: addon.paymentMethodId, plaidAccountID: nil, companyID: cid)
+                if !childPayments.isEmpty { child.savedPaymentSourceIDs = Set(childPayments.map(\.id)) }
                 records.append(child); link(child.id, r.id)
-                if let paymentID = addon.paymentMethodId {
-                    for target in records where target.companyID == cid && target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(child.id, target.id) }
-                    for target in accountAliases[paymentID.uuidString] ?? [] { link(child.id, target) }
-                } else if !inheritsPayment {
-                    let candidates = records.filter { $0.companyID == cid && [.card, .account, .institution].contains($0.kind) && $0.normalizedTitle == SearchText.normalize(addon.paymentMethod) }
-                    if candidates.count == 1 { link(child.id, candidates[0].id) }
-                }
+                for target in childPayments { link(child.id, target.id) }
             }
-            if let paymentID = sub.paymentMethodId {
-                for target in records where target.modelID == paymentID && [.card, .institution].contains(target.kind) { link(r.id, target.id) }
-                for target in accountAliases[paymentID.uuidString] ?? [] { link(r.id, target) }
-            }
-            if let plaidID = sub.plaidAccountId, let targets = accountAliases[plaidID] {
-                for target in targets { link(r.id, target) }
-            } else if sub.paymentMethodId == nil, let name = sub.paymentMethod, !name.isEmpty {
-                let candidates = records.filter { $0.companyID == cid && [.card, .account, .institution].contains($0.kind) && $0.normalizedTitle == SearchText.normalize(name) }
-                if candidates.count == 1 { link(r.id, candidates[0].id) }
-            }
-            let parentPayments = (links[r.id] ?? []).filter { id in records.contains { $0.id == id && [.card, .account, .institution].contains($0.kind) } }
-            for addon in sub.subServices where addon.paymentMethodId == nil && addon.paymentMethod.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                for target in parentPayments { link(r.id + ":addon:" + addon.id, target) }
-            }
+            for target in basePayments { link(r.id, target.id) }
         }
         for loan in appState.loans where allowed(loan.id, loan.userId, loan.companyId) {
             let cid = companyID(loan.id, loan.companyId)

@@ -86,25 +86,29 @@ The credential treatment follows `SINGLE.jpg` and is implemented by `SearchCrede
 
 Payment-source rows use Miloom gold and show the issuing bank logo when a trusted institution relationship can be resolved. Keep the actual saved card or account name and ending in the label, such as `Paid with: Visa ••9225`.
 
-Indent the compact charge facts beneath the payment-source text so the visual hierarchy remains attached to that bank or account:
+Use each base/subservice's resolved saved payment source for its row and charge matching. General saved connections must not add an older or child-only source to that row. The grouped header still counts distinct sources across all active rows; KIA can legitimately have two sources in the header while its base shows only checking and Premium Connectivity shows only Citi.
 
-- relative due date and 30-day funding coverage
-- latest confidently attributed posted expense
-- observed charge-history start date and elapsed months
-- conservatively observed charge increases, or `Not enough history`
+For grouped services, indent the compact facts beneath the payment-source text so the visual hierarchy remains attached to that bank or account:
 
-Use `Charge history since…` rather than claiming continuous active membership. Use `charge increases observed` rather than `price hikes`, because transaction history only proves the saved charges that were actually observed. Pending charges, refunds, transfers, ignored transactions, currency mismatches, gaps, ambiguous periods, and uncertain service assignments must not establish these facts.
+- relative due date
+- auto-pay status
+- latest confidently attributed posted expense, when available
+- `Active since [date]` and elapsed months, when transaction history is available
+- conservatively observed charge increases, only when enough history exists
+
+Funding coverage belongs in the Brief and does not appear in Search cards. Grouped rows omit unavailable-history placeholders and `Not enough history`. Pending charges, refunds, transfers, ignored transactions, currency mismatches, gaps, ambiguous periods, and uncertain service assignments must not establish historical facts.
 
 Base-service and subservice rows share one layout:
 
-- service logo and name
-- active-status dot
-- service type and amount
-- payment-source action with bank logo
-- next-payment and autopay text
+- service logo with the name top-aligned beside it and a smaller italic gray service type directly below the name
+- white amount followed by the saved cadence and due day, such as `$283 /monthly on the 30th`
+- payment-source action with bank logo and text matching the indented fact-list size
+- the same indented fact list
 - saved purpose when present
 
-Separate service rows with subtle divider lines.
+The logo/name stack opens the service sheet. The separate trailing chevron controls the row's transaction accordion. Separate service rows with subtle divider lines.
+
+When a generic parent-brand transaction uses the same entity, currency, and precise card/account as one service row, Search may assign it to that row when its posted amount is either exact or uniquely within two percent of the saved estimate. This presentation-only inference can supply transaction history and the next billing day; it does not persist a relationship or rewrite the saved service. Exact and explicit relationships remain authoritative, and ambiguous candidates stay in account-wide history.
 
 ## Accordions
 
