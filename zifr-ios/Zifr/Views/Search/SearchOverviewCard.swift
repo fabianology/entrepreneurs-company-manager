@@ -64,6 +64,25 @@ struct SearchPaymentDetails: View {
     }
 }
 
+/// Compact service facts aligned beneath the payment-source label.
+struct SearchChargeFactsView: View {
+    let facts: SearchChargeFacts
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("– " + facts.dueAndCoverage)
+                .accessibilityHint(facts.coverageExplanation)
+            Text("– " + facts.latestCharge)
+            Text("– " + facts.historyDuration)
+            Text("– " + facts.increases)
+        }
+        .font(.subheadline)
+        .foregroundStyle(.primary)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.leading, 28)
+    }
+}
+
 struct SearchPaymentSchedule: View {
     let date: Date?
     var body: some View {
@@ -236,8 +255,7 @@ struct SearchOverviewCard: View {
                         }
                         SearchPastCharges(records: overview.transactions, title: "All account transactions", open: open)
                     } else {
-                        SearchPaymentDetails(sources: overview.paymentSources(for: root),
-                            fallback: root.safeDetails["paymentMethod"] ?? "", open: open)
+                        paymentContext(root)
                         SearchPastCharges(records: overview.transactions, title: "Past transactions", open: open)
                     }
                 }
@@ -379,8 +397,7 @@ struct SearchOverviewCard: View {
                 if record.safeDetails["pricingModel"] == "free" { Text("Free").font(.subheadline) }
                 else { SearchBillingAmounts(totals: SearchBillingTotal.totals(for: [record])) }
             }
-            SearchPaymentDetails(sources: overview.paymentSources(for: record),
-                fallback: record.safeDetails["paymentMethod"] ?? "", open: open)
+            paymentContext(record)
             schedule(record)
             if let purpose = record.safeDetails["purpose"], !purpose.isEmpty {
                 Text("Purpose: " + purpose).font(.subheadline).fixedSize(horizontal: false, vertical: true)
@@ -399,6 +416,16 @@ struct SearchOverviewCard: View {
 
     private func schedule(_ record: SearchRecord) -> some View {
         Text(SearchScheduleLabel.text(record)).font(.footnote).fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func paymentContext(_ record: SearchRecord) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SearchPaymentDetails(sources: overview.paymentSources(for: record),
+                fallback: record.safeDetails["paymentMethod"] ?? "", open: open)
+            if let facts = SearchChargeFacts(record: record, summary: overview.chargeSummaries[record.id]) {
+                SearchChargeFactsView(facts: facts)
+            }
+        }
     }
 
     private var bankDetails: some View {

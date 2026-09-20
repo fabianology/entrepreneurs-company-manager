@@ -173,6 +173,37 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(SearchChargeSummary(record: service, transactions: [charge("2025-07-10", 100), charge("2026-07-10", 120)], now: now, calendar: calendar).observedIncreases, 1)
     }
 
+    func testSearchChargeFactsUseCoverageAndConservativeHistoryWording() throws {
+        let company = UUID()
+        var service = SearchRecord(kind: .subscription, modelID: UUID(), companyID: company, company: "Test", title: "Netflix", detail: "")
+        service.financialFacts = ["billingAmount": "26.99", "billingCycle": "monthly"]
+        service.currency = "USD"
+        service.scheduledDueDate = calendar.date(byAdding: .day, value: 20, to: now)
+        service.fundingCoverage = SearchFundingCoverage(status: .covered, reason: nil)
+        func charge(_ day: String, _ amount: Decimal) -> SearchRecord {
+            var record = SearchRecord(kind: .transaction, modelID: UUID(), companyID: company, company: "Test", title: "Netflix", detail: "")
+            record.date = SearchText.date(day, calendar: calendar); record.amount = amount
+            record.transactionSourceIdentity = "card-a"; record.flow = "expense"; record.currency = "USD"
+            return record
+        }
+        let summary = SearchChargeSummary(record: service,
+            transactions: [charge("2026-06-10", 24.99), charge("2026-07-10", 26.99), charge("2026-08-23", 26.99)],
+            now: now, calendar: calendar)
+        let facts = try XCTUnwrap(SearchChargeFacts(record: service, summary: summary, now: now, calendar: calendar))
+
+        XCTAssertEqual(facts.dueAndCoverage, "Due in 20 days • Covered")
+        XCTAssertEqual(facts.latestCharge, "Last: $26.99 • Aug 23, 2026")
+        XCTAssertEqual(facts.historyDuration, "Charge history since Jun 10, 2026 (3 months)")
+        XCTAssertEqual(facts.increases, "1 charge increase observed")
+        XCTAssertFalse(facts.historyDuration.localizedCaseInsensitiveContains("active"))
+
+        service.fundingCoverage = nil
+        XCTAssertEqual(SearchChargeFacts(record: service, summary: summary, now: now, calendar: calendar)?.dueAndCoverage,
+            "Due in 20 days • Coverage unavailable")
+        service.financialFacts["billingAmount"] = "0"
+        XCTAssertNil(SearchChargeFacts(record: service, summary: nil, now: now, calendar: calendar))
+    }
+
     func testSearchCoverageIncludesOtherServicesDespiteSearchFilter() throws {
         let (state, a, b) = fixture()
         var card = FinancialCard(userId: owner, companyId: a.id, name: "Citi", limit: 100, balance: 0)

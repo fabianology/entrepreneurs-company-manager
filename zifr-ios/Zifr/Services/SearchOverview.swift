@@ -83,6 +83,70 @@ struct SearchChargeSummary: Sendable {
     }
 }
 
+/// Display-ready charge facts calculated outside SwiftUI. These labels only use
+/// posted expense history that survived the existing service-attribution rules.
+struct SearchChargeFacts: Equatable, Sendable {
+    let dueAndCoverage: String
+    let latestCharge: String
+    let historyDuration: String
+    let increases: String
+    let coverageExplanation: String
+
+    init?(record: SearchRecord, summary: SearchChargeSummary?, now: Date = Date(), calendar: Calendar = .current) {
+        let savedAmount = record.financialFacts["billingAmount"].flatMap { Decimal(string: $0) } ?? 0
+        guard savedAmount > 0 || summary?.latest != nil || record.fundingCoverage != nil else { return nil }
+
+        let due: String
+        if let date = record.scheduledDueDate ?? record.dueDate {
+            let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now),
+                to: calendar.startOfDay(for: date)).day ?? 0
+            if days == 0 { due = "Due today" }
+            else if days < 0 { due = "Overdue by \(-days) days" }
+            else { due = "Due in \(days) \(days == 1 ? "day" : "days")" }
+        } else {
+            due = "Due date not saved"
+        }
+        dueAndCoverage = due + " • " + (record.fundingCoverage?.status.rawValue ?? "Coverage unavailable")
+        coverageExplanation = record.fundingCoverage?.reason
+            ?? (record.fundingCoverage == nil
+                ? "Coverage is unavailable for inactive services, missing dates, or payments outside the next 30 days."
+                : "Coverage considers all known charges sharing this payment source in the next 30 days.")
+
+        if let latest = summary?.latest {
+            let amount = latest.amount.map { SearchText.money($0, currency: latest.currency) } ?? "Amount unavailable"
+            latestCharge = "Last: " + amount
+                + (latest.date.map { " • " + Self.abbreviatedDate($0, calendar: calendar) } ?? " • Date unavailable")
+        } else {
+            latestCharge = "No posted charges found"
+        }
+
+        if let first = summary?.firstDate {
+            let months = summary?.elapsedMonths ?? 0
+            historyDuration = "Charge history since " + Self.abbreviatedDate(first, calendar: calendar)
+                + (months > 0 ? " (\(months) \(months == 1 ? "month" : "months"))" : "")
+        } else {
+            historyDuration = "Charge history unavailable"
+        }
+
+        if let count = summary?.observedIncreases {
+            increases = count == 0 ? "No charge increases observed"
+                : "\(count) charge \(count == 1 ? "increase" : "increases") observed"
+        } else {
+            increases = "Not enough history"
+        }
+    }
+
+    private static func abbreviatedDate(_ date: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = .current
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter.string(from: date)
+    }
+}
+
 /// Saved billing amounts grouped by their actual cycle, without annualization.
 struct SearchBillingTotal: Identifiable, Sendable {
     var currency: String
