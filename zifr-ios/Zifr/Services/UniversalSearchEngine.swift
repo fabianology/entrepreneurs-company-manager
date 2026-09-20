@@ -72,6 +72,7 @@ struct SearchRecord: Identifiable, Hashable, Sendable {
     var website: String?
     var logoURL: String?
     var brandName: String?
+    var savedBankName: String?
     var isCardAccount = false
     var fundingCoverage: SearchFundingCoverage?
     var transactionSourceIdentity: String?
@@ -434,6 +435,7 @@ struct UniversalSearchIndex: Sendable {
             r.financialFacts["autopay"] = redactor.clean(card.autopay)
             r.safeDetails = ["notes": redactor.clean(card.notes ?? ""), "cardHolder": redactor.clean(card.cardHolder ?? ""), "expirationDate": SearchText.day(card.expiresAt), "paidFrom": redactor.clean(card.paidFrom ?? "")]
             r.brandName = redactor.clean(card.institutionName ?? card.name)
+            r.savedBankName = card.institutionName.map(redactor.clean)
             records.append(r); aliases([card.id.uuidString, card.plaidAccountId], r.id)
         }
         for institution in institutions {
@@ -556,6 +558,7 @@ struct UniversalSearchIndex: Sendable {
                 "nextPayment": SearchText.day(loan.nextPaymentAt), "maturityDate": SearchText.day(loan.maturityDate),
                 "currencyBasis": "USD app default; loan has no currency field"]
             r.safeDetails = ["notes": redactor.clean(loan.notes ?? ""), "lender": redactor.clean(loan.lender ?? ""), "term": redactor.clean(loan.term), "startDate": SearchText.day(loan.startDate), "paidOffDate": SearchText.day(loan.paidOffDate)]
+            r.savedBankName = loan.lender.map(redactor.clean)
             records.append(r)
             for payment in loan.payments ?? [] {
                 var p = make(.payment, payment.id, cid, "\(loan.name) payment", "\(payment.date.formatted(date: .abbreviated, time: .omitted)) · \(payment.amount.formatted(.number.precision(.fractionLength(2))))", payment.source ?? "")

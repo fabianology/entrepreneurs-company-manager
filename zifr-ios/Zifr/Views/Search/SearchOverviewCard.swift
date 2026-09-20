@@ -282,9 +282,10 @@ struct SearchOverviewCard: View {
                             Text("Free").font(.headline)
                         } else { SearchBillingAmounts(totals: SearchBillingTotal.totals(for: [root])) }
                     } else {
-                        Text(overview.bankCounts.label).font(.footnote.weight(.medium))
+                        bankCountsText.font(.footnote.weight(.medium))
                             .foregroundStyle(Color.zifrGold)
                             .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityLabel(overview.bankCounts.label)
                     }
                 }
                 .frame(minHeight: 48, alignment: .top)
@@ -309,6 +310,11 @@ struct SearchOverviewCard: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.black, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var bankCountsText: Text {
+        let counts = overview.bankCounts
+        return Text("\(Text(counts.accounts, format: .number).foregroundColor(.white)) \(counts.accounts == 1 ? "Account" : "Accounts") | \(Text(counts.cards, format: .number).foregroundColor(.white)) \(counts.cards == 1 ? "Card" : "Cards") | \(Text(counts.loans, format: .number).foregroundColor(.white)) \(counts.loans == 1 ? "Loan" : "Loans")")
     }
 
     private func serviceRow(_ record: SearchRecord) -> some View {

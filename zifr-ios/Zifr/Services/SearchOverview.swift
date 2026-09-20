@@ -251,6 +251,31 @@ extension UniversalSearchIndex {
             roots[rootID] = (root, score)
         }
         guard !roots.isEmpty, !Task.isCancelled else { return [] }
+        var productsBySavedBankName: [String: [SearchRecord]] = [:]
+        if roots.values.contains(where: { $0.0.kind == .institution }) {
+            let banks = records.filter { $0.kind == .institution }
+            let accountsByIdentity = Dictionary(grouping: records.filter {
+                $0.kind == .account && $0.balanceIdentity != nil
+            }, by: { $0.balanceIdentity! })
+            func bankName(_ value: String) -> String {
+                value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            }
+            for product in records where [.card, .loan].contains(product.kind) {
+                // Match the saved bank/lender field used by institution cards, never
+                // a card title or fuzzy merchant name. Keep this presentation-only.
+                guard let savedName = product.savedBankName, !bankName(savedName).isEmpty else { continue }
+                let matches = banks.filter {
+                    $0.companyID == product.companyID && bankName($0.title) == bankName(savedName)
+                }
+                guard matches.count == 1, let bank = matches.first else { continue }
+                let explicitBanks = linked(product).filter { [.institution, .account].contains($0.kind) }
+                let syncedAccounts = product.balanceIdentity.map { accountsByIdentity[$0] ?? [] } ?? []
+                // Durable associations take precedence over an old saved bank name.
+                guard explicitBanks.isEmpty,
+                      !syncedAccounts.contains(where: { $0.companyID == product.companyID }) else { continue }
+                productsBySavedBankName[bank.id, default: []].append(product)
+            }
+        }
         let merchantHistory = roots.values.contains { $0.0.kind == .subscription } ? serviceMerchantHistory() : [:]
         guard !Task.isCancelled else { return [] }
         return roots.values.map { root, score in
@@ -277,7 +302,9 @@ extension UniversalSearchIndex {
                 let linkedBalances = records.filter {
                     $0.companyID == root.companyID && $0.balanceIdentity.map(aliases.contains) == true
                 }
-                let candidates = accounts + directlyLinked.filter { [.card, .loan].contains($0.kind) } + linkedBalances
+                let accountProducts = accounts.flatMap(linked).filter { [.card, .loan].contains($0.kind) }
+                let candidates = accounts + directlyLinked.filter { [.card, .loan].contains($0.kind) }
+                    + accountProducts + linkedBalances + (productsBySavedBankName[root.id] ?? [])
                 overview.bankCounts = SearchBankCounts(records: candidates)
                 var seen = Set<String>()
                 overview.balances = candidates.sorted {

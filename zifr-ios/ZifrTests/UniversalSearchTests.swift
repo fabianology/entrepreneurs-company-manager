@@ -251,6 +251,57 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(results.first { $0.root.companyID == b.id }?.bankCounts.label, "0 Accounts • 0 Cards • 0 Loans")
     }
 
+    func testBankOverviewIncludesSavedInstitutionNameWithoutSyncedAccounts() throws {
+        let (state, a, b) = fixture()
+        let first = Institution(userId: owner, companyId: a.id, name: "Citibank Online")
+        let second = Institution(userId: owner, companyId: b.id, name: "Citibank Online")
+        let costco = FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi", institutionName: "Citibank Online")
+        let otherCard = FinancialCard(userId: owner, companyId: b.id, name: "Citi Rewards", institutionName: "citibank online")
+        let loan = Loan(userId: owner, companyId: a.id, lender: "Citibank Online", name: "Personal loan")
+        state.institutions = [first, second]; state.cards = [costco, otherCard]; state.loans = [loan]
+        state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 25, paymentMethodId: costco.id)]
+        var charge = transaction(a.id, card: costco); charge.accountId = costco.id.uuidString
+        state.transactions = [charge]
+        let index = state.searchIndex(for: owner)
+        let results = overviews(index, "citi")
+        let bank = try XCTUnwrap(results.first { $0.root.companyID == a.id })
+        XCTAssertEqual(bank.bankCounts.label, "0 Accounts • 1 Card • 1 Loan")
+        XCTAssertEqual(Set(bank.balances.map(\.modelID)), [costco.id, loan.id])
+        XCTAssertEqual(bank.paidServices.map(\.title), ["Netflix"])
+        XCTAssertEqual(bank.transactions.map(\.modelID), [charge.id])
+        XCTAssertEqual(results.first { $0.root.companyID == b.id }?.bankCounts.label, "0 Accounts • 1 Card • 0 Loans")
+        XCTAssertFalse(index.links[bank.id]?.contains("card:\(costco.id)") == true,
+                       "The display association must not become a confirmed relationship")
+        XCTAssertEqual(overviews(index, "citi", filters: .init(companyID: b.id)).first?.balances.map(\.modelID), [otherCard.id])
+    }
+
+    func testBankNameAssociationDoesNotGuessAmbiguousOrPartialMatches() throws {
+        let (state, a, _) = fixture()
+        state.institutions = [Institution(userId: owner, companyId: a.id, name: "Citibank Online"),
+            Institution(userId: owner, companyId: a.id, name: "Citibank Online")]
+        state.cards = [FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi", institutionName: "Citibank Online")]
+        XCTAssertTrue(overviews(state.searchIndex(for: owner), "citi").allSatisfy { $0.bankCounts.cards == 0 })
+        state.institutions.removeLast()
+        state.cards = [FinancialCard(userId: owner, companyId: a.id, name: "Citibank Online"),
+            FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi", institutionName: "Citi")]
+        XCTAssertEqual(overviews(state.searchIndex(for: owner), "citi").first?.bankCounts.cards, 0,
+                       "Only the saved full institution name establishes this fallback")
+    }
+
+    func testSyncedBankAssociationWinsOverStaleSavedInstitutionName() throws {
+        let (state, a, _) = fixture()
+        var card = FinancialCard(userId: owner, companyId: a.id, name: "Credit card", institutionName: "Citibank Online")
+        card.plaidAccountId = "actual-bank-account"
+        var account = InstitutionAccount(); account.type = "Credit Card"; account.plaidAccountId = card.plaidAccountId
+        state.cards = [card]
+        state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", accounts: [account]),
+            Institution(userId: owner, companyId: a.id, name: "Citibank Online")]
+        let index = state.searchIndex(for: owner)
+        XCTAssertEqual(overviews(index, "citi").first?.bankCounts.cards, 0)
+        XCTAssertEqual(overviews(index, "SoFi").first?.bankCounts.cards, 1)
+        XCTAssertEqual(overviews(index, "SoFi").first?.balances.count, 1)
+    }
+
     func testOverviewCombinesMerchantHistoryWithSavedLinksWithoutDuplicates() throws {
         let cid = UUID()
         let service = SearchRecord(kind: .subscription, modelID: UUID(), companyID: cid, company: "Personal", title: "Tesla", detail: "")
@@ -660,6 +711,9 @@ final class UniversalSearchTests: XCTestCase {
         var loan = InstitutionAccount(); loan.name = "Auto Loan"; loan.type = "Loan"; loan.last4 = "2345"; loan.balance = 15200
         state.institutions = [Institution(userId: owner, companyId: a.id, name: "SoFi", loginUrl: "https://sofi.com", username: "owner@example.com", password: "fixture-only", accounts: [checking, savings, credit, loan])]
         state.institutions.append(Institution(userId: owner, companyId: b.id, name: "SoFi", loginUrl: "https://sofi.com", accounts: [checking]))
+        // Saved bank-name associations can exist without a mirrored synced account.
+        state.institutions.append(Institution(userId: owner, companyId: a.id, name: "Citibank Online", loginUrl: "https://citi.com"))
+        state.cards.append(FinancialCard(userId: owner, companyId: a.id, name: "Costco Citi", institutionName: "Citibank Online", last4: "9225", balance: 640))
         var charge = transaction(a.id, card: first, amount: 144); charge.name = "Figma"
         var insuranceCharge = transaction(a.id, card: first, amount: 120); insuranceCharge.name = "Tesla Insurance"
         state.transactions = [transaction(a.id, amount: 1400), charge, insuranceCharge]
@@ -682,6 +736,7 @@ final class UniversalSearchTests: XCTestCase {
             ("Tesla insurance", .large, "Expanded Tesla insurance"),
             ("SoFi", .large, "Bank overview"),
             ("SoFi", .accessibility3, "Bank accessibility"),
+            ("citi", .large, "Citi saved card without synced accounts"),
             ("No matching record", .large, "No results"),
             ("", .large, "First open"),
             ("largest transaction", .large, "Calculated answer")
