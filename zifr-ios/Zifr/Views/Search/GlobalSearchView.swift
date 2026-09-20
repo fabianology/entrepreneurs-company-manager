@@ -26,6 +26,8 @@ struct GlobalSearchView: View {
     @State private var projectionStamp: SearchProjectionStamp?
     @State private var clockRevision = 0
     @State private var answerTask: Task<Void, Never>?
+    @State private var answerHistory: [SearchAnswerTurn] = []
+    @State private var lastAnswerQuery: PortfolioQuery?
 
     private enum SheetRoute: Identifiable {
         case result(SearchPresentation), premium, coverage
@@ -93,8 +95,7 @@ struct GlobalSearchView: View {
             submitTask = Task { @MainActor in
                 await search()
                 guard !Task.isCancelled, key == taskKey else { return }
-                previousQuery = lastExecutedQuery
-                if response.hits.isEmpty && response.metrics.isEmpty && response.answerSummary == nil && vm.searchQuery.split(separator: " ").count > 3 && !response.isCredentialRequest { ask(useGemini: true) }
+                await answerSubmittedQuestionIfNeeded(key: key)
             }
         }
         .tint(Color.zifrGold)
@@ -547,37 +548,68 @@ struct GlobalSearchView: View {
         guard !Task.isCancelled, key == taskKey, auth.isAuthenticated, auth.currentUser?.id == userID else { return }
         response = result.0; overviews = result.1; fundingSources = result.2; lastExecutedQuery = request; searching = false
     }
-    private func ask(useGemini: Bool) {
-        if useGemini && !access.request(.aiAction, source: "universal_search", appState: appState, userId: auth.currentUser?.id) { presentation = .premium; return }
+    @MainActor
+    private func answerSubmittedQuestionIfNeeded(key: String) async {
+        guard let userID = auth.currentUser?.id,
+              let index = try? await appState.searchIndexInBackground(for: userID),
+              !Task.isCancelled, key == taskKey else { return }
+        let shouldAnswer = SearchAnswerService.shouldAnswerSubmittedQuestion(
+            vm.searchQuery,
+            response: response,
+            savedNames: index.savedNames(filters: filters),
+            hasConversation: !answerHistory.isEmpty
+        )
+        guard shouldAnswer else {
+            answerHistory = []
+            lastAnswerQuery = nil
+            previousQuery = lastExecutedQuery
+            return
+        }
+        ask(index: index, userID: userID, key: key)
+    }
+
+    @MainActor
+    private func ask(index: UniversalSearchIndex, userID: UUID, key: String) {
+        guard access.request(.aiAction, source: "universal_search", appState: appState, userId: userID) else {
+            presentation = .premium
+            return
+        }
         endEditing(); answering = true; answerError = nil
-        guard let userID = auth.currentUser?.id else { answering = false; return }
-        let query = appState.searchRedactor().clean(vm.searchQuery), key = taskKey
+        let query = appState.searchRedactor().clean(vm.searchQuery)
         let selectedFilters = filters
-        let originalResponse = response
+        let history = answerHistory
+        let priorQuery = lastAnswerQuery
         answerTask = Task { @MainActor in
             defer { if key == taskKey { answering = false } }
             do {
-                let index = try await appState.searchIndexInBackground(for: userID)
-                guard !Task.isCancelled, key == taskKey else { return }
-                var found = originalResponse
-                if related == nil && (found.hits.isEmpty || query.split(separator: " ").count > 6) {
-                    let rewritten = try await SearchAnswerService.queryRequest(for: query, useGemini: useGemini)
-                    guard !Task.isCancelled, key == taskKey else { return }
-                    let work = Task.detached(priority: .userInitiated) {
-                        let result = index.execute(rewritten, filters: selectedFilters)
-                        return (result, index.overviews(for: result, request: rewritten, filters: selectedFilters), index.searchPaymentSources(for: result.hits))
-                    }
-                    let result = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
-                    guard !Task.isCancelled, key == taskKey, auth.isAuthenticated, auth.currentUser?.id == userID else { return }
-                    found = result.0
-                    found.interpretation = "Interpreted question · " + found.interpretation
-                    response = found; overviews = result.1; fundingSources = result.2
+                let result = try await SearchAnswerService.answerPortfolioQuestion(
+                    query,
+                    index: index,
+                    filters: selectedFilters,
+                    previousQuery: priorQuery,
+                    history: history
+                )
+                guard !Task.isCancelled, key == taskKey,
+                      auth.isAuthenticated, auth.currentUser?.id == userID,
+                      !result.response.isCredentialRequest else { return }
+                let work = Task.detached(priority: .userInitiated) {
+                    (
+                        index.overviews(for: result.response, request: result.query, filters: selectedFilters),
+                        index.searchPaymentSources(for: result.response.hits)
+                    )
                 }
-                if found.isCredentialRequest { return }
-                let result = try await SearchAnswerService.answer(question: query, evidence: found.assistantEvidence(limit: useGemini ? 12 : 8), useGemini: useGemini)
-                guard !Task.isCancelled, key == taskKey else { return }; answer = result
+                let presentationData = await withTaskCancellationHandler { await work.value } onCancel: { work.cancel() }
+                guard !Task.isCancelled, key == taskKey else { return }
+                response = result.response
+                overviews = presentationData.0
+                fundingSources = presentationData.1
+                lastExecutedQuery = result.query
+                previousQuery = result.query
+                lastAnswerQuery = result.query
+                answer = result.text
+                answerHistory = Array((history + [SearchAnswerTurn(question: query, answer: result.text)]).suffix(3))
             } catch { if !Task.isCancelled, key == taskKey { answerError = "An AI answer is unavailable. Your search results and calculated totals are still available." } }
-            if useGemini { await access.refresh() }
+            await access.refresh()
         }
     }
 }

@@ -1445,6 +1445,78 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertEqual(state.searchIndex(for: owner).search("Which expenses need receipts?").hits.map(\.record.modelID), [incomplete.id])
     }
 
+    func testSubmittedQuestionRoutingPreservesExactNamesAndShortKeywordSearches() {
+        let ordinary = SearchResponse()
+        XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "KIA", response: ordinary, savedNames: ["kia", "netflix"], hasConversation: false
+        ))
+        XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "Netflix history", response: ordinary, savedNames: ["kia", "netflix"], hasConversation: false
+        ))
+        XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "charges last month", response: ordinary, savedNames: [], hasConversation: false
+        ))
+        XCTAssertTrue(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "Which subscriptions increased this year?", response: ordinary, savedNames: [], hasConversation: false
+        ))
+        XCTAssertTrue(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "How much are my bills each month?", response: ordinary, savedNames: [], hasConversation: false
+        ))
+        XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "only Fabian", response: ordinary, savedNames: [], hasConversation: false
+        ))
+        XCTAssertTrue(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "only Fabian", response: ordinary, savedNames: [], hasConversation: true
+        ))
+        var protected = ordinary
+        protected.isCredentialRequest = true
+        XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "What is my Netflix password?", response: protected, savedNames: [], hasConversation: false
+        ))
+    }
+
+    func testPortfolioAnswerUsesValidatedSearchToolAndReturnsItsSupportingResults() async throws {
+        let (state, a, _) = fixture()
+        var largest = transaction(a.id, amount: 1400)
+        largest.name = "Archive"
+        state.transactions = [transaction(a.id, amount: 10), largest]
+        let index = state.searchIndex(for: owner)
+        var calls = 0
+        var sawGroundedEvidence = false
+
+        let result = try await SearchAnswerService.answerPortfolioQuestion(
+            "What is my biggest transaction?",
+            index: index,
+            filters: .init(),
+            previousQuery: nil,
+            history: [SearchAnswerTurn(question: "Show my spending", answer: "I found your saved charges.")]
+        ) { contents, _, tools in
+            calls += 1
+            XCTAssertEqual(tools?.first?.functionDeclarations.first?.name, "searchPortfolio")
+            if calls == 1 {
+                XCTAssertTrue(String(describing: contents).contains("Show my spending"))
+                let functionCall: [String: Any] = [
+                    "name": "searchPortfolio",
+                    "args": ["query": "", "operation": "largest", "kind": "transaction"]
+                ]
+                let content: [String: Any] = ["parts": [["functionCall": functionCall]]]
+                return ["candidates": [["content": content]]]
+            }
+            sawGroundedEvidence = String(describing: contents).contains("Archive")
+            let content: [String: Any] = ["parts": [["text": "Archive was the largest transaction at $1,400."]]]
+            return ["candidates": [["content": content]]]
+        }
+
+        XCTAssertEqual(calls, 2)
+        XCTAssertTrue(sawGroundedEvidence)
+        XCTAssertEqual(result.retrievalRounds, 1)
+        XCTAssertEqual(result.query.operation, .largest)
+        XCTAssertEqual(result.query.kind, .transaction)
+        XCTAssertEqual(result.response.metrics.first?.value, 1400)
+        XCTAssertEqual(result.response.metrics.first?.sourceIDs, ["transaction:\(largest.id.uuidString)"])
+        XCTAssertEqual(result.text, "Archive was the largest transaction at $1,400.")
+    }
+
     func testAuthenticatedTextAndLiveQueryToolsWhenOptedIn() async throws {
         guard ProcessInfo.processInfo.environment["MILOOM_QUERY_INTEGRATION"] == "1" else { throw XCTSkip("Enable MILOOM_QUERY_INTEGRATION for metered Gemini query verification.") }
         // Unsigned simulator builds may not persist Keychain sessions across test installation.
@@ -1461,15 +1533,22 @@ final class UniversalSearchTests: XCTestCase {
         state.transactions = [transaction(a.id, amount: 10), big]
         state.subscriptions = [Subscription(userId: owner, companyId: a.id, name: "Internet", cost: 85, serviceType: .bill), Subscription(userId: owner, companyId: a.id, name: "Netflix", cost: 20, serviceType: .subscription)]
         let index = state.searchIndex(for: owner)
-        let request = try await SearchAnswerService.queryRequest(for: "What is my biggest transaction?", useGemini: true)
-        let ranked = index.execute(request)
-        XCTAssertEqual(ranked.metrics.first?.value, 1400)
-        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(ranked.assistantEvidence().utf8)) as? [String: Any])
+        let portfolioAnswer = try await SearchAnswerService.answerPortfolioQuestion(
+            "What is my biggest transaction?", index: index, filters: .init(), previousQuery: nil, history: []
+        )
+        XCTAssertGreaterThan(portfolioAnswer.retrievalRounds, 0)
+        XCTAssertEqual(portfolioAnswer.response.metrics.first?.value, 1400)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(portfolioAnswer.response.assistantEvidence().utf8)) as? [String: Any])
         let calculation = try XCTUnwrap((payload["calculations"] as? [[String: Any]])?.first)
         XCTAssertEqual(calculation["recordTitle"] as? String, "Archive")
         XCTAssertEqual(calculation["company"] as? String, "North Studio")
-        let textAnswer = try await SearchAnswerService.answer(question: "How much are my bills each month?", evidence: index.search("bills cost").assistantEvidence(), useGemini: true)
-        XCTAssertTrue(textAnswer.contains("85"))
+        XCTAssertTrue(portfolioAnswer.text.localizedCaseInsensitiveContains("Archive"))
+        let monthlyAnswer = try await SearchAnswerService.answerPortfolioQuestion(
+            "How much are my bills each month?", index: index, filters: .init(), previousQuery: nil, history: []
+        )
+        XCTAssertGreaterThan(monthlyAnswer.retrievalRounds, 0)
+        XCTAssertEqual(monthlyAnswer.response.metrics.first?.value, 85)
+        XCTAssertTrue(monthlyAnswer.text.contains("85"))
         let tools = [Tool(functionDeclarations: [FunctionDeclaration(name: "searchPortfolio", description: PortfolioQuery.assistantInstructions, parameters: Schema(type: "OBJECT", properties: PortfolioQuery.toolProperties, required: ["query"]))])]
         let client = GeminiLiveClient(systemInstruction: PortfolioQuery.assistantInstructions + " Always call searchPortfolio before answering. Reply briefly in English.", tools: tools)
         defer { client.disconnect() }

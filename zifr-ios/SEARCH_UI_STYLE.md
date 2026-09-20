@@ -116,6 +116,20 @@ Accordions expand downward in place. The closed state uses `chevron.right`; the 
 
 Past transactions start closed, show the latest three when opened, and expose a `More` action when additional loaded transactions exist. Account-wide unmatched history remains separate from confidently attributed service history. More Matches transactions are grouped into independent year accordions.
 
+## Ask-anything behavior
+
+The same Search sheet supports portfolio questions without changing its visual structure:
+
+- Results continue updating locally while the user types. Typing does not call Gemini or consume AI usage.
+- Exact saved names and short keyword queries, such as `KIA`, `Netflix history`, and `charges last month`, keep the normal Search behavior and card presentation.
+- Submitting a natural-language question, such as `Which subscriptions increased this year?`, shows a concise answer in the existing answer area above the same supporting cards.
+- Gemini 2.5 Flash may call the validated `searchPortfolio` tool up to four times. Calculations, authorization boundaries, entity matching, and UI filters remain local and authoritative.
+- Only bounded, allowlisted Search evidence is sent to Gemini. Passwords and login values remain in the protected credential UI and are never available to the model.
+- The current sheet retains up to three successful question-and-answer turns so a submitted follow-up such as `only Fabian` can reuse the prior query context. A submitted ordinary Search query clears that conversation context.
+- If Gemini is unavailable, the local Search results and calculated totals remain visible with the existing compact error message.
+
+The answer is grounded in the retrieved Search response, and the overview/payment-source cards beneath it are rebuilt from that same response. UI company, type, and date filters cannot be broadened by the model.
+
 ## Existing design-system foundation
 
 Miloom already has reusable foundations:
