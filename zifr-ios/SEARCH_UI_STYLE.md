@@ -121,7 +121,7 @@ Past transactions start closed, show the latest three when opened, and expose a 
 The same Search sheet supports portfolio questions without changing its visual structure:
 
 - Results continue updating locally while the user types. Typing does not call Gemini or consume AI usage.
-- Exact saved names and short keyword queries, such as `KIA`, `Netflix history`, and `charges last month`, keep the normal Search behavior and card presentation.
+- Exact saved names and short keyword queries, such as `KIA`, `Netflix history`, and `charges last month`, keep the normal Search behavior and card presentation. A saved account name, with or without an `account` suffix, shows that specific account (`SoFi Checking` and `SoFi Checking account`). A saved institution name, with or without the suffix, opens the bank overview (`SoFi` and `SoFi account`).
 - Submitting a natural-language question, such as `Which subscriptions increased this year?`, shows a concise answer in the existing answer area above the same supporting cards.
 - Gemini 2.5 Flash may call the validated `searchPortfolio` tool up to four times. Calculations, authorization boundaries, entity matching, and UI filters remain local and authoritative.
 - Only bounded, allowlisted Search evidence is sent to Gemini. Passwords and login values remain in the protected credential UI and are never available to the model.

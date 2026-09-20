@@ -897,15 +897,41 @@ struct UniversalSearchIndex: Sendable {
         let normalized = SearchText.normalize(query)
         let eligible = records.filter { filters.companyID == nil || $0.companyID == filters.companyID }
         let parents = Dictionary(eligible.filter { $0.kind == .subscription && $0.parentServiceID == nil }.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let literal = eligible.contains { record in
+        let literalRecords = eligible.filter { record in
             record.normalizedTitle == normalized || record.parentServiceID.flatMap { parents[$0] }.map {
                 $0.normalizedTitle + " " + record.normalizedTitle == normalized
             } == true
         }
-        if literal {
+        if !literalRecords.isEmpty {
             plan = SearchQuery("all records", filters: filters, now: now, calendar: calendar)
             plan.tokens = normalized.split(separator: " ").map(String.init)
+            // An exact institution name owns the bank overview. Otherwise an exact account name
+            // stays a specific account result instead of being promoted to its parent institution.
+            if !literalRecords.contains(where: { $0.kind == .institution }),
+               literalRecords.contains(where: { $0.kind == .account }) {
+                plan.kind = .account
+            }
             return plan
+        }
+        // A trailing account qualifier follows the saved name it describes. A saved account remains
+        // a specific account result; a saved institution name opens its bank overview. General queries
+        // such as "checking accounts" retain the normal account-only filter.
+        let words = normalized.split(separator: " ").map(String.init)
+        if plan.kind == .account,
+           let suffix = words.last,
+           ["account", "accounts"].contains(suffix),
+           words.count > 1 {
+            let savedName = words.dropLast().joined(separator: " ")
+            let exactAccounts = eligible.filter { $0.kind == .account && $0.normalizedTitle == savedName }
+            if !exactAccounts.isEmpty {
+                plan.tokens = savedName.split(separator: " ").map(String.init)
+                return plan
+            }
+            if eligible.contains(where: { $0.kind == .institution && $0.normalizedTitle == savedName }) {
+                plan = SearchQuery("all records", filters: filters, now: now, calendar: calendar)
+                plan.tokens = savedName.split(separator: " ").map(String.init)
+                return plan
+            }
         }
         let schedulePhrases = ["next payment", "next payments", "autopay", "auto pay"]
         for phrase in schedulePhrases {

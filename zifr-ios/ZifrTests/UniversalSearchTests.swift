@@ -517,6 +517,27 @@ final class UniversalSearchTests: XCTestCase {
         XCTAssertTrue(overviews(index, "1234").isEmpty, "Exact endings must not expand into sibling accounts")
     }
 
+    func testSavedAccountNameTargetsAccountWhileInstitutionNameTargetsBankOverview() throws {
+        let (state, company, _) = fixture()
+        var checking = InstitutionAccount()
+        checking.name = "SoFi Checking"
+        checking.type = "Checking"
+        checking.last4 = "5181"
+        checking.balance = 4250
+        let bank = Institution(userId: owner, companyId: company.id, name: "SoFi", accounts: [checking])
+        state.institutions = [bank]
+        let index = state.searchIndex(for: owner)
+
+        let exact = index.search("SoFi Checking")
+        let qualified = index.search("SoFi Checking account")
+        XCTAssertEqual(qualified.hits.map(\.id), exact.hits.map(\.id))
+        XCTAssertEqual(exact.hits.map(\.record.kind), [.account])
+        XCTAssertTrue(overviews(index, "SoFi Checking").isEmpty)
+        XCTAssertTrue(overviews(index, "SoFi Checking account").isEmpty)
+        XCTAssertEqual(try XCTUnwrap(overviews(index, "SoFi").first).root.modelID, bank.id)
+        XCTAssertEqual(try XCTUnwrap(overviews(index, "SoFi account").first).root.modelID, bank.id)
+    }
+
     func testBankHeaderCountsDeduplicateMirroredCardsAndLoans() throws {
         let (state, a, b) = fixture()
         var credit = InstitutionAccount(); credit.name = "Credit"; credit.type = "Credit Card"; credit.plaidAccountId = "credit"
@@ -1452,6 +1473,10 @@ final class UniversalSearchTests: XCTestCase {
         ))
         XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
             "Netflix history", response: ordinary, savedNames: ["kia", "netflix"], hasConversation: false
+        ))
+        XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
+            "Fabian SoFi Business Checking account", response: ordinary,
+            savedNames: ["fabian sofi business checking"], hasConversation: false
         ))
         XCTAssertFalse(SearchAnswerService.shouldAnswerSubmittedQuestion(
             "charges last month", response: ordinary, savedNames: [], hasConversation: false

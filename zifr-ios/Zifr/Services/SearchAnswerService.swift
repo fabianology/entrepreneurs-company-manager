@@ -48,8 +48,16 @@ enum SearchAnswerService {
     ) -> Bool {
         guard !response.isCredentialRequest else { return false }
         let normalized = SearchText.normalize(question)
-        guard !normalized.isEmpty, !savedNames.contains(normalized) else { return false }
-        let words = normalized.split(separator: " ")
+        guard !normalized.isEmpty else { return false }
+        let words = normalized.split(separator: " ").map(String.init)
+        let savedAccountWithSuffix: Bool
+        if words.count > 1, let suffix = words.last {
+            savedAccountWithSuffix = ["account", "accounts"].contains(suffix)
+                && savedNames.contains(words.dropLast().joined(separator: " "))
+        } else {
+            savedAccountWithSuffix = false
+        }
+        guard !savedNames.contains(normalized), !savedAccountWithSuffix else { return false }
         let conversationalPrefixes = [
             "what ", "which ", "who ", "when ", "where ", "why ", "how ",
             "is ", "are ", "do ", "does ", "did ", "can ", "could ",
