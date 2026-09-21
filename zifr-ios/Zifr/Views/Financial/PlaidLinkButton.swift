@@ -11,6 +11,7 @@ struct PlaidLinkButton: View {
     var isReconnect: Bool = false
     var accentColor: Color = Color(red: 59/255, green: 130/255, blue: 246/255)
     var foregroundColor: Color = .white
+    var iconAssetName: String? = nil
     var prepareForExchange: (() async throws -> Void)? = nil
     var onExchangeFailure: (() async -> Void)? = nil
     let onSuccess: (String, [PlaidService.PlaidAccount], String?) -> Void
@@ -64,6 +65,13 @@ struct PlaidLinkButton: View {
                     HStack(spacing: 12) {
                         if isLoading {
                             ProgressView().tint(isReconnect ? Color(hex: "#C1AA78") : .white)
+                        } else if let iconAssetName {
+                            Image(iconAssetName)
+                                .resizable()
+                                .renderingMode(.template)
+                                .scaledToFit()
+                                .frame(width: 22, height: 22)
+                                .foregroundStyle(foregroundColor)
                         } else {
                             Image(systemName: isReconnect ? "exclamationmark.triangle.fill" : "building.columns.fill")
                                 .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : foregroundColor)

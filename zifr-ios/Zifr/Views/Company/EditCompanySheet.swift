@@ -27,6 +27,12 @@ private enum NewEntityFlowStep: Int, CaseIterable {
 private enum NewEntityIdentityDestination {
     case finish
     case accounts
+    case setupLaterReview
+}
+
+private enum NewEntityReviewMode {
+    case plaidAccounts
+    case setupLater
 }
 
 struct NewEntitySheet: View {
@@ -40,10 +46,11 @@ struct NewEntitySheet: View {
     var onComplete: (Company) -> Void
 
     @State private var step: NewEntityFlowStep = .identity
+    @State private var reviewMode: NewEntityReviewMode = .plaidAccounts
     @State private var name = ""
     @State private var category = "Business"
     @State private var structure = "LLC"
-    @State private var colorHex = "#1f7055"
+    @State private var colorHex = "#000000"
     @State private var website = ""
     @State private var logoData: Data?
     @State private var selectedPhoto: PhotosPickerItem?
@@ -60,7 +67,6 @@ struct NewEntitySheet: View {
     @State private var isSavingEntity = false
     @State private var isFinalizing = false
     @State private var errorMessage: String?
-    @State private var showingSkipConfirmation = false
     @State private var showingAbandonConnectionConfirmation = false
     @State private var showingDeleteConfirmation = false
     @State private var showingPremiumUpgrade = false
@@ -144,23 +150,28 @@ struct NewEntitySheet: View {
             .navigationTitle(company == nil ? "New Entity" : "Edit Entity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: 14) {
-                        if step != .identity {
-                            Button {
-                                goBackOneStep()
-                            } label: {
-                                Image(systemName: "chevron.left")
-                            }
-                            .accessibilityLabel("Back")
+                if step != .identity {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            goBackOneStep()
+                        } label: {
+                            Image(systemName: "chevron.left")
                         }
+                        .accessibilityLabel("Back")
+                        .disabled(isBusy)
+                    }
 
-                        Button(step == .identity ? "Cancel" : "Close") {
-                            if step == .identity {
-                                dismiss()
-                            } else {
-                                closeTapped()
-                            }
+                    if #available(iOS 26.0, *) {
+                        ToolbarSpacer(.fixed, placement: .topBarLeading)
+                    }
+                }
+
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(step == .identity ? "Cancel" : "Close") {
+                        if step == .identity {
+                            dismiss()
+                        } else {
+                            closeTapped()
                         }
                     }
                     .disabled(isBusy)
@@ -204,16 +215,6 @@ struct NewEntitySheet: View {
             Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             if let errorMessage { Text(errorMessage) }
-        }
-        .confirmationDialog(
-            "Finish without connecting an account?",
-            isPresented: $showingSkipConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Finish without accounts") { saveIdentity(destination: .finish) }
-            Button("Connect an account", role: .cancel) {}
-        } message: {
-            Text("Connected accounts make your financial dashboard useful immediately. You can still connect later from the entity’s Financial tab.")
         }
         .confirmationDialog(
             "Stop setting up this connection?",
@@ -288,11 +289,6 @@ struct NewEntitySheet: View {
 
     private var identityStep: some View {
         VStack(spacing: 20) {
-            Text("Set Up Your Entity")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
             contentCard {
                 VStack(spacing: 18) {
                     HStack(alignment: .bottom, spacing: 14) {
@@ -410,7 +406,7 @@ struct NewEntitySheet: View {
             Button { saveIdentity(destination: .accounts) } label: {
                 HStack(spacing: 8) {
                     if isSavingEntity {
-                        ProgressView().tint(Color(hex: "#121212"))
+                        ProgressView().tint(.white)
                     } else {
                         Text("Add Accounts")
                         Image(systemName: "arrow.right")
@@ -421,7 +417,10 @@ struct NewEntitySheet: View {
                 .frame(height: 52)
             }
             .disabled(trimmedName.isEmpty || isSavingEntity)
-            .buttonStyle(NewEntityPrimaryButtonStyle())
+            .buttonStyle(NewEntityPrimaryButtonStyle(
+                enabledBackground: Color.zifrGreen,
+                enabledForeground: .white
+            ))
 
             if company != nil {
                 Button(role: .destructive) {
@@ -474,12 +473,6 @@ struct NewEntitySheet: View {
 
     private var connectStep: some View {
         VStack(spacing: 20) {
-            stepHeading(
-                eyebrow: "RECOMMENDED",
-                title: "Connect Your Accounts",
-                detail: nil
-            )
-
             contentCard {
                 VStack(spacing: 22) {
                     Image(systemName: "building.columns.fill")
@@ -489,7 +482,7 @@ struct NewEntitySheet: View {
                     VStack(spacing: 8) {
                         Text("Connect your first account")
                             .font(.title3.weight(.bold))
-                        Text("Securely choose a bank with Plaid. You’ll review every account before anything is added to Miloom.")
+                        Text("For best experience we recommend linking a checking account or credit card with lots of activity and history.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -499,9 +492,10 @@ struct NewEntitySheet: View {
                     if let company = createdCompany {
                         PlaidLinkButton(
                             companyId: company.id,
-                            buttonText: "Connect an account",
+                            buttonText: "Connect via Plaid",
                             accentColor: Color.zifrGreen,
                             foregroundColor: .white,
+                            iconAssetName: "plaid_mark",
                             prepareForExchange: {
                                 try await prepareDraftForPlaidExchange()
                             },
@@ -514,6 +508,7 @@ struct NewEntitySheet: View {
                             plaidAccounts = accounts
                             plaidItemId = itemId
                             selectedPlaidAccountIDs = Set(accounts.map(\.account_id))
+                            reviewMode = .plaidAccounts
                             UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                             withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                                 step = .review
@@ -521,44 +516,42 @@ struct NewEntitySheet: View {
                         }
                     }
 
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .center, spacing: 10) {
                         Image(systemName: "lock.shield.fill")
                             .foregroundStyle(Color.zifrGreen)
-                        Text("Miloom never receives your bank password. Plaid handles the secure sign-in and consent flow.")
+                        Text("Your data is encrypted in transit with TLS and protected at rest using AES-256 encryption.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
 
-            Button("Set Up Later") { showingSkipConfirmation = true }
+            Button("Set Up Later") { saveIdentity(destination: .setupLaterReview) }
                 .font(.body.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 52)
                 .background(Color.black, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .accessibilityHint("Finishes creating the entity without linked accounts")
-
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundStyle(Color.miloomGold)
-                Text("Most useful setup: one primary checking or credit account")
-                    .font(.footnote.weight(.medium))
-                    .foregroundStyle(Color.white.opacity(0.72))
-            }
+                .disabled(isBusy)
+                .accessibilityHint("Saves the entity and continues to demo account options")
         }
     }
 
+    @ViewBuilder
     private var reviewStep: some View {
-        VStack(spacing: 20) {
-            stepHeading(
-                eyebrow: "YOU’RE IN CONTROL",
-                title: "Choose accounts to add",
-                detail: "All accounts are selected. Turn off anything that doesn’t belong to this entity."
-            )
+        switch reviewMode {
+        case .plaidAccounts:
+            plaidAccountsReview
+        case .setupLater:
+            setupLaterReview
+        }
+    }
 
+    private var plaidAccountsReview: some View {
+        VStack(spacing: 20) {
             contentCard {
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
@@ -605,6 +598,69 @@ struct NewEntitySheet: View {
                     .foregroundStyle(Color.miloomGold)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+        }
+    }
+
+    private var setupLaterReview: some View {
+        VStack(spacing: 20) {
+            contentCard {
+                VStack(spacing: 20) {
+                    Image(systemName: "play.rectangle.on.rectangle.fill")
+                        .font(.system(size: 38, weight: .semibold))
+                        .foregroundStyle(Color.miloomGold)
+
+                    VStack(spacing: 10) {
+                        Text("Explore with a Demo Account")
+                            .font(.title3.weight(.bold))
+                            .multilineTextAlignment(.center)
+
+                        Text("Turn on Demo Account to explore Miloom with sample banks, cards, services, and activity before connecting your own data.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("You can always add a real account later from this entity’s Financial tab.")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.white.opacity(0.78))
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Divider().overlay(Color.white.opacity(0.08))
+
+                    Toggle(isOn: Binding(
+                        get: { isDemoAccountEnabled },
+                        set: { setDemoAccountEnabled($0) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Demo Account")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text("Adds sample financial data across the app")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .tint(Color.zifrGreen)
+                    .frame(minHeight: 52)
+                    .accessibilityHint("Adds or removes local sample data")
+                }
+            }
+        }
+    }
+
+    private var isDemoAccountEnabled: Bool {
+        appState.companies.contains { $0.id == DummyDataSeeder.dummyCompanyId }
+    }
+
+    private func setDemoAccountEnabled(_ enabled: Bool) {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        if enabled {
+            let userID = authViewModel.currentUser?.id ?? UUID()
+            DummyDataSeeder.seed(appState: appState, userId: userID, force: true)
+        } else {
+            DummyDataSeeder.purge(appState: appState)
         }
     }
 
@@ -668,25 +724,6 @@ struct NewEntitySheet: View {
         }
     }
 
-    private func stepHeading(eyebrow: String, title: String, detail: String?) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(eyebrow)
-                .font(.caption2.weight(.bold))
-                .tracking(1.2)
-                .foregroundStyle(Color.miloomGold)
-            Text(title)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.white)
-            if let detail, !detail.isEmpty {
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.white.opacity(0.62))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private func contentCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(20)
@@ -704,21 +741,39 @@ struct NewEntitySheet: View {
                     EmptyView()
 
                 case .review:
-                    Button { saveSelectedAccounts() } label: {
-                        HStack(spacing: 8) {
-                            if isFinalizing {
-                                ProgressView().tint(Color(hex: "#121212"))
-                            } else {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Add \(selectedAccounts.count) account\(selectedAccounts.count == 1 ? "" : "s")")
+                    switch reviewMode {
+                    case .plaidAccounts:
+                        Button { saveSelectedAccounts() } label: {
+                            HStack(spacing: 8) {
+                                if isFinalizing {
+                                    ProgressView().tint(Color(hex: "#121212"))
+                                } else {
+                                    Image(systemName: "checkmark.circle.fill")
+                                    Text("Add \(selectedAccounts.count) account\(selectedAccounts.count == 1 ? "" : "s")")
+                                }
                             }
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
                         }
-                        .font(.body.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
+                        .disabled(selectedAccounts.isEmpty || isFinalizing)
+                        .buttonStyle(NewEntityPrimaryButtonStyle())
+
+                    case .setupLater:
+                        Button { completeFlow() } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Finish Setup")
+                            }
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                        }
+                        .buttonStyle(NewEntityPrimaryButtonStyle(
+                            enabledBackground: Color.zifrGreen,
+                            enabledForeground: .white
+                        ))
                     }
-                    .disabled(selectedAccounts.isEmpty || isFinalizing)
-                    .buttonStyle(NewEntityPrimaryButtonStyle())
                 }
             }
             .padding(.horizontal, 20)
@@ -741,7 +796,9 @@ struct NewEntitySheet: View {
     }
 
     private func closeTapped() {
-        if step == .review || plaidItemId != nil {
+        if reviewMode == .setupLater {
+            completeFlow()
+        } else if step == .review || plaidItemId != nil {
             showingAbandonConnectionConfirmation = true
         } else {
             dismiss()
@@ -776,7 +833,7 @@ struct NewEntitySheet: View {
         name = company.name
         structure = company.structure
         category = ["Individual", "Household"].contains(company.structure) ? "Personal" : "Business"
-        colorHex = company.colorHex.isEmpty ? "#1f7055" : company.colorHex.lowercased()
+        colorHex = company.colorHex.isEmpty ? "#000000" : company.colorHex.lowercased()
         website = company.website ?? ""
         logoData = company.logoData
     }
@@ -900,6 +957,11 @@ struct NewEntitySheet: View {
         case .accounts:
             withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
                 step = .connect
+            }
+        case .setupLaterReview:
+            reviewMode = .setupLater
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                step = .review
             }
         }
     }
@@ -1049,12 +1111,14 @@ struct NewEntitySheet: View {
 
 private struct NewEntityPrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
+    var enabledBackground: Color = .miloomGold
+    var enabledForeground: Color = Color(hex: "#121212")
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isEnabled ? Color(hex: "#121212") : Color.white.opacity(0.34))
+            .foregroundStyle(isEnabled ? enabledForeground : Color.white.opacity(0.34))
             .background(
-                isEnabled ? Color.miloomGold : Color.white.opacity(0.07),
+                isEnabled ? enabledBackground : Color.white.opacity(0.07),
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
