@@ -273,9 +273,6 @@ struct DashboardView: View {
                         vm.path.append(company)
                     }
                 }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color(hex: "#0B0D0C"))
             }
             .sheet(isPresented: $showPremiumUpgrade) {
                 PremiumUpgradeView(gate: accessController.pendingGate)
@@ -284,7 +281,7 @@ struct DashboardView: View {
                 DowngradeSelectionView()
             }
             .sheet(item: $editingCompany) { company in
-                EditCompanySheet(vm: vm, company: company)
+                NewEntitySheet(vm: vm, company: company) { _ in }
             }
             .sheet(isPresented: $vm.showSearch) {
                 GlobalSearchView(vm: vm)

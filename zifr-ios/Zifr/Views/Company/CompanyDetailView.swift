@@ -106,7 +106,7 @@ struct CompanyDetailView: View {
         .coordinateSpace(name: "commandCenter")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditCompany) {
-            EditCompanySheet(vm: vm, company: company)
+            NewEntitySheet(vm: vm, company: company) { _ in }
         }
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)

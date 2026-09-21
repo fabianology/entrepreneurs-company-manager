@@ -10,7 +10,7 @@ private enum NewEntityFlowStep: Int, CaseIterable {
     var title: String {
         switch self {
         case .identity: return "Entity"
-        case .connect: return "Connect"
+        case .connect: return "Accounts"
         case .review: return "Review"
         }
     }
@@ -24,6 +24,11 @@ private enum NewEntityFlowStep: Int, CaseIterable {
     }
 }
 
+private enum NewEntityIdentityDestination {
+    case finish
+    case accounts
+}
+
 struct NewEntitySheet: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var authViewModel
@@ -31,16 +36,20 @@ struct NewEntitySheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @Bindable var vm: AppViewModel
+    var company: Company? = nil
     var onComplete: (Company) -> Void
 
     @State private var step: NewEntityFlowStep = .identity
     @State private var name = ""
     @State private var category = "Business"
     @State private var structure = "LLC"
-    @State private var colorHex = Company.brandColors.first ?? "#4f46e5"
+    @State private var colorHex = "#1f7055"
+    @State private var website = ""
     @State private var logoData: Data?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var createdCompany: Company?
+    @State private var newCompanyIsPersisted = false
+    @State private var provisionalNewCompanyIsPersisted = false
 
     @State private var plaidInstitutionName = ""
     @State private var plaidAccounts: [PlaidService.PlaidAccount] = []
@@ -53,12 +62,17 @@ struct NewEntitySheet: View {
     @State private var errorMessage: String?
     @State private var showingSkipConfirmation = false
     @State private var showingAbandonConnectionConfirmation = false
-    @State private var showingDiscardConfirmation = false
+    @State private var showingDeleteConfirmation = false
     @State private var showingPremiumUpgrade = false
+    @State private var didPrefillIdentity = false
     @FocusState private var isNameFocused: Bool
 
     private var trimmedName: String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedWebsite: String {
+        website.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var isBusy: Bool {
@@ -73,15 +87,40 @@ struct NewEntitySheet: View {
         Company.structures.filter { !["Household", "Individual"].contains($0) }
     }
 
+    private var baselineCompany: Company? {
+        company
+    }
+
+    private var hasIdentityChanges: Bool {
+        guard let baselineCompany else {
+            return !trimmedName.isEmpty || !trimmedWebsite.isEmpty || logoData != nil
+        }
+
+        let baselineCategory = ["Individual", "Household"].contains(baselineCompany.structure) ? "Personal" : "Business"
+        return trimmedName != baselineCompany.name.trimmingCharacters(in: .whitespacesAndNewlines) ||
+            structure != baselineCompany.structure ||
+            category != baselineCategory ||
+            colorHex.caseInsensitiveCompare(baselineCompany.colorHex) != .orderedSame ||
+            trimmedWebsite != (baselineCompany.website ?? "").trimmingCharacters(in: .whitespacesAndNewlines) ||
+            logoData != baselineCompany.logoData
+    }
+
+    private var canSaveIdentity: Bool {
+        !trimmedName.isEmpty && hasIdentityChanges && !isBusy
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 newEntityBackground
 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        flowProgress
+                VStack(spacing: 0) {
+                    flowProgress
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                        .padding(.bottom, 20)
 
+                    ScrollView {
                         Group {
                             switch step {
                             case .identity:
@@ -96,21 +135,47 @@ struct NewEntitySheet: View {
                             insertion: .opacity.combined(with: .move(edge: .trailing)),
                             removal: .opacity.combined(with: .move(edge: .leading))
                         ))
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, step == .review ? 120 : 28)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 120)
+                    .scrollDismissesKeyboard(.interactively)
                 }
-                .scrollDismissesKeyboard(.interactively)
             }
-            .navigationTitle("New Entity")
+            .navigationTitle(company == nil ? "New Entity" : "Edit Entity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(createdCompany == nil ? "Cancel" : "Close") {
-                        closeTapped()
+                    HStack(spacing: 14) {
+                        if step != .identity {
+                            Button {
+                                goBackOneStep()
+                            } label: {
+                                Image(systemName: "chevron.left")
+                            }
+                            .accessibilityLabel("Back")
+                        }
+
+                        Button(step == .identity ? "Cancel" : "Close") {
+                            if step == .identity {
+                                dismiss()
+                            } else {
+                                closeTapped()
+                            }
+                        }
                     }
                     .disabled(isBusy)
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    if step == .identity {
+                        Button("Save") {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            saveIdentity(destination: .finish)
+                        }
+                        .fontWeight(.semibold)
+                        .tint(canSaveIdentity ? .green : nil)
+                        .disabled(!canSaveIdentity)
+                    }
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -118,7 +183,12 @@ struct NewEntitySheet: View {
             }
         }
         .preferredColorScheme(.dark)
-        .interactiveDismissDisabled(isBusy || createdCompany != nil || !trimmedName.isEmpty || logoData != nil)
+        .presentationDetents([.fraction(0.84)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(hex: "#1C1C1E"))
+        .presentationContentInteraction(.resizes)
+        .onAppear { prefillIdentityIfNeeded() }
+        .interactiveDismissDisabled(isBusy || createdCompany != nil || !trimmedName.isEmpty || !trimmedWebsite.isEmpty || logoData != nil)
         .onChange(of: selectedPhoto) { _, item in
             guard let item else { return }
             Task {
@@ -140,7 +210,7 @@ struct NewEntitySheet: View {
             isPresented: $showingSkipConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Finish without accounts") { completeFlow() }
+            Button("Finish without accounts") { saveIdentity(destination: .finish) }
             Button("Connect an account", role: .cancel) {}
         } message: {
             Text("Connected accounts make your financial dashboard useful immediately. You can still connect later from the entity’s Financial tab.")
@@ -156,14 +226,20 @@ struct NewEntitySheet: View {
             Text("The entity is already saved, but this bank and its accounts won’t be added. You can connect again from the Financial tab.")
         }
         .confirmationDialog(
-            "Discard this entity draft?",
-            isPresented: $showingDiscardConfirmation,
+            company?.userId == authViewModel.currentUser?.id ? "Delete this account?" : "Leave this account?",
+            isPresented: $showingDeleteConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Discard", role: .destructive) { dismiss() }
-            Button("Keep editing", role: .cancel) {}
+            Button(company?.userId == authViewModel.currentUser?.id ? "Delete Account" : "Leave Account", role: .destructive) {
+                deleteExistingAccount()
+            }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The entity hasn’t been created yet.")
+            if company?.userId == authViewModel.currentUser?.id {
+                Text("This permanently deletes the entity and its associated data. This action cannot be undone.")
+            } else {
+                Text("This removes the shared entity from your account without deleting it for the owner.")
+            }
         }
         .sheet(isPresented: $showingPremiumUpgrade) {
             PremiumUpgradeView(gate: accessController.pendingGate)
@@ -171,22 +247,9 @@ struct NewEntitySheet: View {
     }
 
     private var newEntityBackground: some View {
-        ZStack {
-            Color(hex: "#0B0D0C")
-            RadialGradient(
-                colors: [Color.zifrGreen.opacity(0.28), .clear],
-                center: .topTrailing,
-                startRadius: 0,
-                endRadius: 460
-            )
-            LinearGradient(
-                colors: [Color.miloomGold.opacity(0.08), .clear, Color.black.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-        .ignoresSafeArea()
-        .onTapGesture { isNameFocused = false }
+        Color(hex: "#1C1C1E")
+            .ignoresSafeArea()
+            .onTapGesture { isNameFocused = false }
     }
 
     private var flowProgress: some View {
@@ -198,7 +261,7 @@ struct NewEntitySheet: View {
                             .fill(item.rawValue <= step.rawValue ? Color.miloomGold : Color.white.opacity(0.08))
                             .frame(width: 34, height: 34)
 
-                        Image(systemName: item.rawValue < step.rawValue ? "checkmark" : item.icon)
+                        Image(systemName: item.icon)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(item.rawValue <= step.rawValue ? Color(hex: "#121212") : Color.white.opacity(0.45))
                     }
@@ -225,15 +288,14 @@ struct NewEntitySheet: View {
 
     private var identityStep: some View {
         VStack(spacing: 20) {
-            stepHeading(
-                eyebrow: "START WITH THE ESSENTIALS",
-                title: "Who owns this financial life?",
-                detail: "Create the entity first, then connect its accounts without leaving this flow."
-            )
+            Text("Set Up Your Entity")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             contentCard {
-                VStack(spacing: 22) {
-                    HStack(alignment: .center, spacing: 16) {
+                VStack(spacing: 18) {
+                    HStack(alignment: .bottom, spacing: 14) {
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
                             entityMark
                                 .overlay(alignment: .bottomTrailing) {
@@ -249,53 +311,58 @@ struct NewEntitySheet: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel(logoData == nil ? "Choose entity logo" : "Change entity logo")
 
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text("Logo or icon")
-                                .font(.headline)
-                            Text("Optional. A monogram and color are used when you don’t add a logo.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(category == "Business" ? "BUSINESS NAME" : "ENTITY NAME")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
 
-                            if logoData != nil {
-                                Button("Remove logo", role: .destructive) { logoData = nil }
-                                    .font(.caption.weight(.semibold))
-                            }
+                            TextField(category == "Business" ? "Acme Holdings LLC" : "Personal finances", text: $name)
+                                .textContentType(.organizationName)
+                                .textInputAutocapitalization(.words)
+                                .submitLabel(.done)
+                                .focused($isNameFocused)
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                                .background(Color(hex: "#2C2C2E"), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .stroke(isNameFocused ? Color.miloomGold.opacity(0.9) : Color.white.opacity(0.06), lineWidth: 1)
+                                )
                         }
-                        Spacer(minLength: 0)
+                        .frame(maxWidth: .infinity)
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("ENTITY NAME")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("WEBSITE")
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                            Text("logo auto populates")
+                                .font(.system(size: 11, weight: .regular).italic())
+                                .foregroundStyle(Color.white.opacity(0.35))
+                        }
 
-                        TextField(category == "Business" ? "Acme Holdings" : "Personal finances", text: $name)
-                            .textContentType(.organizationName)
-                            .textInputAutocapitalization(.words)
-                            .submitLabel(.continue)
-                            .focused($isNameFocused)
-                            .onSubmit { saveIdentityAndContinue() }
-                            .font(.body.weight(.medium))
-                            .padding(.horizontal, 14)
-                            .frame(height: 52)
-                            .background(Color.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                    .stroke(isNameFocused ? Color.miloomGold.opacity(0.9) : Color.white.opacity(0.1), lineWidth: 1)
-                            )
+                        TextField(category == "Business" ? "acme.com" : "yourname.com", text: $website)
+                            .keyboardType(.URL)
+                            .textContentType(.URL)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .font(.system(size: 14, weight: .regular))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                            .background(Color(hex: "#2C2C2E"), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 1))
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("CATEGORY")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundStyle(Color.white.opacity(0.45))
 
-                        Picker("Category", selection: $category) {
-                            Text("Personal").tag("Personal")
-                            Text("Business").tag("Business")
-                        }
-                        .pickerStyle(.segmented)
+                        CustomSegmentedControl(options: ["Personal", "Business"], selection: $category)
                         .onChange(of: category) { _, value in
                             structure = value == "Personal" ? "Individual" : "LLC"
                         }
@@ -331,49 +398,46 @@ struct NewEntitySheet: View {
                             .foregroundStyle(.primary)
                             .padding(.horizontal, 14)
                             .frame(height: 52)
-                            .background(Color.white.opacity(0.065), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 13, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .background(Color(hex: "#2C2C2E"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.white.opacity(0.06), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                     }
 
-                    if logoData == nil {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("ICON COLOR")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
+                }
+            }
 
-                            LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 5),
-                                spacing: 4
-                            ) {
-                                ForEach(Company.brandColors, id: \.self) { hex in
-                                    Button {
-                                        colorHex = hex
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    } label: {
-                                        Circle()
-                                            .fill(Color(hex: hex))
-                                            .frame(width: 28, height: 28)
-                                            .overlay {
-                                                if colorHex.caseInsensitiveCompare(hex) == .orderedSame {
-                                                    Image(systemName: "checkmark")
-                                                        .font(.system(size: 11, weight: .black))
-                                                        .foregroundStyle(.white)
-                                                }
-                                            }
-                                            .overlay(Circle().stroke(Color.white.opacity(colorHex.caseInsensitiveCompare(hex) == .orderedSame ? 0.8 : 0.18), lineWidth: 1.5))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 44)
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Select icon color")
-                                    .accessibilityValue(colorHex.caseInsensitiveCompare(hex) == .orderedSame ? "Selected" : "")
-                                }
-                            }
-                        }
+            Button { saveIdentity(destination: .accounts) } label: {
+                HStack(spacing: 8) {
+                    if isSavingEntity {
+                        ProgressView().tint(Color(hex: "#121212"))
+                    } else {
+                        Text("Add Accounts")
+                        Image(systemName: "arrow.right")
                     }
                 }
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+            }
+            .disabled(trimmedName.isEmpty || isSavingEntity)
+            .buttonStyle(NewEntityPrimaryButtonStyle())
+
+            if company != nil {
+                Button(role: .destructive) {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Label(
+                        company?.userId == authViewModel.currentUser?.id ? "Delete Account" : "Leave Account",
+                        systemImage: company?.userId == authViewModel.currentUser?.id ? "trash" : "rectangle.portrait.and.arrow.right"
+                    )
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .accessibilityHint("Requires confirmation")
             }
         }
     }
@@ -387,39 +451,40 @@ struct NewEntitySheet: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+            } else if !trimmedWebsite.isEmpty {
+                FaviconImage(
+                    website: trimmedWebsite,
+                    size: 70,
+                    fallbackInitial: trimmedName.isEmpty ? nil : String(trimmedName.prefix(1)).uppercased()
+                )
             } else if trimmedName.isEmpty {
                 Image(systemName: category == "Business" ? "building.2.fill" : "person.fill")
-                    .font(.system(size: 30, weight: .semibold))
+                    .font(.system(size: 26, weight: .semibold))
                     .foregroundStyle(.white)
             } else {
                 Text(String(trimmedName.prefix(1)).uppercased())
-                    .font(.system(size: 34, weight: .black, design: .rounded))
+                    .font(.system(size: 28, weight: .black))
                     .foregroundStyle(.white)
             }
         }
-        .frame(width: 84, height: 84)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.white.opacity(0.14), lineWidth: 1))
+        .frame(width: 70, height: 70)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1))
     }
 
     private var connectStep: some View {
         VStack(spacing: 20) {
             stepHeading(
                 eyebrow: "RECOMMENDED",
-                title: "Bring \(createdCompany?.name ?? "your entity") to life",
-                detail: "Connect at least one account so balances, transactions, cards, and loans arrive already organized."
+                title: "Connect Your Accounts",
+                detail: nil
             )
 
             contentCard {
                 VStack(spacing: 22) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.zifrGreen.opacity(0.2))
-                            .frame(width: 88, height: 88)
-                        Image(systemName: "building.columns.fill")
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(Color.miloomGold)
-                    }
+                    Image(systemName: "building.columns.fill")
+                        .font(.system(size: 38, weight: .semibold))
+                        .foregroundStyle(Color.miloomGold)
 
                     VStack(spacing: 8) {
                         Text("Connect your first account")
@@ -435,9 +500,16 @@ struct NewEntitySheet: View {
                         PlaidLinkButton(
                             companyId: company.id,
                             buttonText: "Connect an account",
-                            accentColor: Color.miloomGold,
-                            foregroundColor: Color(hex: "#121212")
+                            accentColor: Color.zifrGreen,
+                            foregroundColor: .white,
+                            prepareForExchange: {
+                                try await prepareDraftForPlaidExchange()
+                            },
+                            onExchangeFailure: {
+                                await rollbackProvisionalCompany()
+                            }
                         ) { institutionName, accounts, itemId in
+                            commitIdentityAfterPlaidConnection()
                             plaidInstitutionName = institutionName
                             plaidAccounts = accounts
                             plaidItemId = itemId
@@ -460,6 +532,14 @@ struct NewEntitySheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+
+            Button("Set Up Later") { showingSkipConfirmation = true }
+                .font(.body.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(Color.black, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .accessibilityHint("Finishes creating the entity without linked accounts")
 
             HStack(spacing: 10) {
                 Image(systemName: "checkmark.seal.fill")
@@ -588,86 +668,64 @@ struct NewEntitySheet: View {
         }
     }
 
-    private func stepHeading(eyebrow: String, title: String, detail: String) -> some View {
+    private func stepHeading(eyebrow: String, title: String, detail: String?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(eyebrow)
                 .font(.caption2.weight(.bold))
                 .tracking(1.2)
                 .foregroundStyle(Color.miloomGold)
             Text(title)
-                .font(.system(.title2, design: .rounded, weight: .bold))
+                .font(.title2.weight(.bold))
                 .foregroundStyle(.white)
-            Text(detail)
-                .font(.subheadline)
-                .foregroundStyle(Color.white.opacity(0.62))
-                .fixedSize(horizontal: false, vertical: true)
+            if let detail, !detail.isEmpty {
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.white.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func contentCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
-            .padding(18)
+            .padding(20)
             .frame(maxWidth: .infinity)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
+            .background(Color.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     @ViewBuilder
     private var actionShelf: some View {
-        VStack(spacing: 10) {
-            switch step {
-            case .identity:
-                Button { saveIdentityAndContinue() } label: {
-                    HStack(spacing: 8) {
-                        if isSavingEntity {
-                            ProgressView().tint(Color(hex: "#121212"))
-                        } else {
-                            Text("Continue to accounts")
-                            Image(systemName: "arrow.right")
-                        }
-                    }
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                }
-                .disabled(trimmedName.isEmpty || isSavingEntity)
-                .buttonStyle(NewEntityPrimaryButtonStyle())
+        if step == .review {
+            VStack(spacing: 10) {
+                switch step {
+                case .identity, .connect:
+                    EmptyView()
 
-            case .connect:
-                Button("Set up later") { showingSkipConfirmation = true }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.white.opacity(0.62))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .accessibilityHint("Finishes creating the entity without linked accounts")
-
-            case .review:
-                Button { saveSelectedAccounts() } label: {
-                    HStack(spacing: 8) {
-                        if isFinalizing {
-                            ProgressView().tint(Color(hex: "#121212"))
-                        } else {
-                            Image(systemName: "checkmark.circle.fill")
-                            Text("Add \(selectedAccounts.count) account\(selectedAccounts.count == 1 ? "" : "s")")
+                case .review:
+                    Button { saveSelectedAccounts() } label: {
+                        HStack(spacing: 8) {
+                            if isFinalizing {
+                                ProgressView().tint(Color(hex: "#121212"))
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Add \(selectedAccounts.count) account\(selectedAccounts.count == 1 ? "" : "s")")
+                            }
                         }
+                        .font(.body.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
                     }
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
+                    .disabled(selectedAccounts.isEmpty || isFinalizing)
+                    .buttonStyle(NewEntityPrimaryButtonStyle())
                 }
-                .disabled(selectedAccounts.isEmpty || isFinalizing)
-                .buttonStyle(NewEntityPrimaryButtonStyle())
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 8)
+            .background(actionShelfBackground)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(actionShelfBackground)
     }
 
     @ViewBuilder
@@ -683,20 +741,92 @@ struct NewEntitySheet: View {
     }
 
     private func closeTapped() {
-        if createdCompany != nil, step == .review {
+        if step == .review || plaidItemId != nil {
             showingAbandonConnectionConfirmation = true
-        } else if createdCompany != nil {
-            showingSkipConfirmation = true
-        } else if !trimmedName.isEmpty || logoData != nil {
-            showingDiscardConfirmation = true
         } else {
             dismiss()
         }
     }
 
-    private func saveIdentityAndContinue() {
+    private func deleteExistingAccount() {
+        guard let company else { return }
+        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        vm.deleteCompany(company, appState: appState, currentUserId: authViewModel.currentUser?.id)
+        dismiss()
+    }
+
+    private func goBackOneStep() {
+        guard !isBusy else { return }
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+            switch step {
+            case .identity:
+                break
+            case .connect:
+                step = .identity
+            case .review:
+                step = .connect
+            }
+        }
+    }
+
+    private func prefillIdentityIfNeeded() {
+        guard !didPrefillIdentity else { return }
+        didPrefillIdentity = true
+        guard let company, createdCompany == nil else { return }
+        name = company.name
+        structure = company.structure
+        category = ["Individual", "Household"].contains(company.structure) ? "Personal" : "Business"
+        colorHex = company.colorHex.isEmpty ? "#1f7055" : company.colorHex.lowercased()
+        website = company.website ?? ""
+        logoData = company.logoData
+    }
+
+    private func saveIdentity(destination: NewEntityIdentityDestination) {
         guard !trimmedName.isEmpty, !isSavingEntity else { return }
         isNameFocused = false
+
+        guard let draftCompany = makeIdentityDraft() else { return }
+        createdCompany = draftCompany
+
+        if destination == .accounts {
+            finishIdentitySave(draftCompany, destination: destination)
+            return
+        }
+
+        if company != nil || newCompanyIsPersisted {
+            if hasIdentityChanges {
+                vm.updateCompany(draftCompany, appState: appState)
+            }
+            finishIdentitySave(draftCompany, destination: destination)
+            return
+        }
+
+        isSavingEntity = true
+        Task { @MainActor in
+            do {
+                try await DataRepository.shared.insertCompany(draftCompany)
+                DummyDataSeeder.purge(appState: appState)
+                appState.companies.append(draftCompany)
+                newCompanyIsPersisted = true
+                isSavingEntity = false
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                finishIdentitySave(draftCompany, destination: destination)
+            } catch {
+                isSavingEntity = false
+                errorMessage = "The entity couldn’t be created. Check your connection and try again."
+            }
+        }
+    }
+
+    private func makeIdentityDraft() -> Company? {
+        if var draftCompany = createdCompany ?? company {
+            draftCompany.name = trimmedName
+            draftCompany.structure = structure
+            draftCompany.colorHex = colorHex.lowercased()
+            draftCompany.logoData = logoData
+            draftCompany.website = trimmedWebsite.isEmpty ? nil : trimmedWebsite
+            return draftCompany
+        }
 
         guard accessController.request(
             .additionalCompany,
@@ -705,40 +835,71 @@ struct NewEntitySheet: View {
             userId: authViewModel.currentUser?.id
         ) else {
             showingPremiumUpgrade = true
-            return
+            return nil
         }
 
         guard let userID = authViewModel.currentUser?.id else {
             errorMessage = "Your session is no longer available. Please sign in again before creating an entity."
-            return
+            return nil
         }
 
-        if createdCompany != nil {
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { step = .connect }
-            return
-        }
-
-        let company = Company(
+        return Company(
             userId: userID,
             name: trimmedName,
             structure: structure,
             colorHex: colorHex.lowercased(),
-            logoData: logoData
+            logoData: logoData,
+            website: trimmedWebsite.isEmpty ? nil : trimmedWebsite
         )
+    }
 
-        isSavingEntity = true
-        Task { @MainActor in
-            do {
-                try await DataRepository.shared.insertCompany(company)
-                DummyDataSeeder.purge(appState: appState)
-                appState.companies.append(company)
-                createdCompany = company
-                isSavingEntity = false
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) { step = .connect }
-            } catch {
-                isSavingEntity = false
-                errorMessage = "The entity couldn’t be created. Check your connection and try again."
+    @MainActor
+    private func prepareDraftForPlaidExchange() async throws {
+        guard company == nil,
+              !newCompanyIsPersisted,
+              let draftCompany = createdCompany else { return }
+
+        try await DataRepository.shared.insertCompany(draftCompany)
+        DummyDataSeeder.purge(appState: appState)
+        if !appState.companies.contains(where: { $0.id == draftCompany.id }) {
+            appState.companies.append(draftCompany)
+        }
+        newCompanyIsPersisted = true
+        provisionalNewCompanyIsPersisted = true
+    }
+
+    @MainActor
+    private func rollbackProvisionalCompany() async {
+        guard provisionalNewCompanyIsPersisted,
+              let draftCompany = createdCompany else { return }
+
+        do {
+            try await DataRepository.shared.deleteCompany(draftCompany.id)
+            appState.companies.removeAll { $0.id == draftCompany.id }
+            newCompanyIsPersisted = false
+            provisionalNewCompanyIsPersisted = false
+        } catch {
+            errorMessage = "The bank connection failed, and the temporary entity could not be removed. You can delete it from the entity sheet."
+        }
+    }
+
+    private func commitIdentityAfterPlaidConnection() {
+        guard let draftCompany = createdCompany else { return }
+
+        if company != nil, hasIdentityChanges {
+            vm.updateCompany(draftCompany, appState: appState)
+        }
+        provisionalNewCompanyIsPersisted = false
+    }
+
+    private func finishIdentitySave(_ company: Company, destination: NewEntityIdentityDestination) {
+        switch destination {
+        case .finish:
+            dismiss()
+            onComplete(company)
+        case .accounts:
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.86)) {
+                step = .connect
             }
         }
     }

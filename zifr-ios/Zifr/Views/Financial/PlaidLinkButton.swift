@@ -11,6 +11,8 @@ struct PlaidLinkButton: View {
     var isReconnect: Bool = false
     var accentColor: Color = Color(red: 59/255, green: 130/255, blue: 246/255)
     var foregroundColor: Color = .white
+    var prepareForExchange: (() async throws -> Void)? = nil
+    var onExchangeFailure: (() async -> Void)? = nil
     let onSuccess: (String, [PlaidService.PlaidAccount], String?) -> Void
     
     @State private var isLoading = false
@@ -115,6 +117,7 @@ struct PlaidLinkButton: View {
                         }
                     } else {
                         do {
+                            try await prepareForExchange?()
                             let result = try await PlaidService.shared.exchangePublicToken(
                                 publicToken: success.publicToken,
                                 institutionName: success.metadata.institution.name,
@@ -127,6 +130,9 @@ struct PlaidLinkButton: View {
                             }
                         } catch {
                             AppDiagnostics.failure("plaid", "exchange_public_token", error: error)
+                            if let onExchangeFailure {
+                                await onExchangeFailure()
+                            }
                             await MainActor.run { 
                                 self.isExchangingToken = false
                                 errorMessage = error.localizedDescription 

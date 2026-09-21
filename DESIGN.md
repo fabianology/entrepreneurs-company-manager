@@ -166,28 +166,31 @@ The layout champions extreme information density, focusing on smooth, gestural f
 
 ## New Entity Sheet
 
-> Current entity-creation direction, implemented 2026-09-20. The old create-mode treatment above remains the named legacy reference; editing an existing entity continues to use `EditCompanySheet`.
+> Current entity create/edit direction, implemented 2026-09-20. The old treatment above remains the named legacy reference; dashboard and entity-detail pencil actions now open `NewEntitySheet` in edit mode.
 
 ### Product flow
 
 1. **Entity:** capture the required name plus optional logo/icon, Personal or Business category, and the corresponding profile/business type.
-2. **Connect:** persist the entity, then strongly recommend connecting at least one account with Plaid. The user may finish without accounts only through an explicit confirmation.
+2. **Accounts:** keep the entity as an in-memory draft while strongly recommending at least one Plaid connection. The user may finish without accounts only through an explicit confirmation.
 3. **Review:** show every returned Plaid account, preselect all of them, and let the user remove accounts before saving the institution, depository/investment accounts, cards, and loans.
 
-The entity is saved before Plaid opens because the connection requires a stable entity ID. Canceling or failing Plaid never removes the entity. Successful completion opens the entity on its Financial tab.
+The entity remains an in-memory draft when **Add Accounts** is pressed. It is committed only by **Save**, confirmed **Set Up Later**, or when a successfully completed Plaid Link session is ready to exchange its token and requires the draft’s stable entity ID. A provisional entity created for a failed token exchange is removed. Successful completion opens the entity on its Financial tab.
 
 ### Visual system
 
-- Full-height native sheet with a grabber, compact inline title, leading Cancel/Close control, and a three-stage progress indicator.
-- Retains Miloom’s dark canvas, green depth glow, gold emphasis, system typography, brand-color palette, and rounded geometry.
-- Content cards use native regular Material with a restrained dark tint and semantic separators. Liquid Glass is reserved for the bottom action/navigation layer on iOS 26 and later; iOS 17–18 use an `ultraThinMaterial` fallback.
-- Primary actions use a minimum 52pt height, visible disabled state, concise action-oriented labels, and native haptic feedback. The persistent action shelf keeps the next action reachable without turning every content surface into glass.
+- Native sheet with a grabber, compact inline title, leading Cancel/Close control, and a three-stage progress indicator. Entity, Accounts, and Review all use the same 84% detent, matching the reference composition; their scroll views preserve accessibility at larger text sizes. The progress glyphs stay fixed as building, link, and check across the flow. Accounts and Review add a back chevron immediately left of Close. Entity identity also exposes a trailing Save action that enables and turns green only after a valid change.
+- Matches the legacy entity sheet’s `#1C1C1E` canvas, black 70%-opacity cards over regular Material, standard app system typography, and rounded geometry. Cards intentionally have no gold outline.
+- The identity step begins with the white **Set Up Your Entity** heading and no eyebrow or supporting paragraph. The 70pt logo/icon tile shares a row with the entity-name field and defaults to Zifr green. Both Personal and Business entities include a website field whose favicon automatically populates the logo preview.
+- Personal / Business uses the shared gold active segment on a `#2C2C2E` track. Form fields and type controls also use `#2C2C2E`, matching the legacy sheet instead of the system blue segmented-control tint. The identity step does not expose an icon-color picker.
+- Liquid Glass is reserved for the Review action layer on iOS 26 and later; iOS 17–18 use an `ultraThinMaterial` fallback.
+- Primary actions use a minimum 52pt height, visible disabled state, concise action-oriented labels, and native haptic feedback. The identity step’s **Add Accounts →** action sits directly below its card with compact bottom spacing. Accounts uses a Zifr-green Plaid action inside the black card and a black **Set Up Later** button below it; Review retains the persistent action shelf.
 - The review list exposes account name, type, masked identifier, balance, selection state, Select all/Clear, and an accessible selected/not-selected label.
+- Edit mode adds a native red bordered **Delete Account** action at the bottom of Entity. It always requires a destructive confirmation; shared entities use the corresponding Leave Account action instead.
 
 ### Safety and recovery
 
 - The primary identity action is unavailable until a trimmed entity name exists.
-- Unsaved identity dismissal, skipping Plaid, and abandoning a returned connection each use context-specific confirmation language.
+- Cancel on Entity and Close on Accounts immediately dismiss and discard the in-memory draft. No entity identity is persisted unless the user presses Save, confirms Set Up Later, or completes a Plaid connection. Abandoning an already returned connection retains context-specific confirmation language because that connection has committed the entity.
 - Plaid authentication stays in Plaid Link; Miloom does not request bank credentials. Account import occurs only after review and requires at least one selected account.
 - A failed account save leaves the entity intact and keeps the review available for retry.
 
