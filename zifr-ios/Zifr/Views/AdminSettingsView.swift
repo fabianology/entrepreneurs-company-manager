@@ -18,6 +18,7 @@ struct AdminSettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(AccessController.self) private var accessController
     @Environment(NotificationRouteCoordinator.self) private var notificationRouter
+    @Environment(\.scenePhase) private var scenePhase
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
@@ -30,6 +31,8 @@ struct AdminSettingsView: View {
     @State private var showingNotificationPreferences: Bool = false
     @State private var showingLinkedAccounts: Bool = false
     @State private var showingCollaborators: Bool = false
+    @State private var sessionToRevoke: ActiveSession?
+    @State private var showingSignOutOtherSessionsConfirmation: Bool = false
     
     private var activeInstitutions: [Institution] {
         let linkedInstitutionIds = Set(
@@ -59,6 +62,10 @@ struct AdminSettingsView: View {
 
         let rules = "\(enabledRuleCount) alert rule\(enabledRuleCount == 1 ? "" : "s")"
         return "\(delivery) · \(rules)"
+    }
+
+    private var otherActiveSessionCount: Int {
+        authVM.activeSessions.filter { !$0.isCurrent }.count
     }
 
     var body: some View {
@@ -440,32 +447,57 @@ struct AdminSettingsView: View {
                     
                     // Active Sessions
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("ACTIVE SESSIONS")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundStyle(Color.white.opacity(0.5))
-                            .padding(.leading, 40)
+                        HStack(spacing: 10) {
+                            Text("ACTIVE SESSIONS")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.5))
+
+                            Spacer()
+
+                            if authVM.isLoadingActiveSessions && !authVM.activeSessions.isEmpty {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(Color.zifrGold)
+                                    .accessibilityLabel("Refreshing active sessions")
+                            }
+                        }
+                        .padding(.horizontal, 40)
                             
                         VStack(spacing: 0) {
-                            if authVM.activeSessions.isEmpty {
-                                Text("No active sessions found")
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(Color.white.opacity(0.4))
-                                    .padding(.vertical, 20)
-                                    .frame(maxWidth: .infinity)
+                            if authVM.isLoadingActiveSessions && authVM.activeSessions.isEmpty {
+                                VStack(spacing: 12) {
+                                    ProgressView()
+                                        .controlSize(.regular)
+                                        .tint(Color.zifrGold)
+                                    Text("Loading signed-in devices…")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 28)
+                                .accessibilityElement(children: .combine)
+                                .accessibilityLabel("Loading signed-in devices")
+                            } else if let error = authVM.activeSessionsError,
+                                      authVM.activeSessions.isEmpty {
+                                ActiveSessionsUnavailableView(message: error) {
+                                    Task { await authVM.fetchActiveSessions() }
+                                }
+                            } else if authVM.activeSessions.isEmpty {
+                                ContentUnavailableView(
+                                    "No Signed-In Devices",
+                                    systemImage: "lock.shield",
+                                    description: Text("Pull down to check again.")
+                                )
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
                             } else {
                                 ForEach(authVM.activeSessions) { session in
-                                    let isCurrent = session.id == authVM.currentSessionId
-                                    let deviceDetails = parseUserAgent(session.userAgent)
-                                    
                                     SessionRow(
-                                        icon: deviceDetails.icon,
-                                        device: deviceDetails.name,
-                                        location: session.location ?? session.ipAddress ?? "Unknown IP",
-                                        isCurrent: isCurrent,
+                                        session: session,
+                                        isRevoking: authVM.revokingSessionID == session.id,
                                         onRevoke: {
-                                            Task {
-                                                await authVM.revokeSession(id: session.id)
-                                            }
+                                            sessionToRevoke = session
                                         }
                                     )
                                     
@@ -474,8 +506,53 @@ struct AdminSettingsView: View {
                                     }
                                 }
                             }
+
+                            if let notice = authVM.activeSessionsNotice {
+                                Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
+                                SessionFeedbackRow(
+                                    icon: "checkmark.circle.fill",
+                                    message: notice,
+                                    color: .green
+                                )
+                            }
+
+                            if let error = authVM.activeSessionsError,
+                               !authVM.activeSessions.isEmpty {
+                                Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
+                                SessionFeedbackRow(
+                                    icon: "exclamationmark.triangle.fill",
+                                    message: error,
+                                    color: .orange
+                                )
+                            }
+
+                            if otherActiveSessionCount > 0 {
+                                Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
+                                Button(role: .destructive) {
+                                    showingSignOutOtherSessionsConfirmation = true
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        if authVM.isSigningOutOtherSessions {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                                .tint(.red)
+                                        } else {
+                                            Image(systemName: "rectangle.stack.badge.minus")
+                                        }
+                                        Text(authVM.isSigningOutOtherSessions ? "Signing Out Other Devices…" : "Sign Out Other Devices")
+                                    }
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 20)
+                                    .frame(minHeight: 52)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.red)
+                                .disabled(authVM.isSigningOutOtherSessions)
+                                .accessibilityHint("Signs out all devices except this one")
+                            }
                         }
-                        .zifrCardBox(cornerRadius: 24)
+                        .modifier(ActiveSessionsMaterialCard())
                         .padding(.horizontal, 20)
                     }
                     
@@ -492,7 +569,7 @@ struct AdminSettingsView: View {
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundStyle(.red)
                                     .frame(width: 24)
-                                Text("Sign Out")
+                                Text("Sign Out This Device")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundStyle(.red)
                                 Spacer()
@@ -526,6 +603,9 @@ struct AdminSettingsView: View {
                     
                 }
                 .padding(.bottom, 60)
+            }
+            .refreshable {
+                await authVM.fetchActiveSessions()
             }
         }
         .navigationBarHidden(true)
@@ -586,6 +666,29 @@ struct AdminSettingsView: View {
         }
         .sheet(isPresented: $showingCollaborators) {
             CollaboratorsSheet(vm: vm, appState: appState)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, !authVM.activeSessions.isEmpty else { return }
+            Task { await authVM.fetchActiveSessions() }
+        }
+        .alert(item: $sessionToRevoke) { session in
+            let device = parseUserAgent(session.userAgent).name
+            return Alert(
+                title: Text("Revoke \(device)?"),
+                message: Text("This device will no longer be able to refresh its sign-in. Its current access may continue briefly until its security token expires."),
+                primaryButton: .destructive(Text("Revoke")) {
+                    Task { await authVM.revokeSession(id: session.id) }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert("Sign Out Other Devices?", isPresented: $showingSignOutOtherSessionsConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Sign Out Other Devices", role: .destructive) {
+                Task { await authVM.signOutOtherSessions() }
+            }
+        } message: {
+            Text("Your current device will stay signed in. Every other device will need to sign in again after its current security token expires.")
         }
     }
 }
@@ -650,55 +753,200 @@ struct ToggleRow: View {
     }
 }
 
-struct SessionRow: View {
+private struct ActiveSessionsMaterialCard: ViewModifier {
+    private let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+
+    func body(content: Content) -> some View {
+        content
+            .background {
+                shape
+                    .fill(.regularMaterial)
+                    .overlay(shape.fill(Color.zifrTabBarFill.opacity(0.62)))
+            }
+            .clipShape(shape)
+            .overlay {
+                shape.stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "#918457").opacity(0.9), Color.white.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+            }
+            .shadow(color: Color.black.opacity(0.28), radius: 10, x: 0, y: 5)
+    }
+}
+
+private struct ActiveSessionsUnavailableView: View {
+    let message: String
+    let retry: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(Color.zifrGold)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            Button("Try Again", action: retry)
+                .buttonStyle(.bordered)
+                .tint(Color.zifrGold)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct SessionFeedbackRow: View {
     let icon: String
-    let device: String
-    let location: String
-    let isCurrent: Bool
+    let message: String
+    let color: Color
+
+    var body: some View {
+        Label(message, systemImage: icon)
+            .font(.footnote)
+            .foregroundStyle(color)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .accessibilityElement(children: .combine)
+    }
+}
+
+struct SessionRow: View {
+    let session: ActiveSession
+    let isRevoking: Bool
     var onRevoke: (() -> Void)? = nil
+
+    private var deviceDetails: (name: String, icon: String) {
+        parseUserAgent(session.userAgent)
+    }
     
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.5))
-                .frame(width: 24)
+            Image(systemName: deviceDetails.icon)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(session.isCurrent ? Color.zifrGold : Color.white.opacity(0.72))
+                .frame(width: 38, height: 38)
+                .background(.thinMaterial, in: Circle())
+                .accessibilityHidden(true)
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(device)
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(.white)
-                    if isCurrent {
-                        Text("Current")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.green.opacity(0.4))
-                            .clipShape(Capsule())
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        sessionDeviceName
+                        currentDeviceBadge
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        sessionDeviceName
+                        currentDeviceBadge
                     }
                 }
-                Text(location)
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(0.5))
+
+                Text(sessionLastActiveDescription(session.updatedAt))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if let network = maskedSessionAddress(session.ipAddress) {
+                    Text(network)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(Color.white.opacity(0.38))
+                }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(sessionAccessibilityLabel(session))
             
             Spacer()
             
-            if !isCurrent {
-                Button("Revoke") {
+            if !session.isCurrent {
+                Button(role: .destructive) {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     onRevoke?()
+                } label: {
+                    if isRevoking {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.red)
+                            .frame(minWidth: 58)
+                    } else {
+                        Text("Revoke")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(minWidth: 58)
+                    }
                 }
-                .font(.system(size: 14, weight: .medium))
+                .buttonStyle(.plain)
                 .foregroundStyle(.red)
+                .frame(minHeight: 44)
+                .disabled(isRevoking)
+                .accessibilityLabel("Revoke \(deviceDetails.name) session")
+                .accessibilityHint("Requires confirmation")
             }
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
         .background(Color.clear)
     }
+
+    private var sessionDeviceName: some View {
+        Text(deviceDetails.name)
+            .font(.headline)
+            .foregroundStyle(.white)
+    }
+
+    @ViewBuilder
+    private var currentDeviceBadge: some View {
+        if session.isCurrent {
+            Label("This Device", systemImage: "checkmark.circle.fill")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Color(hex: "#171914"))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Color.zifrGold)
+                .clipShape(Capsule())
+        }
+    }
+}
+
+private func sessionLastActiveDescription(_ date: Date, relativeTo now: Date = Date()) -> String {
+    if abs(date.timeIntervalSince(now)) < 60 {
+        return "Active now"
+    }
+
+    let formatter = RelativeDateTimeFormatter()
+    formatter.unitsStyle = .full
+    return "Last active \(formatter.localizedString(for: date, relativeTo: now))"
+}
+
+func maskedSessionAddress(_ address: String?) -> String? {
+    guard let address, !address.isEmpty, address != "127.0.0.1", address != "::1" else {
+        return nil
+    }
+
+    let ipv4Parts = address.split(separator: ".")
+    if ipv4Parts.count == 4 {
+        return "Network \(ipv4Parts[0]).\(ipv4Parts[1]).•••.•••"
+    }
+
+    let ipv6Parts = address.split(separator: ":", omittingEmptySubsequences: true)
+    if ipv6Parts.count >= 2 {
+        return "Network \(ipv6Parts[0]):\(ipv6Parts[1]):…"
+    }
+
+    return nil
+}
+
+private func sessionAccessibilityLabel(_ session: ActiveSession) -> String {
+    let device = parseUserAgent(session.userAgent).name
+    let current = session.isCurrent ? ", this device" : ""
+    let activity = sessionLastActiveDescription(session.updatedAt)
+    let network = maskedSessionAddress(session.ipAddress).map { ", \($0)" } ?? ""
+    return "\(device)\(current), \(activity)\(network)"
 }
 
 func parseUserAgent(_ userAgent: String?) -> (name: String, icon: String) {
@@ -710,7 +958,7 @@ func parseUserAgent(_ userAgent: String?) -> (name: String, icon: String) {
         return ("iPhone", "iphone")
     } else if ua.contains("ipad") {
         return ("iPad", "ipad")
-    } else if ua.contains("macintosh") || ua.contains("mac os x") || ua.contains("macos") {
+    } else if ua.contains("macintosh") || ua.contains("mac os x") || ua.contains("macos") || ua.contains("miloom app (mac)") {
         return ("MacBook", "macbook.and.iphone")
     } else if ua.contains("android") {
         return ("Android Device", "phone")

@@ -64,6 +64,7 @@
 		67C34C81852D5D1AB66F6BEE /* DataRepository+BusinessExpenses.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B28B3E1F443C61A95639422 /* DataRepository+BusinessExpenses.swift */; };
 		69D91C3C7B5CDA51965F9B7C /* GeminiLiveModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E25EDBCCD886BA5EE5BA4F7 /* GeminiLiveModels.swift */; };
 		6A1DA1706BC200944A4B817C /* UniversalSearchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93C0F0D156C45236DF1E4478 /* UniversalSearchTests.swift */; };
+		A5E551000000000000000002 /* ActiveSessionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E551000000000000000001 /* ActiveSessionsTests.swift */; };
 		6C46EFBD69964364C9C5EDB4 /* PremiumUpgradeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16D6BBDF83C69BAE06B41FC /* PremiumUpgradeView.swift */; };
 		6C87244063268D8A258D7324 /* ControlCenterTabSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4861EC0D60AFBE606028390E /* ControlCenterTabSelector.swift */; };
 		70EE39CA7BCCCD2D63E45822 /* View+Glass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AD6CB05D630BFE8F57AD702 /* View+Glass.swift */; };
@@ -237,6 +238,7 @@
 		90DB2F263B4BBBE8096C1D54 /* patch.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = patch.py; sourceTree = "<group>"; };
 		92717522EB1C824EB367EF4D /* miloom.console.svg */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = miloom.console.svg; sourceTree = "<group>"; };
 		93C0F0D156C45236DF1E4478 /* UniversalSearchTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UniversalSearchTests.swift; sourceTree = "<group>"; };
+		A5E551000000000000000001 /* ActiveSessionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ActiveSessionsTests.swift; sourceTree = "<group>"; };
 		94404D955B8D06F50A12AB6D /* EditProfileView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EditProfileView.swift; sourceTree = "<group>"; };
 		9527B3A94D5AF9697F46A147 /* EntitySubscriptionSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EntitySubscriptionSection.swift; sourceTree = "<group>"; };
 		9602D7532DE04DFA8294ACAE /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -335,6 +337,7 @@
 				AABBCCDDEEFF001100000004 /* MiloomPaywall.storekit */,
 				19FA9D367C9B148B7DBA3006 /* ExecutiveBriefingTests.swift */,
 				93C0F0D156C45236DF1E4478 /* UniversalSearchTests.swift */,
+				A5E551000000000000000001 /* ActiveSessionsTests.swift */,
 			);
 			name = ZifrTests;
 			path = ZifrTests;
@@ -775,6 +778,7 @@
 				88974DA6FB57F4806E327280 /* BusinessExpenseTests.swift in Sources */,
 				404ADBE780A93BBCD99794FB /* ExecutiveBriefingTests.swift in Sources */,
 				6A1DA1706BC200944A4B817C /* UniversalSearchTests.swift in Sources */,
+				A5E551000000000000000002 /* ActiveSessionsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

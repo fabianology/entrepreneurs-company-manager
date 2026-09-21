@@ -16,34 +16,11 @@ final class AuthViewModel: NSObject {
     var session: Session?
     var currentUser: User?
     var activeSessions: [ActiveSession] = []
-    
-    var currentSessionId: UUID? {
-        guard let token = session?.accessToken else { return nil }
-        let parts = token.components(separatedBy: ".")
-        guard parts.count > 1 else { return nil }
-        
-        var payload64 = parts[1]
-        let remainder = payload64.count % 4
-        if remainder > 0 {
-            payload64 += String(repeating: "=", count: 4 - remainder)
-        }
-        
-        guard let payloadData = Data(base64Encoded: payload64) else { return nil }
-        
-        struct JWTPayload: Codable {
-            let sid: String?
-        }
-        
-        do {
-            let payload = try JSONDecoder().decode(JWTPayload.self, from: payloadData)
-            if let sid = payload.sid {
-                return UUID(uuidString: sid)
-            }
-        } catch {
-            AppDiagnostics.failure("auth", "decode_session_claims", error: error)
-        }
-        return nil
-    }
+    var isLoadingActiveSessions = false
+    var activeSessionsError: String?
+    var activeSessionsNotice: String?
+    var revokingSessionID: UUID?
+    var isSigningOutOtherSessions = false
 
     var isBiometricEnabled: Bool {
         get { UserDefaults.standard.bool(forKey: "isBiometricEnabled") }
@@ -53,6 +30,10 @@ final class AuthViewModel: NSObject {
     private var currentNonce: String?
     private var authorizationController: ASAuthorizationController?
     private var authenticationAttemptID: UUID?
+
+    private var currentSessionID: UUID? {
+        session.flatMap { sessionIDFromAccessToken($0.accessToken) }
+    }
 
     @MainActor
     private func beginAuthenticationAttempt() -> UUID {
@@ -184,21 +165,28 @@ final class AuthViewModel: NSObject {
         }
     }
 
+    @MainActor
     func signOut() async {
+        await PushNotificationService.shared.unregisterCurrentDevice()
         do {
-            await PushNotificationService.shared.unregisterCurrentDevice()
-            try await SupabaseService.shared.client.auth.signOut()
-            await MainActor.run {
-                self.session = nil
-                self.currentUser = nil
-                self.isBiometricEnabled = false
-                self.hasCachedSession = false
-                self.isAuthenticated = false
-                UserDefaults.standard.removeObject(forKey: "onboardingStep")
-            }
+            // A plain Supabase signOut defaults to .global. The account-level
+            // action in Miloom signs out only this device by design.
+            try await SupabaseService.shared.client.auth.signOut(scope: .local)
         } catch {
-            AppDiagnostics.failure("auth", "sign_out", error: error)
+            // The SDK clears its local session before making the network request.
+            // Keep Miloom's local state consistent even when that request fails.
+            AppDiagnostics.failure("auth", "sign_out_local", error: error)
         }
+
+        session = nil
+        currentUser = nil
+        isBiometricEnabled = false
+        hasCachedSession = false
+        isAuthenticated = false
+        activeSessions = []
+        activeSessionsError = nil
+        activeSessionsNotice = nil
+        UserDefaults.standard.removeObject(forKey: "onboardingStep")
     }
     
     func deleteAccount() async throws {
@@ -224,52 +212,114 @@ final class AuthViewModel: NSObject {
     }
     
     // MARK: - Active Sessions
+    @MainActor
     func fetchActiveSessions() async {
+        isLoadingActiveSessions = true
+        activeSessionsError = nil
+        activeSessionsNotice = nil
+        defer { isLoadingActiveSessions = false }
+
         do {
-            var sessions: [ActiveSession] = try await SupabaseService.shared.client.rpc("get_active_sessions").execute().value
-            
-            // Enrich with location based on IP
-            for i in 0..<sessions.count {
-                if let ip = sessions[i].ipAddress, !ip.isEmpty, ip != "127.0.0.1", ip != "::1" {
-                    if let url = URL(string: "https://ipinfo.io/\(ip)/json"),
-                       let (data, _) = try? await URLSession.shared.data(from: url) {
-                        struct IPInfoResponse: Codable {
-                            let city: String?
-                            let region: String?
-                            let country: String?
-                        }
-                        if let response = try? JSONDecoder().decode(IPInfoResponse.self, from: data) {
-                            var components: [String] = []
-                            if let city = response.city, !city.isEmpty { components.append(city) }
-                            if let region = response.region, !region.isEmpty { components.append(region) }
-                            if let country = response.country, !country.isEmpty { components.append(country) }
-                            if !components.isEmpty {
-                                sessions[i].location = components.joined(separator: ", ")
-                            }
-                        }
-                    }
-                }
-            }
-            
-            let finalSessions = sessions
-            await MainActor.run {
-                self.activeSessions = finalSessions
-            }
+            activeSessions = try await requestActiveSessions()
         } catch {
             AppDiagnostics.failure("auth", "fetch_active_sessions", error: error)
+            activeSessionsError = "Sessions couldn’t be loaded. Check your connection and try again."
         }
     }
-    
-    func revokeSession(id: UUID) async {
+
+    @MainActor
+    @discardableResult
+    func revokeSession(id: UUID) async -> Bool {
+        guard activeSessions.first(where: { $0.id == id })?.isCurrent != true else {
+            activeSessionsError = "This device can’t be revoked. Use Sign Out This Device instead."
+            return false
+        }
+
         struct RevokeParams: Encodable {
             let session_id: UUID
         }
+
+        revokingSessionID = id
+        activeSessionsError = nil
+        activeSessionsNotice = nil
+        defer { revokingSessionID = nil }
+
         do {
-            try await SupabaseService.shared.client.rpc("revoke_session", params: RevokeParams(session_id: id)).execute()
-            await fetchActiveSessions()
+            try await SupabaseService.shared.client.rpc(
+                "revoke_session",
+                params: RevokeParams(session_id: id)
+            ).execute()
+
+            // Reflect the successful security action immediately, then reconcile
+            // with the server without turning a refresh failure into a false
+            // "revoke failed" message.
+            activeSessions.removeAll { $0.id == id }
+            activeSessionsNotice = "The session was revoked."
+            if let refreshed = try? await requestActiveSessions() {
+                activeSessions = refreshed
+            }
+            await DataRepository.shared.logSecurityEvent(
+                title: "Session Revoked",
+                message: "You revoked access for another signed-in device."
+            )
+            return true
         } catch {
             AppDiagnostics.failure("auth", "revoke_session", error: error)
+            let description = error.localizedDescription
+            if description.contains("CURRENT_SESSION_CANNOT_BE_REVOKED") {
+                activeSessionsError = "This device can’t be revoked. Use Sign Out This Device instead."
+            } else if description.contains("SESSION_NOT_FOUND") {
+                activeSessionsError = "That session is no longer active. Refresh the list and try again."
+            } else {
+                activeSessionsError = "The session couldn’t be revoked. Check your connection and try again."
+            }
+            return false
         }
+    }
+
+    @MainActor
+    @discardableResult
+    func signOutOtherSessions() async -> Bool {
+        guard !isSigningOutOtherSessions else { return false }
+        isSigningOutOtherSessions = true
+        activeSessionsError = nil
+        activeSessionsNotice = nil
+        defer { isSigningOutOtherSessions = false }
+        do {
+            try await SupabaseService.shared.client.auth.signOut(scope: .others)
+            activeSessions.removeAll { !$0.isCurrent }
+            activeSessionsNotice = "Other devices were signed out."
+            if let refreshed = try? await requestActiveSessions() {
+                activeSessions = refreshed
+            }
+            await DataRepository.shared.logSecurityEvent(
+                title: "Other Sessions Signed Out",
+                message: "You signed out every other device connected to your account."
+            )
+            return true
+        } catch {
+            AppDiagnostics.failure("auth", "sign_out_other_sessions", error: error)
+            activeSessionsError = "Other devices couldn’t be signed out. Check your connection and try again."
+            return false
+        }
+    }
+
+    private func requestActiveSessions() async throws -> [ActiveSession] {
+        var sessions: [ActiveSession] = try await SupabaseService.shared.client
+            .rpc("get_active_sessions")
+            .execute()
+            .value
+
+        // Older deployments do not return `is_current`. During a rolling
+        // deployment, recover that marker from the already-authenticated local
+        // JWT. The secured RPC remains authoritative once the migration lands.
+        if let currentSessionID {
+            for index in sessions.indices where sessions[index].id == currentSessionID {
+                sessions[index].isCurrent = true
+            }
+        }
+
+        return sessions
     }
     
 
@@ -291,28 +341,12 @@ final class AuthViewModel: NSObject {
             // Record new login security alert
             Task {
                 let userId = response.user.id
-                var locationStr = "an unknown location"
-                
-                if let sessions: [ActiveSession] = try? await SupabaseService.shared.client.rpc("get_active_sessions").execute().value,
-                   let latestSession = sessions.first, let ip = latestSession.ipAddress, !ip.isEmpty, ip != "127.0.0.1", ip != "::1" {
-                    if let url = URL(string: "https://ipinfo.io/\(ip)/json"),
-                       let (data, _) = try? await URLSession.shared.data(from: url) {
-                        struct IPInfoResponse: Codable {
-                            let city: String?
-                            let region: String?
-                        }
-                        if let res = try? JSONDecoder().decode(IPInfoResponse.self, from: data) {
-                            var components: [String] = []
-                            if let city = res.city, !city.isEmpty { components.append(city) }
-                            if let region = res.region, !region.isEmpty { components.append(region) }
-                            if !components.isEmpty {
-                                locationStr = components.joined(separator: ", ")
-                            }
-                        }
-                    }
-                }
-                
-                let log = ActivityLog(userId: userId, actorEmail: email, actionType: "security_alert", message: "New login detected from \(locationStr). If this wasn't you, go to Admin Settings to revoke the session immediately.")
+                let log = ActivityLog(
+                    userId: userId,
+                    actorEmail: email,
+                    actionType: "security_alert",
+                    message: "New login detected. If this wasn’t you, review Active Sessions in Account & Settings."
+                )
                 try? await DataRepository.shared.insertActivityLog(log)
             }
         } catch {
@@ -546,13 +580,64 @@ extension AuthViewModel: ASAuthorizationControllerPresentationContextProviding {
 
 // MARK: - Models
 
+func sessionIDFromAccessToken(_ accessToken: String) -> UUID? {
+    let tokenParts = accessToken.split(separator: ".")
+    guard tokenParts.count == 3 else { return nil }
+
+    var payload = String(tokenParts[1])
+        .replacingOccurrences(of: "-", with: "+")
+        .replacingOccurrences(of: "_", with: "/")
+    let paddingCount = (4 - payload.count % 4) % 4
+    payload.append(String(repeating: "=", count: paddingCount))
+
+    struct Claims: Decodable {
+        let sessionID: UUID?
+
+        enum CodingKeys: String, CodingKey {
+            case sessionID = "session_id"
+        }
+    }
+
+    guard let payloadData = Data(base64Encoded: payload),
+          let claims = try? JSONDecoder().decode(Claims.self, from: payloadData) else {
+        return nil
+    }
+    return claims.sessionID
+}
+
 struct ActiveSession: Codable, Identifiable, Hashable {
     let id: UUID
     let createdAt: Date
     let updatedAt: Date
     let userAgent: String?
     let ipAddress: String?
-    var location: String?
+    var isCurrent: Bool
+
+    init(
+        id: UUID,
+        createdAt: Date,
+        updatedAt: Date,
+        userAgent: String?,
+        ipAddress: String?,
+        isCurrent: Bool
+    ) {
+        self.id = id
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.userAgent = userAgent
+        self.ipAddress = ipAddress
+        self.isCurrent = isCurrent
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        userAgent = try container.decodeIfPresent(String.self, forKey: .userAgent)
+        ipAddress = try container.decodeIfPresent(String.self, forKey: .ipAddress)
+        isCurrent = try container.decodeIfPresent(Bool.self, forKey: .isCurrent) ?? false
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -560,5 +645,6 @@ struct ActiveSession: Codable, Identifiable, Hashable {
         case updatedAt = "updated_at"
         case userAgent = "user_agent"
         case ipAddress = "ip_address"
+        case isCurrent = "is_current"
     }
 }
