@@ -566,16 +566,6 @@ struct NewEntitySheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button(selectedAccounts.count == plaidAccounts.count ? "Clear" : "Select all") {
-                            if selectedAccounts.count == plaidAccounts.count {
-                                selectedPlaidAccountIDs.removeAll()
-                            } else {
-                                selectedPlaidAccountIDs = Set(plaidAccounts.map(\.account_id))
-                            }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        }
-                        .font(.caption.weight(.semibold))
-                        .frame(minHeight: 44)
                     }
                     .padding(.bottom, 14)
 
