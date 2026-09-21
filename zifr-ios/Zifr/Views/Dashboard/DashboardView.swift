@@ -195,7 +195,9 @@ struct DashboardView: View {
                 let previousStep = onboardingState.currentStep
                 onboardingState.evaluateState(appState: appState)
                 
-                if (previousStep == .needsEntity || previousStep == .notStarted) && onboardingState.currentStep == .needsBank {
+                if (previousStep == .needsEntity || previousStep == .notStarted)
+                    && onboardingState.currentStep == .needsBank
+                    && !showAddCompany {
                     // Automatically jump to the new entity's financial tab
                     if let newCompany = appState.companies.sorted(by: { $0.lastModified > $1.lastModified }).first {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -263,7 +265,17 @@ struct DashboardView: View {
                 ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
             }
             .sheet(isPresented: $showAddCompany) {
-                EditCompanySheet(vm: vm, company: nil)
+                NewEntitySheet(vm: vm) { company in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        vm.selectedCompany = company
+                        vm.activeTab = .financial
+                        vm.touchCompany(company, appState: appState)
+                        vm.path.append(company)
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(hex: "#0B0D0C"))
             }
             .sheet(isPresented: $showPremiumUpgrade) {
                 PremiumUpgradeView(gate: accessController.pendingGate)

@@ -9,6 +9,8 @@ struct PlaidLinkButton: View {
     var institutionId: UUID? = nil
     var buttonText: String = "Connect Bank via Plaid"
     var isReconnect: Bool = false
+    var accentColor: Color = Color(red: 59/255, green: 130/255, blue: 246/255)
+    var foregroundColor: Color = .white
     let onSuccess: (String, [PlaidService.PlaidAccount], String?) -> Void
     
     @State private var isLoading = false
@@ -62,15 +64,15 @@ struct PlaidLinkButton: View {
                             ProgressView().tint(isReconnect ? Color(hex: "#C1AA78") : .white)
                         } else {
                             Image(systemName: isReconnect ? "exclamationmark.triangle.fill" : "building.columns.fill")
-                                .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : .white)
+                                .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : foregroundColor)
                         }
                         Text(isLoading ? (isReconnect ? "Preparing connection..." : "Preparing connection...") : buttonText)
                             .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : .white)
+                            .foregroundStyle(isReconnect ? Color(hex: "#C1AA78") : foregroundColor)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: isReconnect ? 44 : 56)
-                    .background(isReconnect ? Color(hex: "#C1AA78").opacity(0.15) : Color(red: 59/255, green: 130/255, blue: 246/255))
+                    .background(isReconnect ? Color(hex: "#C1AA78").opacity(0.15) : accentColor)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .disabled(isLoading)

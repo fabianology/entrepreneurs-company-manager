@@ -119,3 +119,80 @@ The layout champions extreme information density, focusing on smooth, gestural f
 - **Radii:** A distinct corner radius hierarchy. Small internal elements (fields, buttons) use tighter curves, while main architectural cards use generous corner smoothing. Interactive elements often use full pill (capsule) shapes.
 - **Liquid Glass:** Action buttons utilize an advanced "liquid glass" morphing animation. When interacted with, elements expand and seamlessly merge their geometric bounds with neighboring components, simulating viscous physics rather than rigid bounds.
 - **Interactive Feedback:** Haptic feedback is a first-class citizen, paired with structural micro-animations on actions like expanding accordions, copying values, or revealing secure fields.
+
+## Old Entity Sheet
+
+> Legacy reference snapshot, saved 2026-09-20. “Old Entity Sheet” means the create-mode UI of `EditCompanySheet` (`company == nil`) as it existed when this snapshot was recorded. Preserve this description as a visual fallback when the entity-creation experience is redesigned; it is not the default direction for new screens.
+
+### Presentation and structure
+
+- Opens as a native SwiftUI sheet from the dashboard’s Add Entity action and contains a `NavigationStack` with a vertically scrolling form.
+- Uses a solid `#1C1C1E` full-sheet background, 20pt horizontal page insets, 16pt top inset, 40pt bottom inset, and 20pt spacing between primary cards.
+- The compact navigation bar reads **New Business** in 17pt bold gold (`#C1AA78`), with **Cancel** leading and **Save** trailing. Save is disabled until a business name exists and becomes green when enabled.
+- The create flow has two stacked cards: **BUSINESS IDENTITY** followed by **APP NAVIGATION**. Edit-only connection, sharing, and deletion controls are not part of the old create-mode sheet.
+
+### Card treatment
+
+- Cards use the shared `ZifrSheetCard`: 24pt continuous corners, black at 70% over regular material, and a 1.5pt vertical gold border gradient from `#918457` to 30% opacity.
+- Card headers use 12pt black-weight uppercase gold text (`#C1AA78`) with 1.5pt tracking, 20pt horizontal padding, 14pt vertical padding, and an 8% white divider.
+- Card content uses 20pt horizontal padding, 16pt top padding, and 20pt bottom padding.
+
+### Business Identity card
+
+- A 70×70pt rounded identity tile sits beside the business-name field. It has an 18pt radius and 10% white outline. Without a logo it shows the selected brand color plus the first name initial in 28pt black-weight rounded type; when empty it shows `?`.
+- Tapping the identity tile cycles through `Company.brandColors` with a spring animation and clears any uploaded logo. An uploaded logo fills and crops within the same tile and gains a red remove control at the top-right.
+- **BUSINESS NAME** uses the shared premium field: 12pt regular uppercase label at 45% white; 44pt-high `#2C2C2E` input with a 10pt radius, 6% white outline, 12pt horizontal inset, and 14pt regular white value text. Placeholder: `Acme Holdings LLC`.
+- **WEBSITE** repeats that field treatment with placeholder `acme.com`. A 72pt-wide adjacent upload tile uses `#2C2C2E`, a 12pt radius, 6% white outline, the `square.and.arrow.up` symbol, and a 9pt black-weight tracked **UPLOAD** label.
+- **BUSINESS CATEGORY** is a 36pt-high two-option segmented control: Personal / Business. Its track is `#2C2C2E` with a 10pt radius; the selected 8pt-radius segment is Miloom gold with dark `#121212` text and moves with a 0.25-second ease-in-out matched-geometry animation.
+- **BUSINESS STRUCTURE** is a 120pt-high wheel picker on `#2C2C2E`, with a 12pt radius and 6% white outline. Personal offers Household and Individual; Business offers the remaining company structures.
+
+### App Navigation card
+
+- A 52pt-high `#2C2C2E` row contains **Demo Account** in 14pt semibold white, supporting copy in 11pt regular at 50% white, and a green-tinted native toggle.
+- A full-width **Replay Tutorial** action sits below it, with a play-circle icon, 14pt semibold white text, 12pt vertical padding, a green `#166A4E` fill, and a 12pt radius. Pressing scales the control to 97% over 0.2 seconds.
+
+### Interaction signature
+
+- Medium haptics accompany logo-color changes, demo toggling, and Save; Replay Tutorial uses a light haptic.
+- Switching category or dragging the structure wheel dismisses the keyboard. The scroll view also dismisses it interactively, and tapping the sheet background resigns focus.
+- Personal defaults to Individual; switching to Business selects LLC. Save persists name, structure, lowercase color hex, optional website, and optional logo.
+
+### Implementation anchors
+
+- Sheet and create-mode layout: `zifr-ios/Zifr/Views/Company/EditCompanySheet.swift`
+- Shared card shell: `zifr-ios/Zifr/Views/Components/ZifrSheetCard.swift`
+- Premium input, segmented control, and secondary button style: `zifr-ios/Zifr/Views/Components/SharedComponents.swift`
+- Dashboard presentation entry point: `zifr-ios/Zifr/Views/Dashboard/DashboardView.swift`
+
+## New Entity Sheet
+
+> Current entity-creation direction, implemented 2026-09-20. The old create-mode treatment above remains the named legacy reference; editing an existing entity continues to use `EditCompanySheet`.
+
+### Product flow
+
+1. **Entity:** capture the required name plus optional logo/icon, Personal or Business category, and the corresponding profile/business type.
+2. **Connect:** persist the entity, then strongly recommend connecting at least one account with Plaid. The user may finish without accounts only through an explicit confirmation.
+3. **Review:** show every returned Plaid account, preselect all of them, and let the user remove accounts before saving the institution, depository/investment accounts, cards, and loans.
+
+The entity is saved before Plaid opens because the connection requires a stable entity ID. Canceling or failing Plaid never removes the entity. Successful completion opens the entity on its Financial tab.
+
+### Visual system
+
+- Full-height native sheet with a grabber, compact inline title, leading Cancel/Close control, and a three-stage progress indicator.
+- Retains Miloom’s dark canvas, green depth glow, gold emphasis, system typography, brand-color palette, and rounded geometry.
+- Content cards use native regular Material with a restrained dark tint and semantic separators. Liquid Glass is reserved for the bottom action/navigation layer on iOS 26 and later; iOS 17–18 use an `ultraThinMaterial` fallback.
+- Primary actions use a minimum 52pt height, visible disabled state, concise action-oriented labels, and native haptic feedback. The persistent action shelf keeps the next action reachable without turning every content surface into glass.
+- The review list exposes account name, type, masked identifier, balance, selection state, Select all/Clear, and an accessible selected/not-selected label.
+
+### Safety and recovery
+
+- The primary identity action is unavailable until a trimmed entity name exists.
+- Unsaved identity dismissal, skipping Plaid, and abandoning a returned connection each use context-specific confirmation language.
+- Plaid authentication stays in Plaid Link; Miloom does not request bank credentials. Account import occurs only after review and requires at least one selected account.
+- A failed account save leaves the entity intact and keeps the review available for retry.
+
+### Implementation anchors
+
+- New flow, account review, and Plaid-to-domain mapping: `zifr-ios/Zifr/Views/Company/EditCompanySheet.swift` (`NewEntitySheet`)
+- Dashboard presentation and completion routing: `zifr-ios/Zifr/Views/Dashboard/DashboardView.swift`
+- Reusable Plaid launch control and Miloom color customization: `zifr-ios/Zifr/Views/Financial/PlaidLinkButton.swift`
