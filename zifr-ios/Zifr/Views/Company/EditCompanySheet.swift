@@ -142,7 +142,7 @@ struct NewEntitySheet: View {
                             removal: .opacity.combined(with: .move(edge: .leading))
                         ))
                         .padding(.horizontal, 20)
-                        .padding(.bottom, step == .review ? 120 : 28)
+                        .padding(.bottom, 28)
                     }
                     .scrollDismissesKeyboard(.interactively)
                 }
@@ -188,9 +188,6 @@ struct NewEntitySheet: View {
                         .disabled(!canSaveIdentity)
                     }
                 }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                actionShelf
             }
         }
         .preferredColorScheme(.dark)
@@ -555,9 +552,12 @@ struct NewEntitySheet: View {
             contentCard {
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
-                        Image(systemName: "building.columns.circle.fill")
-                            .font(.system(size: 32))
-                            .foregroundStyle(Color.miloomGold)
+                        FaviconImage(
+                            website: inferredInstitutionURL(plaidInstitutionName) ?? "",
+                            size: 40,
+                            fallbackInitial: plaidInstitutionName.first.map(String.init)
+                        )
+                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(plaidInstitutionName.isEmpty ? "Connected institution" : plaidInstitutionName)
                                 .font(.headline)
@@ -591,6 +591,25 @@ struct NewEntitySheet: View {
                     }
                 }
             }
+
+            Button { saveSelectedAccounts() } label: {
+                HStack(spacing: 8) {
+                    if isFinalizing {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("Add \(selectedAccounts.count) account\(selectedAccounts.count == 1 ? "" : "s")")
+                    }
+                }
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+            }
+            .disabled(selectedAccounts.isEmpty || isFinalizing)
+            .buttonStyle(NewEntityPrimaryButtonStyle(
+                enabledBackground: Color.zifrGreen,
+                enabledForeground: .white
+            ))
 
             if selectedPlaidAccountIDs.isEmpty {
                 Label("Select at least one account to finish connecting this bank.", systemImage: "info.circle")
@@ -647,6 +666,20 @@ struct NewEntitySheet: View {
                     .accessibilityHint("Adds or removes local sample data")
                 }
             }
+
+            Button { completeFlow() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                    Text("Finish Setup")
+                }
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+            }
+            .buttonStyle(NewEntityPrimaryButtonStyle(
+                enabledBackground: Color.zifrGreen,
+                enabledForeground: .white
+            ))
         }
     }
 
@@ -682,12 +715,6 @@ struct NewEntitySheet: View {
                     .font(.system(size: 23))
                     .foregroundStyle(selected ? Color.zifrGreen : Color.white.opacity(0.28))
 
-                Image(systemName: accountIcon(account))
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(Color.miloomGold)
-                    .frame(width: 28, height: 28)
-                    .background(Color.miloomGold.opacity(0.1), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
                 VStack(alignment: .leading, spacing: 3) {
                     Text(account.official_name ?? account.name)
                         .font(.subheadline.weight(.semibold))
@@ -715,84 +742,12 @@ struct NewEntitySheet: View {
         .accessibilityLabel("\(account.official_name ?? account.name), \(selected ? "selected" : "not selected")")
     }
 
-    private func accountIcon(_ account: PlaidService.PlaidAccount) -> String {
-        switch account.type.lowercased() {
-        case "credit": return "creditcard.fill"
-        case "loan": return "banknote.fill"
-        case "investment": return "chart.line.uptrend.xyaxis"
-        default: return "dollarsign.circle.fill"
-        }
-    }
-
     private func contentCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         content()
             .padding(20)
             .frame(maxWidth: .infinity)
             .background(Color.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-    }
-
-    @ViewBuilder
-    private var actionShelf: some View {
-        if step == .review {
-            VStack(spacing: 10) {
-                switch step {
-                case .identity, .connect:
-                    EmptyView()
-
-                case .review:
-                    switch reviewMode {
-                    case .plaidAccounts:
-                        Button { saveSelectedAccounts() } label: {
-                            HStack(spacing: 8) {
-                                if isFinalizing {
-                                    ProgressView().tint(Color(hex: "#121212"))
-                                } else {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("Add \(selectedAccounts.count) account\(selectedAccounts.count == 1 ? "" : "s")")
-                                }
-                            }
-                            .font(.body.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                        }
-                        .disabled(selectedAccounts.isEmpty || isFinalizing)
-                        .buttonStyle(NewEntityPrimaryButtonStyle())
-
-                    case .setupLater:
-                        Button { completeFlow() } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Finish Setup")
-                            }
-                            .font(.body.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                        }
-                        .buttonStyle(NewEntityPrimaryButtonStyle(
-                            enabledBackground: Color.zifrGreen,
-                            enabledForeground: .white
-                        ))
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
-            .background(actionShelfBackground)
-        }
-    }
-
-    @ViewBuilder
-    private var actionShelfBackground: some View {
-        if #available(iOS 26.0, *) {
-            Color.clear
-                .glassEffect(.regular.tint(Color.black.opacity(0.16)), in: Rectangle())
-        } else {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(Color.black.opacity(0.24))
-        }
     }
 
     private func closeTapped() {
