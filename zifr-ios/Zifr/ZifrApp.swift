@@ -157,6 +157,7 @@ struct ZifrApp: App {
             )) {
                 if let token = pendingInvitationToken {
                     InvitationAcceptanceSheet(token: token)
+                        .environment(appState)
                 }
             }
             .alert("Error", isPresented: Binding(
