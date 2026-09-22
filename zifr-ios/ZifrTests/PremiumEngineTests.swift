@@ -301,6 +301,124 @@ final class PremiumEngineTests: XCTestCase {
         XCTAssertEqual(SecurityService.encryptValue(result, using: replacementKey), encrypted)
     }
 
+    func testVersionedVaultFieldEnvelopeBindsCiphertextToItsRecordAndField() throws {
+        let key = SymmetricKey(size: .bits256)
+        let owner = UUID()
+        let resource = UUID()
+        let context = VaultFieldContext(
+            ownerUserID: owner,
+            resourceType: "subscription",
+            resourceID: resource,
+            fieldName: "password",
+            keyVersion: 1
+        )
+
+        let envelope = try VaultCryptography.encryptField("correct horse battery staple", using: key, context: context)
+        XCTAssertTrue(envelope.hasPrefix("miloom:v1:1:"))
+        XCTAssertTrue(SecurityService.isLockedValue(envelope))
+        XCTAssertEqual(SecurityService.decryptValue(envelope, using: key), envelope)
+        XCTAssertEqual(try VaultCryptography.decryptField(envelope, using: key, context: context), "correct horse battery staple")
+
+        let swappedField = VaultFieldContext(
+            ownerUserID: owner,
+            resourceType: "subscription",
+            resourceID: resource,
+            fieldName: "login_id",
+            keyVersion: 1
+        )
+        XCTAssertThrowsError(try VaultCryptography.decryptField(envelope, using: key, context: swappedField)) {
+            XCTAssertEqual($0 as? VaultCryptographyError, .authenticationFailed)
+        }
+    }
+
+    func testVaultKeyWrapCanOnlyBeOpenedByTheTargetDevice() throws {
+        let owner = UUID()
+        let targetDevice = UUID()
+        let targetIdentity = VaultDeviceIdentity(
+            agreementPrivateKey: P256.KeyAgreement.PrivateKey(),
+            signingPrivateKey: P256.Signing.PrivateKey()
+        )
+        let wrongIdentity = VaultDeviceIdentity(
+            agreementPrivateKey: P256.KeyAgreement.PrivateKey(),
+            signingPrivateKey: P256.Signing.PrivateKey()
+        )
+        let vaultKey = SymmetricKey(size: .bits256)
+        let context = VaultKeyWrapContext(ownerUserID: owner, recipientDeviceID: targetDevice, keyVersion: 1)
+        let envelope = try VaultCryptography.wrapVaultKey(
+            vaultKey,
+            for: targetIdentity.publicKeys.agreementPublicKey,
+            context: context
+        )
+
+        let unwrapped = try VaultCryptography.unwrapVaultKey(
+            envelope,
+            using: targetIdentity.agreementPrivateKey,
+            context: context
+        )
+        XCTAssertEqual(keyData(unwrapped), keyData(vaultKey))
+        XCTAssertThrowsError(
+            try VaultCryptography.unwrapVaultKey(
+                envelope,
+                using: wrongIdentity.agreementPrivateKey,
+                context: context
+            )
+        ) {
+            XCTAssertEqual($0 as? VaultCryptographyError, .authenticationFailed)
+        }
+    }
+
+    func testRecoveryWrapRequiresTheGeneratedHighEntropyCode() throws {
+        let vaultKey = SymmetricKey(size: .bits256)
+        let context = VaultRecoveryWrapContext(ownerUserID: UUID(), keyVersion: 1)
+        let recoveryCode = try VaultCryptography.generateRecoveryCode()
+        let otherRecoveryCode = try VaultCryptography.generateRecoveryCode()
+        let envelope = try VaultCryptography.wrapVaultKeyForRecovery(
+            vaultKey,
+            recoveryCode: recoveryCode,
+            context: context
+        )
+
+        let recovered = try VaultCryptography.unwrapVaultKeyFromRecovery(
+            envelope,
+            recoveryCode: recoveryCode,
+            context: context
+        )
+        XCTAssertEqual(keyData(recovered), keyData(vaultKey))
+        XCTAssertThrowsError(
+            try VaultCryptography.unwrapVaultKeyFromRecovery(
+                envelope,
+                recoveryCode: otherRecoveryCode,
+                context: context
+            )
+        ) {
+            XCTAssertEqual($0 as? VaultCryptographyError, .authenticationFailed)
+        }
+    }
+
+    func testVaultDeviceSignatureRejectsChangedChallenge() throws {
+        let identity = VaultDeviceIdentity(
+            agreementPrivateKey: P256.KeyAgreement.PrivateKey(),
+            signingPrivateKey: P256.Signing.PrivateKey()
+        )
+        let challenge = Data("approve-device|nonce-1".utf8)
+        let signature = try VaultCryptography.sign(challenge, using: identity)
+
+        XCTAssertTrue(VaultCryptography.verify(
+            signature: signature,
+            challenge: challenge,
+            signingPublicKeyBase64: identity.publicKeys.signingPublicKey
+        ))
+        XCTAssertFalse(VaultCryptography.verify(
+            signature: signature,
+            challenge: Data("approve-device|nonce-2".utf8),
+            signingPublicKeyBase64: identity.publicKeys.signingPublicKey
+        ))
+    }
+
+    private func keyData(_ key: SymmetricKey) -> Data {
+        key.withUnsafeBytes { Data($0) }
+    }
+
     func testPlaidConnectionHealthDetectsReconnectAndStaleItems() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let reconnect = PlaidItemSummary(

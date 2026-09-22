@@ -1182,6 +1182,7 @@ struct Transaction: Identifiable, Codable, Equatable {
 final class SecurityService {
     static let shared = SecurityService()
     static let lockedValueLabel = "Locked on this device"
+    static let vaultEnvelopePrefix = "miloom:v1:"
     
     private let keyTag = "com.zifr.encryptionKey"
     private var symmetricKey: SymmetricKey?
@@ -1237,7 +1238,8 @@ final class SecurityService {
     }
 
     static func isLockedValue(_ string: String?) -> Bool {
-        string?.hasPrefix("enc:") == true
+        guard let string else { return false }
+        return string.hasPrefix("enc:") || string.hasPrefix(vaultEnvelopePrefix)
     }
 
     static func editableValue(_ string: String?) -> String {
@@ -1258,7 +1260,7 @@ final class SecurityService {
     }
 
     static func decryptValue(_ string: String?, using key: SymmetricKey?) -> String? {
-        guard let string, isLockedValue(string), let key else { return string }
+        guard let string, string.hasPrefix("enc:"), let key else { return string }
         let base64 = String(string.dropFirst(4))
         guard let combined = Data(base64Encoded: base64) else { return string }
 
@@ -1268,6 +1270,393 @@ final class SecurityService {
             return String(data: decryptedData, encoding: .utf8) ?? string
         } catch {
             return string
+        }
+    }
+}
+
+enum VaultCryptographyError: Error, Equatable {
+    case invalidEnvelope
+    case unsupportedVersion
+    case invalidKeyVersion
+    case invalidPublicKey
+    case invalidRecoveryCode
+    case authenticationFailed
+    case randomGenerationFailed
+    case keychainFailure(OSStatus)
+}
+
+struct VaultFieldContext: Hashable {
+    let ownerUserID: UUID
+    let resourceType: String
+    let resourceID: UUID
+    let fieldName: String
+    let keyVersion: Int
+
+    fileprivate var authenticatedData: Data {
+        Data([
+            "miloom-field-v1",
+            ownerUserID.uuidString.lowercased(),
+            resourceType.lowercased(),
+            resourceID.uuidString.lowercased(),
+            fieldName.lowercased(),
+            String(keyVersion)
+        ].joined(separator: "|").utf8)
+    }
+}
+
+struct VaultKeyWrapContext: Hashable {
+    let ownerUserID: UUID
+    let recipientDeviceID: UUID
+    let keyVersion: Int
+
+    fileprivate var authenticatedData: Data {
+        Data([
+            "miloom-device-wrap-v1",
+            ownerUserID.uuidString.lowercased(),
+            recipientDeviceID.uuidString.lowercased(),
+            String(keyVersion)
+        ].joined(separator: "|").utf8)
+    }
+}
+
+struct VaultRecoveryWrapContext: Hashable {
+    let ownerUserID: UUID
+    let keyVersion: Int
+
+    fileprivate var authenticatedData: Data {
+        Data([
+            "miloom-recovery-wrap-v1",
+            ownerUserID.uuidString.lowercased(),
+            String(keyVersion)
+        ].joined(separator: "|").utf8)
+    }
+}
+
+struct VaultDeviceKeyWrapEnvelope: Codable, Equatable {
+    let version: Int
+    let keyVersion: Int
+    let ephemeralPublicKey: String
+    let wrappedKey: String
+}
+
+struct VaultRecoveryKeyWrapEnvelope: Codable, Equatable {
+    let version: Int
+    let keyVersion: Int
+    let wrappedKey: String
+}
+
+struct VaultDevicePublicKeys: Codable, Equatable {
+    let agreementPublicKey: String
+    let signingPublicKey: String
+}
+
+struct VaultDeviceIdentity {
+    let agreementPrivateKey: P256.KeyAgreement.PrivateKey
+    let signingPrivateKey: P256.Signing.PrivateKey
+
+    var publicKeys: VaultDevicePublicKeys {
+        VaultDevicePublicKeys(
+            agreementPublicKey: agreementPrivateKey.publicKey.x963Representation.base64EncodedString(),
+            signingPublicKey: signingPrivateKey.publicKey.x963Representation.base64EncodedString()
+        )
+    }
+}
+
+enum VaultCryptography {
+    static let fieldEnvelopePrefix = SecurityService.vaultEnvelopePrefix
+    private static let deviceWrapSalt = Data("miloom-device-wrap-v1".utf8)
+    private static let recoveryWrapSalt = Data("miloom-recovery-wrap-v1".utf8)
+
+    static func encryptField(
+        _ plaintext: String,
+        using vaultKey: SymmetricKey,
+        context: VaultFieldContext
+    ) throws -> String {
+        guard context.keyVersion > 0 else { throw VaultCryptographyError.invalidKeyVersion }
+        let box = try AES.GCM.seal(
+            Data(plaintext.utf8),
+            using: vaultKey,
+            authenticating: context.authenticatedData
+        )
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return "\(fieldEnvelopePrefix)\(context.keyVersion):\(combined.base64EncodedString())"
+    }
+
+    static func decryptField(
+        _ envelope: String,
+        using vaultKey: SymmetricKey,
+        context: VaultFieldContext
+    ) throws -> String {
+        let components = envelope.split(separator: ":", omittingEmptySubsequences: false)
+        guard components.count == 4,
+              components[0] == "miloom",
+              components[1] == "v1",
+              let embeddedVersion = Int(components[2]),
+              embeddedVersion == context.keyVersion,
+              let combined = Data(base64Encoded: String(components[3])) else {
+            throw VaultCryptographyError.invalidEnvelope
+        }
+
+        do {
+            let box = try AES.GCM.SealedBox(combined: combined)
+            let plaintext = try AES.GCM.open(
+                box,
+                using: vaultKey,
+                authenticating: context.authenticatedData
+            )
+            guard let value = String(data: plaintext, encoding: .utf8) else {
+                throw VaultCryptographyError.invalidEnvelope
+            }
+            return value
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    static func wrapVaultKey(
+        _ vaultKey: SymmetricKey,
+        for recipientPublicKeyBase64: String,
+        context: VaultKeyWrapContext
+    ) throws -> VaultDeviceKeyWrapEnvelope {
+        guard context.keyVersion > 0,
+              let publicKeyData = Data(base64Encoded: recipientPublicKeyBase64),
+              let recipientPublicKey = try? P256.KeyAgreement.PublicKey(x963Representation: publicKeyData) else {
+            throw VaultCryptographyError.invalidPublicKey
+        }
+
+        let ephemeralKey = P256.KeyAgreement.PrivateKey()
+        let sharedSecret = try ephemeralKey.sharedSecretFromKeyAgreement(with: recipientPublicKey)
+        let wrappingKey = sharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self,
+            salt: deviceWrapSalt,
+            sharedInfo: context.authenticatedData,
+            outputByteCount: 32
+        )
+        let rawVaultKey = vaultKey.withUnsafeBytes { Data($0) }
+        let box = try AES.GCM.seal(
+            rawVaultKey,
+            using: wrappingKey,
+            authenticating: context.authenticatedData
+        )
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+
+        return VaultDeviceKeyWrapEnvelope(
+            version: 1,
+            keyVersion: context.keyVersion,
+            ephemeralPublicKey: ephemeralKey.publicKey.x963Representation.base64EncodedString(),
+            wrappedKey: combined.base64EncodedString()
+        )
+    }
+
+    static func unwrapVaultKey(
+        _ envelope: VaultDeviceKeyWrapEnvelope,
+        using recipientPrivateKey: P256.KeyAgreement.PrivateKey,
+        context: VaultKeyWrapContext
+    ) throws -> SymmetricKey {
+        guard envelope.version == 1 else { throw VaultCryptographyError.unsupportedVersion }
+        guard envelope.keyVersion == context.keyVersion, context.keyVersion > 0 else {
+            throw VaultCryptographyError.invalidKeyVersion
+        }
+        guard let ephemeralData = Data(base64Encoded: envelope.ephemeralPublicKey),
+              let ephemeralPublicKey = try? P256.KeyAgreement.PublicKey(x963Representation: ephemeralData),
+              let wrappedData = Data(base64Encoded: envelope.wrappedKey) else {
+            throw VaultCryptographyError.invalidEnvelope
+        }
+
+        do {
+            let sharedSecret = try recipientPrivateKey.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
+            let wrappingKey = sharedSecret.hkdfDerivedSymmetricKey(
+                using: SHA256.self,
+                salt: deviceWrapSalt,
+                sharedInfo: context.authenticatedData,
+                outputByteCount: 32
+            )
+            let box = try AES.GCM.SealedBox(combined: wrappedData)
+            let rawVaultKey = try AES.GCM.open(
+                box,
+                using: wrappingKey,
+                authenticating: context.authenticatedData
+            )
+            guard rawVaultKey.count == 32 else { throw VaultCryptographyError.invalidEnvelope }
+            return SymmetricKey(data: rawVaultKey)
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    static func generateRecoveryCode() throws -> String {
+        var bytes = Data(count: 32)
+        let status = bytes.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, 32, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else { throw VaultCryptographyError.randomGenerationFailed }
+        return base64URL(bytes)
+    }
+
+    static func wrapVaultKeyForRecovery(
+        _ vaultKey: SymmetricKey,
+        recoveryCode: String,
+        context: VaultRecoveryWrapContext
+    ) throws -> VaultRecoveryKeyWrapEnvelope {
+        let recoveryMaterial = try decodeRecoveryCode(recoveryCode)
+        let wrappingKey = HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: SymmetricKey(data: recoveryMaterial),
+            salt: recoveryWrapSalt,
+            info: context.authenticatedData,
+            outputByteCount: 32
+        )
+        let rawVaultKey = vaultKey.withUnsafeBytes { Data($0) }
+        let box = try AES.GCM.seal(
+            rawVaultKey,
+            using: wrappingKey,
+            authenticating: context.authenticatedData
+        )
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return VaultRecoveryKeyWrapEnvelope(
+            version: 1,
+            keyVersion: context.keyVersion,
+            wrappedKey: combined.base64EncodedString()
+        )
+    }
+
+    static func unwrapVaultKeyFromRecovery(
+        _ envelope: VaultRecoveryKeyWrapEnvelope,
+        recoveryCode: String,
+        context: VaultRecoveryWrapContext
+    ) throws -> SymmetricKey {
+        guard envelope.version == 1 else { throw VaultCryptographyError.unsupportedVersion }
+        guard envelope.keyVersion == context.keyVersion, context.keyVersion > 0 else {
+            throw VaultCryptographyError.invalidKeyVersion
+        }
+        guard let wrappedData = Data(base64Encoded: envelope.wrappedKey) else {
+            throw VaultCryptographyError.invalidEnvelope
+        }
+        let recoveryMaterial = try decodeRecoveryCode(recoveryCode)
+        let wrappingKey = HKDF<SHA256>.deriveKey(
+            inputKeyMaterial: SymmetricKey(data: recoveryMaterial),
+            salt: recoveryWrapSalt,
+            info: context.authenticatedData,
+            outputByteCount: 32
+        )
+
+        do {
+            let box = try AES.GCM.SealedBox(combined: wrappedData)
+            let rawVaultKey = try AES.GCM.open(
+                box,
+                using: wrappingKey,
+                authenticating: context.authenticatedData
+            )
+            guard rawVaultKey.count == 32 else { throw VaultCryptographyError.invalidEnvelope }
+            return SymmetricKey(data: rawVaultKey)
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    static func sign(_ challenge: Data, using identity: VaultDeviceIdentity) throws -> Data {
+        try identity.signingPrivateKey.signature(for: challenge).derRepresentation
+    }
+
+    static func verify(
+        signature: Data,
+        challenge: Data,
+        signingPublicKeyBase64: String
+    ) -> Bool {
+        guard let publicKeyData = Data(base64Encoded: signingPublicKeyBase64),
+              let publicKey = try? P256.Signing.PublicKey(x963Representation: publicKeyData),
+              let signature = try? P256.Signing.ECDSASignature(derRepresentation: signature) else {
+            return false
+        }
+        return publicKey.isValidSignature(signature, for: challenge)
+    }
+
+    private static func decodeRecoveryCode(_ code: String) throws -> Data {
+        var base64 = code.replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        base64 += String(repeating: "=", count: (4 - base64.count % 4) % 4)
+        guard let data = Data(base64Encoded: base64), data.count == 32 else {
+            throw VaultCryptographyError.invalidRecoveryCode
+        }
+        return data
+    }
+
+    private static func base64URL(_ data: Data) -> String {
+        data.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+final class VaultDeviceKeyStore {
+    static let shared = VaultDeviceKeyStore()
+
+    private let service = "com.vibing.miloom.vault-device.v1"
+
+    private init() {}
+
+    func loadOrCreateIdentity(for userID: UUID) throws -> VaultDeviceIdentity {
+        let agreementAccount = "\(userID.uuidString.lowercased()).agreement"
+        let signingAccount = "\(userID.uuidString.lowercased()).signing"
+
+        let agreementKey: P256.KeyAgreement.PrivateKey
+        if let data = try load(account: agreementAccount) {
+            agreementKey = try P256.KeyAgreement.PrivateKey(rawRepresentation: data)
+        } else {
+            agreementKey = P256.KeyAgreement.PrivateKey()
+            try save(agreementKey.rawRepresentation, account: agreementAccount)
+        }
+
+        let signingKey: P256.Signing.PrivateKey
+        if let data = try load(account: signingAccount) {
+            signingKey = try P256.Signing.PrivateKey(rawRepresentation: data)
+        } else {
+            signingKey = P256.Signing.PrivateKey()
+            try save(signingKey.rawRepresentation, account: signingAccount)
+        }
+
+        return VaultDeviceIdentity(
+            agreementPrivateKey: agreementKey,
+            signingPrivateKey: signingKey
+        )
+    }
+
+    private func load(account: String) throws -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: false,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = item as? Data else {
+            throw VaultCryptographyError.keychainFailure(status)
+        }
+        return data
+    }
+
+    private func save(_ data: Data, account: String) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecAttrSynchronizable as String: false,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        ]
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw VaultCryptographyError.keychainFailure(status)
         }
     }
 }
