@@ -2,6 +2,9 @@ import Foundation
 import Supabase
 import CryptoKit
 import Security
+#if canImport(UIKit)
+import UIKit
+#endif
 
 private actor PortfolioLoadFailures {
     var names = Set<String>()
@@ -230,14 +233,24 @@ class DataRepository {
         let transactionOverrides = await fTransactionOverrides
         let transactionCategoryRules = await fTransactionCategoryRules
         
-        let secureSubs = fetchedSubscriptions.map { s -> Subscription in var m = s; m.password = SecurityService.shared.decrypt(s.password); return m }
+        await VaultService.shared.restoreSessionIfAvailable(for: loadingUserID)
+
+        let secureSubs = fetchedSubscriptions.map { s -> Subscription in
+            var m = s
+            m.password = SecurityService.shared.decrypt(s.password, context: vaultContext(owner: s.userId, type: "subscription", id: s.id, field: "password"))
+            return m
+        }
         let normalizedSubscriptions = secureSubs.map { SubscriptionRenewalScheduler.normalized($0) }
         let subscriptionsNeedingRenewalUpdate = zip(secureSubs, normalizedSubscriptions).compactMap { pair in
             let (original, normalized) = pair
             return original == normalized ? nil : normalized
         }
         let secureInst = fetchedInstitutions.map { decryptInstitutionSecrets($0) }
-        let secureCards = fetchedCards.map { c -> FinancialCard in var m = c; m.password = SecurityService.shared.decrypt(c.password); return m }
+        let secureCards = fetchedCards.map { c -> FinancialCard in
+            var m = c
+            m.password = SecurityService.shared.decrypt(c.password, context: vaultContext(owner: c.userId, type: "financial_card", id: c.id, field: "password"))
+            return m
+        }
         
         let paymentsByLoan = Dictionary(grouping: fetchedLoanPayments, by: { $0.loanId })
         let combinedLoans = fetchedLoans.map { loan -> Loan in
@@ -541,15 +554,22 @@ class DataRepository {
     
     // MARK: - Subscriptions
     func insertSubscription(_ sub: Subscription) async throws {
-        var secureSub = sub; secureSub.password = SecurityService.shared.encrypt(secureSub.password)
+        var secureSub = sub
+        secureSub.password = SecurityService.shared.encrypt(secureSub.password, context: vaultContext(owner: sub.userId, type: "subscription", id: sub.id, field: "password"))
         try await client.from("subscriptions").insert(secureSub).execute()
     }
     func updateSubscription(_ sub: Subscription) async throws {
-        if let session = try? await client.auth.session, sub.userId != session.user.id {
+        let session = try? await client.auth.session
+        if let session, sub.userId != session.user.id {
             let log = ActivityLog(userId: sub.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_subscription", message: "\(session.user.email ?? "Someone") updated the shared subscription '\(sub.name)'.", resourceId: sub.id, resourceType: "subscription")
             try? await insertActivityLog(log)
         }
-        var secureSub = sub; secureSub.password = SecurityService.shared.encrypt(secureSub.password)
+        var secureSub = sub
+        if let session, sub.userId != session.user.id {
+            secureSub.password = try await storedPassword(table: "subscriptions", id: sub.id)
+        } else {
+            secureSub.password = SecurityService.shared.encrypt(secureSub.password, context: vaultContext(owner: sub.userId, type: "subscription", id: sub.id, field: "password"))
+        }
         try await client.from("subscriptions").update(secureSub).eq("id", value: sub.id).execute()
     }
     func deleteSubscription(_ id: UUID) async throws {
@@ -558,20 +578,31 @@ class DataRepository {
     
     // MARK: - Financial Cards
     func insertCard(_ card: FinancialCard) async throws {
-        var secureCard = card; secureCard.password = SecurityService.shared.encrypt(secureCard.password)
+        var secureCard = card
+        secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
         try await client.from("financial_cards").insert(secureCard).execute()
     }
     func updateCard(_ card: FinancialCard) async throws {
-        if let session = try? await client.auth.session, card.userId != session.user.id {
+        let session = try? await client.auth.session
+        if let session, card.userId != session.user.id {
             let log = ActivityLog(userId: card.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_card", message: "\(session.user.email ?? "Someone") updated the shared card '\(card.name)'.", resourceId: card.id, resourceType: "card")
             try? await insertActivityLog(log)
         }
-        var secureCard = card; secureCard.password = SecurityService.shared.encrypt(secureCard.password)
+        var secureCard = card
+        if let session, card.userId != session.user.id {
+            secureCard.password = try await storedPassword(table: "financial_cards", id: card.id)
+        } else {
+            secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
+        }
         try await client.from("financial_cards").update(secureCard).eq("id", value: card.id).execute()
     }
     func upsertCard(_ card: FinancialCard) async throws {
         var secureCard = card
-        secureCard.password = SecurityService.shared.encrypt(secureCard.password)
+        if let session = try? await client.auth.session, card.userId != session.user.id {
+            secureCard.password = try await storedPassword(table: "financial_cards", id: card.id)
+        } else {
+            secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
+        }
         try await client.from("financial_cards").upsert(secureCard).execute()
     }
     func deleteCard(_ id: UUID) async throws {
@@ -584,26 +615,78 @@ class DataRepository {
         try await client.from("institutions").insert(secureInst).execute()
     }
     func updateInstitution(_ inst: Institution) async throws {
-        if let session = try? await client.auth.session, inst.userId != session.user.id {
+        let session = try? await client.auth.session
+        if let session, inst.userId != session.user.id {
             let log = ActivityLog(userId: inst.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_institution", message: "\(session.user.email ?? "Someone") updated the shared institution '\(inst.name)'.", resourceId: inst.id, resourceType: "institution")
             try? await insertActivityLog(log)
         }
-        let secureInst = encryptInstitutionSecrets(inst)
+        let secureInst: Institution
+        if let session, inst.userId != session.user.id {
+            secureInst = try await preservingStoredInstitutionSecrets(in: inst)
+        } else {
+            secureInst = encryptInstitutionSecrets(inst)
+        }
         try await client.from("institutions").update(secureInst).eq("id", value: inst.id).execute()
     }
     func upsertInstitution(_ inst: Institution) async throws {
-        let secureInst = encryptInstitutionSecrets(inst)
+        let secureInst: Institution
+        if let session = try? await client.auth.session, inst.userId != session.user.id {
+            secureInst = try await preservingStoredInstitutionSecrets(in: inst)
+        } else {
+            secureInst = encryptInstitutionSecrets(inst)
+        }
         try await client.from("institutions").upsert(secureInst).execute()
+    }
+
+    private struct StoredPassword: Decodable { let password: String? }
+
+    private func storedPassword(table: String, id: UUID) async throws -> String? {
+        let rows: [StoredPassword] = try await client.from(table)
+            .select("password")
+            .eq("id", value: id)
+            .limit(1)
+            .execute().value
+        return rows.first?.password
+    }
+
+    private func preservingStoredInstitutionSecrets(in proposed: Institution) async throws -> Institution {
+        let rows: [Institution] = try await client.from("institutions")
+            .select()
+            .eq("id", value: proposed.id)
+            .limit(1)
+            .execute().value
+        guard let stored = rows.first else { return proposed }
+        let storedAccounts = stored.accounts.reduce(into: [String: InstitutionAccount]()) { result, account in
+            if result[account.id] == nil { result[account.id] = account }
+        }
+        var preserved = proposed
+        preserved.password = stored.password
+        preserved.accounts = proposed.accounts.map { account in
+            guard let storedAccount = storedAccounts[account.id] else {
+                var newAccount = account
+                newAccount.accountNumber = nil
+                newAccount.routingNumber = nil
+                newAccount.wireRoutingNumber = nil
+                return newAccount
+            }
+            var merged = account
+            merged.accountNumber = storedAccount.accountNumber
+            merged.routingNumber = storedAccount.routingNumber
+            merged.wireRoutingNumber = storedAccount.wireRoutingNumber
+            return merged
+        }
+        return preserved
     }
 
     private func encryptInstitutionSecrets(_ institution: Institution) -> Institution {
         var secured = institution
-        secured.password = SecurityService.shared.encrypt(secured.password)
+        secured.password = SecurityService.shared.encrypt(secured.password, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "password"))
         secured.accounts = secured.accounts.map { account in
             var securedAccount = account
-            securedAccount.accountNumber = SecurityService.shared.encrypt(account.accountNumber)
-            securedAccount.routingNumber = SecurityService.shared.encrypt(account.routingNumber)
-            securedAccount.wireRoutingNumber = SecurityService.shared.encrypt(account.wireRoutingNumber)
+            let prefix = "accounts.\(account.id)"
+            securedAccount.accountNumber = SecurityService.shared.encrypt(account.accountNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).account_number"))
+            securedAccount.routingNumber = SecurityService.shared.encrypt(account.routingNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).routing_number"))
+            securedAccount.wireRoutingNumber = SecurityService.shared.encrypt(account.wireRoutingNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).wire_routing_number"))
             return securedAccount
         }
         return secured
@@ -611,15 +694,139 @@ class DataRepository {
 
     private func decryptInstitutionSecrets(_ institution: Institution) -> Institution {
         var decrypted = institution
-        decrypted.password = SecurityService.shared.decrypt(decrypted.password)
+        decrypted.password = SecurityService.shared.decrypt(decrypted.password, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "password"))
         decrypted.accounts = decrypted.accounts.map { account in
             var decryptedAccount = account
-            decryptedAccount.accountNumber = SecurityService.shared.decrypt(account.accountNumber)
-            decryptedAccount.routingNumber = SecurityService.shared.decrypt(account.routingNumber)
-            decryptedAccount.wireRoutingNumber = SecurityService.shared.decrypt(account.wireRoutingNumber)
+            let prefix = "accounts.\(account.id)"
+            decryptedAccount.accountNumber = SecurityService.shared.decrypt(account.accountNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).account_number"))
+            decryptedAccount.routingNumber = SecurityService.shared.decrypt(account.routingNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).routing_number"))
+            decryptedAccount.wireRoutingNumber = SecurityService.shared.decrypt(account.wireRoutingNumber, context: vaultContext(owner: institution.userId, type: "institution", id: institution.id, field: "\(prefix).wire_routing_number"))
             return decryptedAccount
         }
         return decrypted
+    }
+
+    private func vaultContext(owner: UUID, type: String, id: UUID, field: String) -> VaultFieldContext? {
+        guard let snapshot = VaultKeySession.shared.snapshot(for: owner) else { return nil }
+        return VaultFieldContext(ownerUserID: owner, resourceType: type, resourceID: id, fieldName: field, keyVersion: snapshot.keyVersion)
+    }
+
+    func migrateLegacyVaultSecrets(snapshot: VaultKeySession.Snapshot) async throws -> VaultMigrationReport {
+        let owner = snapshot.userID
+        let subscriptions: [Subscription] = try await client.from("subscriptions").select().eq("user_id", value: owner).execute().value
+        let cards: [FinancialCard] = try await client.from("financial_cards").select().eq("user_id", value: owner).execute().value
+        let institutions: [Institution] = try await client.from("institutions").select().eq("user_id", value: owner).execute().value
+        var report = VaultMigrationReport()
+
+        struct PasswordPatch: Encodable { let password: String }
+        for subscription in subscriptions {
+            let context = VaultFieldContext(ownerUserID: owner, resourceType: "subscription", resourceID: subscription.id, fieldName: "password", keyVersion: snapshot.keyVersion)
+            switch migrateSecret(subscription.password, using: snapshot.key, context: context) {
+            case .migrated(let value):
+                do {
+                    try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).execute()
+                    report.migratedFields += 1
+                } catch {
+                    report.failedRecords += 1
+                    AppDiagnostics.failure("vault", "migrate_subscription", error: error)
+                }
+            case .locked:
+                report.skippedLockedFields += 1
+            case .unchanged:
+                break
+            }
+        }
+
+        for card in cards {
+            let context = VaultFieldContext(ownerUserID: owner, resourceType: "financial_card", resourceID: card.id, fieldName: "password", keyVersion: snapshot.keyVersion)
+            switch migrateSecret(card.password, using: snapshot.key, context: context) {
+            case .migrated(let value):
+                do {
+                    try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).execute()
+                    report.migratedFields += 1
+                } catch {
+                    report.failedRecords += 1
+                    AppDiagnostics.failure("vault", "migrate_card", error: error)
+                }
+            case .locked:
+                report.skippedLockedFields += 1
+            case .unchanged:
+                break
+            }
+        }
+
+        struct InstitutionSecretsPatch: Encodable {
+            let password: String?
+            let accountsData: [InstitutionAccount]
+            enum CodingKeys: String, CodingKey {
+                case password
+                case accountsData = "accounts_data"
+            }
+        }
+        for institution in institutions {
+            var password = institution.password
+            var accounts = institution.accounts
+            var migratedCount = 0
+            var lockedCount = 0
+            let passwordContext = VaultFieldContext(ownerUserID: owner, resourceType: "institution", resourceID: institution.id, fieldName: "password", keyVersion: snapshot.keyVersion)
+            switch migrateSecret(password, using: snapshot.key, context: passwordContext) {
+            case .migrated(let value): password = value; migratedCount += 1
+            case .locked: lockedCount += 1
+            case .unchanged: break
+            }
+            for index in accounts.indices {
+                let prefix = "accounts.\(accounts[index].id)"
+                let fields: [(String, WritableKeyPath<InstitutionAccount, String?>)] = [
+                    ("account_number", \.accountNumber),
+                    ("routing_number", \.routingNumber),
+                    ("wire_routing_number", \.wireRoutingNumber)
+                ]
+                for (field, keyPath) in fields {
+                    let context = VaultFieldContext(ownerUserID: owner, resourceType: "institution", resourceID: institution.id, fieldName: "\(prefix).\(field)", keyVersion: snapshot.keyVersion)
+                    switch migrateSecret(accounts[index][keyPath: keyPath], using: snapshot.key, context: context) {
+                    case .migrated(let value): accounts[index][keyPath: keyPath] = value; migratedCount += 1
+                    case .locked: lockedCount += 1
+                    case .unchanged: break
+                    }
+                }
+            }
+            report.skippedLockedFields += lockedCount
+            guard migratedCount > 0 else { continue }
+            do {
+                try await client.from("institutions")
+                    .update(InstitutionSecretsPatch(password: password, accountsData: accounts))
+                    .eq("id", value: institution.id)
+                    .eq("user_id", value: owner)
+                    .execute()
+                report.migratedFields += migratedCount
+            } catch {
+                report.failedRecords += 1
+                AppDiagnostics.failure("vault", "migrate_institution", error: error)
+            }
+        }
+        return report
+    }
+
+    private enum VaultSecretMigration {
+        case unchanged
+        case migrated(String)
+        case locked
+    }
+
+    private func migrateSecret(_ value: String?, using key: SymmetricKey, context: VaultFieldContext) -> VaultSecretMigration {
+        guard let value, !value.isEmpty else { return .unchanged }
+        if value.hasPrefix(SecurityService.vaultEnvelopePrefix) { return .unchanged }
+        let plaintext: String
+        if value.hasPrefix("enc:") {
+            guard let decrypted = SecurityService.shared.decryptLegacyStrict(value) else { return .locked }
+            plaintext = decrypted
+        } else {
+            plaintext = value
+        }
+        guard let encrypted = try? VaultCryptography.encryptField(plaintext, using: key, context: context) else {
+            return .locked
+        }
+        return .migrated(encrypted)
     }
     func deleteInstitution(_ id: UUID) async throws {
         struct Request: Encodable { let institution_id: UUID }
@@ -1227,6 +1434,17 @@ final class SecurityService {
         Self.encryptValue(string, using: symmetricKey)
     }
 
+    func encrypt(_ string: String?, context: VaultFieldContext?) -> String? {
+        guard let string, !string.isEmpty else { return string }
+        guard !Self.isLockedValue(string) else { return string }
+        guard let context,
+              let snapshot = VaultKeySession.shared.snapshot(for: context.ownerUserID),
+              snapshot.keyVersion == context.keyVersion else {
+            return encrypt(string)
+        }
+        return (try? VaultCryptography.encryptField(string, using: snapshot.key, context: context)) ?? string
+    }
+
     func decrypt(_ string: String?) -> String? {
         let value = Self.decryptValue(string, using: symmetricKey)
         if Self.isLockedValue(value) {
@@ -1235,6 +1453,21 @@ final class SecurityService {
             AppDiagnostics.event("encryption", "decrypt_protected_value", status: "locked")
         }
         return value
+    }
+
+    func decrypt(_ string: String?, context: VaultFieldContext?) -> String? {
+        guard let string else { return nil }
+        if string.hasPrefix(Self.vaultEnvelopePrefix) {
+            guard let context,
+                  let snapshot = VaultKeySession.shared.snapshot(for: context.ownerUserID),
+                  snapshot.keyVersion == context.keyVersion,
+                  let value = try? VaultCryptography.decryptField(string, using: snapshot.key, context: context) else {
+                AppDiagnostics.event("encryption", "decrypt_vault_value", status: "locked")
+                return string
+            }
+            return value
+        }
+        return decrypt(string)
     }
 
     static func isLockedValue(_ string: String?) -> Bool {
@@ -1271,6 +1504,398 @@ final class SecurityService {
         } catch {
             return string
         }
+    }
+
+    func decryptLegacyStrict(_ string: String) -> String? {
+        guard string.hasPrefix("enc:"), let key = symmetricKey else { return nil }
+        let decrypted = Self.decryptValue(string, using: key)
+        return decrypted == string ? nil : decrypted
+    }
+}
+
+final class VaultKeySession: @unchecked Sendable {
+    static let shared = VaultKeySession()
+
+    struct Snapshot {
+        let userID: UUID
+        let deviceID: UUID
+        let keyVersion: Int
+        let key: SymmetricKey
+    }
+
+    private let lock = NSLock()
+    private var current: Snapshot?
+
+    private init() {}
+
+    func install(userID: UUID, deviceID: UUID, keyVersion: Int, key: SymmetricKey) {
+        lock.lock()
+        current = Snapshot(userID: userID, deviceID: deviceID, keyVersion: keyVersion, key: key)
+        lock.unlock()
+    }
+
+    func snapshot(for userID: UUID) -> Snapshot? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard current?.userID == userID else { return nil }
+        return current
+    }
+
+    func clear() {
+        lock.lock()
+        current = nil
+        lock.unlock()
+    }
+}
+
+struct VaultAccountMetadata: Decodable {
+    let userID: UUID
+    let currentKeyVersion: Int
+
+    enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case currentKeyVersion = "current_key_version"
+    }
+}
+
+struct VaultDeviceRecord: Decodable, Identifiable, Equatable {
+    let deviceID: UUID
+    let label: String
+    let platform: String
+    let agreementPublicKey: String
+    let signingPublicKey: String
+    let status: String
+    let createdAt: Date?
+    let approvedAt: Date?
+    let revokedAt: Date?
+    let lastSeenAt: Date?
+
+    var id: UUID { deviceID }
+
+    enum CodingKeys: String, CodingKey {
+        case deviceID = "device_id"
+        case label, platform, status
+        case agreementPublicKey = "agreement_public_key"
+        case signingPublicKey = "signing_public_key"
+        case createdAt = "created_at"
+        case approvedAt = "approved_at"
+        case revokedAt = "revoked_at"
+        case lastSeenAt = "last_seen_at"
+    }
+}
+
+struct VaultDeviceWrapRecord: Decodable {
+    let deviceID: UUID
+    let keyVersion: Int
+    let ephemeralPublicKey: String
+    let wrappedKey: String
+
+    enum CodingKeys: String, CodingKey {
+        case deviceID = "device_id"
+        case keyVersion = "key_version"
+        case ephemeralPublicKey = "ephemeral_public_key"
+        case wrappedKey = "wrapped_key"
+    }
+}
+
+struct VaultRecoveryWrapRecord: Decodable {
+    let keyVersion: Int
+    let wrappedKey: String
+
+    enum CodingKeys: String, CodingKey {
+        case keyVersion = "key_version"
+        case wrappedKey = "wrapped_key"
+    }
+}
+
+struct VaultOverview {
+    let metadata: VaultAccountMetadata?
+    let devices: [VaultDeviceRecord]
+    let currentDevice: VaultDeviceRecord?
+    let isUnlocked: Bool
+}
+
+struct VaultMigrationReport: Equatable {
+    var migratedFields = 0
+    var skippedLockedFields = 0
+    var failedRecords = 0
+}
+
+final class VaultService: @unchecked Sendable {
+    static let shared = VaultService()
+
+    private var client: SupabaseClient { SupabaseService.shared.client }
+
+    private init() {}
+
+    func restoreSessionIfAvailable(for userID: UUID) async {
+        if VaultKeySession.shared.snapshot(for: userID) != nil { return }
+
+        do {
+            let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
+            let devices = try await listDevices()
+            guard let device = currentDevice(in: devices, identity: identity), device.status == "approved" else { return }
+            let wraps: [VaultDeviceWrapRecord] = try await client
+                .rpc("miloom_get_vault_device_wrap", params: ["p_device_id": device.deviceID.uuidString])
+                .execute().value
+            guard let wrap = wraps.first else { return }
+            let envelope = VaultDeviceKeyWrapEnvelope(
+                version: 1,
+                keyVersion: wrap.keyVersion,
+                ephemeralPublicKey: wrap.ephemeralPublicKey,
+                wrappedKey: wrap.wrappedKey
+            )
+            let key = try VaultCryptography.unwrapVaultKey(
+                envelope,
+                using: identity.agreementPrivateKey,
+                context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: device.deviceID, keyVersion: wrap.keyVersion)
+            )
+            VaultKeySession.shared.install(userID: userID, deviceID: device.deviceID, keyVersion: wrap.keyVersion, key: key)
+        } catch {
+            AppDiagnostics.failure("vault", "restore_device_key", error: error)
+        }
+    }
+
+    func overview() async throws -> VaultOverview {
+        let session = try await client.auth.session
+        let userID = session.user.id
+        let metadata: [VaultAccountMetadata] = try await client
+            .from("account_vaults")
+            .select("user_id,current_key_version")
+            .eq("user_id", value: userID)
+            .limit(1)
+            .execute().value
+        guard metadata.first != nil else {
+            VaultKeySession.shared.clear()
+            return VaultOverview(metadata: nil, devices: [], currentDevice: nil, isUnlocked: false)
+        }
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
+        let devices = try await listDevices()
+        await restoreSessionIfAvailable(for: userID)
+        let current = currentDevice(in: devices, identity: identity)
+        return VaultOverview(
+            metadata: metadata.first,
+            devices: devices,
+            currentDevice: current,
+            isUnlocked: VaultKeySession.shared.snapshot(for: userID) != nil
+        )
+    }
+
+    func bootstrap() async throws -> String {
+        let session = try await client.auth.refreshSession()
+        let userID = session.user.id
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
+        let deviceID = UUID()
+        let keyVersion = 1
+        let vaultKey = SymmetricKey(size: .bits256)
+        let recoveryCode = try VaultCryptography.generateRecoveryCode()
+        let deviceEnvelope = try VaultCryptography.wrapVaultKey(
+            vaultKey,
+            for: identity.publicKeys.agreementPublicKey,
+            context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: deviceID, keyVersion: keyVersion)
+        )
+        let recoveryEnvelope = try VaultCryptography.wrapVaultKeyForRecovery(
+            vaultKey,
+            recoveryCode: recoveryCode,
+            context: VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: keyVersion)
+        )
+        let confirmation = VaultCryptography.keyConfirmation(for: vaultKey)
+
+        struct Params: Encodable {
+            let p_device_id: UUID
+            let p_device_label: String
+            let p_platform: String
+            let p_agreement_public_key: String
+            let p_signing_public_key: String
+            let p_ephemeral_public_key: String
+            let p_wrapped_vault_key: String
+            let p_wrapped_recovery_key: String
+            let p_key_confirmation: String
+        }
+        let params = Params(
+            p_device_id: deviceID,
+            p_device_label: deviceLabel,
+            p_platform: "ios",
+            p_agreement_public_key: identity.publicKeys.agreementPublicKey,
+            p_signing_public_key: identity.publicKeys.signingPublicKey,
+            p_ephemeral_public_key: deviceEnvelope.ephemeralPublicKey,
+            p_wrapped_vault_key: deviceEnvelope.wrappedKey,
+            p_wrapped_recovery_key: recoveryEnvelope.wrappedKey,
+            p_key_confirmation: confirmation
+        )
+        try await client.rpc("miloom_bootstrap_account_vault_v2", params: params).execute()
+        VaultKeySession.shared.install(userID: userID, deviceID: deviceID, keyVersion: keyVersion, key: vaultKey)
+        return recoveryCode
+    }
+
+    func registerCurrentDevice() async throws {
+        let session = try await client.auth.refreshSession()
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)
+        let devices = try await listDevices()
+        guard currentDevice(in: devices, identity: identity) == nil else { return }
+        struct Params: Encodable {
+            let p_device_label: String
+            let p_platform: String
+            let p_agreement_public_key: String
+            let p_signing_public_key: String
+        }
+        try await client.rpc("miloom_register_vault_device", params: Params(
+            p_device_label: deviceLabel,
+            p_platform: "ios",
+            p_agreement_public_key: identity.publicKeys.agreementPublicKey,
+            p_signing_public_key: identity.publicKeys.signingPublicKey
+        )).execute()
+    }
+
+    func approve(device target: VaultDeviceRecord) async throws {
+        let session = try await client.auth.refreshSession()
+        let userID = session.user.id
+        guard let snapshot = VaultKeySession.shared.snapshot(for: userID) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
+        let devices = try await listDevices()
+        guard let actor = currentDevice(in: devices, identity: identity), actor.status == "approved",
+              target.status == "pending" else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        let envelope = try VaultCryptography.wrapVaultKey(
+            snapshot.key,
+            for: target.agreementPublicKey,
+            context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: target.deviceID, keyVersion: snapshot.keyVersion)
+        )
+        struct ChallengeParams: Encodable {
+            let p_actor_device_id: UUID
+            let p_target_device_id: UUID
+        }
+        struct Challenge: Decodable {
+            let challengeID: UUID
+            let nonce: String
+            let keyVersion: Int
+            enum CodingKeys: String, CodingKey {
+                case challengeID = "challenge_id"
+                case nonce
+                case keyVersion = "key_version"
+            }
+        }
+        let challenge: Challenge = try await client.rpc(
+            "miloom_create_vault_approval_challenge",
+            params: ChallengeParams(p_actor_device_id: actor.deviceID, p_target_device_id: target.deviceID)
+        ).execute().value
+        let payload = VaultCryptography.approvalChallenge(
+            userID: userID,
+            challengeID: challenge.challengeID,
+            actorDeviceID: actor.deviceID,
+            targetDeviceID: target.deviceID,
+            keyVersion: challenge.keyVersion,
+            nonce: challenge.nonce,
+            ephemeralPublicKey: envelope.ephemeralPublicKey,
+            wrappedVaultKey: envelope.wrappedKey
+        )
+        let signature = try VaultCryptography.sign(payload, using: identity).base64EncodedString()
+        struct ApprovalBody: Encodable {
+            let challenge_id: UUID
+            let actor_device_id: UUID
+            let target_device_id: UUID
+            let key_version: Int
+            let signature: String
+            let ephemeral_public_key: String
+            let wrapped_vault_key: String
+        }
+        let body = try JSONEncoder().encode(ApprovalBody(
+            challenge_id: challenge.challengeID,
+            actor_device_id: actor.deviceID,
+            target_device_id: target.deviceID,
+            key_version: challenge.keyVersion,
+            signature: signature,
+            ephemeral_public_key: envelope.ephemeralPublicKey,
+            wrapped_vault_key: envelope.wrappedKey
+        ))
+        let options = FunctionInvokeOptions(
+            method: .post,
+            headers: ["Content-Type": "application/json", "Authorization": "Bearer \(session.accessToken)"],
+            body: body
+        )
+        try await client.functions.invoke("approve-vault-device", options: options)
+    }
+
+    func recoverCurrentDevice(code: String) async throws {
+        let session = try await client.auth.refreshSession()
+        let userID = session.user.id
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
+        var devices = try await listDevices()
+        if currentDevice(in: devices, identity: identity) == nil {
+            try await registerCurrentDevice()
+            devices = try await listDevices()
+        }
+        guard let device = currentDevice(in: devices, identity: identity), device.status == "pending" else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        let metadata: [VaultAccountMetadata] = try await client
+            .from("account_vaults").select("user_id,current_key_version")
+            .eq("user_id", value: userID).limit(1).execute().value
+        guard let vault = metadata.first else { throw VaultCryptographyError.invalidEnvelope }
+        let wraps: [VaultRecoveryWrapRecord] = try await client
+            .from("vault_recovery_key_wraps")
+            .select("key_version,wrapped_key")
+            .eq("user_id", value: userID)
+            .eq("key_version", value: vault.currentKeyVersion)
+            .is("revoked_at", value: nil)
+            .limit(1).execute().value
+        guard let wrap = wraps.first else { throw VaultCryptographyError.invalidEnvelope }
+        let vaultKey = try VaultCryptography.unwrapVaultKeyFromRecovery(
+            VaultRecoveryKeyWrapEnvelope(version: 1, keyVersion: wrap.keyVersion, wrappedKey: wrap.wrappedKey),
+            recoveryCode: code.trimmingCharacters(in: .whitespacesAndNewlines),
+            context: VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: wrap.keyVersion)
+        )
+        let deviceEnvelope = try VaultCryptography.wrapVaultKey(
+            vaultKey,
+            for: identity.publicKeys.agreementPublicKey,
+            context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: device.deviceID, keyVersion: wrap.keyVersion)
+        )
+        struct Params: Encodable {
+            let p_device_id: UUID
+            let p_key_version: Int
+            let p_ephemeral_public_key: String
+            let p_wrapped_vault_key: String
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_recover_vault_device", params: Params(
+            p_device_id: device.deviceID,
+            p_key_version: wrap.keyVersion,
+            p_ephemeral_public_key: deviceEnvelope.ephemeralPublicKey,
+            p_wrapped_vault_key: deviceEnvelope.wrappedKey,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: vaultKey)
+        )).execute()
+        VaultKeySession.shared.install(userID: userID, deviceID: device.deviceID, keyVersion: wrap.keyVersion, key: vaultKey)
+    }
+
+    func migrateLegacySecrets() async throws -> VaultMigrationReport {
+        let userID = try await client.auth.session.user.id
+        guard let snapshot = VaultKeySession.shared.snapshot(for: userID) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        return try await DataRepository.shared.migrateLegacyVaultSecrets(snapshot: snapshot)
+    }
+
+    func listDevices() async throws -> [VaultDeviceRecord] {
+        try await client.rpc("miloom_list_vault_devices").execute().value
+    }
+
+    private func currentDevice(in devices: [VaultDeviceRecord], identity: VaultDeviceIdentity) -> VaultDeviceRecord? {
+        devices.first {
+            $0.agreementPublicKey == identity.publicKeys.agreementPublicKey
+                && $0.signingPublicKey == identity.publicKeys.signingPublicKey
+        }
+    }
+
+    private var deviceLabel: String {
+        #if canImport(UIKit)
+        let name = UIDevice.current.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return String((name.isEmpty ? "iPhone" : name).prefix(80))
+        #else
+        return "Apple Device"
+        #endif
     }
 }
 
@@ -1560,7 +2185,7 @@ enum VaultCryptography {
     }
 
     static func sign(_ challenge: Data, using identity: VaultDeviceIdentity) throws -> Data {
-        try identity.signingPrivateKey.signature(for: challenge).derRepresentation
+        try identity.signingPrivateKey.signature(for: challenge).rawRepresentation
     }
 
     static func verify(
@@ -1570,10 +2195,40 @@ enum VaultCryptography {
     ) -> Bool {
         guard let publicKeyData = Data(base64Encoded: signingPublicKeyBase64),
               let publicKey = try? P256.Signing.PublicKey(x963Representation: publicKeyData),
-              let signature = try? P256.Signing.ECDSASignature(derRepresentation: signature) else {
+              let signature = try? P256.Signing.ECDSASignature(rawRepresentation: signature) else {
             return false
         }
         return publicKey.isValidSignature(signature, for: challenge)
+    }
+
+    static func keyConfirmation(for vaultKey: SymmetricKey) -> String {
+        Data(HMAC<SHA256>.authenticationCode(
+            for: Data("miloom-vault-key-confirmation-v1".utf8),
+            using: vaultKey
+        )).base64EncodedString()
+    }
+
+    static func approvalChallenge(
+        userID: UUID,
+        challengeID: UUID,
+        actorDeviceID: UUID,
+        targetDeviceID: UUID,
+        keyVersion: Int,
+        nonce: String,
+        ephemeralPublicKey: String,
+        wrappedVaultKey: String
+    ) -> Data {
+        Data([
+            "miloom-vault-approval-v1",
+            userID.uuidString.lowercased(),
+            challengeID.uuidString.lowercased(),
+            actorDeviceID.uuidString.lowercased(),
+            targetDeviceID.uuidString.lowercased(),
+            String(keyVersion),
+            nonce,
+            ephemeralPublicKey,
+            wrappedVaultKey
+        ].joined(separator: "|").utf8)
     }
 
     private static func decodeRecoveryCode(_ code: String) throws -> Data {

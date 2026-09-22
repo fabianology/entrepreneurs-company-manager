@@ -1,5 +1,6 @@
 import SwiftUI
 import Supabase
+import LocalAuthentication
 
 private struct AdminProButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
@@ -31,6 +32,7 @@ struct AdminSettingsView: View {
     @State private var showingLinkedAccounts: Bool = false
     @State private var showingCollaborators: Bool = false
     @State private var showingActiveSessions: Bool = false
+    @State private var showingVaultSecurity: Bool = false
     
     private var activeInstitutions: [Institution] {
         let linkedInstitutionIds = Set(
@@ -368,6 +370,40 @@ struct AdminSettingsView: View {
                     // Linked Accounts
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingVaultSecurity = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "key.viewfinder")
+                                .foregroundStyle(Color.zifrGold)
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 44, height: 44)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("PASSWORD VAULT")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Encryption, recovery, and trusted devices")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .padding(.leading, 8)
+                        }
+                        .padding(16)
+                        .zifrCardBox(cornerRadius: 24)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .accessibilityHint("Opens password encryption and trusted device settings")
+
+                    // Linked Accounts
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         showingLinkedAccounts = true
                     } label: {
                         HStack {
@@ -604,6 +640,9 @@ struct AdminSettingsView: View {
             ActiveSessionsSheet()
                 .environment(authVM)
         }
+        .sheet(isPresented: $showingVaultSecurity) {
+            VaultSecuritySheet()
+        }
     }
 }
 
@@ -664,6 +703,418 @@ struct ToggleRow: View {
         .padding(.horizontal, 20)
         .frame(height: 56)
         .background(Color.clear)
+    }
+}
+
+private enum VaultPresenceError: LocalizedError {
+    case unavailable
+    case notConfirmed
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable: return "Face ID or your device passcode is required to manage the vault."
+        case .notConfirmed: return "Your identity wasn’t confirmed. No vault changes were made."
+        }
+    }
+}
+
+@MainActor
+@Observable
+private final class VaultSecurityController {
+    var overview: VaultOverview?
+    var isLoading = false
+    var activeOperation: String?
+    var errorMessage: String?
+    var recoveryCode: String?
+    var recoveryInput = ""
+    var migrationReport: VaultMigrationReport?
+
+    var isInitialized: Bool { overview?.metadata != nil }
+    var isUnlocked: Bool { overview?.isUnlocked == true }
+    var currentDevice: VaultDeviceRecord? { overview?.currentDevice }
+    var pendingDevices: [VaultDeviceRecord] {
+        overview?.devices.filter { $0.status == "pending" && $0.id != currentDevice?.id } ?? []
+    }
+
+    func load() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            overview = try await VaultService.shared.overview()
+        } catch {
+            AppDiagnostics.failure("vault", "load_settings", error: error)
+            errorMessage = "Vault security couldn’t be loaded. Check your connection and try again."
+        }
+    }
+
+    func setup() async {
+        await perform("Setting Up Vault…", reason: "Set up encrypted password syncing for your Miloom account.") {
+            let code = try await VaultService.shared.bootstrap()
+            self.recoveryCode = code
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
+    func requestAccess() async {
+        await perform("Requesting Access…", reason: "Register this device with your encrypted password vault.") {
+            try await VaultService.shared.registerCurrentDevice()
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
+    func recover() async {
+        guard !recoveryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Enter the recovery code you saved when the vault was created."
+            return
+        }
+        await perform("Recovering Vault…", reason: "Use your recovery code to unlock encrypted passwords on this device.") {
+            try await VaultService.shared.recoverCurrentDevice(code: self.recoveryInput)
+            self.recoveryInput = ""
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
+    func approve(_ device: VaultDeviceRecord) async {
+        await perform("Approving Device…", reason: "Approve \(device.label) to decrypt your Miloom passwords.") {
+            try await VaultService.shared.approve(device: device)
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
+    @discardableResult
+    func migrate() async -> Bool {
+        var completed = false
+        await perform("Encrypting Existing Passwords…", reason: "Encrypt existing passwords with your synced Miloom vault key.") {
+            self.migrationReport = try await VaultService.shared.migrateLegacySecrets()
+            completed = true
+        }
+        return completed
+    }
+
+    private func perform(_ operation: String, reason: String, work: () async throws -> Void) async {
+        activeOperation = operation
+        errorMessage = nil
+        defer { activeOperation = nil }
+        do {
+            try await confirmUserPresence(reason: reason)
+            try await work()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch let error as VaultPresenceError {
+            errorMessage = error.localizedDescription
+        } catch {
+            AppDiagnostics.failure("vault", operation, error: error)
+            errorMessage = friendlyMessage(for: error)
+        }
+    }
+
+    private func confirmUserPresence(reason: String) async throws {
+        let context = LAContext()
+        context.localizedCancelTitle = "Cancel"
+        var policyError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
+            throw VaultPresenceError.unavailable
+        }
+        guard try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) else {
+            throw VaultPresenceError.notConfirmed
+        }
+    }
+
+    private func friendlyMessage(for error: Error) -> String {
+        if case VaultCryptographyError.invalidRecoveryCode = error {
+            return "That recovery code isn’t valid. Check the complete code and try again."
+        }
+        if case VaultCryptographyError.authenticationFailed = error {
+            return "The vault couldn’t verify that key. No passwords were changed."
+        }
+        return "The vault change couldn’t be completed. Check your connection and try again."
+    }
+}
+
+private struct VaultSecuritySheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    @State private var controller = VaultSecurityController()
+    @State private var showingMigrationConfirmation = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    statusCard
+
+                    if let recoveryCode = controller.recoveryCode {
+                        recoveryCodeCard(recoveryCode)
+                    }
+
+                    if controller.isInitialized && !controller.isUnlocked {
+                        deviceAccessCard
+                        recoveryCard
+                    }
+
+                    if controller.isUnlocked {
+                        trustedDevicesCard
+                        migrationCard
+                    }
+
+                    ZifrSheetCard(title: "ZERO-KNOWLEDGE SECURITY", icon: "lock.shield.fill") {
+                        Text("Miloom stores encrypted vault-key wraps and public device keys. Your recovery code and plaintext vault key stay off the server.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.58))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle("Password Vault")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Password Vault")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.zifrGold)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+            .overlay {
+                if let operation = controller.activeOperation {
+                    ZStack {
+                        Color.black.opacity(0.32).ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            ProgressView().tint(Color.zifrGold)
+                            Text(operation)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 20)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(operation)
+                }
+            }
+        }
+        .task { await controller.load() }
+        .refreshable { await controller.load() }
+        .alert("Vault Security", isPresented: Binding(
+            get: { controller.errorMessage != nil },
+            set: { if !$0 { controller.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { controller.errorMessage = nil }
+        } message: {
+            Text(controller.errorMessage ?? "")
+        }
+        .confirmationDialog("Encrypt Existing Passwords?", isPresented: $showingMigrationConfirmation, titleVisibility: .visible) {
+            Button("Encrypt Existing Passwords") {
+                Task {
+                    if await controller.migrate() {
+                        await DataRepository.shared.fetchAllData(appState: appState)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Miloom will migrate passwords this device can read. Locked legacy values will be skipped and never overwritten.")
+        }
+        .presentationDetents([.fraction(0.9), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+    }
+
+    @ViewBuilder
+    private var statusCard: some View {
+        ZifrSheetCard(title: "VAULT STATUS", icon: "key.viewfinder") {
+            if controller.isLoading && controller.overview == nil {
+                HStack(spacing: 12) {
+                    ProgressView().tint(Color.zifrGold)
+                    Text("Checking vault security…").foregroundStyle(.secondary)
+                }
+                .frame(minHeight: 52)
+            } else if !controller.isInitialized {
+                VStack(alignment: .leading, spacing: 14) {
+                    Label("Not set up", systemImage: "lock.open")
+                        .font(.headline)
+                        .foregroundStyle(Color.zifrGold)
+                    Text("Create an account vault to sync encrypted passwords across devices without sending the plaintext key to Miloom.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Set Up Synced Vault") { Task { await controller.setup() } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.zifrGold)
+                        .foregroundStyle(Color.black)
+                        .controlSize(.large)
+                }
+            } else {
+                HStack(spacing: 14) {
+                    Image(systemName: controller.isUnlocked ? "lock.shield.fill" : "lock.trianglebadge.exclamationmark")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(controller.isUnlocked ? Color.green : Color.orange)
+                        .frame(width: 44, height: 44)
+                        .background(.thinMaterial, in: Circle())
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(controller.isUnlocked ? "Vault Unlocked" : "This Device Needs Access")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                        Text(controller.isUnlocked ? "Passwords use your synced account key" : "Approve this device or use recovery")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    private func recoveryCodeCard(_ code: String) -> some View {
+        ZifrSheetCard(title: "SAVE YOUR RECOVERY CODE", icon: "exclamationmark.shield.fill") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("This code is shown once. Store it in a trusted password manager before continuing.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text(code)
+                    .font(.system(.footnote, design: .monospaced, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .textSelection(.enabled)
+                    .privacySensitive()
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                Button {
+                    UIPasteboard.general.string = code
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                } label: {
+                    Label("Copy Recovery Code", systemImage: "doc.on.doc")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(Color.zifrGold)
+                Button("I Saved This Code") { controller.recoveryCode = nil }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.zifrGold)
+                    .foregroundStyle(Color.black)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var deviceAccessCard: some View {
+        ZifrSheetCard(title: "THIS DEVICE", icon: "iphone") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let device = controller.currentDevice {
+                    Label(device.status == "pending" ? "Approval requested" : device.status.capitalized, systemImage: "clock.badge.exclamationmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.orange)
+                    Text("Approve \(device.label) from an already trusted device, or use your recovery code below.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Register this iPhone so a trusted device can approve it.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Request Device Access") { Task { await controller.requestAccess() } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.zifrGold)
+                        .foregroundStyle(Color.black)
+                        .controlSize(.large)
+                }
+            }
+        }
+    }
+
+    private var recoveryCard: some View {
+        ZifrSheetCard(title: "RECOVER ACCESS", icon: "lifepreserver.fill") {
+            VStack(spacing: 12) {
+                TextField("Recovery code", text: $controller.recoveryInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.system(.body, design: .monospaced))
+                    .textContentType(.oneTimeCode)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 48)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .privacySensitive()
+                Button("Recover This Device") { Task { await controller.recover() } }
+                    .buttonStyle(.bordered)
+                    .tint(Color.zifrGold)
+                    .controlSize(.large)
+                    .disabled(controller.recoveryInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+    }
+
+    private var trustedDevicesCard: some View {
+        ZifrSheetCard(title: "TRUSTED DEVICES", icon: "laptopcomputer.and.iphone") {
+            VStack(spacing: 0) {
+                ForEach(controller.overview?.devices ?? []) { device in
+                    HStack(spacing: 12) {
+                        Image(systemName: device.id == controller.currentDevice?.id ? "iphone.gen3" : "iphone")
+                            .foregroundStyle(device.status == "approved" ? Color.zifrGold : Color.orange)
+                            .frame(width: 30)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(device.label)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text(device.id == controller.currentDevice?.id ? "This device" : device.status.capitalized)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if device.status == "pending" {
+                            Button("Approve") { Task { await controller.approve(device) } }
+                                .buttonStyle(.bordered)
+                                .tint(Color.zifrGold)
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundStyle(Color.green)
+                                .accessibilityLabel("Approved")
+                        }
+                    }
+                    .frame(minHeight: 56)
+                    if device.id != controller.overview?.devices.last?.id {
+                        Divider().background(Color.white.opacity(0.1)).padding(.leading, 42)
+                    }
+                }
+            }
+        }
+    }
+
+    private var migrationCard: some View {
+        ZifrSheetCard(title: "ENCRYPTION MIGRATION", icon: "arrow.triangle.2.circlepath") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let report = controller.migrationReport {
+                    Label("\(report.migratedFields) field\(report.migratedFields == 1 ? "" : "s") encrypted", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.green)
+                    if report.skippedLockedFields > 0 {
+                        Text("\(report.skippedLockedFields) locked legacy field\(report.skippedLockedFields == 1 ? " was" : "s were") left unchanged.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if report.failedRecords > 0 {
+                        Text("\(report.failedRecords) record\(report.failedRecords == 1 ? "" : "s") couldn’t be updated. You can safely retry.")
+                            .font(.caption)
+                            .foregroundStyle(Color.orange)
+                    }
+                } else {
+                    Text("Move readable legacy passwords and account numbers to record-bound account encryption. Values locked to another device are preserved.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Encrypt Existing Passwords") { showingMigrationConfirmation = true }
+                    .buttonStyle(.bordered)
+                    .tint(Color.zifrGold)
+                    .controlSize(.large)
+            }
+        }
     }
 }
 

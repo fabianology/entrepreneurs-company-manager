@@ -413,6 +413,60 @@ final class PremiumEngineTests: XCTestCase {
             challenge: Data("approve-device|nonce-2".utf8),
             signingPublicKeyBase64: identity.publicKeys.signingPublicKey
         ))
+        XCTAssertEqual(signature.count, 64, "Edge WebCrypto verification requires the P-256 raw signature format")
+    }
+
+    func testVaultApprovalChallengeIsCanonicalAndKeyConfirmationIsStable() {
+        let key = SymmetricKey(data: Data(repeating: 0x42, count: 32))
+        XCTAssertEqual(
+            VaultCryptography.keyConfirmation(for: key),
+            VaultCryptography.keyConfirmation(for: key)
+        )
+        XCTAssertNotEqual(
+            VaultCryptography.keyConfirmation(for: key),
+            VaultCryptography.keyConfirmation(for: SymmetricKey(data: Data(repeating: 0x43, count: 32)))
+        )
+
+        let payload = VaultCryptography.approvalChallenge(
+            userID: UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!,
+            challengeID: UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!,
+            actorDeviceID: UUID(uuidString: "CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC")!,
+            targetDeviceID: UUID(uuidString: "DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD")!,
+            keyVersion: 2,
+            nonce: "nonce",
+            ephemeralPublicKey: "ephemeral",
+            wrappedVaultKey: "wrapped"
+        )
+        XCTAssertEqual(
+            String(decoding: payload, as: UTF8.self),
+            "miloom-vault-approval-v1|aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa|bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb|cccccccc-cccc-cccc-cccc-cccccccccccc|dddddddd-dddd-dddd-dddd-dddddddddddd|2|nonce|ephemeral|wrapped"
+        )
+    }
+
+    func testSecurityServiceUsesOnlyTheActiveOwnersVaultSession() throws {
+        let owner = UUID()
+        let device = UUID()
+        let key = SymmetricKey(size: .bits256)
+        let context = VaultFieldContext(
+            ownerUserID: owner,
+            resourceType: "subscription",
+            resourceID: UUID(),
+            fieldName: "password",
+            keyVersion: 1
+        )
+        VaultKeySession.shared.install(userID: owner, deviceID: device, keyVersion: 1, key: key)
+        defer { VaultKeySession.shared.clear() }
+
+        let encrypted = try XCTUnwrap(SecurityService.shared.encrypt("secret", context: context))
+        XCTAssertTrue(encrypted.hasPrefix(SecurityService.vaultEnvelopePrefix))
+        XCTAssertEqual(SecurityService.shared.decrypt(encrypted, context: context), "secret")
+
+        VaultKeySession.shared.clear()
+        XCTAssertEqual(
+            SecurityService.shared.decrypt(encrypted, context: context),
+            encrypted,
+            "A vault envelope must remain locked when its owner's key is not active"
+        )
     }
 
     private func keyData(_ key: SymmetricKey) -> Data {

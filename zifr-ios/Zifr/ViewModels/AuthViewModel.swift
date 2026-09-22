@@ -186,6 +186,7 @@ final class AuthViewModel: NSObject {
         activeSessions = []
         activeSessionsError = nil
         activeSessionsNotice = nil
+        VaultKeySession.shared.clear()
         UserDefaults.standard.removeObject(forKey: "onboardingStep")
     }
     
@@ -199,6 +200,7 @@ final class AuthViewModel: NSObject {
                 self.isBiometricEnabled = false
                 self.hasCachedSession = false
                 self.isAuthenticated = false
+                VaultKeySession.shared.clear()
                 UserDefaults.standard.removeObject(forKey: "onboardingStep")
                 self.isLoading = false
             }

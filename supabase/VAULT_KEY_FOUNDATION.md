@@ -3,6 +3,12 @@
 Phase: Collaboration and Vault Phase 3
 Date: 2026-09-21
 
+Phase 4 now builds on this foundation. See `VAULT_PHASE4.md`. The original
+`miloom_bootstrap_account_vault` RPC is revoked by Phase 4 because a
+server-generated device id cannot be included in the client-side wrap's
+authenticated context; clients must use the v2 bootstrap with a client-generated
+device id.
+
 Migration: `migrations/202609210004_vault_key_foundation.sql`
 
 ## Boundary
