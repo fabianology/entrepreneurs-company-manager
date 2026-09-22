@@ -148,6 +148,40 @@ class DataRepository {
         }
     }
 
+    // The newer backend returns owner records intact and collaborator records
+    // with credential fields redacted. Fall back only while that RPC has not
+    // been deployed; a permission or network failure must not widen access.
+    private func isMissingVisibleRecordsRPC(_ error: Error) -> Bool {
+        (error as? PostgrestError)?.code == "PGRST202"
+    }
+
+    private func fetchVisibleSubscriptions() async throws -> [Subscription] {
+        do {
+            return try await client.rpc("miloom_visible_subscriptions").execute().value
+        } catch {
+            guard isMissingVisibleRecordsRPC(error) else { throw error }
+            return try await client.from("subscriptions").select().execute().value
+        }
+    }
+
+    private func fetchVisibleCards() async throws -> [FinancialCard] {
+        do {
+            return try await client.rpc("miloom_visible_financial_cards").execute().value
+        } catch {
+            guard isMissingVisibleRecordsRPC(error) else { throw error }
+            return try await client.from("financial_cards").select().execute().value
+        }
+    }
+
+    private func fetchVisibleInstitutions() async throws -> [Institution] {
+        do {
+            return try await client.rpc("miloom_visible_institutions").execute().value
+        } catch {
+            guard isMissingVisibleRecordsRPC(error) else { throw error }
+            return try await client.from("institutions").select().execute().value
+        }
+    }
+
     func fetchAlertRules() async throws -> [AlertRule] {
         let rules: [AlertRule] = try await client
             .from("alert_rules")
@@ -191,9 +225,9 @@ class DataRepository {
             appState.portfolioLoadIssue = "Companies could not be refreshed. Pull down to try again."
         }
 
-        async let fSubscriptions: [Subscription] = measure("subscriptions") { await searchLoad("services", failures: searchLoadFailures) { try await client.from("subscriptions").select().execute().value } }
-        async let fInstitutions: [Institution] = measure("institutions") { await searchLoad("bank accounts", failures: searchLoadFailures) { try await client.from("institutions").select().execute().value } }
-        async let fCards: [FinancialCard] = measure("cards") { await searchLoad("cards", failures: searchLoadFailures) { try await client.from("financial_cards").select().execute().value } }
+        async let fSubscriptions: [Subscription] = measure("subscriptions") { await searchLoad("services", failures: searchLoadFailures) { try await fetchVisibleSubscriptions() } }
+        async let fInstitutions: [Institution] = measure("institutions") { await searchLoad("bank accounts", failures: searchLoadFailures) { try await fetchVisibleInstitutions() } }
+        async let fCards: [FinancialCard] = measure("cards") { await searchLoad("cards", failures: searchLoadFailures) { try await fetchVisibleCards() } }
         async let fLoans: [Loan] = measure("loans") { await searchLoad("loans", failures: searchLoadFailures) { try await client.from("loans").select().execute().value } }
         async let fLoanPayments: [LoanPayment] = measure("loan_payments") { await searchLoad("loan payments", failures: searchLoadFailures) { try await client.from("loan_payments").select().execute().value } }
         async let fDocuments: [CompanyDocument] = measure("documents") { await searchLoad("documents", failures: searchLoadFailures) { try await client.from("company_documents").select().execute().value } }
@@ -582,7 +616,8 @@ class DataRepository {
         let session = try? await client.auth.session
         var secureSub = sub
         if let session, sub.userId != session.user.id {
-            secureSub.password = try await storedPassword(table: "subscriptions", id: sub.id)
+            // The backend preserves owner credentials on collaborator edits.
+            secureSub.password = nil
         } else {
             secureSub.password = SecurityService.shared.encrypt(secureSub.password, context: vaultContext(owner: sub.userId, type: "subscription", id: sub.id, field: "password"))
         }
@@ -611,7 +646,7 @@ class DataRepository {
         let session = try? await client.auth.session
         var secureCard = card
         if let session, card.userId != session.user.id {
-            secureCard.password = try await storedPassword(table: "financial_cards", id: card.id)
+            secureCard.password = nil
         } else {
             secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
         }
@@ -629,11 +664,25 @@ class DataRepository {
     func upsertCard(_ card: FinancialCard) async throws {
         var secureCard = card
         if let session = try? await client.auth.session, card.userId != session.user.id {
-            secureCard.password = try await storedPassword(table: "financial_cards", id: card.id)
+            secureCard.password = nil
         } else {
             secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
         }
-        try await client.from("financial_cards").upsert(secureCard).execute()
+        // INSERT ... ON CONFLICT DO UPDATE needs SELECT grants for every
+        // updated column, including credentials. Keep those grants closed.
+        let updated: [MutationReceipt] = try await client.from("financial_cards")
+            .update(secureCard).eq("id", value: card.id).select("id").execute().value
+        if !updated.isEmpty {
+            try requireUpdatedRow(updated, resource: "card")
+            return
+        }
+        do {
+            try await client.from("financial_cards").insert(secureCard).execute()
+        } catch let error as PostgrestError where error.code == "23505" {
+            let retry: [MutationReceipt] = try await client.from("financial_cards")
+                .update(secureCard).eq("id", value: card.id).select("id").execute().value
+            try requireUpdatedRow(retry, resource: "card")
+        }
     }
     func deleteCard(_ id: UUID) async throws {
         try await client.from("financial_cards").delete().eq("id", value: id).execute()
@@ -670,27 +719,23 @@ class DataRepository {
         } else {
             secureInst = encryptInstitutionSecrets(inst)
         }
-        try await client.from("institutions").upsert(secureInst).execute()
-    }
-
-    private struct StoredPassword: Decodable { let password: String? }
-
-    private func storedPassword(table: String, id: UUID) async throws -> String? {
-        let rows: [StoredPassword] = try await client.from(table)
-            .select("password")
-            .eq("id", value: id)
-            .limit(1)
-            .execute().value
-        return rows.first?.password
+        let updated: [MutationReceipt] = try await client.from("institutions")
+            .update(secureInst).eq("id", value: inst.id).select("id").execute().value
+        if !updated.isEmpty {
+            try requireUpdatedRow(updated, resource: "bank")
+            return
+        }
+        do {
+            try await client.from("institutions").insert(secureInst).execute()
+        } catch let error as PostgrestError where error.code == "23505" {
+            let retry: [MutationReceipt] = try await client.from("institutions")
+                .update(secureInst).eq("id", value: inst.id).select("id").execute().value
+            try requireUpdatedRow(retry, resource: "bank")
+        }
     }
 
     private func preservingStoredInstitutionSecrets(in proposed: Institution) async throws -> Institution {
-        let rows: [Institution] = try await client.from("institutions")
-            .select()
-            .eq("id", value: proposed.id)
-            .limit(1)
-            .execute().value
-        guard let stored = rows.first else { return proposed }
+        guard let stored = try await fetchVisibleInstitutions().first(where: { $0.id == proposed.id }) else { return proposed }
         let storedAccounts = stored.accounts.reduce(into: [String: InstitutionAccount]()) { result, account in
             if result[account.id] == nil { result[account.id] = account }
         }
@@ -748,9 +793,9 @@ class DataRepository {
 
     func migrateLegacyVaultSecrets(snapshot: VaultKeySession.Snapshot) async throws -> VaultMigrationReport {
         let owner = snapshot.userID
-        let subscriptions: [Subscription] = try await client.from("subscriptions").select().eq("user_id", value: owner).execute().value
-        let cards: [FinancialCard] = try await client.from("financial_cards").select().eq("user_id", value: owner).execute().value
-        let institutions: [Institution] = try await client.from("institutions").select().eq("user_id", value: owner).execute().value
+        let subscriptions = try await fetchVisibleSubscriptions().filter { $0.userId == owner }
+        let cards = try await fetchVisibleCards().filter { $0.userId == owner }
+        let institutions = try await fetchVisibleInstitutions().filter { $0.userId == owner }
         var report = VaultMigrationReport()
 
         struct PasswordPatch: Encodable { let password: String }
@@ -847,9 +892,9 @@ class DataRepository {
         fromKeyVersion: Int
     ) async throws -> VaultMigrationReport {
         let owner = snapshot.userID
-        let subscriptions: [Subscription] = try await client.from("subscriptions").select().eq("user_id", value: owner).execute().value
-        let cards: [FinancialCard] = try await client.from("financial_cards").select().eq("user_id", value: owner).execute().value
-        let institutions: [Institution] = try await client.from("institutions").select().eq("user_id", value: owner).execute().value
+        let subscriptions = try await fetchVisibleSubscriptions().filter { $0.userId == owner }
+        let cards = try await fetchVisibleCards().filter { $0.userId == owner }
+        let institutions = try await fetchVisibleInstitutions().filter { $0.userId == owner }
         var report = VaultMigrationReport()
 
         struct PasswordPatch: Encodable { let password: String }
