@@ -782,6 +782,38 @@ private final class VaultSecurityController {
         }
     }
 
+    func revoke(_ device: VaultDeviceRecord) async {
+        await perform(
+            device.status == "pending" ? "Canceling Request…" : "Revoking Device & Rotating Key…",
+            reason: device.status == "pending"
+                ? "Cancel the vault access request from \(device.label)."
+                : "Revoke \(device.label) and rotate encryption for your remaining trusted devices."
+        ) {
+            if device.status == "pending" {
+                try await VaultService.shared.cancelPendingDevice(device)
+            } else {
+                let result = try await VaultService.shared.revokeAndRotate(device: device)
+                self.recoveryCode = result.recoveryCode
+                self.migrationReport = result.report
+            }
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
+    func rotateRecoveryCode() async {
+        await perform("Rotating Recovery Code…", reason: "Replace your Miloom vault recovery code.") {
+            self.recoveryCode = try await VaultService.shared.rotateRecoveryCode()
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
+    func resumeRotation() async {
+        await perform("Finishing Key Rotation…", reason: "Finish re-encrypting records after device revocation.") {
+            self.migrationReport = try await VaultService.shared.resumeRotation()
+            self.overview = try await VaultService.shared.overview()
+        }
+    }
+
     @discardableResult
     func migrate() async -> Bool {
         var completed = false
@@ -836,6 +868,7 @@ private struct VaultSecuritySheet: View {
     @Environment(AppState.self) private var appState
     @State private var controller = VaultSecurityController()
     @State private var showingMigrationConfirmation = false
+    @State private var deviceToRevoke: VaultDeviceRecord?
 
     var body: some View {
         NavigationStack {
@@ -855,6 +888,8 @@ private struct VaultSecuritySheet: View {
                     if controller.isUnlocked {
                         trustedDevicesCard
                         migrationCard
+                        auditCard
+                        secretSharingBoundaryCard
                     }
 
                     ZifrSheetCard(title: "ZERO-KNOWLEDGE SECURITY", icon: "lock.shield.fill") {
@@ -924,6 +959,18 @@ private struct VaultSecuritySheet: View {
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("Miloom will migrate passwords this device can read. Locked legacy values will be skipped and never overwritten.")
+        }
+        .alert(item: $deviceToRevoke) { device in
+            Alert(
+                title: Text(device.status == "pending" ? "Cancel Device Request?" : "Revoke \(device.label)?"),
+                message: Text(device.status == "pending"
+                    ? "This pending device will need to request access again."
+                    : "Miloom will revoke this device, end its linked sign-in session, rotate the account vault key, rewrap it for remaining devices, and re-encrypt protected records. Existing access tokens may remain valid briefly, and this cannot erase passwords the device already viewed."),
+                primaryButton: .destructive(Text(device.status == "pending" ? "Cancel Request" : "Revoke & Rotate")) {
+                    Task { await controller.revoke(device) }
+                },
+                secondaryButton: .cancel()
+            )
         }
         .presentationDetents([.fraction(0.9), .large])
         .presentationDragIndicator(.visible)
@@ -1069,14 +1116,33 @@ private struct VaultSecuritySheet: View {
                         }
                         Spacer()
                         if device.status == "pending" {
-                            Button("Approve") { Task { await controller.approve(device) } }
+                            HStack(spacing: 8) {
+                                Button("Approve") { Task { await controller.approve(device) } }
+                                    .buttonStyle(.bordered)
+                                    .tint(Color.zifrGold)
+                                    .controlSize(.small)
+                                Button(role: .destructive) { deviceToRevoke = device } label: {
+                                    Image(systemName: "xmark")
+                                        .frame(width: 30, height: 30)
+                                }
                                 .buttonStyle(.bordered)
-                                .tint(Color.zifrGold)
-                                .controlSize(.small)
-                        } else {
+                                .accessibilityLabel("Cancel access request for \(device.label)")
+                            }
+                        } else if device.status == "approved" && device.id != controller.currentDevice?.id {
+                            Button(role: .destructive) { deviceToRevoke = device } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 32, height: 32)
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("Revoke \(device.label)")
+                        } else if device.status == "approved" {
                             Image(systemName: "checkmark.seal.fill")
                                 .foregroundStyle(Color.green)
                                 .accessibilityLabel("Approved")
+                        } else {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel("Revoked")
                         }
                     }
                     .frame(minHeight: 56)
@@ -1113,7 +1179,88 @@ private struct VaultSecuritySheet: View {
                     .buttonStyle(.bordered)
                     .tint(Color.zifrGold)
                     .controlSize(.large)
+                if controller.overview?.metadata?.rotationStatus == "migrating" {
+                    Button("Resume Key Rotation") { Task { await controller.resumeRotation() } }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Color.orange)
+                        .controlSize(.large)
+                    Text("The previous key remains encrypted under the current key until every old-version vault field has migrated.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button("Replace Recovery Code") { Task { await controller.rotateRecoveryCode() } }
+                    .buttonStyle(.bordered)
+                    .tint(Color.zifrGold)
+                    .controlSize(.large)
             }
+        }
+    }
+
+    private var auditCard: some View {
+        ZifrSheetCard(title: "VAULT ACTIVITY", icon: "clock.arrow.circlepath") {
+            if controller.overview?.auditEvents.isEmpty != false {
+                Text("No vault security activity yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(controller.overview?.auditEvents.prefix(8).map { $0 } ?? []) { event in
+                        HStack(spacing: 12) {
+                            Image(systemName: auditIcon(event.eventType))
+                                .foregroundStyle(Color.zifrGold)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(auditTitle(event.eventType))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                Text(event.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .frame(minHeight: 52)
+                    }
+                }
+            }
+        }
+    }
+
+    private var secretSharingBoundaryCard: some View {
+        ZifrSheetCard(title: "COLLABORATOR SECRET ACCESS", icon: "person.2.fill") {
+            Label {
+                Text("Company and resource sharing never includes passwords or account numbers. A future secret grant must be separate, resource-specific, and explicitly confirmed.")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.58))
+                    .fixedSize(horizontal: false, vertical: true)
+            } icon: {
+                Image(systemName: "hand.raised.fill")
+                    .foregroundStyle(Color.zifrGold)
+            }
+        }
+    }
+
+    private func auditTitle(_ type: String) -> String {
+        switch type {
+        case "vault_bootstrapped": return "Vault created"
+        case "device_registration_requested": return "Device access requested"
+        case "device_approved": return "Device approved"
+        case "device_revoked": return "Device revoked"
+        case "recovery_device_approved": return "Device recovered"
+        case "recovery_rotated": return "Recovery code replaced"
+        case "vault_key_rotated": return "Vault key rotated"
+        case "vault_rotation_completed": return "Key rotation completed"
+        default: return "Vault security updated"
+        }
+    }
+
+    private func auditIcon(_ type: String) -> String {
+        switch type {
+        case "device_revoked": return "iphone.slash"
+        case "recovery_rotated": return "lifepreserver"
+        case "vault_key_rotated", "vault_rotation_completed": return "arrow.triangle.2.circlepath"
+        case "device_approved", "recovery_device_approved": return "checkmark.shield.fill"
+        default: return "lock.shield.fill"
         }
     }
 }

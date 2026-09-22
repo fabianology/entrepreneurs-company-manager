@@ -807,10 +807,123 @@ class DataRepository {
         return report
     }
 
+    func rotateVaultSecrets(
+        snapshot: VaultKeySession.Snapshot,
+        fromKeyVersion: Int
+    ) async throws -> VaultMigrationReport {
+        let owner = snapshot.userID
+        let subscriptions: [Subscription] = try await client.from("subscriptions").select().eq("user_id", value: owner).execute().value
+        let cards: [FinancialCard] = try await client.from("financial_cards").select().eq("user_id", value: owner).execute().value
+        let institutions: [Institution] = try await client.from("institutions").select().eq("user_id", value: owner).execute().value
+        var report = VaultMigrationReport()
+
+        struct PasswordPatch: Encodable { let password: String }
+        for subscription in subscriptions {
+            let context = VaultFieldContext(ownerUserID: owner, resourceType: "subscription", resourceID: subscription.id, fieldName: "password", keyVersion: snapshot.keyVersion)
+            switch rotateSecret(subscription.password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
+            case .migrated(let value):
+                do {
+                    try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).execute()
+                    report.migratedFields += 1
+                } catch {
+                    report.failedRecords += 1
+                    report.remainingOldVaultFields += 1
+                    AppDiagnostics.failure("vault", "rotate_subscription", error: error)
+                }
+            case .oldVaultLocked: report.remainingOldVaultFields += 1
+            case .legacyLocked: report.skippedLockedFields += 1
+            case .unchanged: break
+            }
+        }
+
+        for card in cards {
+            let context = VaultFieldContext(ownerUserID: owner, resourceType: "financial_card", resourceID: card.id, fieldName: "password", keyVersion: snapshot.keyVersion)
+            switch rotateSecret(card.password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
+            case .migrated(let value):
+                do {
+                    try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).execute()
+                    report.migratedFields += 1
+                } catch {
+                    report.failedRecords += 1
+                    report.remainingOldVaultFields += 1
+                    AppDiagnostics.failure("vault", "rotate_card", error: error)
+                }
+            case .oldVaultLocked: report.remainingOldVaultFields += 1
+            case .legacyLocked: report.skippedLockedFields += 1
+            case .unchanged: break
+            }
+        }
+
+        struct InstitutionSecretsPatch: Encodable {
+            let password: String?
+            let accountsData: [InstitutionAccount]
+            enum CodingKeys: String, CodingKey {
+                case password
+                case accountsData = "accounts_data"
+            }
+        }
+        for institution in institutions {
+            var password = institution.password
+            var accounts = institution.accounts
+            var migratedCount = 0
+            var oldLockedCount = 0
+            var legacyLockedCount = 0
+            let passwordContext = VaultFieldContext(ownerUserID: owner, resourceType: "institution", resourceID: institution.id, fieldName: "password", keyVersion: snapshot.keyVersion)
+            switch rotateSecret(password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: passwordContext) {
+            case .migrated(let encrypted): password = encrypted; migratedCount += 1
+            case .oldVaultLocked: oldLockedCount += 1
+            case .legacyLocked: legacyLockedCount += 1
+            case .unchanged: break
+            }
+            for index in accounts.indices {
+                let prefix = "accounts.\(accounts[index].id)"
+                let fields: [(String, WritableKeyPath<InstitutionAccount, String?>)] = [
+                    ("account_number", \.accountNumber),
+                    ("routing_number", \.routingNumber),
+                    ("wire_routing_number", \.wireRoutingNumber)
+                ]
+                for (field, keyPath) in fields {
+                    let context = VaultFieldContext(ownerUserID: owner, resourceType: "institution", resourceID: institution.id, fieldName: "\(prefix).\(field)", keyVersion: snapshot.keyVersion)
+                    var value = accounts[index][keyPath: keyPath]
+                    switch rotateSecret(value, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
+                    case .migrated(let encrypted): value = encrypted; migratedCount += 1
+                    case .oldVaultLocked: oldLockedCount += 1
+                    case .legacyLocked: legacyLockedCount += 1
+                    case .unchanged: break
+                    }
+                    accounts[index][keyPath: keyPath] = value
+                }
+            }
+            report.remainingOldVaultFields += oldLockedCount
+            report.skippedLockedFields += legacyLockedCount
+            guard migratedCount > 0 else { continue }
+            do {
+                try await client.from("institutions")
+                    .update(InstitutionSecretsPatch(password: password, accountsData: accounts))
+                    .eq("id", value: institution.id)
+                    .eq("user_id", value: owner)
+                    .execute()
+                report.migratedFields += migratedCount
+            } catch {
+                report.failedRecords += 1
+                report.remainingOldVaultFields += migratedCount
+                AppDiagnostics.failure("vault", "rotate_institution", error: error)
+            }
+        }
+        return report
+    }
+
     private enum VaultSecretMigration {
         case unchanged
         case migrated(String)
         case locked
+    }
+
+    private enum VaultRotationSecret {
+        case unchanged
+        case migrated(String)
+        case legacyLocked
+        case oldVaultLocked
     }
 
     private func migrateSecret(_ value: String?, using key: SymmetricKey, context: VaultFieldContext) -> VaultSecretMigration {
@@ -825,6 +938,37 @@ class DataRepository {
         }
         guard let encrypted = try? VaultCryptography.encryptField(plaintext, using: key, context: context) else {
             return .locked
+        }
+        return .migrated(encrypted)
+    }
+
+    private func rotateSecret(
+        _ value: String?,
+        snapshot: VaultKeySession.Snapshot,
+        fromKeyVersion: Int,
+        context: VaultFieldContext
+    ) -> VaultRotationSecret {
+        guard let value, !value.isEmpty else { return .unchanged }
+        let plaintext: String
+        if value.hasPrefix(SecurityService.vaultEnvelopePrefix) {
+            guard let version = VaultCryptography.fieldKeyVersion(in: value) else { return .oldVaultLocked }
+            if version == snapshot.keyVersion { return .unchanged }
+            guard version == fromKeyVersion,
+                  let oldKey = snapshot.key(for: version),
+                  let decrypted = try? VaultCryptography.decryptField(
+                    value,
+                    using: oldKey,
+                    context: context.withKeyVersion(version)
+                  ) else { return .oldVaultLocked }
+            plaintext = decrypted
+        } else if value.hasPrefix("enc:") {
+            guard let decrypted = SecurityService.shared.decryptLegacyStrict(value) else { return .legacyLocked }
+            plaintext = decrypted
+        } else {
+            plaintext = value
+        }
+        guard let encrypted = try? VaultCryptography.encryptField(plaintext, using: snapshot.key, context: context) else {
+            return .oldVaultLocked
         }
         return .migrated(encrypted)
     }
@@ -1460,8 +1604,13 @@ final class SecurityService {
         if string.hasPrefix(Self.vaultEnvelopePrefix) {
             guard let context,
                   let snapshot = VaultKeySession.shared.snapshot(for: context.ownerUserID),
-                  snapshot.keyVersion == context.keyVersion,
-                  let value = try? VaultCryptography.decryptField(string, using: snapshot.key, context: context) else {
+                  let embeddedVersion = VaultCryptography.fieldKeyVersion(in: string),
+                  let key = snapshot.key(for: embeddedVersion),
+                  let value = try? VaultCryptography.decryptField(
+                    string,
+                    using: key,
+                    context: context.withKeyVersion(embeddedVersion)
+                  ) else {
                 AppDiagnostics.event("encryption", "decrypt_vault_value", status: "locked")
                 return string
             }
@@ -1521,6 +1670,9 @@ final class VaultKeySession: @unchecked Sendable {
         let deviceID: UUID
         let keyVersion: Int
         let key: SymmetricKey
+        let keys: [Int: SymmetricKey]
+
+        func key(for version: Int) -> SymmetricKey? { keys[version] }
     }
 
     private let lock = NSLock()
@@ -1529,8 +1681,19 @@ final class VaultKeySession: @unchecked Sendable {
     private init() {}
 
     func install(userID: UUID, deviceID: UUID, keyVersion: Int, key: SymmetricKey) {
+        install(userID: userID, deviceID: deviceID, currentKeyVersion: keyVersion, keys: [keyVersion: key])
+    }
+
+    func install(userID: UUID, deviceID: UUID, currentKeyVersion: Int, keys: [Int: SymmetricKey]) {
+        guard let currentKey = keys[currentKeyVersion] else { return }
         lock.lock()
-        current = Snapshot(userID: userID, deviceID: deviceID, keyVersion: keyVersion, key: key)
+        current = Snapshot(
+            userID: userID,
+            deviceID: deviceID,
+            keyVersion: currentKeyVersion,
+            key: currentKey,
+            keys: keys
+        )
         lock.unlock()
     }
 
@@ -1551,10 +1714,14 @@ final class VaultKeySession: @unchecked Sendable {
 struct VaultAccountMetadata: Decodable {
     let userID: UUID
     let currentKeyVersion: Int
+    let rotationStatus: String?
+    let previousKeyVersion: Int?
 
     enum CodingKeys: String, CodingKey {
         case userID = "user_id"
         case currentKeyVersion = "current_key_version"
+        case rotationStatus = "rotation_status"
+        case previousKeyVersion = "previous_key_version"
     }
 }
 
@@ -1608,17 +1775,53 @@ struct VaultRecoveryWrapRecord: Decodable {
     }
 }
 
+struct VaultKeyTransitionRecord: Decodable {
+    let fromKeyVersion: Int
+    let toKeyVersion: Int
+    let wrappedPreviousKey: String
+
+    enum CodingKeys: String, CodingKey {
+        case fromKeyVersion = "from_key_version"
+        case toKeyVersion = "to_key_version"
+        case wrappedPreviousKey = "wrapped_previous_key"
+    }
+}
+
+struct VaultAuditEventRecord: Decodable, Identifiable {
+    let id: UUID
+    let actorDeviceID: UUID?
+    let targetDeviceID: UUID?
+    let eventType: String
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case actorDeviceID = "actor_device_id"
+        case targetDeviceID = "target_device_id"
+        case eventType = "event_type"
+        case createdAt = "created_at"
+    }
+}
+
 struct VaultOverview {
     let metadata: VaultAccountMetadata?
     let devices: [VaultDeviceRecord]
     let currentDevice: VaultDeviceRecord?
     let isUnlocked: Bool
+    let auditEvents: [VaultAuditEventRecord]
 }
 
 struct VaultMigrationReport: Equatable {
     var migratedFields = 0
     var skippedLockedFields = 0
     var failedRecords = 0
+    var remainingOldVaultFields = 0
+}
+
+struct VaultRotationResult {
+    let recoveryCode: String
+    let report: VaultMigrationReport
+    let completed: Bool
 }
 
 final class VaultService: @unchecked Sendable {
@@ -1650,7 +1853,36 @@ final class VaultService: @unchecked Sendable {
                 using: identity.agreementPrivateKey,
                 context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: device.deviceID, keyVersion: wrap.keyVersion)
             )
-            VaultKeySession.shared.install(userID: userID, deviceID: device.deviceID, keyVersion: wrap.keyVersion, key: key)
+            var keys = [wrap.keyVersion: key]
+            let transitions: [VaultKeyTransitionRecord] = try await client
+                .from("vault_key_transitions")
+                .select("from_key_version,to_key_version,wrapped_previous_key")
+                .eq("user_id", value: userID)
+                .eq("to_key_version", value: wrap.keyVersion)
+                .is("completed_at", value: nil)
+                .execute().value
+            for transition in transitions {
+                let previous = try VaultCryptography.unwrapPreviousVaultKey(
+                    transition.wrappedPreviousKey,
+                    using: key,
+                    context: VaultKeyTransitionContext(
+                        ownerUserID: userID,
+                        fromKeyVersion: transition.fromKeyVersion,
+                        toKeyVersion: transition.toKeyVersion
+                    )
+                )
+                keys[transition.fromKeyVersion] = previous
+            }
+            VaultKeySession.shared.install(
+                userID: userID,
+                deviceID: device.deviceID,
+                currentKeyVersion: wrap.keyVersion,
+                keys: keys
+            )
+            try await bindCurrentSession(
+                deviceID: device.deviceID,
+                key: key
+            )
         } catch {
             AppDiagnostics.failure("vault", "restore_device_key", error: error)
         }
@@ -1661,23 +1893,31 @@ final class VaultService: @unchecked Sendable {
         let userID = session.user.id
         let metadata: [VaultAccountMetadata] = try await client
             .from("account_vaults")
-            .select("user_id,current_key_version")
+            .select("user_id,current_key_version,rotation_status,previous_key_version")
             .eq("user_id", value: userID)
             .limit(1)
             .execute().value
         guard metadata.first != nil else {
             VaultKeySession.shared.clear()
-            return VaultOverview(metadata: nil, devices: [], currentDevice: nil, isUnlocked: false)
+            return VaultOverview(metadata: nil, devices: [], currentDevice: nil, isUnlocked: false, auditEvents: [])
         }
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
         let devices = try await listDevices()
         await restoreSessionIfAvailable(for: userID)
         let current = currentDevice(in: devices, identity: identity)
+        let auditEvents: [VaultAuditEventRecord] = try await client
+            .from("vault_audit_events")
+            .select("id,actor_device_id,target_device_id,event_type,created_at")
+            .eq("user_id", value: userID)
+            .order("created_at", ascending: false)
+            .limit(20)
+            .execute().value
         return VaultOverview(
             metadata: metadata.first,
             devices: devices,
             currentDevice: current,
-            isUnlocked: VaultKeySession.shared.snapshot(for: userID) != nil
+            isUnlocked: VaultKeySession.shared.snapshot(for: userID) != nil,
+            auditEvents: auditEvents
         )
     }
 
@@ -1725,6 +1965,7 @@ final class VaultService: @unchecked Sendable {
         )
         try await client.rpc("miloom_bootstrap_account_vault_v2", params: params).execute()
         VaultKeySession.shared.install(userID: userID, deviceID: deviceID, keyVersion: keyVersion, key: vaultKey)
+        try await bindCurrentSession(deviceID: deviceID, key: vaultKey)
         return recoveryCode
     }
 
@@ -1832,7 +2073,7 @@ final class VaultService: @unchecked Sendable {
             throw VaultCryptographyError.authenticationFailed
         }
         let metadata: [VaultAccountMetadata] = try await client
-            .from("account_vaults").select("user_id,current_key_version")
+            .from("account_vaults").select("user_id,current_key_version,rotation_status,previous_key_version")
             .eq("user_id", value: userID).limit(1).execute().value
         guard let vault = metadata.first else { throw VaultCryptographyError.invalidEnvelope }
         let wraps: [VaultRecoveryWrapRecord] = try await client
@@ -1868,6 +2109,157 @@ final class VaultService: @unchecked Sendable {
             p_key_confirmation: VaultCryptography.keyConfirmation(for: vaultKey)
         )).execute()
         VaultKeySession.shared.install(userID: userID, deviceID: device.deviceID, keyVersion: wrap.keyVersion, key: vaultKey)
+        try await bindCurrentSession(deviceID: device.deviceID, key: vaultKey)
+        // A recovery can occur while a revocation rotation is still migrating.
+        // Reload so the encrypted transition also restores the previous key.
+        VaultKeySession.shared.clear()
+        await restoreSessionIfAvailable(for: userID)
+        _ = try requireSnapshot(for: userID)
+    }
+
+    func revokeAndRotate(device target: VaultDeviceRecord) async throws -> VaultRotationResult {
+        let session = try await client.auth.refreshSession()
+        let userID = session.user.id
+        guard target.status == "approved",
+              let snapshot = VaultKeySession.shared.snapshot(for: userID),
+              target.deviceID != snapshot.deviceID else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        let devices = try await listDevices()
+        guard devices.contains(where: { $0.deviceID == target.deviceID && $0.status == "approved" }) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        let remaining = devices.filter { $0.status == "approved" && $0.deviceID != target.deviceID }
+        guard remaining.contains(where: { $0.deviceID == snapshot.deviceID }) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+
+        let newVersion = snapshot.keyVersion + 1
+        let newKey = SymmetricKey(size: .bits256)
+        struct DeviceWrap: Encodable {
+            let device_id: UUID
+            let ephemeral_public_key: String
+            let wrapped_key: String
+        }
+        var deviceWraps: [DeviceWrap] = []
+        for device in remaining {
+            let envelope = try VaultCryptography.wrapVaultKey(
+                newKey,
+                for: device.agreementPublicKey,
+                context: VaultKeyWrapContext(ownerUserID: userID, recipientDeviceID: device.deviceID, keyVersion: newVersion)
+            )
+            deviceWraps.append(DeviceWrap(
+                device_id: device.deviceID,
+                ephemeral_public_key: envelope.ephemeralPublicKey,
+                wrapped_key: envelope.wrappedKey
+            ))
+        }
+        let recoveryCode = try VaultCryptography.generateRecoveryCode()
+        let recovery = try VaultCryptography.wrapVaultKeyForRecovery(
+            newKey,
+            recoveryCode: recoveryCode,
+            context: VaultRecoveryWrapContext(ownerUserID: userID, keyVersion: newVersion)
+        )
+        let transition = try VaultCryptography.wrapPreviousVaultKey(
+            snapshot.key,
+            using: newKey,
+            context: VaultKeyTransitionContext(ownerUserID: userID, fromKeyVersion: snapshot.keyVersion, toKeyVersion: newVersion)
+        )
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_revoked_device_id: UUID
+            let p_new_key_version: Int
+            let p_device_wraps: [DeviceWrap]
+            let p_wrapped_recovery_key: String
+            let p_new_key_confirmation: String
+            let p_current_key_confirmation: String
+            let p_wrapped_previous_key: String
+        }
+        try await client.rpc("miloom_revoke_vault_device_and_rotate", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_revoked_device_id: target.deviceID,
+            p_new_key_version: newVersion,
+            p_device_wraps: deviceWraps,
+            p_wrapped_recovery_key: recovery.wrappedKey,
+            p_new_key_confirmation: VaultCryptography.keyConfirmation(for: newKey),
+            p_current_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key),
+            p_wrapped_previous_key: transition
+        )).execute()
+
+        var keys = snapshot.keys
+        keys[newVersion] = newKey
+        VaultKeySession.shared.install(
+            userID: userID,
+            deviceID: snapshot.deviceID,
+            currentKeyVersion: newVersion,
+            keys: keys
+        )
+        let rotatedSnapshot = try requireSnapshot(for: userID)
+        let report = try await DataRepository.shared.rotateVaultSecrets(
+            snapshot: rotatedSnapshot,
+            fromKeyVersion: snapshot.keyVersion
+        )
+        let completed = report.failedRecords == 0 && report.remainingOldVaultFields == 0
+        if completed { try await completeRotation(snapshot: rotatedSnapshot) }
+        return VaultRotationResult(recoveryCode: recoveryCode, report: report, completed: completed)
+    }
+
+    func cancelPendingDevice(_ target: VaultDeviceRecord) async throws {
+        let session = try await client.auth.refreshSession()
+        guard target.status == "pending",
+              let snapshot = VaultKeySession.shared.snapshot(for: session.user.id) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_target_device_id: UUID
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_revoke_pending_vault_device", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_target_device_id: target.deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute()
+    }
+
+    func rotateRecoveryCode() async throws -> String {
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        let code = try VaultCryptography.generateRecoveryCode()
+        let recovery = try VaultCryptography.wrapVaultKeyForRecovery(
+            snapshot.key,
+            recoveryCode: code,
+            context: VaultRecoveryWrapContext(ownerUserID: session.user.id, keyVersion: snapshot.keyVersion)
+        )
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_key_version: Int
+            let p_wrapped_recovery_key: String
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_rotate_vault_recovery", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_key_version: snapshot.keyVersion,
+            p_wrapped_recovery_key: recovery.wrappedKey,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute()
+        return code
+    }
+
+    func resumeRotation() async throws -> VaultMigrationReport {
+        let userID = try await client.auth.session.user.id
+        let snapshot = try requireSnapshot(for: userID)
+        guard let previousVersion = snapshot.keys.keys.filter({ $0 < snapshot.keyVersion }).max() else {
+            throw VaultCryptographyError.invalidKeyVersion
+        }
+        let report = try await DataRepository.shared.rotateVaultSecrets(
+            snapshot: snapshot,
+            fromKeyVersion: previousVersion
+        )
+        if report.failedRecords == 0 && report.remainingOldVaultFields == 0 {
+            try await completeRotation(snapshot: snapshot)
+        }
+        return report
     }
 
     func migrateLegacySecrets() async throws -> VaultMigrationReport {
@@ -1887,6 +2279,37 @@ final class VaultService: @unchecked Sendable {
             $0.agreementPublicKey == identity.publicKeys.agreementPublicKey
                 && $0.signingPublicKey == identity.publicKeys.signingPublicKey
         }
+    }
+
+    private func requireSnapshot(for userID: UUID) throws -> VaultKeySession.Snapshot {
+        guard let snapshot = VaultKeySession.shared.snapshot(for: userID) else {
+            throw VaultCryptographyError.authenticationFailed
+        }
+        return snapshot
+    }
+
+    private func completeRotation(snapshot: VaultKeySession.Snapshot) async throws {
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_key_version: Int
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_complete_vault_rotation", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_key_version: snapshot.keyVersion,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute()
+    }
+
+    private func bindCurrentSession(deviceID: UUID, key: SymmetricKey) async throws {
+        struct Params: Encodable {
+            let p_device_id: UUID
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_bind_vault_device_session", params: Params(
+            p_device_id: deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: key)
+        )).execute()
     }
 
     private var deviceLabel: String {
@@ -1927,6 +2350,16 @@ struct VaultFieldContext: Hashable {
             String(keyVersion)
         ].joined(separator: "|").utf8)
     }
+
+    func withKeyVersion(_ version: Int) -> VaultFieldContext {
+        VaultFieldContext(
+            ownerUserID: ownerUserID,
+            resourceType: resourceType,
+            resourceID: resourceID,
+            fieldName: fieldName,
+            keyVersion: version
+        )
+    }
 }
 
 struct VaultKeyWrapContext: Hashable {
@@ -1953,6 +2386,21 @@ struct VaultRecoveryWrapContext: Hashable {
             "miloom-recovery-wrap-v1",
             ownerUserID.uuidString.lowercased(),
             String(keyVersion)
+        ].joined(separator: "|").utf8)
+    }
+}
+
+struct VaultKeyTransitionContext: Hashable {
+    let ownerUserID: UUID
+    let fromKeyVersion: Int
+    let toKeyVersion: Int
+
+    fileprivate var authenticatedData: Data {
+        Data([
+            "miloom-key-transition-v1",
+            ownerUserID.uuidString.lowercased(),
+            String(fromKeyVersion),
+            String(toKeyVersion)
         ].joined(separator: "|").utf8)
     }
 }
@@ -2033,6 +2481,44 @@ enum VaultCryptography {
                 throw VaultCryptographyError.invalidEnvelope
             }
             return value
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    static func fieldKeyVersion(in envelope: String) -> Int? {
+        let components = envelope.split(separator: ":", omittingEmptySubsequences: false)
+        guard components.count == 4, components[0] == "miloom", components[1] == "v1" else { return nil }
+        return Int(components[2])
+    }
+
+    static func wrapPreviousVaultKey(
+        _ previousKey: SymmetricKey,
+        using currentKey: SymmetricKey,
+        context: VaultKeyTransitionContext
+    ) throws -> String {
+        guard context.fromKeyVersion > 0, context.toKeyVersion == context.fromKeyVersion + 1 else {
+            throw VaultCryptographyError.invalidKeyVersion
+        }
+        let rawKey = previousKey.withUnsafeBytes { Data($0) }
+        let box = try AES.GCM.seal(rawKey, using: currentKey, authenticating: context.authenticatedData)
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return combined.base64EncodedString()
+    }
+
+    static func unwrapPreviousVaultKey(
+        _ wrappedKey: String,
+        using currentKey: SymmetricKey,
+        context: VaultKeyTransitionContext
+    ) throws -> SymmetricKey {
+        guard let combined = Data(base64Encoded: wrappedKey) else { throw VaultCryptographyError.invalidEnvelope }
+        do {
+            let box = try AES.GCM.SealedBox(combined: combined)
+            let rawKey = try AES.GCM.open(box, using: currentKey, authenticating: context.authenticatedData)
+            guard rawKey.count == 32 else { throw VaultCryptographyError.invalidEnvelope }
+            return SymmetricKey(data: rawKey)
         } catch let error as VaultCryptographyError {
             throw error
         } catch {

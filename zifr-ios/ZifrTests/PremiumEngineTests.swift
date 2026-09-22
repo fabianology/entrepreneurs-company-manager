@@ -469,6 +469,48 @@ final class PremiumEngineTests: XCTestCase {
         )
     }
 
+    func testVaultKeyTransitionSupportsResumableRotation() throws {
+        let owner = UUID()
+        let oldKey = SymmetricKey(size: .bits256)
+        let newKey = SymmetricKey(size: .bits256)
+        let context = VaultKeyTransitionContext(ownerUserID: owner, fromKeyVersion: 1, toKeyVersion: 2)
+        let wrapped = try VaultCryptography.wrapPreviousVaultKey(oldKey, using: newKey, context: context)
+        let recovered = try VaultCryptography.unwrapPreviousVaultKey(wrapped, using: newKey, context: context)
+        XCTAssertEqual(keyData(recovered), keyData(oldKey))
+        XCTAssertThrowsError(
+            try VaultCryptography.unwrapPreviousVaultKey(
+                wrapped,
+                using: SymmetricKey(size: .bits256),
+                context: context
+            )
+        )
+    }
+
+    func testVaultKeyringDecryptsPreviousAndCurrentFieldVersions() throws {
+        let owner = UUID()
+        let device = UUID()
+        let resource = UUID()
+        let oldKey = SymmetricKey(size: .bits256)
+        let newKey = SymmetricKey(size: .bits256)
+        let oldContext = VaultFieldContext(ownerUserID: owner, resourceType: "card", resourceID: resource, fieldName: "password", keyVersion: 1)
+        let newContext = oldContext.withKeyVersion(2)
+        let oldEnvelope = try VaultCryptography.encryptField("old secret", using: oldKey, context: oldContext)
+        let newEnvelope = try VaultCryptography.encryptField("new secret", using: newKey, context: newContext)
+
+        VaultKeySession.shared.install(
+            userID: owner,
+            deviceID: device,
+            currentKeyVersion: 2,
+            keys: [1: oldKey, 2: newKey]
+        )
+        defer { VaultKeySession.shared.clear() }
+
+        XCTAssertEqual(VaultCryptography.fieldKeyVersion(in: oldEnvelope), 1)
+        XCTAssertEqual(VaultCryptography.fieldKeyVersion(in: newEnvelope), 2)
+        XCTAssertEqual(SecurityService.shared.decrypt(oldEnvelope, context: newContext), "old secret")
+        XCTAssertEqual(SecurityService.shared.decrypt(newEnvelope, context: newContext), "new secret")
+    }
+
     private func keyData(_ key: SymmetricKey) -> Data {
         key.withUnsafeBytes { Data($0) }
     }
