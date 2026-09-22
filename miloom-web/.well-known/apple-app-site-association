@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "WYYJ6FGYRP.com.vibing.miloom",
+        "paths": [
+          "/oauth",
+          "/oauth/*",
+          "/invite",
+          "/invite/*"
+        ]
+      }
+    ]
+  }
+}

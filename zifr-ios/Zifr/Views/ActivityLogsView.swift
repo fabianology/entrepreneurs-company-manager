@@ -388,6 +388,7 @@ struct MessageRowView: View {
 
 private enum InboxSection: String, CaseIterable, Identifiable {
     case alerts = "Alerts"
+    case invitations = "Invites"
     case activity = "Activity"
 
     var id: String { rawValue }
@@ -401,10 +402,14 @@ struct NotificationInboxView: View {
     @Environment(AppState.self) private var appState
     @State private var section: InboxSection = .alerts
     @State private var errorMessage: String?
+    @State private var incomingInvitations: [IncomingResourceInvitation] = []
+    @State private var invitationInProgress: UUID?
+    @State private var decliningInvitation: IncomingResourceInvitation?
 
     private var unreadCount: Int {
         switch section {
         case .alerts: appState.unreadNotificationCount
+        case .invitations: incomingInvitations.count
         case .activity: appState.activityLogs.filter { !$0.isRead }.count
         }
     }
@@ -428,6 +433,7 @@ struct NotificationInboxView: View {
                 Group {
                     switch section {
                     case .alerts: alertList
+                    case .invitations: invitationList
                     case .activity: activityList
                     }
                 }
@@ -435,6 +441,23 @@ struct NotificationInboxView: View {
         }
         .task {
             try? await DataRepository.shared.refreshNotifications(appState: appState)
+            await refreshInvitations()
+        }
+        .confirmationDialog(
+            "Decline Invitation?",
+            isPresented: Binding(
+                get: { decliningInvitation != nil },
+                set: { if !$0 { decliningInvitation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Decline Invitation", role: .destructive) {
+                guard let invitation = decliningInvitation else { return }
+                Task { await decline(invitation) }
+            }
+            Button("Cancel", role: .cancel) { decliningInvitation = nil }
+        } message: {
+            Text("The invitation will be removed. The owner can invite you again later.")
         }
         .alert("Inbox Error", isPresented: Binding(
             get: { errorMessage != nil },
@@ -468,7 +491,7 @@ struct NotificationInboxView: View {
                     .font(.system(size: 10, weight: .black))
                     .tracking(2)
                     .foregroundStyle(Color.white.opacity(0.65))
-                Text(unreadCount == 1 ? "1 UNREAD" : "\(unreadCount) UNREAD")
+                Text(inboxCountLabel)
                     .font(.system(size: 8, weight: .bold))
                     .tracking(1)
                     .foregroundStyle(Color.zifrGold)
@@ -477,20 +500,26 @@ struct NotificationInboxView: View {
             Spacer()
 
             Menu {
-                Button {
-                    Task { await markAllRead() }
-                } label: {
-                    Label("Mark All as Read", systemImage: "envelope.open")
+                if section != .invitations {
+                    Button {
+                        Task { await markAllRead() }
+                    } label: {
+                        Label("Mark All as Read", systemImage: "envelope.open")
+                    }
+                    .disabled(unreadCount == 0)
                 }
-                .disabled(unreadCount == 0)
 
-                if section == .alerts {
+                if section != .activity {
                     Button {
                         Task {
-                            do {
-                                try await DataRepository.shared.refreshNotifications(appState: appState)
-                            } catch {
-                                errorMessage = error.localizedDescription
+                            if section == .alerts {
+                                do {
+                                    try await DataRepository.shared.refreshNotifications(appState: appState)
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            } else {
+                                await refreshInvitations()
                             }
                         }
                     } label: {
@@ -510,6 +539,13 @@ struct NotificationInboxView: View {
         .padding(.horizontal, 20)
         .padding(.top, 16)
         .padding(.bottom, 12)
+    }
+
+    private var inboxCountLabel: String {
+        if section == .invitations {
+            return unreadCount == 1 ? "1 PENDING" : "\(unreadCount) PENDING"
+        }
+        return unreadCount == 1 ? "1 UNREAD" : "\(unreadCount) UNREAD"
     }
 
     @ViewBuilder
@@ -557,6 +593,95 @@ struct NotificationInboxView: View {
                 .padding(.bottom, 32)
             }
         }
+    }
+
+    @ViewBuilder
+    private var invitationList: some View {
+        if incomingInvitations.isEmpty {
+            emptyState(icon: "person.crop.circle.badge.checkmark", message: "No pending invitations")
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(incomingInvitations) { invitation in
+                        invitationRow(invitation)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .padding(.bottom, 32)
+            }
+            .refreshable { await refreshInvitations() }
+        }
+    }
+
+    private func invitationRow(_ invitation: IncomingResourceInvitation) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.zifrGold.opacity(0.14))
+                        .frame(width: 42, height: 42)
+                    Image(systemName: "person.2.badge.gearshape")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(Color.zifrGold)
+                }
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(invitation.resourceTitle)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(invitation.companyTitle)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.52))
+                    Text("Invited by \(invitation.inviterEmail) as \(invitation.role)")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.68))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                Text(invitation.role.uppercased())
+                    .font(.system(size: 9, weight: .black))
+                    .foregroundStyle(Color.zifrGold)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color.zifrGold.opacity(0.12), in: Capsule())
+            }
+
+            HStack(spacing: 10) {
+                Button("Decline", role: .destructive) {
+                    decliningInvitation = invitation
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .disabled(invitationInProgress != nil)
+
+                Button {
+                    Task { await accept(invitation) }
+                } label: {
+                    if invitationInProgress == invitation.id {
+                        ProgressView().tint(.black)
+                    } else {
+                        Text("Accept").fontWeight(.semibold)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.zifrGold)
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .disabled(invitationInProgress != nil)
+            }
+        }
+        .padding(16)
+        .background(Color.black.opacity(0.70))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(.vaultOutline, lineWidth: 1.25)
+        )
     }
 
     private func notificationRow(_ notification: AppNotification) -> some View {
@@ -686,6 +811,8 @@ struct NotificationInboxView: View {
                     appState.notifications = originals
                     throw error
                 }
+            case .invitations:
+                return
             case .activity:
                 let originals = appState.activityLogs
                 for index in appState.activityLogs.indices { appState.activityLogs[index].isRead = true }
@@ -698,6 +825,45 @@ struct NotificationInboxView: View {
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func refreshInvitations() async {
+        do {
+            incomingInvitations = try await DataRepository.shared.fetchIncomingInvitations()
+        } catch {
+            errorMessage = "Invitations couldn’t be loaded. Please try again."
+        }
+    }
+
+    @MainActor
+    private func accept(_ invitation: IncomingResourceInvitation) async {
+        invitationInProgress = invitation.id
+        defer { invitationInProgress = nil }
+        do {
+            _ = try await DataRepository.shared.acceptInvitation(id: invitation.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            await refreshInvitations()
+            await DataRepository.shared.fetchAllData(appState: appState)
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            errorMessage = "The invitation couldn’t be accepted. It may have expired or been cancelled."
+        }
+    }
+
+    @MainActor
+    private func decline(_ invitation: IncomingResourceInvitation) async {
+        invitationInProgress = invitation.id
+        decliningInvitation = nil
+        defer { invitationInProgress = nil }
+        do {
+            try await DataRepository.shared.declineInvitation(id: invitation.id)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            await refreshInvitations()
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            errorMessage = "The invitation couldn’t be declined. Please try again."
         }
     }
 
@@ -727,5 +893,185 @@ struct NotificationInboxView: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+struct InvitationAcceptanceSheet: View {
+    let token: String
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AppState.self) private var appState
+    @State private var invitation: IncomingResourceInvitation?
+    @State private var isLoading = true
+    @State private var isResponding = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView("Loading invitation…")
+                        .tint(Color.zifrGold)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let invitation {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            ZifrSheetCard(title: "SHARED WITH YOU", icon: "person.2.badge.gearshape") {
+                                VStack(alignment: .leading, spacing: 14) {
+                                    HStack(spacing: 12) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .fill(Color.zifrGold.opacity(0.13))
+                                            Image(systemName: resourceIcon(invitation.resourceType))
+                                                .font(.system(size: 21, weight: .bold))
+                                                .foregroundStyle(Color.zifrGold)
+                                        }
+                                        .frame(width: 52, height: 52)
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(invitation.resourceTitle)
+                                                .font(.system(size: 17, weight: .bold))
+                                                .foregroundStyle(.white)
+                                            Text(invitation.companyTitle)
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundStyle(Color.white.opacity(0.52))
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+
+                                    Divider().overlay(Color.white.opacity(0.08))
+
+                                    invitationDetail("INVITED BY", value: invitation.inviterEmail)
+                                    invitationDetail("ACCESS", value: invitation.role)
+                                    invitationDetail("EXPIRES", value: relativeExpiration(invitation.expiresAt))
+                                }
+                            }
+
+                            ZifrSheetCard(title: "BEFORE YOU ACCEPT", icon: "lock.shield") {
+                                Text("Accepting adds this shared resource to your Miloom account. The owner can change or revoke your access later. Vault secrets require a separate encrypted grant in a later phase.")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.white.opacity(0.62))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            HStack(spacing: 12) {
+                                Button("Decline", role: .destructive) {
+                                    Task { await respond(accept: false) }
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.red)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+
+                                Button {
+                                    Task { await respond(accept: true) }
+                                } label: {
+                                    if isResponding {
+                                        ProgressView().tint(.black)
+                                    } else {
+                                        Text("Accept").fontWeight(.semibold)
+                                    }
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(Color.zifrGold)
+                                .foregroundStyle(.black)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                            }
+                            .disabled(isResponding)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 16)
+                        .padding(.bottom, 40)
+                    }
+                } else {
+                    ContentUnavailableView(
+                        "Invitation Unavailable",
+                        systemImage: "envelope.badge.shield.half.filled",
+                        description: Text(errorMessage ?? "This invitation may have expired, been cancelled, or belong to another account.")
+                    )
+                }
+            }
+            .background(Color(hex: "#1C1C1E").ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Invitation")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.zifrGold)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+        .task { await loadInvitation() }
+        .presentationDetents([.fraction(0.72), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+    }
+
+    @ViewBuilder
+    private func invitationDetail(_ label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(label)
+                .font(.system(size: 10, weight: .black))
+                .tracking(0.8)
+                .foregroundStyle(Color.white.opacity(0.4))
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.82))
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    @MainActor
+    private func loadInvitation() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            invitation = try await DataRepository.shared.previewInvitation(token: token)
+        } catch {
+            invitation = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func respond(accept: Bool) async {
+        isResponding = true
+        defer { isResponding = false }
+        do {
+            if accept {
+                _ = try await DataRepository.shared.acceptInvitation(token: token)
+                await DataRepository.shared.fetchAllData(appState: appState)
+            } else {
+                try await DataRepository.shared.declineInvitation(token: token)
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            dismiss()
+        } catch {
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            invitation = nil
+            errorMessage = "This invitation is no longer available."
+        }
+    }
+
+    private func relativeExpiration(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    private func resourceIcon(_ type: String) -> String {
+        switch type.lowercased() {
+        case "company": return "building.2.crop.circle"
+        case "all_subscriptions", "subscription": return "repeat.circle"
+        case "all_documents", "document": return "doc.text"
+        case "all_financials", "institution", "card", "loan": return "dollarsign.circle"
+        default: return "person.2"
+        }
     }
 }

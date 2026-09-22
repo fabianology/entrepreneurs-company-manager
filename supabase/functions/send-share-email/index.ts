@@ -1,122 +1,184 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { corsHeaders, json } from "../_shared/http.ts";
+import {
+  isEmail,
+  isShareRole,
+  resourceName,
+  shareEmailHtml,
+  shareEmailSubject,
+} from "../_shared/share_email.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+type InvitationRow = {
+  id: string;
+  email: string;
+  role: string;
+  resource_type: string;
+  invited_by: string;
+  status: string;
+};
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+type InvitationToken = {
+  token: string;
+  expires_at: string;
+};
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+Deno.serve(async (request) => {
+  if (request.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed." }, 405);
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  if (!supabaseUrl || !anonKey) {
+    console.error("send-share-email configuration is incomplete");
+    return json({ error: "Invitation email delivery is unavailable." }, 503);
+  }
+
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+  if (!token) {
+    return json({ error: "Authentication required." }, 401);
+  }
+
+  const authClient = createClient(supabaseUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: authData, error: authError } = await authClient.auth.getUser(token);
+  const user = authData.user;
+  if (authError || !user) {
+    return json({ error: "Authentication required." }, 401);
+  }
+
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+  const sender = Deno.env.get("SHARE_EMAIL_FROM");
+  if (!serviceRoleKey || !resendApiKey || !sender) {
+    console.error("send-share-email configuration is incomplete");
+    return json({ error: "Invitation email delivery is unavailable." }, 503);
+  }
+
+  let body: unknown;
   try {
-    const { email, role, resourceType, inviterId } = await req.json()
+    body = await request.json();
+  } catch {
+    return json({ error: "A valid invitation ID is required." }, 400);
+  }
 
-    if (!email || !role || !resourceType) {
-      throw new Error("Missing required parameters")
-    }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return json({ error: "A valid invitation ID is required." }, 400);
+  }
 
-    // Get API key from environment or fallback to user-provided one
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "re_5rQXDHi6_JF8LjWyhvAsTK783EjhosARj"
+  const payload = body as Record<string, unknown>;
+  if (
+    Object.keys(payload).some((key) => key !== "invitationId") ||
+    typeof payload.invitationId !== "string" ||
+    !UUID_PATTERN.test(payload.invitationId)
+  ) {
+    return json({ error: "A valid invitation ID is required." }, 400);
+  }
 
-    const resourceNameMap: Record<string, string> = {
-      'company': 'an Entity',
-      'institution': 'a Financial Institution',
-      'card': 'a Financial Card',
-      'loan': 'a Loan',
-      'subscription': 'a Subscription',
-      'document': 'a Document'
-    }
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error: invitationError } = await adminClient
+    .from("resource_invitations")
+    .select("id,email,role,resource_type,invited_by,status")
+    .eq("id", payload.invitationId)
+    .eq("invited_by", user.id)
+    .maybeSingle<InvitationRow>();
 
-    const readableResource = resourceNameMap[resourceType] || 'a resource'
+  if (invitationError) {
+    console.error("send-share-email invitation lookup failed", {
+      invitationId: payload.invitationId,
+      code: invitationError.code,
+    });
+    return json({ error: "Invitation email delivery is unavailable." }, 503);
+  }
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-      </head>
-      <body style="margin: 0; padding: 0; background-color: #000000; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff;">
-        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #000000; padding: 40px 20px;">
-          <tr>
-            <td align="center">
-              <div style="max-width: 600px; width: 100%; background-color: #111111; border: 1px solid #333333; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.5); text-align: left;">
-                
-                <!-- Header -->
-                <div style="background: linear-gradient(135deg, #4f46e5 0%, #0A84FF 100%); padding: 32px 24px; text-align: center;">
-                  <h1 style="margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; color: #ffffff;">Zifr</h1>
-                </div>
-                
-                <!-- Body -->
-                <div style="padding: 40px 32px;">
-                  <h2 style="margin-top: 0; margin-bottom: 24px; font-size: 22px; font-weight: 600; color: #ffffff;">You've been invited!</h2>
-                  
-                  <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #A2A2A2;">
-                    You have been invited to collaborate on <strong style="color: #ffffff;">${readableResource}</strong> with the role of <strong style="color: #ffffff;">${role}</strong>.
-                  </p>
-                  
-                  <p style="margin: 0 0 32px 0; font-size: 16px; line-height: 1.6; color: #A2A2A2;">
-                    Open your Zifr app to view the details, access insights, and start collaborating instantly.
-                  </p>
-                  
-                  <!-- CTA Button -->
-                  <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
-                    <a href="https://zifr.com" style="display: inline-block; padding: 16px 32px; background-color: #ffffff; color: #000000; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 30px; letter-spacing: 0.5px;">
-                      Open Zifr App
-                    </a>
-                  </div>
-                </div>
-                
-                <!-- Footer -->
-                <div style="padding: 24px 32px; background-color: #0A0A0A; border-top: 1px solid #222222; text-align: center;">
-                  <p style="margin: 0; font-size: 13px; color: #666666;">
-                    © 2026 Zifr. All rights reserved.<br>
-                    Secure entity and financial management.
-                  </p>
-                </div>
+  if (!data) {
+    return json({ error: "Invitation not found." }, 404);
+  }
 
-              </div>
-            </td>
-          </tr>
-        </table>
-      </body>
-      </html>
-    `
+  if (data.status.toLowerCase() !== "pending") {
+    return json({ error: "Only pending invitations can be emailed." }, 409);
+  }
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
+  if (!isEmail(data.email) || !isShareRole(data.role) || !resourceName(data.resource_type)) {
+    console.error("send-share-email rejected invalid invitation data", {
+      invitationId: data.id,
+    });
+    return json({ error: "Invitation data is invalid." }, 422);
+  }
+
+  const { data: tokenData, error: tokenError } = await adminClient.rpc(
+    "miloom_issue_invitation_token",
+    { p_invitation_id: data.id, p_invited_by: user.id },
+  );
+  if (tokenError || !tokenData) {
+    console.error("send-share-email token issuance failed", {
+      invitationId: data.id,
+      code: tokenError?.code,
+    });
+    const status = tokenError?.message?.includes("INVITATION_SEND_RATE_LIMITED") ? 429 : 503;
+    return json({ error: status === 429 ? "Please wait before resending this invitation." : "Invitation email delivery is unavailable." }, status);
+  }
+
+  const invitationToken = tokenData as InvitationToken;
+  if (!/^[0-9a-f]{64}$/.test(invitationToken.token)) {
+    console.error("send-share-email received invalid invitation token", { invitationId: data.id });
+    return json({ error: "Invitation email delivery is unavailable." }, 503);
+  }
+
+  const invitationUrl = new URL("https://miloom.co/invite");
+  invitationUrl.searchParams.set("token", invitationToken.token);
+
+  const subject = shareEmailSubject(data.resource_type);
+  const html = shareEmailHtml({
+    inviter: user.email ?? "A Miloom member",
+    invitationUrl: invitationUrl.toString(),
+    role: data.role,
+    resourceType: data.resource_type,
+  });
+  if (!subject || !html) {
+    return json({ error: "Invitation data is invalid." }, 422);
+  }
+
+  let providerResponse: Response;
+  try {
+    providerResponse = await fetch("https://api.resend.com/emails", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        "Authorization": `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: 'Zifr <onboarding@resend.dev>',
-        to: email,
-        subject: `You've been invited to view ${readableResource}`,
-        html: htmlContent,
+        from: sender,
+        to: [data.email],
+        subject,
+        html,
       }),
-    })
-
-    const data = await res.json()
-
-    if (res.ok) {
-      return new Response(
-        JSON.stringify(data),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      )
-    } else {
-      return new Response(
-        JSON.stringify({ error: data }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
-      )
-    }
-
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 },
-    )
+    });
+  } catch {
+    console.error("send-share-email provider request failed", {
+      invitationId: data.id,
+    });
+    return json({ error: "Invitation email could not be delivered." }, 502);
   }
-})
+
+  if (!providerResponse.ok) {
+    console.error("send-share-email provider rejected request", {
+      invitationId: data.id,
+      status: providerResponse.status,
+    });
+    return json({ error: "Invitation email could not be delivered." }, 502);
+  }
+
+  console.info("send-share-email delivered", { invitationId: data.id });
+  return json({ ok: true, status: "sent", invitationId: data.id });
+});

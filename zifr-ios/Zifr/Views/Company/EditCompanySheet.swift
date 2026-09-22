@@ -1531,10 +1531,10 @@ struct ShareEntitySheet: View {
     let resourceTitle: String
     
     @State private var email: String = ""
-    @State private var senderDisplayName: String = ""
     @State private var role: String = "Viewer"
     @State private var isSending = false
     @State private var successMessage: String?
+    @State private var warningMessage: String?
     @State private var errorMessage: String?
     @State private var showingPremiumUpgrade = false
     
@@ -1577,22 +1577,13 @@ struct ShareEntitySheet: View {
                     }
 
                     ZifrSheetCard(title: "INVITE COLLABORATOR", icon: "envelope.badge") {
-                        VStack(spacing: 14) {
-                            ZifrField(
-                                label: "COLLABORATOR EMAIL",
-                                placeholder: "name@example.com",
-                                text: $email,
-                                keyboardType: .emailAddress,
-                                textContentType: .emailAddress
-                            )
-
-                            ZifrField(
-                                label: "SEND AS (OPTIONAL)",
-                                placeholder: "e.g. Kris from Miloom",
-                                text: $senderDisplayName,
-                                textContentType: .name
-                            )
-                        }
+                        ZifrField(
+                            label: "COLLABORATOR EMAIL",
+                            placeholder: "name@example.com",
+                            text: $email,
+                            keyboardType: .emailAddress,
+                            textContentType: .emailAddress
+                        )
                     }
 
                     ZifrSheetCard(title: "ACCESS LEVEL", icon: "person.badge.key") {
@@ -1626,6 +1617,14 @@ struct ShareEntitySheet: View {
                             message: success,
                             systemImage: "checkmark.circle.fill",
                             color: .green
+                        )
+                    }
+
+                    if let warning = warningMessage {
+                        shareStatusBanner(
+                            message: warning,
+                            systemImage: "exclamationmark.triangle.fill",
+                            color: .orange
                         )
                     }
                 }
@@ -1682,7 +1681,7 @@ struct ShareEntitySheet: View {
     private var roleDescription: String {
         switch role {
         case "Admin":
-            return "Can view, edit, share, and manage collaborator access."
+            return "Can view and edit with administrative access. Only the owner can manage collaborators."
         case "Editor":
             return "Can view and edit this resource, but cannot manage access."
         default:
@@ -1704,7 +1703,7 @@ struct ShareEntitySheet: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(Color.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(color.opacity(0.35), lineWidth: 1)
@@ -1726,18 +1725,52 @@ struct ShareEntitySheet: View {
         isSending = true
         errorMessage = nil
         successMessage = nil
+        warningMessage = nil
         
         Task {
             do {
-                try await DataRepository.shared.inviteUser(email: cleanedEmail, role: role, resourceId: resourceId, resourceType: resourceType, senderDisplayName: senderDisplayName.isEmpty ? nil : senderDisplayName)
-                await DataRepository.shared.logSecurityEvent(title: "Resource Shared", message: "You shared \(resourceTitle) with \(cleanedEmail).")
+                let result = try await DataRepository.shared.inviteUser(
+                    email: cleanedEmail,
+                    role: role,
+                    resourceId: resourceId,
+                    resourceType: resourceType
+                )
+
+                switch result {
+                case .sharedDirectly:
+                    await DataRepository.shared.logSecurityEvent(
+                        title: "Resource Shared",
+                        message: "You granted \(cleanedEmail) access to \(resourceTitle)."
+                    )
+                case .invitationEmailSent:
+                    await DataRepository.shared.logSecurityEvent(
+                        title: "Invitation Sent",
+                        message: "You invited \(cleanedEmail) to \(resourceTitle)."
+                    )
+                case .invitationCreatedEmailFailed:
+                    await DataRepository.shared.logSecurityEvent(
+                        title: "Invitation Created",
+                        message: "You invited \(cleanedEmail) to \(resourceTitle), but email delivery failed."
+                    )
+                }
+
                 await MainActor.run {
                     isSending = false
-                    successMessage = "Invitation sent successfully!"
                     let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-                    
-                    // Dismiss after a short delay
+
+                    switch result {
+                    case .sharedDirectly:
+                        successMessage = "Access granted successfully."
+                        generator.notificationOccurred(.success)
+                    case .invitationEmailSent:
+                        successMessage = "Invitation sent successfully."
+                        generator.notificationOccurred(.success)
+                    case .invitationCreatedEmailFailed:
+                        warningMessage = "The invitation was created, but the email couldn’t be delivered. Review it in Collaborators & Sharing."
+                        generator.notificationOccurred(.warning)
+                        return
+                    }
+
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         dismiss()
                     }

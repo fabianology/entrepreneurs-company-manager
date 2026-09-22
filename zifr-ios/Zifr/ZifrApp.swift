@@ -36,6 +36,7 @@ struct ZifrApp: App {
     @Environment(\.scenePhase) var scenePhase
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
     @State private var backgroundDate: Date? = nil
+    @State private var pendingInvitationToken: String?
 
     init() {
         // MARK: - Global UI Styling
@@ -120,9 +121,20 @@ struct ZifrApp: App {
                 }
             }
             .onOpenURL { url in
+                if url.host?.lowercased() == "miloom.co",
+                   url.path == "/invite",
+                   let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                    .queryItems?
+                    .first(where: { $0.name == "token" })?
+                    .value,
+                   token.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil {
+                    pendingInvitationToken = token
+                    return
+                }
+
                 Task {
                     // Check if it's a Plaid OAuth redirect
-                    if url.absoluteString.starts(with: "https://miloom.com/oauth") {
+                    if url.absoluteString.starts(with: "https://miloom.co/oauth") {
                         NotificationCenter.default.post(name: Notification.Name("PlaidOAuthRedirect"), object: url)
                         return
                     }
@@ -137,6 +149,14 @@ struct ZifrApp: App {
             }
             .sheet(isPresented: $authViewModel.isRecoveringPassword) {
                 ResetPasswordSheet(authViewModel: authViewModel)
+            }
+            .sheet(isPresented: Binding(
+                get: { authViewModel.isAuthenticated && pendingInvitationToken != nil },
+                set: { if !$0 { pendingInvitationToken = nil } }
+            )) {
+                if let token = pendingInvitationToken {
+                    InvitationAcceptanceSheet(token: token)
+                }
             }
             .alert("Error", isPresented: Binding(
                 get: { appState.error != nil },

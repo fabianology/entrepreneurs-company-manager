@@ -8,6 +8,12 @@ private actor PortfolioLoadFailures {
     func record(_ name: String) { names.insert(name) }
 }
 
+enum ShareInviteResult {
+    case sharedDirectly
+    case invitationEmailSent
+    case invitationCreatedEmailFailed
+}
+
 class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
@@ -527,9 +533,10 @@ class DataRepository {
         // Use the secure backend RPC to atomically delete both shares and invitations case-insensitively
         struct LeaveRPCParams: Encodable {
             let p_resource_id: UUID
+            let p_resource_type: String
         }
-        let params = LeaveRPCParams(p_resource_id: resourceId)
-        try await client.rpc("leave_resource", params: params).execute()
+        let params = LeaveRPCParams(p_resource_id: resourceId, p_resource_type: resourceType)
+        try await client.rpc("miloom_leave_resource", params: params).execute()
     }
     
     // MARK: - Subscriptions
@@ -717,10 +724,10 @@ class DataRepository {
     }
     
     // MARK: - Sharing
-    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String, senderDisplayName: String?) async throws {
+    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String) async throws -> ShareInviteResult {
         AppDiagnostics.event("sharing", "invite_user", status: "started")
         
-        guard let currentUser = try? await client.auth.session.user else {
+        guard (try? await client.auth.session.user) != nil else {
             AppDiagnostics.failure("sharing", "invite_user_session")
             throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not logged in."])
         }
@@ -733,60 +740,58 @@ class DataRepository {
                 let p_role: String
                 let p_resource_id: UUID
                 let p_resource_type: String
-                let p_invited_by: UUID
-                let p_sender_email: String?
-                let p_sender_display_name: String?
             }
             
             struct ShareRPCResponse: Decodable {
                 let status: String
+                let invitationId: UUID?
+
+                enum CodingKeys: String, CodingKey {
+                    case status
+                    case invitationId = "invitation_id"
+                }
             }
             
             let params = ShareRPCParams(
                 p_email: email,
                 p_role: role,
                 p_resource_id: resourceId,
-                p_resource_type: resourceType,
-                p_invited_by: currentUser.id,
-                p_sender_email: currentUser.email,
-                p_sender_display_name: senderDisplayName
+                p_resource_type: resourceType
             )
             
-            let response: ShareRPCResponse = try await client.rpc("share_resource", params: params).execute().value
+            let response: ShareRPCResponse = try await client.rpc("miloom_share_resource", params: params).execute().value
             
             if response.status == "shared_directly" {
                 AppDiagnostics.event("sharing", "share_resource", status: "shared_directly")
-                return // Skip email
+                return .sharedDirectly
             }
             
             AppDiagnostics.event("sharing", "share_resource", status: "invitation_created")
-            
-            // Invoke the edge function to send the email
-            struct ShareEmailPayload: Encodable {
-                let email: String
-                let role: String
-                let resourceType: String
-                let inviterId: UUID
-            }
-            
-            let payload = ShareEmailPayload(
-                email: email,
-                role: role,
-                resourceType: resourceType,
-                inviterId: currentUser.id
-            )
-            
-            if let encodedPayload = try? JSONEncoder().encode(payload) {
-                let options = FunctionInvokeOptions(method: .post, headers: ["Content-Type": "application/json"], body: encodedPayload)
-                do {
-                    try await client.functions.invoke("send-share-email", options: options)
-                    AppDiagnostics.event("sharing", "send_invitation_email", status: "requested")
-                } catch {
-                    AppDiagnostics.failure("sharing", "send_invitation_email", error: error)
-                    // We don't throw here so the UI still shows success for the database insertion
+
+            do {
+                guard let invitationId = response.invitationId else {
+                    AppDiagnostics.failure("sharing", "find_created_invitation")
+                    return .invitationCreatedEmailFailed
                 }
+
+                struct ShareEmailPayload: Encodable {
+                    let invitationId: UUID
+                }
+
+                let encodedPayload = try JSONEncoder().encode(ShareEmailPayload(invitationId: invitationId))
+                let options = FunctionInvokeOptions(
+                    method: .post,
+                    headers: ["Content-Type": "application/json"],
+                    body: encodedPayload
+                )
+
+                try await client.functions.invoke("send-share-email", options: options)
+                AppDiagnostics.event("sharing", "send_invitation_email", status: "sent")
+                return .invitationEmailSent
+            } catch {
+                AppDiagnostics.failure("sharing", "send_invitation_email", error: error)
+                return .invitationCreatedEmailFailed
             }
-            
         } catch {
             AppDiagnostics.failure("sharing", "share_resource", error: error)
             throw error
@@ -910,12 +915,100 @@ class DataRepository {
             .createSignedURL(path: storagePath, expiresIn: 60)
     }
     
-    // MARK: - Revoke Shared Access
-    func revokeResourceShare(invitationId: UUID) async throws {
-        try await client.from("resource_invitations")
-            .delete()
-            .eq("id", value: invitationId)
+    // MARK: - Managed Shared Access
+    func fetchManagedResourceAccess() async throws -> [ManagedResourceAccess] {
+        try await client.rpc("miloom_list_managed_access").execute().value
+    }
+
+    func fetchBlockedCollaborators() async throws -> [BlockedCollaborator] {
+        try await client.rpc("miloom_list_access_blocks").execute().value
+    }
+
+    func fetchIncomingInvitations() async throws -> [IncomingResourceInvitation] {
+        try await client.rpc("miloom_list_my_invitations").execute().value
+    }
+
+    func previewInvitation(token: String) async throws -> IncomingResourceInvitation {
+        struct Params: Encodable { let p_token: String }
+        let invitations: [IncomingResourceInvitation] = try await client
+            .rpc("miloom_preview_invitation_token", params: Params(p_token: token))
             .execute()
+            .value
+        guard let invitation = invitations.first else {
+            throw NSError(
+                domain: "Invitation",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "This invitation is unavailable or has expired."]
+            )
+        }
+        return invitation
+    }
+
+    func acceptInvitation(id: UUID) async throws -> InvitationDecisionResult {
+        struct Params: Encodable { let p_invitation_id: UUID }
+        return try await client
+            .rpc("miloom_accept_invitation", params: Params(p_invitation_id: id))
+            .execute()
+            .value
+    }
+
+    func acceptInvitation(token: String) async throws -> InvitationDecisionResult {
+        struct Params: Encodable { let p_token: String }
+        return try await client
+            .rpc("miloom_accept_invitation_token", params: Params(p_token: token))
+            .execute()
+            .value
+    }
+
+    func declineInvitation(id: UUID) async throws {
+        struct Params: Encodable { let p_invitation_id: UUID }
+        try await client
+            .rpc("miloom_decline_invitation", params: Params(p_invitation_id: id))
+            .execute()
+    }
+
+    func declineInvitation(token: String) async throws {
+        struct Params: Encodable { let p_token: String }
+        try await client
+            .rpc("miloom_decline_invitation_token", params: Params(p_token: token))
+            .execute()
+    }
+
+    func resendInvitation(id: UUID) async throws {
+        struct Payload: Encodable { let invitationId: UUID }
+        let payload = try JSONEncoder().encode(Payload(invitationId: id))
+        let options = FunctionInvokeOptions(
+            method: .post,
+            headers: ["Content-Type": "application/json"],
+            body: payload
+        )
+        try await client.functions.invoke("send-share-email", options: options)
+    }
+
+    func revokeResourceAccess(
+        accessId: UUID,
+        accessKind: String,
+        scope: AccessRevokeScope
+    ) async throws {
+        struct Params: Encodable {
+            let p_access_id: UUID
+            let p_access_kind: String
+            let p_scope: String
+        }
+
+        let params = Params(
+            p_access_id: accessId,
+            p_access_kind: accessKind,
+            p_scope: scope.rawValue
+        )
+        try await client.rpc("miloom_revoke_access", params: params).execute()
+    }
+
+    func unblockCollaborator(blockId: UUID) async throws {
+        struct Params: Encodable {
+            let p_block_id: UUID
+        }
+        try await client.rpc("miloom_unblock_collaborator", params: Params(p_block_id: blockId)).execute()
     }
 }
 

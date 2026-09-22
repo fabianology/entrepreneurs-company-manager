@@ -208,3 +208,91 @@ struct ResourceShare: Identifiable, Codable, Hashable {
         self.createdAt = createdAt
     }
 }
+
+struct ManagedResourceAccess: Identifiable, Codable, Hashable {
+    let accessId: UUID
+    let accessKind: String
+    let resourceId: UUID
+    let resourceType: String
+    let companyId: UUID?
+    let email: String
+    let subjectUserId: UUID?
+    let role: String
+    let status: String
+    let createdAt: Date
+
+    var id: UUID { accessId }
+
+    enum CodingKeys: String, CodingKey {
+        case accessId = "access_id"
+        case accessKind = "access_kind"
+        case resourceId = "resource_id"
+        case resourceType = "resource_type"
+        case companyId = "company_id"
+        case email
+        case subjectUserId = "subject_user_id"
+        case role
+        case status
+        case createdAt = "created_at"
+    }
+}
+
+struct BlockedCollaborator: Identifiable, Codable, Hashable {
+    let id: UUID
+    let email: String
+    let blockedUserId: UUID?
+    let createdAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case blockedUserId = "blocked_user_id"
+        case createdAt = "created_at"
+    }
+}
+
+enum AccessRevokeScope: String, CaseIterable {
+    case resource
+    case entity
+    case person
+}
+
+struct IncomingResourceInvitation: Identifiable, Codable, Hashable {
+    let invitationId: UUID
+    let resourceId: UUID
+    let resourceType: String
+    let resourceTitle: String
+    let companyId: UUID
+    let companyTitle: String
+    let inviterEmail: String
+    let role: String
+    let createdAt: Date
+    let expiresAt: Date
+
+    var id: UUID { invitationId }
+
+    enum CodingKeys: String, CodingKey {
+        case invitationId = "invitation_id"
+        case resourceId = "resource_id"
+        case resourceType = "resource_type"
+        case resourceTitle = "resource_title"
+        case companyId = "company_id"
+        case companyTitle = "company_title"
+        case inviterEmail = "inviter_email"
+        case role
+        case createdAt = "created_at"
+        case expiresAt = "expires_at"
+    }
+}
+
+struct InvitationDecisionResult: Codable, Hashable {
+    let status: String
+    let resourceId: UUID?
+    let resourceType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case resourceId = "resource_id"
+        case resourceType = "resource_type"
+    }
+}

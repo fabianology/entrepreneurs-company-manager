@@ -1457,10 +1457,10 @@ struct LinkedAccountsSheet: View {
 struct EntityCollaborators: Identifiable {
     var id: UUID { company.id }
     let company: Company
-    var companyShares: [ResourceInvitation] = []
-    var bankShares: [ResourceInvitation] = []
-    var subscriptionShares: [ResourceInvitation] = []
-    var documentShares: [ResourceInvitation] = []
+    var companyShares: [ManagedResourceAccess] = []
+    var bankShares: [ManagedResourceAccess] = []
+    var subscriptionShares: [ManagedResourceAccess] = []
+    var documentShares: [ManagedResourceAccess] = []
     
     var isEmpty: Bool {
         companyShares.isEmpty && bankShares.isEmpty && subscriptionShares.isEmpty && documentShares.isEmpty
@@ -1472,47 +1472,37 @@ struct CollaboratorsSheet: View {
     let appState: AppState
     @Environment(\.dismiss) private var dismiss
     
-    @State private var collaborators: [ResourceInvitation] = []
+    @State private var collaborators: [ManagedResourceAccess] = []
+    @State private var blockedCollaborators: [BlockedCollaborator] = []
     @State private var isLoading = false
-    @State private var revokingId: UUID? = nil
-    @State private var showingRevokeAlert = false
-    @State private var revokingEmail = ""
+    @State private var selectedAccess: ManagedResourceAccess?
+    @State private var showingRevokeOptions = false
+    @State private var selectedBlock: BlockedCollaborator?
+    @State private var showingUnblockAlert = false
+    @State private var errorMessage: String?
+    @State private var resendingInvitationId: UUID?
     
     var groupedCollaborators: [EntityCollaborators] {
         var groups: [EntityCollaborators] = []
         
         for company in appState.companies {
-            var companyShares: [ResourceInvitation] = []
-            var bankShares: [ResourceInvitation] = []
-            var subscriptionShares: [ResourceInvitation] = []
-            var documentShares: [ResourceInvitation] = []
+            var companyShares: [ManagedResourceAccess] = []
+            var bankShares: [ManagedResourceAccess] = []
+            var subscriptionShares: [ManagedResourceAccess] = []
+            var documentShares: [ManagedResourceAccess] = []
             
             for collab in collaborators {
                 let type = collab.resourceType.lowercased()
-                if type == "company" && collab.resourceId == company.id {
+                guard collab.companyId == company.id else { continue }
+
+                if type == "company" {
                     companyShares.append(collab)
-                } else if type == "institution" || type == "card" || type == "loan" {
-                    if type == "institution" {
-                        if let inst = appState.institutions.first(where: { $0.id == collab.resourceId }), inst.companyId == company.id {
-                            bankShares.append(collab)
-                        }
-                    } else if type == "card" {
-                        if let card = appState.cards.first(where: { $0.id == collab.resourceId }), card.companyId == company.id {
-                            bankShares.append(collab)
-                        }
-                    } else if type == "loan" {
-                        if let loan = appState.loans.first(where: { $0.id == collab.resourceId }), loan.companyId == company.id {
-                            bankShares.append(collab)
-                        }
-                    }
-                } else if type == "subscription" {
-                    if let sub = appState.subscriptions.first(where: { $0.id == collab.resourceId }), sub.companyId == company.id {
-                        subscriptionShares.append(collab)
-                    }
-                } else if type == "document" {
-                    if let doc = appState.documents.first(where: { $0.id == collab.resourceId }), doc.companyId == company.id {
-                        documentShares.append(collab)
-                    }
+                } else if ["all_financials", "institution", "card", "loan"].contains(type) {
+                    bankShares.append(collab)
+                } else if ["all_subscriptions", "subscription"].contains(type) {
+                    subscriptionShares.append(collab)
+                } else if ["all_documents", "document"].contains(type) {
+                    documentShares.append(collab)
                 }
             }
             
@@ -1532,76 +1522,20 @@ struct CollaboratorsSheet: View {
         return groups
     }
     
-    var uncategorizedShares: [ResourceInvitation] {
-        collaborators.filter { collab in
-            let type = collab.resourceType.lowercased()
-            for company in appState.companies {
-                if type == "company" && collab.resourceId == company.id {
-                    return false
-                } else if type == "institution" || type == "card" || type == "loan" {
-                    if type == "institution" {
-                        if let inst = appState.institutions.first(where: { $0.id == collab.resourceId }), inst.companyId == company.id {
-                            return false
-                        }
-                    } else if type == "card" {
-                        if let card = appState.cards.first(where: { $0.id == collab.resourceId }), card.companyId == company.id {
-                            return false
-                        }
-                    } else if type == "loan" {
-                        if let loan = appState.loans.first(where: { $0.id == collab.resourceId }), loan.companyId == company.id {
-                            return false
-                        }
-                    }
-                } else if type == "subscription" {
-                    if let sub = appState.subscriptions.first(where: { $0.id == collab.resourceId }), sub.companyId == company.id {
-                        return false
-                    }
-                } else if type == "document" {
-                    if let doc = appState.documents.first(where: { $0.id == collab.resourceId }), doc.companyId == company.id {
-                        return false
-                    }
-                }
-            }
-            return true
+    var uncategorizedShares: [ManagedResourceAccess] {
+        collaborators.filter { access in
+            guard let companyId = access.companyId else { return true }
+            return !appState.companies.contains(where: { $0.id == companyId })
         }
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(hex: "#171717").ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
-                    }
-                    
-                    Spacer()
-                    
-                    Text("COLLABORATORS")
-                        .zifrLabel()
-                    
-                    Spacer()
-                    
-                    Color.clear.frame(width: 44, height: 44)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 16)
-                
+        NavigationStack {
+            Group {
                 if isLoading {
                     VStack {
                         ProgressView()
-                            .tint(Color(hex: "#4f46e5"))
+                            .tint(Color.zifrGold)
                             .scaleEffect(1.2)
                         Text("Loading collaborators...")
                             .font(.system(size: 13, weight: .medium))
@@ -1609,34 +1543,46 @@ struct CollaboratorsSheet: View {
                             .padding(.top, 8)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if collaborators.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.2.slash")
-                            .font(.system(size: 48, weight: .light))
-                            .foregroundStyle(Color.white.opacity(0.3))
-                        Text("No shared collaborators found")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.5))
-                    }
+                } else if collaborators.isEmpty && blockedCollaborators.isEmpty {
+                    ContentUnavailableView(
+                        "No Collaborators",
+                        systemImage: "person.2.slash",
+                        description: Text("People you share resources with will appear here.")
+                    )
+                    .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(groupedCollaborators) { group in
-                                EntityCollaboratorsCard(group: group, appState: appState) { collab in
+                                EntityCollaboratorsCard(
+                                    group: group,
+                                    appState: appState,
+                                    resendingInvitationId: resendingInvitationId,
+                                    onResend: performResend
+                                ) { collab in
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    revokingId = collab.id
-                                    revokingEmail = collab.email
-                                    showingRevokeAlert = true
+                                    selectedAccess = collab
+                                    showingRevokeOptions = true
                                 }
                             }
                             
                             if !uncategorizedShares.isEmpty {
-                                UncategorizedCollaboratorsCard(shares: uncategorizedShares) { collab in
+                                UncategorizedCollaboratorsCard(
+                                    shares: uncategorizedShares,
+                                    resendingInvitationId: resendingInvitationId,
+                                    onResend: performResend
+                                ) { collab in
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    revokingId = collab.id
-                                    revokingEmail = collab.email
-                                    showingRevokeAlert = true
+                                    selectedAccess = collab
+                                    showingRevokeOptions = true
+                                }
+                            }
+
+                            if !blockedCollaborators.isEmpty {
+                                BlockedCollaboratorsCard(blocks: blockedCollaborators) { block in
+                                    selectedBlock = block
+                                    showingUnblockAlert = true
                                 }
                             }
                         }
@@ -1644,57 +1590,173 @@ struct CollaboratorsSheet: View {
                         .padding(.top, 16)
                         .padding(.bottom, 40)
                     }
+                    .refreshable {
+                        await loadCollaborators()
+                    }
+                }
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle("Collaborators & Sharing")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Collaborators & Sharing")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
                 }
             }
         }
         .task {
             await loadCollaborators()
         }
-        .alert("Revoke Collaborator Access?", isPresented: $showingRevokeAlert) {
+        .confirmationDialog(
+            "Manage \(selectedAccess?.email ?? "Collaborator")",
+            isPresented: $showingRevokeOptions,
+            titleVisibility: .visible
+        ) {
+            Button(selectedAccess?.accessKind == "invitation" ? "Cancel This Invitation" : "Remove from This Resource", role: .destructive) {
+                performRevoke(scope: .resource)
+            }
+            Button("Remove from This Entity", role: .destructive) {
+                performRevoke(scope: .entity)
+            }
+            .disabled(selectedAccess?.companyId == nil)
+            Button("Block All Access for This Person", role: .destructive) {
+                performRevoke(scope: .person)
+            }
             Button("Cancel", role: .cancel) {}
-            Button("Revoke Access", role: .destructive) {
-                if let id = revokingId {
-                    performRevoke(invitationId: id)
-                }
+        } message: {
+            Text("Choose how broadly Miloom should remove access. Other independent shares remain unless you select a broader scope.")
+        }
+        .alert("Unblock Collaborator?", isPresented: $showingUnblockAlert) {
+            Button("Cancel", role: .cancel) {}
+            Button("Unblock") {
+                performUnblock()
             }
         } message: {
-            Text("This will instantly and permanently revoke \(revokingEmail)'s access to the shared resource and remove it from their dashboard.")
+            Text("\(selectedBlock?.email ?? "This person") can be invited again after being unblocked.")
         }
+        .alert("Access Couldn’t Be Updated", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "Please try again.")
+        }
+        .presentationDetents([.fraction(0.86), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
     }
     
     private func loadCollaborators() async {
-        guard let session = try? await SupabaseService.shared.client.auth.session else { return }
-        let currentUserId = session.user.id
+        guard (try? await SupabaseService.shared.client.auth.session) != nil else { return }
         
         await MainActor.run { isLoading = true }
         
         do {
-            let list: [ResourceInvitation] = try await SupabaseService.shared.client.from("resource_invitations")
-                .select()
-                .eq("invited_by", value: currentUserId)
-                .order("created_at", ascending: false)
-                .execute()
-                .value
+            async let access = DataRepository.shared.fetchManagedResourceAccess()
+            async let blocks = DataRepository.shared.fetchBlockedCollaborators()
+            let (list, blocked) = try await (access, blocks)
             
             await MainActor.run {
                 self.collaborators = list
+                self.blockedCollaborators = blocked
                 self.isLoading = false
             }
         } catch {
             AppDiagnostics.failure("sharing", "fetch_active_shares", error: error)
-            await MainActor.run { self.isLoading = false }
+            await MainActor.run {
+                self.isLoading = false
+                self.errorMessage = "Collaborators couldn’t be loaded. Pull down to try again."
+            }
         }
     }
     
-    private func performRevoke(invitationId: UUID) {
+    private func performRevoke(scope: AccessRevokeScope) {
+        guard let access = selectedAccess else { return }
         Task {
             do {
-                try await DataRepository.shared.revokeResourceShare(invitationId: invitationId)
-                await DataRepository.shared.logSecurityEvent(title: "Access Revoked", message: "You permanently revoked \(revokingEmail)'s access to a shared resource.")
+                try await DataRepository.shared.revokeResourceAccess(
+                    accessId: access.accessId,
+                    accessKind: access.accessKind,
+                    scope: scope
+                )
+                await DataRepository.shared.logSecurityEvent(
+                    title: scope == .person ? "Collaborator Blocked" : "Access Revoked",
+                    message: "You removed \(access.email)'s access with \(scope.rawValue) scope."
+                )
                 await loadCollaborators()
                 await DataRepository.shared.fetchAllData(appState: appState)
+                await MainActor.run {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    selectedAccess = nil
+                }
             } catch {
                 AppDiagnostics.failure("sharing", "revoke_share", error: error)
+                await MainActor.run {
+                    errorMessage = "Access couldn’t be updated. Please try again."
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                }
+            }
+        }
+    }
+
+    private func performUnblock() {
+        guard let block = selectedBlock else { return }
+        Task {
+            do {
+                try await DataRepository.shared.unblockCollaborator(blockId: block.id)
+                await DataRepository.shared.logSecurityEvent(
+                    title: "Collaborator Unblocked",
+                    message: "You unblocked \(block.email)."
+                )
+                await loadCollaborators()
+                await MainActor.run {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    selectedBlock = nil
+                }
+            } catch {
+                AppDiagnostics.failure("sharing", "unblock_collaborator", error: error)
+                await MainActor.run {
+                    errorMessage = "The collaborator couldn’t be unblocked. Please try again."
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                }
+            }
+        }
+    }
+
+    private func performResend(_ access: ManagedResourceAccess) {
+        guard access.accessKind == "invitation", resendingInvitationId == nil else { return }
+        resendingInvitationId = access.id
+        Task {
+            do {
+                try await DataRepository.shared.resendInvitation(id: access.id)
+                await DataRepository.shared.logSecurityEvent(
+                    title: "Invitation Resent",
+                    message: "You resent \(access.email)'s invitation."
+                )
+                await loadCollaborators()
+                await MainActor.run {
+                    resendingInvitationId = nil
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+            } catch {
+                AppDiagnostics.failure("sharing", "resend_invitation", error: error)
+                await MainActor.run {
+                    resendingInvitationId = nil
+                    errorMessage = "The invitation couldn’t be resent. Wait a moment and try again."
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                }
             }
         }
     }
@@ -1703,7 +1765,9 @@ struct CollaboratorsSheet: View {
 struct EntityCollaboratorsCard: View {
     let group: EntityCollaborators
     let appState: AppState
-    let onRevoke: (ResourceInvitation) -> Void
+    let resendingInvitationId: UUID?
+    let onResend: (ManagedResourceAccess) -> Void
+    let onRevoke: (ManagedResourceAccess) -> Void
     
     @State private var isExpanded: Bool = false
     @State private var isCompanyExpanded: Bool = true
@@ -1775,7 +1839,7 @@ struct EntityCollaboratorsCard: View {
                             if isCompanyExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.companyShares) { collab in
-                                        NestedCollaboratorRow(collab: collab, resourceName: group.company.name, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1802,8 +1866,7 @@ struct EntityCollaboratorsCard: View {
                             if isBanksExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.bankShares) { collab in
-                                        let name = appState.institutions.first(where: { $0.id == collab.resourceId })?.name ?? "Bank Access"
-                                        NestedCollaboratorRow(collab: collab, resourceName: name, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1830,8 +1893,7 @@ struct EntityCollaboratorsCard: View {
                             if isSubscriptionsExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.subscriptionShares) { collab in
-                                        let name = appState.subscriptions.first(where: { $0.id == collab.resourceId })?.name ?? "Subscription Access"
-                                        NestedCollaboratorRow(collab: collab, resourceName: name, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1858,8 +1920,7 @@ struct EntityCollaboratorsCard: View {
                             if isDocumentsExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.documentShares) { collab in
-                                        let name = appState.documents.first(where: { $0.id == collab.resourceId })?.name ?? "Document Access"
-                                        NestedCollaboratorRow(collab: collab, resourceName: name, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1872,7 +1933,22 @@ struct EntityCollaboratorsCard: View {
                 .padding(.bottom, 16)
             }
         }
-        .zifrCardBox(cornerRadius: 20)
+        .modifier(AdminSheetCardSurface(cornerRadius: 20))
+    }
+
+    private func resourceName(for access: ManagedResourceAccess) -> String {
+        switch access.resourceType.lowercased() {
+        case "company": return group.company.name
+        case "all_financials": return "All Financials"
+        case "all_subscriptions": return "All Subscriptions"
+        case "all_documents": return "All Documents"
+        case "institution": return appState.institutions.first(where: { $0.id == access.resourceId })?.name ?? "Financial Institution"
+        case "card": return appState.cards.first(where: { $0.id == access.resourceId })?.name ?? "Financial Card"
+        case "loan": return appState.loans.first(where: { $0.id == access.resourceId })?.name ?? "Loan"
+        case "subscription": return appState.subscriptions.first(where: { $0.id == access.resourceId })?.name ?? "Subscription"
+        case "document": return appState.documents.first(where: { $0.id == access.resourceId })?.name ?? "Document"
+        default: return "Shared Resource"
+        }
     }
 }
 
@@ -1919,8 +1995,10 @@ struct CollaboratorSubAccordionHeader: View {
 }
 
 struct NestedCollaboratorRow: View {
-    let collab: ResourceInvitation
+    let collab: ManagedResourceAccess
     let resourceName: String
+    let isResending: Bool
+    let onResend: () -> Void
     let onRevoke: () -> Void
     
     var body: some View {
@@ -1932,15 +2010,13 @@ struct NestedCollaboratorRow: View {
                         .foregroundStyle(.white)
                         .lineLimit(1)
                     
-                    if collab.status.lowercased() == "pending" {
-                        Text("PENDING")
+                    Text(collab.status.uppercased())
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color.orange)
+                            .foregroundStyle(statusColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.15))
+                            .background(statusColor.opacity(0.15))
                             .clipShape(Capsule())
-                    }
                 }
                 
                 HStack(spacing: 6) {
@@ -1964,16 +2040,45 @@ struct NestedCollaboratorRow: View {
             }
             
             Spacer()
-            
+
+            if collab.accessKind == "invitation" {
+                Button(action: onResend) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.zifrGold.opacity(0.1))
+                            .frame(width: 32, height: 32)
+                        if isResending {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(Color.zifrGold)
+                        } else {
+                            Image(systemName: "envelope.arrow.triangle.branch")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.zifrGold)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isResending)
+                .accessibilityLabel("Resend invitation to \(collab.email)")
+            }
+
             Button(action: onRevoke) {
-                Image(systemName: "trash")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.red.opacity(0.85))
-                    .frame(width: 32, height: 32)
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(Circle())
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.1))
+                        .frame(width: 32, height: 32)
+                    Image(systemName: "trash")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.red.opacity(0.85))
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Manage access for \(collab.email)")
         }
         .padding(12)
         .background(Color.white.opacity(0.04))
@@ -1991,11 +2096,21 @@ struct NestedCollaboratorRow: View {
         default: return Color(hex: "#3b82f6")
         }
     }
+
+    private var statusColor: Color {
+        switch collab.status.lowercased() {
+        case "active", "accepted": return .green
+        case "pending": return .orange
+        default: return .red
+        }
+    }
 }
 
 struct UncategorizedCollaboratorsCard: View {
-    let shares: [ResourceInvitation]
-    let onRevoke: (ResourceInvitation) -> Void
+    let shares: [ManagedResourceAccess]
+    let resendingInvitationId: UUID?
+    let onResend: (ManagedResourceAccess) -> Void
+    let onRevoke: (ManagedResourceAccess) -> Void
     
     @State private var isExpanded: Bool = false
     
@@ -2054,7 +2169,13 @@ struct UncategorizedCollaboratorsCard: View {
                     
                     VStack(spacing: 8) {
                         ForEach(shares) { collab in
-                            NestedCollaboratorRow(collab: collab, resourceName: "Resource type: \(collab.resourceType.capitalized)", onRevoke: { onRevoke(collab) })
+                            NestedCollaboratorRow(
+                                collab: collab,
+                                resourceName: "Resource type: \(collab.resourceType.capitalized)",
+                                isResending: resendingInvitationId == collab.id,
+                                onResend: { onResend(collab) },
+                                onRevoke: { onRevoke(collab) }
+                            )
                         }
                     }
                     .padding(.horizontal, 16)
@@ -2062,6 +2183,113 @@ struct UncategorizedCollaboratorsCard: View {
                 .padding(.bottom, 16)
             }
         }
-        .zifrCardBox(cornerRadius: 20)
+        .modifier(AdminSheetCardSurface(cornerRadius: 20))
+    }
+}
+
+struct BlockedCollaboratorsCard: View {
+    let blocks: [BlockedCollaborator]
+    let onUnblock: (BlockedCollaborator) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.red.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Blocked People")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text("They cannot receive new access")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.45))
+                }
+
+                Spacer()
+
+                Text("\(blocks.count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.red.opacity(0.12), in: Capsule())
+            }
+            .padding(16)
+
+            Divider()
+                .overlay(Color.white.opacity(0.08))
+                .padding(.horizontal, 16)
+
+            VStack(spacing: 8) {
+                ForEach(blocks) { block in
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(block.email)
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                            Text("BLOCKED")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.red.opacity(0.12), in: Capsule())
+                        }
+
+                        Spacer()
+
+                        Button("Unblock") {
+                            onUnblock(block)
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .buttonStyle(.bordered)
+                        .tint(Color(hex: "#C1AA78"))
+                        .frame(minHeight: 44)
+                        .accessibilityHint("Allows this person to be invited again")
+                    }
+                    .padding(12)
+                    .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                    }
+                }
+            }
+            .padding(16)
+        }
+        .modifier(AdminSheetCardSurface(cornerRadius: 20))
+    }
+}
+
+private struct AdminSheetCardSurface: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        content
+            .background(shape.fill(Color.black.opacity(0.70)))
+            .background(.regularMaterial, in: shape)
+            .clipShape(shape)
+            .overlay {
+                shape.stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+            }
     }
 }
