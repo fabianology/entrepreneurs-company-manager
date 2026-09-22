@@ -140,6 +140,32 @@ class DataRepository {
         }
     }
 
+    /// A foreground check stays inexpensive when grants are unchanged, while
+    /// refreshing all RLS-scoped records after a collaborator is added, removed,
+    /// or assigned a different role. Never interpret a failed check as revocation.
+    @MainActor
+    func refreshPortfolioIfSharingChanged(appState: AppState) async {
+        guard appState.hasLoadedPortfolio,
+              let userID = appState.portfolioUserID,
+              (try? await client.auth.session.user.id) == userID else { return }
+
+        do {
+            let shares: [ResourceShare] = try await client
+                .from("resource_shares")
+                .select()
+                .execute()
+                .value
+            guard !Task.isCancelled,
+                  appState.portfolioUserID == userID,
+                  (try? await client.auth.session.user.id) == userID else { return }
+            if Set(shares) != Set(appState.resourceShares) {
+                await fetchAllData(appState: appState, force: true)
+            }
+        } catch {
+            AppDiagnostics.failure("data", "refresh_sharing_on_foreground", error: error)
+        }
+    }
+
     private func safeFetchAlertRules() async -> [AlertRule] {
         do { return try await fetchAlertRules() }
         catch {
@@ -197,9 +223,9 @@ class DataRepository {
     }
 
     @MainActor
-    func fetchAllData(appState: AppState) async {
+    func fetchAllData(appState: AppState, force: Bool = false) async {
         guard let loadingUserID = try? await client.auth.session.user.id else { return }
-        if appState.isLoading && appState.portfolioLoadingUserID == loadingUserID { return }
+        if !force && appState.isLoading && appState.portfolioLoadingUserID == loadingUserID { return }
         if appState.portfolioUserID != loadingUserID {
             appState.clearSearchSession()
             appState.companies = []

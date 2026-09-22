@@ -91,6 +91,7 @@ struct ZifrApp: App {
                         Task {
                             await accessController.refresh()
                             appState.entitlementSnapshot = accessController.effectiveSnapshot
+                            await DataRepository.shared.refreshPortfolioIfSharingChanged(appState: appState)
                             try? await DataRepository.shared.refreshNotifications(appState: appState)
                             try? await DataRepository.shared.refreshBusinessExpenses(appState: appState)
                         }

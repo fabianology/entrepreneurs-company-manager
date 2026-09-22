@@ -2134,6 +2134,7 @@ struct CollaboratorsSheet: View {
     @State private var isLoading = false
     @State private var selectedAccess: ManagedResourceAccess?
     @State private var showingRevokeOptions = false
+    @State private var showingBlockConfirmation = false
     @State private var selectedBlock: BlockedCollaborator?
     @State private var showingUnblockAlert = false
     @State private var errorMessage: String?
@@ -2288,11 +2289,21 @@ struct CollaboratorsSheet: View {
             }
             .disabled(selectedAccess?.companyId == nil)
             Button("Block All Access for This Person", role: .destructive) {
-                performRevoke(scope: .person)
+                showingBlockConfirmation = true
             }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Choose how broadly Miloom should remove access. Other independent shares remain unless you select a broader scope.")
+        }
+        .alert("Block All Access?", isPresented: $showingBlockConfirmation) {
+            Button("Cancel", role: .cancel) {
+                selectedAccess = nil
+            }
+            Button("Block All Access", role: .destructive) {
+                performRevoke(scope: .person)
+            }
+        } message: {
+            Text("Remove \(selectedAccess?.email ?? "this person") from every resource you've shared with them and prevent new invitations until you unblock them? There is no Undo.")
         }
         .alert("Unblock Collaborator?", isPresented: $showingUnblockAlert) {
             Button("Cancel", role: .cancel) {}
