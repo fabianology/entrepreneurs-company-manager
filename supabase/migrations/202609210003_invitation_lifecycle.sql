@@ -3,6 +3,8 @@
 
 begin;
 
+create extension if not exists pgcrypto with schema extensions;
+
 alter table public.resource_invitations
     add column if not exists token_hash bytea,
     add column if not exists token_issued_at timestamptz,
@@ -83,11 +85,11 @@ security definer
 set search_path = public
 as $$
 declare
-    v_token text := encode(gen_random_bytes(32), 'hex');
+    v_token text := encode(extensions.gen_random_bytes(32), 'hex');
     v_expires_at timestamptz := now() + interval '7 days';
 begin
     update public.resource_invitations
-       set token_hash = digest(v_token, 'sha256'),
+       set token_hash = extensions.digest(v_token, 'sha256'),
            token_issued_at = now(),
            expires_at = v_expires_at,
            last_sent_at = now(),
@@ -194,7 +196,7 @@ as $$
       left join auth.users au on au.id = ri.invited_by
      where auth.uid() is not null
        and p_token ~ '^[0-9a-f]{64}$'
-       and ri.token_hash = digest(p_token, 'sha256')
+       and ri.token_hash = extensions.digest(p_token, 'sha256')
        and lower(ri.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
        and ri.status = 'Pending'
        and ri.expires_at > now()
@@ -234,7 +236,7 @@ begin
             or (
                 p_token is not null
                 and p_token ~ '^[0-9a-f]{64}$'
-                and ri.token_hash = digest(p_token, 'sha256')
+                and ri.token_hash = extensions.digest(p_token, 'sha256')
             )
         )
        and lower(ri.email) = v_actor_email

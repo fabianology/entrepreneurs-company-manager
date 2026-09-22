@@ -38,12 +38,16 @@ begin
         alter table public.resource_invitations
             add constraint resource_invitations_role_check check (role in ('Viewer', 'Editor', 'Admin'));
     end if;
-    if not exists (select 1 from pg_constraint where conname = 'resource_invitations_status_check') then
-        alter table public.resource_invitations
-            add constraint resource_invitations_status_check check (status in ('Pending', 'Accepted', 'Declined', 'Revoked'));
-    end if;
 end;
 $$;
+
+-- Production already has a narrower Pending/Accepted constraint. Replace it so
+-- the decline and revoke lifecycle can persist its terminal states.
+alter table public.resource_invitations
+    drop constraint if exists resource_invitations_status_check;
+alter table public.resource_invitations
+    add constraint resource_invitations_status_check
+    check (status in ('Pending', 'Accepted', 'Declined', 'Revoked'));
 
 create table if not exists public.resource_access_blocks (
     id uuid primary key default gen_random_uuid(),

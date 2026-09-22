@@ -14,6 +14,10 @@ Migration: `migrations/202609210002_canonical_resource_access.sql`
 - A registered email becomes a direct `resource_shares` edge. An unknown email becomes a pending `resource_invitations` edge.
 - One active edge exists per person/resource. Re-sharing updates the role instead of creating another active edge.
 - Sharing tables are read-only to authenticated clients. Mutations pass through security-definer RPCs with explicit grants; anonymous execution is denied.
+- The older `share_resource` overloads remain callable by authenticated clients,
+  but are thin compatibility wrappers around `miloom_share_resource`; forged
+  inviter/sender values are ignored and anonymous execution is denied. The
+  legacy one-argument `leave_resource` RPC is likewise authenticated-only.
 - Authorization rows and future vault key wraps remain separate. This phase creates no cryptographic grants.
 
 ## Canonical RPCs
@@ -81,7 +85,9 @@ This source change is not backward-compatible with a database that lacks the new
 4. Deploy the secured `send-share-email` function.
 5. Verify valid owner, wrong owner, anonymous, direct-share, pending-invitation, each revoke scope, block, unblock, and leave flows with disposable accounts.
 6. Distribute the matching iOS build.
-7. After the minimum supported client uses the canonical RPCs, remove or revoke the untracked legacy `share_resource` and `leave_resource` functions in a separate audited migration.
+7. After the minimum supported client uses the canonical RPCs, remove the
+   authenticated-only legacy compatibility wrappers in a separate audited
+   migration.
 
 Do not deploy the client before the migration. Do not remove legacy RPCs until active older clients are accounted for.
 

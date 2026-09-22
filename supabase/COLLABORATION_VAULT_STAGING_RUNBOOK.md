@@ -25,8 +25,22 @@ production deployment.
 - The generated staging database password was not written to the repository or
   logs. Reset or retrieve it through the approved secure credential workflow
   before a CLI operation that requires it.
-- Migrations, functions, website assets, secrets, and production data were not
-  changed while preparing this runbook.
+- On 2026-09-22, the audited production `public` and `private` schema was copied
+  into staging without table rows, auth users, Storage objects, secrets, or cron
+  jobs. The combined schema artifact was 244,514 bytes with SHA-256
+  `ea59128bbda4cffcdb21b67544bbcd9c1c6e7bc5bf05e69483b75fe4019468d3`.
+- Staging now has migrations through
+  `202609220002_harden_legacy_resource_access.sql`. The five planned
+  collaboration/vault migrations, the invitation-status forward repair, and
+  the legacy-client security wrapper all passed their current rollback-only
+  contract suites.
+- `send-share-email` deployment `2001e494-be58-42d8-9d80-998cc102df20` and
+  `approve-vault-device` deployment `df2277ed-2f9c-4428-bb69-eba7b95e1831`
+  are active in staging with gateway JWT verification enabled. Anonymous HTTP
+  requests return 401.
+- Staging custom secrets are still empty. Invitation delivery therefore remains
+  intentionally unavailable until a staging-only Resend key and sender are
+  configured. No website asset or production system was deployed or changed.
 
 ## Gate 1 — create and identify staging
 
@@ -46,7 +60,7 @@ the known production ref, requires the explicit ref to match the CLI link,
 confirms the verified Phase 5 commit is in history, rejects uncommitted rollout
 artifacts, and checks the universal-link contract.
 
-### Current baseline stop
+### Resolved staging baseline
 
 The first staging dry run on 2026-09-21 correctly performed no deployment, but
 it proposed all 33 tracked migrations because the new staging project has no app
@@ -55,12 +69,11 @@ app schema and migration history through `202609210001`; migrations
 `202609210002` through `202609210006` are not present there. Do not push the
 33-migration plan and do not mark unapplied versions as repaired.
 
-Before Gate 2 can continue, establish an audited schema-only staging baseline
-that matches production through `202609210001`. It must contain no customer
-rows, auth users, Storage objects, secrets, external webhook credentials, or
-active scheduled jobs. Record the baseline source and verification, then rerun
-the dry run. The expected pending set is exactly `202609210002` through
-`202609210006`.
+The audited schema-only staging baseline now matches production through
+`202609210001`. Exact verification after the rehearsal reported 52 public
+tables, zero rows across all 52, zero auth users, zero Storage objects, and no
+cron job table. Migration history contains all 35 repository migrations through
+`202609220002`, and the final dry run reports no pending migrations.
 
 ## Gate 2 — schema rehearsal and dry run
 
@@ -80,6 +93,13 @@ the dry run. The expected pending set is exactly `202609210002` through
    3. `202609210004_vault_key_foundation.sql`
    4. `202609210005_vault_device_approval_and_recovery.sql`
    5. `202609210006_vault_rotation_and_device_revocation.sql`
+   6. `202609220001_expand_resource_invitation_statuses.sql`
+   7. `202609220002_harden_legacy_resource_access.sql`
+
+   The two September 22 migrations are forward repairs discovered by staging:
+   the first expands production's older invitation-status constraint; the
+   second keeps older client RPC signatures while routing them through the
+   canonical owner-authorized implementation and denying anonymous execution.
 
 5. Stop if the dry run includes an unexpected migration, destructive statement,
    legacy-RPC removal, or monetization-enforcement change. Reconcile migration
@@ -90,7 +110,8 @@ the dry run. The expected pending set is exactly `202609210002` through
 ## Gate 3 — staging backend and web assets
 
 1. Confirm the audited baseline includes `001`, then apply migrations `002`
-   through `006` in timestamp order.
+   through `006` followed by the two September 22 forward repairs in timestamp
+   order.
 2. Configure staging function secrets using a secure secret source, never shell
    history or a tracked file:
    `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,

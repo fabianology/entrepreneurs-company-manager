@@ -80,6 +80,42 @@ begin
 end;
 $$;
 
+-- Older app builds retain their original RPC signatures, but their requests
+-- are now authorized and normalized by the canonical implementation.
+do $$
+declare
+    v_text_result text;
+    v_json_result json;
+begin
+    v_text_result := public.share_resource(
+        'collaborator@example.com', 'Viewer',
+        '82000000-0000-0000-0000-000000000002', 'company',
+        'forged-sender@example.com', 'Forged Sender'
+    );
+    if v_text_result <> 'share_created' then
+        raise exception 'Legacy text sharing RPC did not preserve its response contract';
+    end if;
+
+    v_json_result := public.share_resource(
+        'legacy-pending@example.com', 'Viewer',
+        '83000000-0000-0000-0000-000000000002', 'subscription',
+        '81000000-0000-0000-0000-000000000003',
+        'forged-sender@example.com', 'Forged Sender'
+    );
+    if v_json_result->>'status' <> 'invited' then
+        raise exception 'Legacy JSON sharing RPC did not preserve its response contract';
+    end if;
+    if not exists (
+        select 1 from public.resource_invitations
+         where email = 'legacy-pending@example.com'
+           and invited_by = '81000000-0000-0000-0000-000000000001'
+           and sender_email = 'owner@example.com'
+    ) then
+        raise exception 'Legacy sharing RPC trusted forged inviter or sender data';
+    end if;
+end;
+$$;
+
 -- Resource scope removes only the selected resource and any matching form of access.
 do $$
 declare v_access_id uuid;
@@ -199,6 +235,15 @@ begin
     end if;
     if has_function_privilege('anon', 'public.miloom_revoke_access(uuid,text,text)', 'EXECUTE') then
         raise exception 'Anonymous role can execute revoke RPC';
+    end if;
+    if has_function_privilege('anon', 'public.share_resource(text,text,uuid,text,text,text)', 'EXECUTE') then
+        raise exception 'Anonymous role can execute legacy text sharing RPC';
+    end if;
+    if has_function_privilege('anon', 'public.share_resource(text,text,uuid,text,uuid,text,text)', 'EXECUTE') then
+        raise exception 'Anonymous role can execute legacy JSON sharing RPC';
+    end if;
+    if has_function_privilege('anon', 'public.leave_resource(uuid)', 'EXECUTE') then
+        raise exception 'Anonymous role can execute legacy leave RPC';
     end if;
 end;
 $$;
