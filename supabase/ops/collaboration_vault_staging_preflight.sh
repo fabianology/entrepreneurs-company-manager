@@ -80,6 +80,7 @@ supabase/migrations/202609220001_expand_resource_invitation_statuses.sql
 supabase/migrations/202609220002_harden_legacy_resource_access.sql
 supabase/migrations/202609220003_restore_auth_user_triggers.sql
 supabase/migrations/202609220004_disable_automatic_invitation_acceptance.sql
+supabase/migrations/202609220005_allow_revoked_vault_device_reregistration.sql
 supabase/tests/canonical_resource_access_contracts.sql
 supabase/tests/auth_user_trigger_contracts.sql
 supabase/tests/active_sessions_contracts.sql
@@ -87,6 +88,7 @@ supabase/tests/invitation_lifecycle_contracts.sql
 supabase/tests/vault_key_foundation_contracts.sql
 supabase/tests/vault_phase4_contracts.sql
 supabase/tests/vault_phase5_contracts.sql
+supabase/tests/vault_device_reregistration_contracts.sql
 "
 
 for required_path in $release_paths; do

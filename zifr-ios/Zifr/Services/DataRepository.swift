@@ -1973,7 +1973,9 @@ final class VaultService: @unchecked Sendable {
         let session = try await client.auth.refreshSession()
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)
         let devices = try await listDevices()
-        guard currentDevice(in: devices, identity: identity) == nil else { return }
+        if let device = currentDevice(in: devices, identity: identity), device.status != "revoked" {
+            return
+        }
         struct Params: Encodable {
             let p_device_label: String
             let p_platform: String
@@ -2057,7 +2059,16 @@ final class VaultService: @unchecked Sendable {
             headers: ["Content-Type": "application/json", "Authorization": "Bearer \(session.accessToken)"],
             body: body
         )
-        try await client.functions.invoke("approve-vault-device", options: options)
+        do {
+            try await client.functions.invoke("approve-vault-device", options: options)
+        } catch let FunctionsError.httpError(code, data) {
+            let reason = Self.approvalFailureReason(from: data)
+            AppDiagnostics.serviceFailure("vault", "approve_device", statusCode: code, reason: reason)
+            throw VaultApprovalServiceError.remote(statusCode: code, reason: reason)
+        } catch FunctionsError.relayError {
+            AppDiagnostics.serviceFailure("vault", "approve_device", statusCode: 0, reason: "RELAY_UNAVAILABLE")
+            throw VaultApprovalServiceError.relayUnavailable
+        }
     }
 
     func recoverCurrentDevice(code: String) async throws {
@@ -2065,7 +2076,8 @@ final class VaultService: @unchecked Sendable {
         let userID = session.user.id
         let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: userID)
         var devices = try await listDevices()
-        if currentDevice(in: devices, identity: identity) == nil {
+        let localDevice = currentDevice(in: devices, identity: identity)
+        if localDevice == nil || localDevice?.status == "revoked" {
             try await registerCurrentDevice()
             devices = try await listDevices()
         }
@@ -2320,6 +2332,33 @@ final class VaultService: @unchecked Sendable {
         return "Apple Device"
         #endif
     }
+
+    private static func approvalFailureReason(from data: Data) -> String {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let reason = object["error"] as? String,
+            approvalFailureReasons.contains(reason)
+        else {
+            return "UNKNOWN"
+        }
+        return reason
+    }
+
+    private static let approvalFailureReasons: Set<String> = [
+        "UNAUTHORIZED",
+        "INVALID_APPROVAL_REQUEST",
+        "INVALID_APPROVAL_CRYPTOGRAPHY",
+        "APPROVAL_CHALLENGE_INVALID",
+        "APPROVING_DEVICE_NOT_AUTHORIZED",
+        "APPROVAL_SIGNATURE_INVALID",
+        "APPROVAL_FINALIZATION_FAILED",
+        "APPROVAL_REQUEST_FAILED",
+    ]
+}
+
+enum VaultApprovalServiceError: Error, Equatable {
+    case remote(statusCode: Int, reason: String)
+    case relayUnavailable
 }
 
 enum VaultCryptographyError: Error, Equatable {

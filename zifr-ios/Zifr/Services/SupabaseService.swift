@@ -11,8 +11,14 @@ enum AppDiagnostics {
     }
 
     static func failure(_ area: String, _ operation: String, error: Error? = nil) {
-        let code = (error as NSError?)?.code ?? 0
-        logger.error("area=\(area, privacy: .public) operation=\(operation, privacy: .public) status=failure code=\(code, privacy: .public)")
+        let nsError = error as NSError?
+        let domain = nsError?.domain ?? "none"
+        let code = nsError?.code ?? 0
+        logger.error("area=\(area, privacy: .public) operation=\(operation, privacy: .public) status=failure domain=\(domain, privacy: .public) code=\(code, privacy: .public)")
+    }
+
+    static func serviceFailure(_ area: String, _ operation: String, statusCode: Int, reason: String) {
+        logger.error("area=\(area, privacy: .public) operation=\(operation, privacy: .public) status=remote_failure http_status=\(statusCode, privacy: .public) reason=\(reason, privacy: .public)")
     }
 
     static func duration(_ area: String, _ operation: String, seconds: TimeInterval) {

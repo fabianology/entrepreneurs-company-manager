@@ -723,6 +723,7 @@ private enum VaultPresenceError: LocalizedError {
 private final class VaultSecurityController {
     var overview: VaultOverview?
     var isLoading = false
+    var hasLoaded = false
     var activeOperation: String?
     var errorMessage: String?
     var recoveryCode: String?
@@ -739,7 +740,10 @@ private final class VaultSecurityController {
     func load() async {
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            hasLoaded = true
+        }
         do {
             overview = try await VaultService.shared.overview()
         } catch {
@@ -853,6 +857,34 @@ private final class VaultSecurityController {
     }
 
     private func friendlyMessage(for error: Error) -> String {
+        if error is AuthError {
+            return "This device was signed out when vault access was revoked. Sign in again, then request access."
+        }
+        if let approvalError = error as? VaultApprovalServiceError {
+            switch approvalError {
+            case .relayUnavailable:
+                return "Miloom couldn’t reach the vault approval service. Check your connection and try again."
+            case let .remote(statusCode, reason):
+                switch reason {
+                case "UNAUTHORIZED":
+                    return "The approval service couldn’t verify your sign-in (\(statusCode)). Sign in again, then retry."
+                case "INVALID_APPROVAL_REQUEST", "INVALID_APPROVAL_CRYPTOGRAPHY":
+                    return "This device created an invalid approval request (\(statusCode)). No vault access was granted."
+                case "APPROVAL_CHALLENGE_INVALID":
+                    return "That approval request is no longer valid (\(statusCode)). Refresh the vault and try again."
+                case "APPROVING_DEVICE_NOT_AUTHORIZED":
+                    return "This iPhone is no longer authorized to approve devices (\(statusCode)). No vault access was granted."
+                case "APPROVAL_SIGNATURE_INVALID":
+                    return "The vault rejected this device’s approval signature (\(statusCode)). No vault access was granted."
+                case "APPROVAL_FINALIZATION_FAILED":
+                    return "The approval was verified but couldn’t be saved (\(statusCode)). No vault access was granted."
+                case "APPROVAL_REQUEST_FAILED":
+                    return "The approval service couldn’t process this request (\(statusCode)). No vault access was granted."
+                default:
+                    return "The approval service returned an unexpected error (\(statusCode)). No vault access was granted."
+                }
+            }
+        }
         if case VaultCryptographyError.invalidRecoveryCode = error {
             return "That recovery code isn’t valid. Check the complete code and try again."
         }
@@ -986,6 +1018,19 @@ private struct VaultSecuritySheet: View {
                     Text("Checking vault security…").foregroundStyle(.secondary)
                 }
                 .frame(minHeight: 52)
+            } else if controller.hasLoaded && controller.overview == nil {
+                VStack(alignment: .leading, spacing: 14) {
+                    Label("Vault unavailable", systemImage: "exclamationmark.icloud")
+                        .font(.headline)
+                        .foregroundStyle(Color.orange)
+                    Text("Miloom couldn’t verify this account’s vault. Your existing vault and recovery information were not changed.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Try Again") { Task { await controller.load() } }
+                        .buttonStyle(.bordered)
+                        .tint(Color.zifrGold)
+                        .controlSize(.large)
+                }
             } else if !controller.isInitialized {
                 VStack(alignment: .leading, spacing: 14) {
                     Label("Not set up", systemImage: "lock.open")
@@ -1057,12 +1102,26 @@ private struct VaultSecuritySheet: View {
         ZifrSheetCard(title: "THIS DEVICE", icon: "iphone") {
             VStack(alignment: .leading, spacing: 12) {
                 if let device = controller.currentDevice {
-                    Label(device.status == "pending" ? "Approval requested" : device.status.capitalized, systemImage: "clock.badge.exclamationmark")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Color.orange)
-                    Text("Approve \(device.label) from an already trusted device, or use your recovery code below.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if device.status == "revoked" {
+                        Label("Access revoked", systemImage: "xmark.shield.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.orange)
+                        Text("This device no longer has a vault key. Request access again for approval, or use your replacement recovery code.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Request Access Again") { Task { await controller.requestAccess() } }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.zifrGold)
+                            .foregroundStyle(Color.black)
+                            .controlSize(.large)
+                    } else {
+                        Label("Approval requested", systemImage: "clock.badge.exclamationmark")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.orange)
+                        Text("Approve \(device.label) from an already trusted device, or use your recovery code below.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
                     Text("Register this iPhone so a trusted device can approve it.")
                         .font(.subheadline)
