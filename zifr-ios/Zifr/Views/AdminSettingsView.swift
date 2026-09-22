@@ -18,7 +18,6 @@ struct AdminSettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(AccessController.self) private var accessController
     @Environment(NotificationRouteCoordinator.self) private var notificationRouter
-    @Environment(\.scenePhase) private var scenePhase
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
@@ -31,8 +30,7 @@ struct AdminSettingsView: View {
     @State private var showingNotificationPreferences: Bool = false
     @State private var showingLinkedAccounts: Bool = false
     @State private var showingCollaborators: Bool = false
-    @State private var sessionToRevoke: ActiveSession?
-    @State private var showingSignOutOtherSessionsConfirmation: Bool = false
+    @State private var showingActiveSessions: Bool = false
     
     private var activeInstitutions: [Institution] {
         let linkedInstitutionIds = Set(
@@ -62,10 +60,6 @@ struct AdminSettingsView: View {
 
         let rules = "\(enabledRuleCount) alert rule\(enabledRuleCount == 1 ? "" : "s")"
         return "\(delivery) · \(rules)"
-    }
-
-    private var otherActiveSessionCount: Int {
-        authVM.activeSessions.filter { !$0.isCurrent }.count
     }
 
     var body: some View {
@@ -446,115 +440,54 @@ struct AdminSettingsView: View {
                     .padding(.horizontal, 20)
                     
                     // Active Sessions
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(spacing: 10) {
-                            Text("ACTIVE SESSIONS")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showingActiveSessions = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "laptopcomputer.and.iphone")
+                                .foregroundStyle(Color.zifrGold)
+                                .font(.system(size: 20, weight: .semibold))
+                                .frame(width: 44, height: 44)
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("ACTIVE SESSIONS")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundStyle(.white)
+                                Text("Manage signed-in devices")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                            }
 
                             Spacer()
 
-                            if authVM.isLoadingActiveSessions && !authVM.activeSessions.isEmpty {
+                            if authVM.isLoadingActiveSessions && authVM.activeSessions.isEmpty {
                                 ProgressView()
                                     .controlSize(.small)
                                     .tint(Color.zifrGold)
-                                    .accessibilityLabel("Refreshing active sessions")
+                                    .accessibilityLabel("Loading active sessions")
+                            } else if !authVM.activeSessions.isEmpty {
+                                Text("\(authVM.activeSessions.count)")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.white.opacity(0.15))
+                                    .clipShape(Capsule())
+                                    .accessibilityLabel("\(authVM.activeSessions.count) active sessions")
                             }
+
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.4))
+                                .padding(.leading, 8)
                         }
-                        .padding(.horizontal, 40)
-                            
-                        VStack(spacing: 0) {
-                            if authVM.isLoadingActiveSessions && authVM.activeSessions.isEmpty {
-                                VStack(spacing: 12) {
-                                    ProgressView()
-                                        .controlSize(.regular)
-                                        .tint(Color.zifrGold)
-                                    Text("Loading signed-in devices…")
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 28)
-                                .accessibilityElement(children: .combine)
-                                .accessibilityLabel("Loading signed-in devices")
-                            } else if let error = authVM.activeSessionsError,
-                                      authVM.activeSessions.isEmpty {
-                                ActiveSessionsUnavailableView(message: error) {
-                                    Task { await authVM.fetchActiveSessions() }
-                                }
-                            } else if authVM.activeSessions.isEmpty {
-                                ContentUnavailableView(
-                                    "No Signed-In Devices",
-                                    systemImage: "lock.shield",
-                                    description: Text("Pull down to check again.")
-                                )
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                            } else {
-                                ForEach(authVM.activeSessions) { session in
-                                    SessionRow(
-                                        session: session,
-                                        isRevoking: authVM.revokingSessionID == session.id,
-                                        onRevoke: {
-                                            sessionToRevoke = session
-                                        }
-                                    )
-                                    
-                                    if session.id != authVM.activeSessions.last?.id {
-                                        Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
-                                    }
-                                }
-                            }
-
-                            if let notice = authVM.activeSessionsNotice {
-                                Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
-                                SessionFeedbackRow(
-                                    icon: "checkmark.circle.fill",
-                                    message: notice,
-                                    color: .green
-                                )
-                            }
-
-                            if let error = authVM.activeSessionsError,
-                               !authVM.activeSessions.isEmpty {
-                                Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
-                                SessionFeedbackRow(
-                                    icon: "exclamationmark.triangle.fill",
-                                    message: error,
-                                    color: .orange
-                                )
-                            }
-
-                            if otherActiveSessionCount > 0 {
-                                Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
-                                Button(role: .destructive) {
-                                    showingSignOutOtherSessionsConfirmation = true
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        if authVM.isSigningOutOtherSessions {
-                                            ProgressView()
-                                                .controlSize(.small)
-                                                .tint(.red)
-                                        } else {
-                                            Image(systemName: "rectangle.stack.badge.minus")
-                                        }
-                                        Text(authVM.isSigningOutOtherSessions ? "Signing Out Other Devices…" : "Sign Out Other Devices")
-                                    }
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.horizontal, 20)
-                                    .frame(minHeight: 52)
-                                }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.red)
-                                .disabled(authVM.isSigningOutOtherSessions)
-                                .accessibilityHint("Signs out all devices except this one")
-                            }
-                        }
-                        .modifier(ActiveSessionsMaterialCard())
-                        .padding(.horizontal, 20)
+                        .padding(16)
+                        .zifrCardBox(cornerRadius: 24)
                     }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 20)
+                    .accessibilityHint("Opens signed-in device management")
                     
                     // Actions
                     VStack(spacing: 0) {
@@ -667,28 +600,9 @@ struct AdminSettingsView: View {
         .sheet(isPresented: $showingCollaborators) {
             CollaboratorsSheet(vm: vm, appState: appState)
         }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, !authVM.activeSessions.isEmpty else { return }
-            Task { await authVM.fetchActiveSessions() }
-        }
-        .alert(item: $sessionToRevoke) { session in
-            let device = parseUserAgent(session.userAgent).name
-            return Alert(
-                title: Text("Revoke \(device)?"),
-                message: Text("This device will no longer be able to refresh its sign-in. Its current access may continue briefly until its security token expires."),
-                primaryButton: .destructive(Text("Revoke")) {
-                    Task { await authVM.revokeSession(id: session.id) }
-                },
-                secondaryButton: .cancel()
-            )
-        }
-        .alert("Sign Out Other Devices?", isPresented: $showingSignOutOtherSessionsConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Sign Out Other Devices", role: .destructive) {
-                Task { await authVM.signOutOtherSessions() }
-            }
-        } message: {
-            Text("Your current device will stay signed in. Every other device will need to sign in again after its current security token expires.")
+        .sheet(isPresented: $showingActiveSessions) {
+            ActiveSessionsSheet()
+                .environment(authVM)
         }
     }
 }
@@ -753,28 +667,247 @@ struct ToggleRow: View {
     }
 }
 
-private struct ActiveSessionsMaterialCard: ViewModifier {
-    private let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+struct ActiveSessionsSheet: View {
+    @Environment(AuthViewModel.self) private var authVM
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var sessionToRevoke: ActiveSession?
+    @State private var showingSignOutOtherSessionsConfirmation = false
 
-    func body(content: Content) -> some View {
-        content
-            .background {
-                shape
-                    .fill(.regularMaterial)
-                    .overlay(shape.fill(Color.zifrTabBarFill.opacity(0.62)))
+    private var otherActiveSessionCount: Int {
+        authVM.activeSessions.filter { !$0.isCurrent }.count
+    }
+
+    private var sessionCountSubtitle: String {
+        let count = authVM.activeSessions.count
+        guard count > 0 else { return "signed-in devices" }
+        return "\(count) active"
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    ZifrSheetCard(
+                        title: "SIGNED-IN DEVICES",
+                        icon: "laptopcomputer.and.iphone",
+                        subtitle: sessionCountSubtitle,
+                        contentHorizontalPadding: 0,
+                        contentTopPadding: 0,
+                        contentBottomPadding: 0,
+                        contentSpacing: 0,
+                        trailing: {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                Task { await authVM.fetchActiveSessions() }
+                            } label: {
+                                if authVM.isLoadingActiveSessions && !authVM.activeSessions.isEmpty {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(Color.zifrGold)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.zifrGold)
+                                        .frame(width: 32, height: 32)
+                                        .contentShape(Rectangle())
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(authVM.isLoadingActiveSessions)
+                            .accessibilityLabel("Refresh active sessions")
+                        }
+                    ) {
+                        sessionsContent
+                    }
+
+                    if otherActiveSessionCount > 0 {
+                        ZifrSheetCard(
+                            title: "ACTIONS",
+                            icon: "slider.horizontal.3"
+                        ) {
+                            Button(role: .destructive) {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                showingSignOutOtherSessionsConfirmation = true
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Group {
+                                        if authVM.isSigningOutOtherSessions {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                                .tint(.red)
+                                        } else {
+                                            Image(systemName: "rectangle.stack.badge.minus")
+                                                .font(.system(size: 17, weight: .semibold))
+                                        }
+                                    }
+                                    .frame(width: 24)
+
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(authVM.isSigningOutOtherSessions ? "Signing Out Other Devices…" : "Sign Out Other Devices")
+                                            .font(.system(size: 15, weight: .semibold))
+                                        Text("Keep this iPhone signed in")
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.5))
+                                    }
+
+                                    Spacer()
+                                }
+                                .foregroundStyle(.red)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 56)
+                                .background(Color.red.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(Color.red.opacity(0.16), lineWidth: 1)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(authVM.isSigningOutOtherSessions)
+                            .accessibilityHint("Signs out every device except this one")
+                        }
+                    }
+
+                    ZifrSheetCard(
+                        title: "SESSION SECURITY",
+                        icon: "lock.shield"
+                    ) {
+                        Label {
+                            Text("Revoked devices can no longer refresh their sign-in. Existing access may continue briefly until the current security token expires.")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.58))
+                                .fixedSize(horizontal: false, vertical: true)
+                        } icon: {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Color.zifrGold)
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 40)
             }
-            .clipShape(shape)
-            .overlay {
-                shape.stroke(
-                    LinearGradient(
-                        colors: [Color(hex: "#918457").opacity(0.9), Color.white.opacity(0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
+            .refreshable {
+                await authVM.fetchActiveSessions()
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle("Active Sessions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Active Sessions")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .task {
+            await authVM.fetchActiveSessions()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, !authVM.activeSessions.isEmpty else { return }
+            Task { await authVM.fetchActiveSessions() }
+        }
+        .alert(item: $sessionToRevoke) { session in
+            let device = parseUserAgent(session.userAgent).name
+            return Alert(
+                title: Text("Revoke \(device)?"),
+                message: Text("This device will no longer be able to refresh its sign-in. Its current access may continue briefly until its security token expires."),
+                primaryButton: .destructive(Text("Revoke")) {
+                    Task { await authVM.revokeSession(id: session.id) }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert("Sign Out Other Devices?", isPresented: $showingSignOutOtherSessionsConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Sign Out Other Devices", role: .destructive) {
+                Task { await authVM.signOutOtherSessions() }
+            }
+        } message: {
+            Text("Your current device will stay signed in. Every other device will need to sign in again after its current security token expires.")
+        }
+        .presentationDetents([.fraction(0.86), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
+    }
+
+    @ViewBuilder
+    private var sessionsContent: some View {
+        if authVM.isLoadingActiveSessions && authVM.activeSessions.isEmpty {
+            VStack(spacing: 12) {
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(Color.zifrGold)
+                Text("Loading signed-in devices…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Loading signed-in devices")
+        } else if let error = authVM.activeSessionsError,
+                  authVM.activeSessions.isEmpty {
+            ActiveSessionsUnavailableView(message: error) {
+                Task { await authVM.fetchActiveSessions() }
+            }
+        } else if authVM.activeSessions.isEmpty {
+            ContentUnavailableView(
+                "No Signed-In Devices",
+                systemImage: "lock.shield",
+                description: Text("Pull down to check again.")
+            )
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 20)
+        } else {
+            ForEach(authVM.activeSessions) { session in
+                SessionRow(
+                    session: session,
+                    isRevoking: authVM.revokingSessionID == session.id,
+                    onRevoke: {
+                        sessionToRevoke = session
+                    }
                 )
+
+                if session.id != authVM.activeSessions.last?.id {
+                    Divider()
+                        .background(Color.white.opacity(0.1))
+                        .padding(.leading, 56)
+                }
             }
-            .shadow(color: Color.black.opacity(0.28), radius: 10, x: 0, y: 5)
+        }
+
+        if let notice = authVM.activeSessionsNotice {
+            Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
+            SessionFeedbackRow(
+                icon: "checkmark.circle.fill",
+                message: notice,
+                color: .green
+            )
+        }
+
+        if let error = authVM.activeSessionsError,
+           !authVM.activeSessions.isEmpty {
+            Divider().background(Color.white.opacity(0.1)).padding(.leading, 56)
+            SessionFeedbackRow(
+                icon: "exclamationmark.triangle.fill",
+                message: error,
+                color: .orange
+            )
+        }
     }
 }
 
@@ -1157,7 +1290,25 @@ struct LinkedAccountRow: View {
             }
         }
         .padding(16)
-        .zifrCardBox(cornerRadius: 20)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color.black)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "#918457"),
+                            Color(hex: "#918457").opacity(0.3)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        }
         .alert("Unlink Connection?", isPresented: $showingUnlinkAlert) {
             Button("Cancel", role: .cancel) {}
             Button("Unlink", role: .destructive) {
@@ -1231,85 +1382,73 @@ struct LinkedAccountsSheet: View {
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(hex: "#171717").ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(Circle())
+        NavigationStack {
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    if let unlinkConfirmation {
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                            Text("\(unlinkConfirmation) was removed from Plaid and deleted from the server.")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.8))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Color.green.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    
-                    Spacer()
-                    
-                    Text("LINKED ACCOUNTS")
-                        .zifrLabel()
-                    
-                    Spacer()
-                    
-                    Color.clear.frame(width: 44, height: 44)
+
+                    if activeInstitutions.isEmpty {
+                        ContentUnavailableView(
+                            "No Linked Accounts",
+                            systemImage: "building.columns",
+                            description: Text("Plaid-linked accounts will appear here.")
+                        )
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 48)
+                    } else {
+                        ForEach(activeInstitutions) { inst in
+                            if let item = plaidItem(for: inst) {
+                                LinkedAccountRow(
+                                    inst: inst,
+                                    plaidItem: item,
+                                    vm: vm,
+                                    appState: appState,
+                                    onUnlinked: { unlinkConfirmation = $0 }
+                                )
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-                .padding(.bottom, 16)
-
-                if let unlinkConfirmation {
-                    HStack(spacing: 10) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("\(unlinkConfirmation) was removed from Plaid and deleted from the server.")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(Color.green.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 4)
+                .padding(.bottom, 40)
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle("Linked Accounts")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Linked Accounts")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color(hex: "#C1AA78"))
                 }
-                
-                if activeInstitutions.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "building.columns")
-                            .font(.system(size: 48, weight: .light))
-                            .foregroundStyle(Color.white.opacity(0.3))
-                        Text("No Plaid-linked accounts")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.5))
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(activeInstitutions) { inst in
-                                if let item = plaidItem(for: inst) {
-                                    LinkedAccountRow(
-                                        inst: inst,
-                                        plaidItem: item,
-                                        vm: vm,
-                                        appState: appState,
-                                        onUnlinked: { unlinkConfirmation = $0 }
-                                    )
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
-                        .padding(.bottom, 40)
-                    }
+                    .fontWeight(.semibold)
                 }
             }
         }
+        .presentationDetents([.fraction(0.86), .large])
+        .presentationDragIndicator(.visible)
+        .presentationCornerRadius(24)
     }
 }
 
