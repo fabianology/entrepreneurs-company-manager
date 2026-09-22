@@ -30,10 +30,13 @@ production deployment.
   jobs. The combined schema artifact was 244,514 bytes with SHA-256
   `ea59128bbda4cffcdb21b67544bbcd9c1c6e7bc5bf05e69483b75fe4019468d3`.
 - Staging now has migrations through
-  `202609220002_harden_legacy_resource_access.sql`. The five planned
+  `202609220004_disable_automatic_invitation_acceptance.sql`. The five planned
   collaboration/vault migrations, the invitation-status forward repair, and
   the legacy-client security wrapper all passed their current rollback-only
-  contract suites.
+  contract suites. The auth-trigger repair restores the app-owned profile and
+  account-cleanup triggers attached to `auth.users`, which are not included in
+  a public/private schema-only export, while intentionally disabling the legacy
+  signup trigger that bypassed explicit invitation acceptance.
 - `send-share-email` deployment `2001e494-be58-42d8-9d80-998cc102df20` and
   `approve-vault-device` deployment `df2277ed-2f9c-4428-bb69-eba7b95e1831`
   are active in staging with gateway JWT verification enabled. Anonymous HTTP
@@ -72,8 +75,8 @@ app schema and migration history through `202609210001`; migrations
 The audited schema-only staging baseline now matches production through
 `202609210001`. Exact verification after the rehearsal reported 52 public
 tables, zero rows across all 52, zero auth users, zero Storage objects, and no
-cron job table. Migration history contains all 35 repository migrations through
-`202609220002`, and the final dry run reports no pending migrations.
+cron job table. Migration history contains all 37 repository migrations through
+`202609220004`, and the final dry run reports no pending migrations.
 
 ## Gate 2 — schema rehearsal and dry run
 
@@ -95,11 +98,17 @@ cron job table. Migration history contains all 35 repository migrations through
    5. `202609210006_vault_rotation_and_device_revocation.sql`
    6. `202609220001_expand_resource_invitation_statuses.sql`
    7. `202609220002_harden_legacy_resource_access.sql`
+   8. `202609220003_restore_auth_user_triggers.sql`
+   9. `202609220004_disable_automatic_invitation_acceptance.sql`
 
-   The two September 22 migrations are forward repairs discovered by staging:
+   The September 22 migrations are forward repairs discovered by staging:
    the first expands production's older invitation-status constraint; the
    second keeps older client RPC signatures while routing them through the
-   canonical owner-authorized implementation and denying anonymous execution.
+   canonical owner-authorized implementation and denying anonymous execution;
+   the third restores app-owned profile and account-cleanup triggers attached to
+   the managed `auth.users` table while disabling legacy invitation auto-claim;
+   the fourth is a forward repair for staging environments that briefly
+   restored that incompatible legacy trigger.
 
 5. Stop if the dry run includes an unexpected migration, destructive statement,
    legacy-RPC removal, or monetization-enforcement change. Reconcile migration
@@ -110,7 +119,7 @@ cron job table. Migration history contains all 35 repository migrations through
 ## Gate 3 — staging backend and web assets
 
 1. Confirm the audited baseline includes `001`, then apply migrations `002`
-   through `006` followed by the two September 22 forward repairs in timestamp
+   through `006` followed by the September 22 forward repairs in timestamp
    order.
 2. Configure staging function secrets using a secure secret source, never shell
    history or a tracked file:
