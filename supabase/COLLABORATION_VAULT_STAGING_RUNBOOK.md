@@ -19,8 +19,9 @@ production deployment.
   created in `us-east-1` with Data API enabled, automatic exposure of new tables
   disabled, and automatic RLS enabled. It began healthy with no migrations or
   production data.
-- The Supabase CLI and Deno are not installed on the current host. PostgreSQL
-  client tooling is available.
+- Supabase CLI `2.117.0` and Deno `2.9.7` are installed on the current host.
+  The checkout is linked to Miloom Staging and the staging-only preflight passed
+  on 2026-09-21. The production link was replaced rather than reused.
 - The generated staging database password was not written to the repository or
   logs. Reset or retrieve it through the approved secure credential workflow
   before a CLI operation that requires it.
@@ -45,6 +46,22 @@ the known production ref, requires the explicit ref to match the CLI link,
 confirms the verified Phase 5 commit is in history, rejects uncommitted rollout
 artifacts, and checks the universal-link contract.
 
+### Current baseline stop
+
+The first staging dry run on 2026-09-21 correctly performed no deployment, but
+it proposed all 33 tracked migrations because the new staging project has no app
+schema or migration history. Production's read-only catalog shows the complete
+app schema and migration history through `202609210001`; migrations
+`202609210002` through `202609210006` are not present there. Do not push the
+33-migration plan and do not mark unapplied versions as repaired.
+
+Before Gate 2 can continue, establish an audited schema-only staging baseline
+that matches production through `202609210001`. It must contain no customer
+rows, auth users, Storage objects, secrets, external webhook credentials, or
+active scheduled jobs. Record the baseline source and verification, then rerun
+the dry run. The expected pending set is exactly `202609210002` through
+`202609210006`.
+
 ## Gate 2 — schema rehearsal and dry run
 
 1. Capture a restorable staging backup or recreate point.
@@ -54,15 +71,15 @@ artifacts, and checks the universal-link contract.
 3. Run Deno checks for both edge functions and execute
    `functions/_shared/share_email_test.ts`. Stop on any type-check or test
    failure.
-4. Run a Supabase migration dry run and inspect every proposed version. The
-   collaboration/vault sequence must be exactly:
+4. Run a Supabase migration dry run and inspect every proposed version. With
+   the approved current-production baseline, the pending collaboration/vault
+   sequence must be exactly:
 
-   1. `202609210001_secure_active_sessions.sql`
-   2. `202609210002_canonical_resource_access.sql`
-   3. `202609210003_invitation_lifecycle.sql`
-   4. `202609210004_vault_key_foundation.sql`
-   5. `202609210005_vault_device_approval_and_recovery.sql`
-   6. `202609210006_vault_rotation_and_device_revocation.sql`
+   1. `202609210002_canonical_resource_access.sql`
+   2. `202609210003_invitation_lifecycle.sql`
+   3. `202609210004_vault_key_foundation.sql`
+   4. `202609210005_vault_device_approval_and_recovery.sql`
+   5. `202609210006_vault_rotation_and_device_revocation.sql`
 
 5. Stop if the dry run includes an unexpected migration, destructive statement,
    legacy-RPC removal, or monetization-enforcement change. Reconcile migration
@@ -72,7 +89,8 @@ artifacts, and checks the universal-link contract.
 
 ## Gate 3 — staging backend and web assets
 
-1. Apply migrations `001` through `006` in timestamp order.
+1. Confirm the audited baseline includes `001`, then apply migrations `002`
+   through `006` in timestamp order.
 2. Configure staging function secrets using a secure secret source, never shell
    history or a tracked file:
    `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
