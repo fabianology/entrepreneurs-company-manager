@@ -12,6 +12,7 @@ Deno.test("sharing email policy accepts only supported roles, resources, and ema
   assertEquals(isShareRole("Viewer"), true);
   assertEquals(isShareRole("Owner"), false);
   assertEquals(resourceName("all_financials"), "all financial resources for an entity");
+  assertEquals(resourceName("all_institutions"), "all financial institutions for an entity");
   assertEquals(resourceName("password_vault"), null);
   assertEquals(isEmail("collaborator@example.com"), true);
   assertEquals(isEmail("not-an-email"), false);

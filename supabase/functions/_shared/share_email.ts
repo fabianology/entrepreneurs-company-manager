@@ -9,6 +9,7 @@ const resourceNames: Record<string, string> = {
   all_documents: "all documents for an entity",
   document: "a document",
   all_financials: "all financial resources for an entity",
+  all_institutions: "all financial institutions for an entity",
   institution: "a financial institution",
   card: "a financial card",
   loan: "a loan",

@@ -1070,7 +1070,7 @@ struct InvitationAcceptanceSheet: View {
         case "company": return "building.2.crop.circle"
         case "all_subscriptions", "subscription": return "repeat.circle"
         case "all_documents", "document": return "doc.text"
-        case "all_financials", "institution", "card", "loan": return "dollarsign.circle"
+        case "all_financials", "all_institutions", "institution", "card", "loan": return "dollarsign.circle"
         default: return "person.2"
         }
     }

@@ -2127,6 +2127,7 @@ struct EntityCollaborators: Identifiable {
 struct CollaboratorsSheet: View {
     @Bindable var vm: AppViewModel
     let appState: AppState
+    @Environment(AuthViewModel.self) private var authVM
     @Environment(\.dismiss) private var dismiss
     
     @State private var collaborators: [ManagedResourceAccess] = []
@@ -2139,6 +2140,24 @@ struct CollaboratorsSheet: View {
     @State private var showingUnblockAlert = false
     @State private var errorMessage: String?
     @State private var resendingInvitationId: UUID?
+
+    private var adminCompanyIds: [UUID] {
+        guard let userId = authVM.currentUser?.id else { return [] }
+        return appState.resourceShares.filter {
+            $0.userId == userId && $0.resourceType == "company" && $0.role == "Admin"
+        }.map(\.resourceId)
+    }
+
+    private func isAdminManaged(_ access: ManagedResourceAccess) -> Bool {
+        guard let companyId = access.companyId,
+              let company = appState.companies.first(where: { $0.id == companyId }),
+              let userId = authVM.currentUser?.id else { return false }
+        return company.userId != userId && adminCompanyIds.contains(companyId)
+    }
+
+    private func canManage(_ access: ManagedResourceAccess) -> Bool {
+        !isAdminManaged(access) || access.role == "Viewer"
+    }
     
     var groupedCollaborators: [EntityCollaborators] {
         var groups: [EntityCollaborators] = []
@@ -2155,7 +2174,7 @@ struct CollaboratorsSheet: View {
 
                 if type == "company" {
                     companyShares.append(collab)
-                } else if ["all_financials", "institution", "card", "loan"].contains(type) {
+                } else if ["all_financials", "all_institutions", "institution", "card", "loan"].contains(type) {
                     bankShares.append(collab)
                 } else if ["all_subscriptions", "subscription"].contains(type) {
                     subscriptionShares.append(collab)
@@ -2217,6 +2236,8 @@ struct CollaboratorsSheet: View {
                                     group: group,
                                     appState: appState,
                                     resendingInvitationId: resendingInvitationId,
+                                    canManage: canManage,
+                                    canResend: { !isAdminManaged($0) },
                                     onResend: performResend
                                 ) { collab in
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -2281,19 +2302,25 @@ struct CollaboratorsSheet: View {
             isPresented: $showingRevokeOptions,
             titleVisibility: .visible
         ) {
-            Button(selectedAccess?.accessKind == "invitation" ? "Cancel This Invitation" : "Remove from This Resource", role: .destructive) {
-                performRevoke(scope: .resource)
-            }
-            Button("Remove from This Entity", role: .destructive) {
-                performRevoke(scope: .entity)
-            }
-            .disabled(selectedAccess?.companyId == nil)
-            Button("Block All Access for This Person", role: .destructive) {
-                showingBlockConfirmation = true
+            if let access = selectedAccess, canManage(access) {
+                Button(access.accessKind == "invitation" ? "Cancel This Invitation" : "Remove from This Resource", role: .destructive) {
+                    performRevoke(scope: .resource)
+                }
+                if !isAdminManaged(access) {
+                    Button("Remove from This Entity", role: .destructive) {
+                        performRevoke(scope: .entity)
+                    }
+                    .disabled(access.companyId == nil)
+                    Button("Block All Access for This Person", role: .destructive) {
+                        showingBlockConfirmation = true
+                    }
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Choose how broadly Miloom should remove access. Other independent shares remain unless you select a broader scope.")
+            Text(selectedAccess.map(isAdminManaged) == true
+                 ? "Entity Admins can remove Viewer access from this resource only. Other shares remain in place."
+                 : "Choose how broadly Miloom should remove access. Other independent shares remain unless you select a broader scope.")
         }
         .alert("Block All Access?", isPresented: $showingBlockConfirmation) {
             Button("Cancel", role: .cancel) {
@@ -2334,7 +2361,11 @@ struct CollaboratorsSheet: View {
         do {
             async let access = DataRepository.shared.fetchManagedResourceAccess()
             async let blocks = DataRepository.shared.fetchBlockedCollaborators()
-            let (list, blocked) = try await (access, blocks)
+            let (ownedAccess, blocked) = try await (access, blocks)
+            var list = ownedAccess
+            for companyId in adminCompanyIds {
+                list.append(contentsOf: try await DataRepository.shared.fetchEntityAdminAccess(companyId: companyId))
+            }
             
             await MainActor.run {
                 self.collaborators = list
@@ -2354,11 +2385,19 @@ struct CollaboratorsSheet: View {
         guard let access = selectedAccess else { return }
         Task {
             do {
-                try await DataRepository.shared.revokeResourceAccess(
-                    accessId: access.accessId,
-                    accessKind: access.accessKind,
-                    scope: scope
-                )
+                if isAdminManaged(access) {
+                    guard access.role == "Viewer", scope == .resource else { return }
+                    try await DataRepository.shared.revokeViewerAsEntityAdmin(
+                        accessId: access.accessId,
+                        accessKind: access.accessKind
+                    )
+                } else {
+                    try await DataRepository.shared.revokeResourceAccess(
+                        accessId: access.accessId,
+                        accessKind: access.accessKind,
+                        scope: scope
+                    )
+                }
                 await DataRepository.shared.logSecurityEvent(
                     title: scope == .person ? "Collaborator Blocked" : "Access Revoked",
                     message: "You removed \(access.email)'s access with \(scope.rawValue) scope."
@@ -2404,7 +2443,7 @@ struct CollaboratorsSheet: View {
     }
 
     private func performResend(_ access: ManagedResourceAccess) {
-        guard access.accessKind == "invitation", resendingInvitationId == nil else { return }
+        guard access.accessKind == "invitation", !isAdminManaged(access), resendingInvitationId == nil else { return }
         resendingInvitationId = access.id
         Task {
             do {
@@ -2434,6 +2473,8 @@ struct EntityCollaboratorsCard: View {
     let group: EntityCollaborators
     let appState: AppState
     let resendingInvitationId: UUID?
+    let canManage: (ManagedResourceAccess) -> Bool
+    let canResend: (ManagedResourceAccess) -> Bool
     let onResend: (ManagedResourceAccess) -> Void
     let onRevoke: (ManagedResourceAccess) -> Void
     
@@ -2507,7 +2548,7 @@ struct EntityCollaboratorsCard: View {
                             if isCompanyExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.companyShares) { collab in
-                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, canManage: canManage(collab), canResend: canResend(collab), onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -2534,7 +2575,7 @@ struct EntityCollaboratorsCard: View {
                             if isBanksExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.bankShares) { collab in
-                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, canManage: canManage(collab), canResend: canResend(collab), onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -2561,7 +2602,7 @@ struct EntityCollaboratorsCard: View {
                             if isSubscriptionsExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.subscriptionShares) { collab in
-                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, canManage: canManage(collab), canResend: canResend(collab), onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -2588,7 +2629,7 @@ struct EntityCollaboratorsCard: View {
                             if isDocumentsExpanded {
                                 VStack(spacing: 8) {
                                     ForEach(group.documentShares) { collab in
-                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
+                                        NestedCollaboratorRow(collab: collab, resourceName: resourceName(for: collab), isResending: resendingInvitationId == collab.id, canManage: canManage(collab), canResend: canResend(collab), onResend: { onResend(collab) }, onRevoke: { onRevoke(collab) })
                                     }
                                 }
                                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -2608,6 +2649,7 @@ struct EntityCollaboratorsCard: View {
         switch access.resourceType.lowercased() {
         case "company": return group.company.name
         case "all_financials": return "All Financials"
+        case "all_institutions": return "All Institutions"
         case "all_subscriptions": return "All Subscriptions"
         case "all_documents": return "All Documents"
         case "institution": return appState.institutions.first(where: { $0.id == access.resourceId })?.name ?? "Financial Institution"
@@ -2666,6 +2708,8 @@ struct NestedCollaboratorRow: View {
     let collab: ManagedResourceAccess
     let resourceName: String
     let isResending: Bool
+    let canManage: Bool
+    let canResend: Bool
     let onResend: () -> Void
     let onRevoke: () -> Void
     
@@ -2709,7 +2753,7 @@ struct NestedCollaboratorRow: View {
             
             Spacer()
 
-            if collab.accessKind == "invitation" {
+            if collab.accessKind == "invitation" && canResend {
                 Button(action: onResend) {
                     ZStack {
                         Circle()
@@ -2733,6 +2777,7 @@ struct NestedCollaboratorRow: View {
                 .accessibilityLabel("Resend invitation to \(collab.email)")
             }
 
+            if canManage {
             Button(action: onRevoke) {
                 ZStack {
                     Circle()
@@ -2747,6 +2792,7 @@ struct NestedCollaboratorRow: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Manage access for \(collab.email)")
+            }
         }
         .padding(12)
         .background(Color.white.opacity(0.04))
@@ -2841,6 +2887,8 @@ struct UncategorizedCollaboratorsCard: View {
                                 collab: collab,
                                 resourceName: "Resource type: \(collab.resourceType.capitalized)",
                                 isResending: resendingInvitationId == collab.id,
+                                canManage: true,
+                                canResend: true,
                                 onResend: { onResend(collab) },
                                 onRevoke: { onRevoke(collab) }
                             )

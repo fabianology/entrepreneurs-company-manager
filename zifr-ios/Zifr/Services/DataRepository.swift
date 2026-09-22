@@ -1266,6 +1266,41 @@ class DataRepository {
             throw error
         }
     }
+
+    /// Entity Admins have a separate Viewer-only server endpoint. Never route
+    /// their request through the Owner's broader role-management RPC.
+    func inviteViewerAsEntityAdmin(email: String, resourceId: UUID, resourceType: String) async throws -> ShareInviteResult {
+        struct Params: Encodable {
+            let p_email: String
+            let p_resource_id: UUID
+            let p_resource_type: String
+        }
+        struct Response: Decodable {
+            let status: String
+            let invitationId: UUID?
+
+            enum CodingKeys: String, CodingKey {
+                case status
+                case invitationId = "invitation_id"
+            }
+        }
+
+        let response: Response = try await client.rpc(
+            "miloom_admin_share_viewer",
+            params: Params(p_email: email, p_resource_id: resourceId, p_resource_type: resourceType)
+        ).execute().value
+        if response.status == "shared_directly" { return .sharedDirectly }
+        guard response.status == "invitation_created", let invitationId = response.invitationId else {
+            throw NSError(domain: "Sharing", code: 500, userInfo: [NSLocalizedDescriptionKey: "The Viewer invitation could not be confirmed."])
+        }
+        do {
+            try await resendInvitation(id: invitationId)
+            return .invitationEmailSent
+        } catch {
+            AppDiagnostics.failure("sharing", "send_admin_viewer_invitation", error: error)
+            return .invitationCreatedEmailFailed
+        }
+    }
     
     // MARK: - Activity Logs
     func insertActivityLog(_ log: ActivityLog) async throws {
@@ -1389,6 +1424,14 @@ class DataRepository {
         try await client.rpc("miloom_list_managed_access").execute().value
     }
 
+    func fetchEntityAdminAccess(companyId: UUID) async throws -> [ManagedResourceAccess] {
+        struct Params: Encodable { let p_company_id: UUID }
+        return try await client.rpc(
+            "miloom_admin_list_entity_access",
+            params: Params(p_company_id: companyId)
+        ).execute().value
+    }
+
     func fetchBlockedCollaborators() async throws -> [BlockedCollaborator] {
         try await client.rpc("miloom_list_access_blocks").execute().value
     }
@@ -1471,6 +1514,17 @@ class DataRepository {
             p_scope: scope.rawValue
         )
         try await client.rpc("miloom_revoke_access", params: params).execute()
+    }
+
+    func revokeViewerAsEntityAdmin(accessId: UUID, accessKind: String) async throws {
+        struct Params: Encodable {
+            let p_access_id: UUID
+            let p_access_kind: String
+        }
+        try await client.rpc(
+            "miloom_admin_revoke_viewer",
+            params: Params(p_access_id: accessId, p_access_kind: accessKind)
+        ).execute()
     }
 
     func unblockCollaborator(blockId: UUID) async throws {
@@ -2534,6 +2588,54 @@ struct VaultKeyWrapContext: Hashable {
     }
 }
 
+/// A resource key is never the account vault key. These contexts deliberately
+/// use separate authenticated-data domains so a wrap or ciphertext copied from
+/// another owner, resource, device, or version cannot be opened here.
+struct ResourceKeyContext: Hashable {
+    let ownerUserID: UUID
+    let resourceType: String
+    let resourceID: UUID
+    let keyVersion: Int
+
+    fileprivate var authenticatedData: Data {
+        Data([
+            "miloom-resource-secret-v1",
+            ownerUserID.uuidString.lowercased(),
+            resourceType.lowercased(),
+            resourceID.uuidString.lowercased(),
+            String(keyVersion)
+        ].joined(separator: "|").utf8)
+    }
+}
+
+struct ResourceSecretFieldContext: Hashable {
+    let resource: ResourceKeyContext
+    let fieldName: String
+
+    fileprivate var authenticatedData: Data {
+        Data("miloom-resource-field-v1|\(String(decoding: resource.authenticatedData, as: UTF8.self))|\(fieldName.lowercased())".utf8)
+    }
+}
+
+struct ResourceOwnerWrapContext: Hashable {
+    let resource: ResourceKeyContext
+    let accountKeyVersion: Int
+
+    fileprivate var authenticatedData: Data {
+        Data("miloom-resource-owner-wrap-v1|\(String(decoding: resource.authenticatedData, as: UTF8.self))|\(accountKeyVersion)".utf8)
+    }
+}
+
+struct ResourceDeviceWrapContext: Hashable {
+    let resource: ResourceKeyContext
+    let recipientUserID: UUID
+    let recipientDeviceID: UUID
+
+    fileprivate var authenticatedData: Data {
+        Data("miloom-resource-device-wrap-v1|\(String(decoding: resource.authenticatedData, as: UTF8.self))|\(recipientUserID.uuidString.lowercased())|\(recipientDeviceID.uuidString.lowercased())".utf8)
+    }
+}
+
 struct VaultRecoveryWrapContext: Hashable {
     let ownerUserID: UUID
     let keyVersion: Int
@@ -2596,6 +2698,99 @@ enum VaultCryptography {
     static let fieldEnvelopePrefix = SecurityService.vaultEnvelopePrefix
     private static let deviceWrapSalt = Data("miloom-device-wrap-v1".utf8)
     private static let recoveryWrapSalt = Data("miloom-recovery-wrap-v1".utf8)
+    private static let resourceDeviceWrapSalt = Data("miloom-resource-device-wrap-v1".utf8)
+
+    static func encryptResourceSecret(_ plaintext: String, using resourceKey: SymmetricKey, context: ResourceSecretFieldContext) throws -> String {
+        guard context.resource.keyVersion > 0, !context.fieldName.isEmpty else { throw VaultCryptographyError.invalidKeyVersion }
+        let box = try AES.GCM.seal(Data(plaintext.utf8), using: resourceKey, authenticating: context.authenticatedData)
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return "miloom-resource:v1:\(context.resource.keyVersion):\(combined.base64EncodedString())"
+    }
+
+    static func decryptResourceSecret(_ envelope: String, using resourceKey: SymmetricKey, context: ResourceSecretFieldContext) throws -> String {
+        let parts = envelope.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 4, parts[0] == "miloom-resource", parts[1] == "v1",
+              let embeddedVersion = Int(parts[2]), embeddedVersion == context.resource.keyVersion,
+              let combined = Data(base64Encoded: String(parts[3])) else {
+            throw VaultCryptographyError.invalidEnvelope
+        }
+        do {
+            let box = try AES.GCM.SealedBox(combined: combined)
+            let data = try AES.GCM.open(box, using: resourceKey, authenticating: context.authenticatedData)
+            guard let plaintext = String(data: data, encoding: .utf8) else { throw VaultCryptographyError.invalidEnvelope }
+            return plaintext
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    static func wrapResourceKeyForOwner(_ resourceKey: SymmetricKey, using accountKey: SymmetricKey, context: ResourceOwnerWrapContext) throws -> String {
+        guard context.resource.keyVersion > 0, context.accountKeyVersion > 0 else { throw VaultCryptographyError.invalidKeyVersion }
+        let rawKey = resourceKey.withUnsafeBytes { Data($0) }
+        let box = try AES.GCM.seal(rawKey, using: accountKey, authenticating: context.authenticatedData)
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return combined.base64EncodedString()
+    }
+
+    static func unwrapResourceKeyForOwner(_ wrappedKey: String, using accountKey: SymmetricKey, context: ResourceOwnerWrapContext) throws -> SymmetricKey {
+        guard context.resource.keyVersion > 0, context.accountKeyVersion > 0,
+              let combined = Data(base64Encoded: wrappedKey) else { throw VaultCryptographyError.invalidEnvelope }
+        do {
+            let box = try AES.GCM.SealedBox(combined: combined)
+            let rawKey = try AES.GCM.open(box, using: accountKey, authenticating: context.authenticatedData)
+            guard rawKey.count == 32 else { throw VaultCryptographyError.invalidEnvelope }
+            return SymmetricKey(data: rawKey)
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
+
+    static func wrapResourceKeyForDevice(_ resourceKey: SymmetricKey, for publicKeyBase64: String, context: ResourceDeviceWrapContext) throws -> VaultDeviceKeyWrapEnvelope {
+        guard context.resource.keyVersion > 0,
+              let publicData = Data(base64Encoded: publicKeyBase64),
+              let publicKey = try? P256.KeyAgreement.PublicKey(x963Representation: publicData) else {
+            throw VaultCryptographyError.invalidPublicKey
+        }
+        let ephemeral = P256.KeyAgreement.PrivateKey()
+        let sharedSecret = try ephemeral.sharedSecretFromKeyAgreement(with: publicKey)
+        let wrappingKey = sharedSecret.hkdfDerivedSymmetricKey(
+            using: SHA256.self, salt: resourceDeviceWrapSalt,
+            sharedInfo: context.authenticatedData, outputByteCount: 32
+        )
+        let rawKey = resourceKey.withUnsafeBytes { Data($0) }
+        let box = try AES.GCM.seal(rawKey, using: wrappingKey, authenticating: context.authenticatedData)
+        guard let combined = box.combined else { throw VaultCryptographyError.invalidEnvelope }
+        return VaultDeviceKeyWrapEnvelope(version: 1, keyVersion: context.resource.keyVersion,
+                                          ephemeralPublicKey: ephemeral.publicKey.x963Representation.base64EncodedString(),
+                                          wrappedKey: combined.base64EncodedString())
+    }
+
+    static func unwrapResourceKeyForDevice(_ envelope: VaultDeviceKeyWrapEnvelope, using privateKey: P256.KeyAgreement.PrivateKey, context: ResourceDeviceWrapContext) throws -> SymmetricKey {
+        guard envelope.version == 1 else { throw VaultCryptographyError.unsupportedVersion }
+        guard context.resource.keyVersion > 0, envelope.keyVersion == context.resource.keyVersion else { throw VaultCryptographyError.invalidKeyVersion }
+        guard let ephemeralData = Data(base64Encoded: envelope.ephemeralPublicKey),
+              let ephemeralPublicKey = try? P256.KeyAgreement.PublicKey(x963Representation: ephemeralData),
+              let combined = Data(base64Encoded: envelope.wrappedKey) else { throw VaultCryptographyError.invalidEnvelope }
+        do {
+            let sharedSecret = try privateKey.sharedSecretFromKeyAgreement(with: ephemeralPublicKey)
+            let wrappingKey = sharedSecret.hkdfDerivedSymmetricKey(
+                using: SHA256.self, salt: resourceDeviceWrapSalt,
+                sharedInfo: context.authenticatedData, outputByteCount: 32
+            )
+            let box = try AES.GCM.SealedBox(combined: combined)
+            let rawKey = try AES.GCM.open(box, using: wrappingKey, authenticating: context.authenticatedData)
+            guard rawKey.count == 32 else { throw VaultCryptographyError.invalidEnvelope }
+            return SymmetricKey(data: rawKey)
+        } catch let error as VaultCryptographyError {
+            throw error
+        } catch {
+            throw VaultCryptographyError.authenticationFailed
+        }
+    }
 
     static func encryptField(
         _ plaintext: String,

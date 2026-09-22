@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import CryptoKit
 @testable import Zifr
 
 final class ActiveSessionsTests: XCTestCase {
@@ -75,5 +76,54 @@ final class ActiveSessionsTests: XCTestCase {
             fittedHeight(.large),
             "The session row should grow rather than clip accessibility text."
         )
+    }
+}
+
+final class ResourceVaultCryptographyTests: XCTestCase {
+    private let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private let bank = UUID(uuidString: "30000000-0000-0000-0000-000000000001")!
+    private let otherBank = UUID(uuidString: "30000000-0000-0000-0000-000000000002")!
+    private let recipient = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    private let device = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
+
+    func testResourceCiphertextIsBoundToOwnerResourceAndVersion() throws {
+        let key = SymmetricKey(size: .bits256)
+        let context = ResourceSecretFieldContext(resource: ResourceKeyContext(ownerUserID: owner, resourceType: "institution", resourceID: bank, keyVersion: 1), fieldName: "password")
+        let ciphertext = try VaultCryptography.encryptResourceSecret("example-secret", using: key, context: context)
+        XCTAssertEqual(try VaultCryptography.decryptResourceSecret(ciphertext, using: key, context: context), "example-secret")
+        XCTAssertThrowsError(try VaultCryptography.decryptResourceSecret(ciphertext, using: key,
+            context: ResourceSecretFieldContext(resource: ResourceKeyContext(ownerUserID: owner, resourceType: "institution", resourceID: otherBank, keyVersion: 1), fieldName: "password")))
+        XCTAssertThrowsError(try VaultCryptography.decryptResourceSecret(ciphertext, using: key,
+            context: ResourceSecretFieldContext(resource: ResourceKeyContext(ownerUserID: recipient, resourceType: "institution", resourceID: bank, keyVersion: 1), fieldName: "password")))
+        XCTAssertThrowsError(try VaultCryptography.decryptResourceSecret(ciphertext, using: key,
+            context: ResourceSecretFieldContext(resource: ResourceKeyContext(ownerUserID: owner, resourceType: "institution", resourceID: bank, keyVersion: 2), fieldName: "password")))
+        XCTAssertThrowsError(try VaultCryptography.decryptResourceSecret(ciphertext, using: key,
+            context: ResourceSecretFieldContext(resource: context.resource, fieldName: "username")))
+    }
+
+    func testResourceKeyWrapsCannotMoveToAnotherResourceOrDevice() throws {
+        let resourceKey = SymmetricKey(size: .bits256)
+        let accountKey = SymmetricKey(size: .bits256)
+        let resource = ResourceKeyContext(ownerUserID: owner, resourceType: "institution", resourceID: bank, keyVersion: 1)
+        let otherResource = ResourceKeyContext(ownerUserID: owner, resourceType: "institution", resourceID: otherBank, keyVersion: 1)
+        let ownerContext = ResourceOwnerWrapContext(resource: resource, accountKeyVersion: 3)
+        let ownerWrap = try VaultCryptography.wrapResourceKeyForOwner(resourceKey, using: accountKey, context: ownerContext)
+        XCTAssertNoThrow(try VaultCryptography.unwrapResourceKeyForOwner(ownerWrap, using: accountKey, context: ownerContext))
+        XCTAssertThrowsError(try VaultCryptography.unwrapResourceKeyForOwner(ownerWrap, using: accountKey,
+            context: ResourceOwnerWrapContext(resource: otherResource, accountKeyVersion: 3)))
+        XCTAssertThrowsError(try VaultCryptography.unwrapResourceKeyForOwner(ownerWrap, using: accountKey,
+            context: ResourceOwnerWrapContext(resource: resource, accountKeyVersion: 4)))
+
+        let identity = P256.KeyAgreement.PrivateKey()
+        let deviceContext = ResourceDeviceWrapContext(resource: resource, recipientUserID: recipient, recipientDeviceID: device)
+        let envelope = try VaultCryptography.wrapResourceKeyForDevice(resourceKey,
+            for: identity.publicKey.x963Representation.base64EncodedString(), context: deviceContext)
+        XCTAssertNoThrow(try VaultCryptography.unwrapResourceKeyForDevice(envelope, using: identity, context: deviceContext))
+        XCTAssertThrowsError(try VaultCryptography.unwrapResourceKeyForDevice(envelope, using: identity,
+            context: ResourceDeviceWrapContext(resource: otherResource, recipientUserID: recipient, recipientDeviceID: device)))
+        XCTAssertThrowsError(try VaultCryptography.unwrapResourceKeyForDevice(envelope, using: identity,
+            context: ResourceDeviceWrapContext(resource: resource, recipientUserID: recipient, recipientDeviceID: UUID())))
+        XCTAssertThrowsError(try VaultCryptography.unwrapResourceKeyForDevice(envelope,
+            using: P256.KeyAgreement.PrivateKey(), context: deviceContext))
     }
 }

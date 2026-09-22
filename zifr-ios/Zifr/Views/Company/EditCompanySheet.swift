@@ -1098,13 +1098,17 @@ struct EditCompanySheet: View {
     }
 
     private var shareRole: String? {
-        guard let cId = company?.id else { return nil }
-        return appState.resourceShares.first(where: { $0.resourceId == cId })?.role
+        guard let cId = company?.id, let userId = authViewModel.currentUser?.id else { return nil }
+        return appState.resourceShares.first(where: {
+            $0.resourceId == cId && $0.resourceType == "company" && $0.userId == userId
+        })?.role
     }
 
     private var sharedBy: String? {
-        guard let cId = company?.id else { return nil }
-        return appState.resourceShares.first(where: { $0.resourceId == cId })?.senderEmail
+        guard let cId = company?.id, let userId = authViewModel.currentUser?.id else { return nil }
+        return appState.resourceShares.first(where: {
+            $0.resourceId == cId && $0.resourceType == "company" && $0.userId == userId
+        })?.senderEmail
     }
 
     private var isSharedWithMe: Bool {
@@ -1341,7 +1345,7 @@ struct EditCompanySheet: View {
                         }
 
                         // MARK: - Actions Card
-                        if isEditing && !isViewer {
+                        if isEditing && (!isSharedWithMe || shareRole == "Admin") {
                             ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
                                 VStack(spacing: 12) {
                                     // Share Entity
@@ -1537,8 +1541,49 @@ struct ShareEntitySheet: View {
     @State private var warningMessage: String?
     @State private var errorMessage: String?
     @State private var showingPremiumUpgrade = false
+
+    private var containingCompanyId: UUID? {
+        switch resourceType.lowercased() {
+        case "company", "all_subscriptions", "all_documents", "all_financials", "all_institutions":
+            return resourceId
+        case "subscription":
+            return appState.subscriptions.first(where: { $0.id == resourceId })?.companyId
+        case "institution":
+            return appState.institutions.first(where: { $0.id == resourceId })?.companyId
+        case "card":
+            return appState.cards.first(where: { $0.id == resourceId })?.companyId
+        case "loan":
+            return appState.loans.first(where: { $0.id == resourceId })?.companyId
+        case "document":
+            return appState.documents.first(where: { $0.id == resourceId })?.companyId
+        default:
+            return nil
+        }
+    }
+
+    private var isDelegatedAdmin: Bool {
+        guard let userId = authVM.currentUser?.id,
+              let companyId = containingCompanyId,
+              let company = appState.companies.first(where: { $0.id == companyId }),
+              company.userId != userId else { return false }
+        return appState.resourceShares.contains {
+            $0.userId == userId && $0.resourceId == companyId
+                && $0.resourceType == "company" && $0.role == "Admin"
+        }
+    }
+
+    private var canManageSharing: Bool {
+        guard let userId = authVM.currentUser?.id,
+              let companyId = containingCompanyId,
+              let company = appState.companies.first(where: { $0.id == companyId }) else { return false }
+        return company.userId == userId || isDelegatedAdmin
+    }
     
-    let roles = ["Viewer", "Editor", "Admin"]
+    private var roles: [String] {
+        isDelegatedAdmin ? ["Viewer"] : resourceType.lowercased() == "company"
+            ? ["Viewer", "Editor", "Admin"]
+            : ["Viewer", "Editor"]
+    }
     
     var body: some View {
         NavigationStack {
@@ -1566,7 +1611,9 @@ struct ShareEntitySheet: View {
                                     .foregroundStyle(.white)
                                     .lineLimit(2)
 
-                                Text("Invite a collaborator to access this resource.")
+                                Text(isDelegatedAdmin
+                                     ? "As an entity Admin, you can invite Viewers to this resource."
+                                     : "Invite a collaborator to access this resource.")
                                     .font(.system(size: 12, weight: .regular))
                                     .foregroundStyle(Color.white.opacity(0.48))
                                     .fixedSize(horizontal: false, vertical: true)
@@ -1675,17 +1722,19 @@ struct ShareEntitySheet: View {
     }
 
     private var canSend: Bool {
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        canManageSharing && !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var roleDescription: String {
         switch role {
         case "Admin":
-            return "Can view and edit with administrative access. Only the owner can manage collaborators."
+            return "Entity-wide editing. Only the owner can manage collaborators or grant password access for now."
         case "Editor":
-            return "Can view and edit this resource, but cannot manage access."
+            return "Can edit this resource’s business details. Passwords remain owner-only for now."
         default:
-            return "Can view this resource without making changes."
+            return isDelegatedAdmin
+                ? "Viewer access only. The owner manages Editors, Admins, blocks, and passwords."
+                : "Can view this resource’s non-secret details without making changes."
         }
     }
 
@@ -1729,12 +1778,21 @@ struct ShareEntitySheet: View {
         
         Task {
             do {
-                let result = try await DataRepository.shared.inviteUser(
-                    email: cleanedEmail,
-                    role: role,
-                    resourceId: resourceId,
-                    resourceType: resourceType
-                )
+                let result: ShareInviteResult
+                if isDelegatedAdmin {
+                    result = try await DataRepository.shared.inviteViewerAsEntityAdmin(
+                        email: cleanedEmail,
+                        resourceId: resourceId,
+                        resourceType: resourceType
+                    )
+                } else {
+                    result = try await DataRepository.shared.inviteUser(
+                        email: cleanedEmail,
+                        role: role,
+                        resourceId: resourceId,
+                        resourceType: resourceType
+                    )
+                }
 
                 switch result {
                 case .sharedDirectly:
@@ -1792,7 +1850,7 @@ private func iconForResourceType(_ type: String) -> String {
     case "company": return "building.2.crop.circle"
     case "all_subscriptions", "subscription": return "repeat.circle"
     case "all_documents", "document": return "doc.text"
-    case "all_financials", "institution", "card", "loan": return "dollarsign.circle"
+    case "all_financials", "all_institutions", "institution", "card", "loan": return "dollarsign.circle"
     default: return "person.crop.circle.badge.plus"
     }
 }

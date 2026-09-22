@@ -11,7 +11,17 @@ struct FinancialView: View {
     var canAccessCredentials: Bool = true
     
     @Environment(AppState.self) private var appState
+    @Environment(AuthViewModel.self) private var authVM
     @Environment(OnboardingStateManager.self) private var onboardingState
+
+    private var canManageSharing: Bool {
+        guard let userId = authVM.currentUser?.id else { return false }
+        if company.userId == userId { return true }
+        return appState.resourceShares.contains {
+            $0.userId == userId && $0.resourceId == company.id
+                && $0.resourceType == "company" && $0.role == "Admin"
+        }
+    }
 
     @State private var editingCard: FinancialCard? = nil
     @State private var editingInst: Institution? = nil
@@ -754,6 +764,7 @@ struct FinancialView: View {
 
             Spacer()
 
+            if canManageSharing {
             Menu {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -763,6 +774,15 @@ struct FinancialView: View {
                     showShareSheet = true
                 } label: {
                     Label("All Financials", systemImage: "folder.badge.person.crop")
+                }
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    shareResourceId = company.id
+                    shareResourceType = "all_institutions"
+                    shareResourceTitle = "All Institutions"
+                    showShareSheet = true
+                } label: {
+                    Label("All Institutions", systemImage: "building.columns")
                 }
                 if !institutions.isEmpty {
                     Section("Institutions") {
@@ -817,6 +837,7 @@ struct FinancialView: View {
                     .foregroundStyle(Color(hex: "#A2A2A2"))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
+            }
             }
 
             Rectangle()
