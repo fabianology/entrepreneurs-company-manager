@@ -3,6 +3,7 @@
 set -eu
 
 production_project_ref="xxqdytdbpiqjilhutvhz"
+approved_staging_ref="bvtuyzhyospqxvpzcrmv"
 required_commit="0cdaf4cbf43e54f9808d397dc4552ae4a2d1907d"
 
 usage() {
@@ -31,6 +32,10 @@ fi
 
 if [ "$expected_staging_ref" = "$production_project_ref" ]; then
   fail "The supplied project is Miloom production. This preflight is staging-only."
+fi
+
+if [ "$expected_staging_ref" != "$approved_staging_ref" ]; then
+  fail "The supplied project is not the approved Miloom Staging project."
 fi
 
 for command_name in git jq supabase deno; do

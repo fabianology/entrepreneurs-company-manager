@@ -15,30 +15,33 @@ production deployment.
 - The checkout's existing Supabase link points to project
   `xxqdytdbpiqjilhutvhz`, named **Miloom**. Repository operations identify this
   as production. Do not use that link for this staging pass.
-- No committed staging project configuration currently exists.
+- Supabase project `bvtuyzhyospqxvpzcrmv`, named **Miloom Staging**, was
+  created in `us-east-1` with Data API enabled, automatic exposure of new tables
+  disabled, and automatic RLS enabled. It began healthy with no migrations or
+  production data.
 - The Supabase CLI and Deno are not installed on the current host. PostgreSQL
   client tooling is available.
+- The generated staging database password was not written to the repository or
+  logs. Reset or retrieve it through the approved secure credential workflow
+  before a CLI operation that requires it.
 - Migrations, functions, website assets, secrets, and production data were not
   changed while preparing this runbook.
 
 ## Gate 1 — create and identify staging
 
-1. Select a Supabase project whose name explicitly includes `Staging`, `Stage`,
-   `Development`, `Sandbox`, or `Test`. Do not reuse the Miloom production
-   project.
-2. Record the staging project ref in the team's secure deployment record. A
-   project ref is not a service-role key, but it still must not be confused
-   with production.
+1. Use only **Miloom Staging** (`bvtuyzhyospqxvpzcrmv`). Do not reuse the Miloom
+   production project.
+2. Confirm the project remains healthy and empty before each rollout attempt.
 3. Install the current Supabase CLI and Deno through the team's approved
    package-management process.
 4. Link the CLI to the staging ref, then run:
 
    ```sh
-   supabase/ops/collaboration_vault_staging_preflight.sh <staging-project-ref>
+   supabase/ops/collaboration_vault_staging_preflight.sh bvtuyzhyospqxvpzcrmv
    ```
 
-The preflight is read-only. It rejects the known production ref, requires the
-explicit ref to match the CLI link, requires a staging-like project name,
+The preflight is read-only. It accepts only the approved staging ref, rejects
+the known production ref, requires the explicit ref to match the CLI link,
 confirms the verified Phase 5 commit is in history, rejects uncommitted rollout
 artifacts, and checks the universal-link contract.
 
