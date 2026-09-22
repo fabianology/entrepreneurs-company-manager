@@ -147,6 +147,17 @@ final class AuthViewModel: NSObject {
     func authenticateWithBiometrics() async {
         checkBiometrics()
         guard isBiometricsAvailable else { return }
+        guard let cachedSession = SupabaseService.shared.client.auth.currentSession else {
+            await MainActor.run {
+                self.session = nil
+                self.currentUser = nil
+                self.hasCachedSession = false
+                self.isAuthenticated = false
+                self.authError = "Your saved session is no longer available. Sign in again to continue."
+            }
+            AppDiagnostics.failure("auth", "biometric_session_missing")
+            return
+        }
         let context = LAContext()
         let reason = "Unlock your business command center."
         
@@ -154,6 +165,9 @@ final class AuthViewModel: NSObject {
             let success = try await context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: reason)
             if success {
                 await MainActor.run {
+                    self.session = cachedSession
+                    self.currentUser = cachedSession.user
+                    self.hasCachedSession = true
                     self.isAuthenticated = true
                     self.authError = nil
                 }
@@ -335,7 +349,6 @@ final class AuthViewModel: NSObject {
                 guard self.finishAuthenticationAttempt(attemptID) else { return }
                 self.session = response
                 self.currentUser = response.user
-                self.isBiometricEnabled = true
                 self.hasCachedSession = true
                 self.isAuthenticated = true
             }
@@ -373,7 +386,6 @@ final class AuthViewModel: NSObject {
                 if let session = response.session {
                     self.session = session
                     self.currentUser = response.user
-                    self.isBiometricEnabled = true
                     self.hasCachedSession = true
                     self.isAuthenticated = true
                 } else {
@@ -392,7 +404,7 @@ final class AuthViewModel: NSObject {
     func resetPassword(email: String) async -> Bool {
         let attemptID = await beginAuthenticationAttempt()
         do {
-            let redirectURL = URL(string: "miloom://reset-password")
+            let redirectURL = SupabaseService.shared.appURL(path: "reset-password")
             try await SupabaseService.shared.client.auth.resetPasswordForEmail(email, redirectTo: redirectURL)
             return await MainActor.run { self.finishAuthenticationAttempt(attemptID) }
         } catch {

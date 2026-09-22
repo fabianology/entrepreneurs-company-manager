@@ -24,6 +24,11 @@ struct EditCardSheet: View {
         let share = appState.resourceShares.first(where: { $0.resourceId == card.id || $0.resourceId == card.companyId })
         return share?.role == "Viewer"
     }
+
+    private var canAccessCredentials: Bool {
+        guard let currentUserId = appState.portfolioUserID else { return false }
+        return card.userId == currentUserId
+    }
     
     @State private var showFinancials = false
     @State private var showPaymentPicker = false
@@ -293,6 +298,7 @@ struct EditCardSheet: View {
     @ViewBuilder private var row2: some View {
         Group {
             VStack(alignment: .leading, spacing: 10) {
+                if canAccessCredentials {
                 ZifrField(
                     label: "CARD NUMBER",
                     placeholder: "0000 0000 0000 0000",
@@ -322,6 +328,19 @@ struct EditCardSheet: View {
                     } else {
                         card.last4 = filtered
                     }
+                }
+                } else {
+                    Label {
+                        Text("Card number remains private to the owner.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    } icon: {
+                        Image(systemName: "lock.shield")
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10)
+                    .accessibilityElement(children: .combine)
                 }
                 
                 if hasLinkedAccount {

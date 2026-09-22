@@ -110,8 +110,20 @@ struct PlaidLinkButton: View {
                 companyId: companyId,
                 institutionId: institutionId
             )
+
+            guard linkToken.isUpdateMode == isReconnect else {
+                throw NSError(
+                    domain: "PlaidService",
+                    code: 409,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: isReconnect
+                            ? "The existing Plaid connection could not be opened for repair. Remove and reconnect this bank if the problem continues."
+                            : "Plaid returned an unexpected reconnect session. Please try again."
+                    ]
+                )
+            }
             
-            var config = LinkTokenConfiguration(token: linkToken) { success in
+            var config = LinkTokenConfiguration(token: linkToken.value) { success in
                 // Clear handler when done
                 self.linkHandler = nil
                 self.isExchangingToken = true
@@ -147,6 +159,20 @@ struct PlaidLinkButton: View {
                             }
                         }
                     }
+                }
+            }
+
+            config.onEvent = { event in
+                switch event.eventName {
+                case .open:
+                    let mode = event.metadata.isUpdateMode == "true" ? "update" : "standard"
+                    AppDiagnostics.event("plaid", "link_open", status: mode)
+                case .failOAuth:
+                    AppDiagnostics.event("plaid", "oauth", status: "failure")
+                case .error:
+                    AppDiagnostics.event("plaid", "link_event", status: "failure")
+                default:
+                    break
                 }
             }
             

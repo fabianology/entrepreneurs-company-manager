@@ -11,6 +11,8 @@ struct EntityHomeView: View {
     let allSubscriptions: [Subscription]
     let allCards: [FinancialCard]
     let allLoans: [Loan]
+    let canEdit: Bool
+    let canAccessCredentials: Bool
     @Bindable var vm: AppViewModel
 
     // MARK: - Design Tokens
@@ -72,7 +74,9 @@ struct EntityHomeView: View {
                         institutions: institutions,
                         loans: loans,
                         vm: vm,
-                        hideActionBar: true
+                        hideActionBar: true,
+                        canEdit: canEdit,
+                        canAccessCredentials: canAccessCredentials
                     )
                     .id("financialSection")
                     
@@ -83,7 +87,9 @@ struct EntityHomeView: View {
                         institutions: institutions,
                         cards: cards,
                         vm: vm,
-                        hideActionBar: true
+                        hideActionBar: true,
+                        canEdit: canEdit,
+                        canAccessCredentials: canAccessCredentials
                     )
                     .id("subscriptionSection")
                     
@@ -92,7 +98,8 @@ struct EntityHomeView: View {
                         company: company,
                         documents: documents,
                         vm: vm,
-                        hideActionBar: true
+                        hideActionBar: true,
+                        canEdit: canEdit
                     )
                     .id("documentSection")
                 }

@@ -7,6 +7,8 @@ struct FinancialView: View {
     let loans: [Loan]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
     
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
@@ -186,7 +188,7 @@ struct FinancialView: View {
                             .allowsHitTesting(false)
                             .padding(.top, 40)
                             .id("tutorialWallet")
-                        } else {
+                        } else if canEdit {
                             VStack(spacing: 0) {
                                 Button {
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -218,6 +220,8 @@ struct FinancialView: View {
                                 .padding(.top, 24)
                                 .spotlightTarget(isActive: onboardingState.isSpotlightingBank)
                             }
+                        } else {
+                            readOnlyEmptyState
                         }
                     } else {
                         // Institutions Block
@@ -227,6 +231,8 @@ struct FinancialView: View {
                                 cards: cards,
                                 loans: loans,
                                 vm: vm,
+                                canEdit: canEdit,
+                                canAccessCredentials: canAccessCredentials,
                                 onEditInst: { editingInst = $0 },
                                 onEditCard: { editingCard = $0 },
                                 onEditLoan: { editingLoan = $0 }
@@ -360,7 +366,7 @@ struct FinancialView: View {
             }
         }
             
-            if !hideActionBar {
+            if !hideActionBar && canEdit {
                 financialActionBar
                     .zIndex(100)
             }
@@ -501,7 +507,7 @@ struct FinancialView: View {
                     let shadowOpacity: Double = (isPopped || isPulling) ? 0.5 : 0.15
                     let zIndex = (isPopped || isFront) ? 25.0 : Double(instCards.count - index)
                     
-                    FinancialCardVisual(card: card, isPopped: isPopped)
+                    FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
                         .id(card.id)
                         .frame(maxWidth: UIScreen.main.bounds.width - 40)
                         .frame(height: isPopped ? fullCardH : cardH)
@@ -521,7 +527,7 @@ struct FinancialView: View {
                             togglePop(for: card.id.uuidString)
                         }
                         .onLongPressGesture {
-                            editingCard = card
+                            if canEdit { editingCard = card }
                         }
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 10)
@@ -543,7 +549,9 @@ struct FinancialView: View {
                 loans: instLoans,
                 vm: vm,
                 onEdit: { editingInst = inst },
-                onEditLoan: { editingLoan = $0 }
+                onEditLoan: { editingLoan = $0 },
+                canEdit: canEdit,
+                canAccessCredentials: canAccessCredentials
             )
             .id(inst.id)
             .zIndex(20)
@@ -567,7 +575,7 @@ struct FinancialView: View {
                     let shadowRadius: CGFloat = isPopped ? 20 : 4
                     let shadowOpacity: Double = isPopped ? 0.5 : 0.15
                     
-                    FinancialCardVisual(card: card, isPopped: isPopped)
+                    FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
                         .id(card.id)
                         .frame(maxWidth: UIScreen.main.bounds.width - 40)
                         .frame(height: fullCardH)
@@ -601,7 +609,7 @@ struct FinancialView: View {
                             }
                         }
                         .onLongPressGesture {
-                            editingCard = card
+                            if canEdit { editingCard = card }
                         }
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 10)
@@ -634,6 +642,7 @@ struct FinancialView: View {
             loans: loans,
             isPaidOff: isPaidOff,
             isExpanded: isExpanded,
+            canEdit: canEdit,
             onEdit: { editingLoan = $0 },
             onAddPayment: { loan in
                 paymentLoan = loan
@@ -661,6 +670,31 @@ struct FinancialView: View {
                 vm.saveLoan(updatedLoan, appState: appState)
             }
         )
+    }
+
+    private var readOnlyEmptyState: some View {
+        DynamicGlassCard(cornerRadius: 24, height: 190) {
+            VStack(spacing: 14) {
+                Image(systemName: "building.columns")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(Color(hex: "#C1AA78"))
+
+                VStack(spacing: 6) {
+                    Text("NO FINANCIAL ACCOUNTS SHARED")
+                        .font(.system(size: 13, weight: .bold))
+                        .tracking(1.5)
+                        .foregroundStyle(.white)
+                    Text("You can view accounts here when the owner adds them.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding(.horizontal, 28)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 24)
+        .accessibilityElement(children: .combine)
     }
 
     private func standaloneSectionHeading(

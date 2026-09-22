@@ -417,6 +417,7 @@ struct LiquidGlassButtonContainer<MenuContent: View>: View {
 
 // MARK: - Pro Context Menu (Zero-Click Access)
 struct ProContextMenuModifier: ViewModifier {
+    let enabled: Bool
     let password: String?
     let loginId: String?
     let last4: String?
@@ -424,9 +425,10 @@ struct ProContextMenuModifier: ViewModifier {
     @Environment(AppState.self) private var appState
     @Environment(AuthViewModel.self) private var auth
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
-            .contextMenu {
+        if enabled {
+            content.contextMenu {
                 if let password, !password.isEmpty, !SecurityService.isLockedValue(password) {
                     Button {
                         guard auth.isAuthenticated, let userID = auth.currentUser?.id else { return }
@@ -457,12 +459,15 @@ struct ProContextMenuModifier: ViewModifier {
                     ShareLink(item: "Login: \(loginId)") { Label("Share login", systemImage: "square.and.arrow.up") }
                 }
             }
+        } else {
+            content
+        }
     }
 }
 
 extension View {
-    func proContextMenu(password: String? = nil, loginId: String? = nil, last4: String? = nil, credentialRecordID: String? = nil) -> some View {
-        self.modifier(ProContextMenuModifier(password: password, loginId: loginId, last4: last4, credentialRecordID: credentialRecordID))
+    func proContextMenu(enabled: Bool = true, password: String? = nil, loginId: String? = nil, last4: String? = nil, credentialRecordID: String? = nil) -> some View {
+        self.modifier(ProContextMenuModifier(enabled: enabled, password: password, loginId: loginId, last4: last4, credentialRecordID: credentialRecordID))
     }
 }
 

@@ -72,6 +72,8 @@ final class AppViewModel {
     }
 
     func touchCompany(_ company: Company, appState: AppState) {
+        // Viewing a shared company must not attempt to update the owner's row.
+        guard company.userId == appState.portfolioUserID else { return }
         guard canEdit(companyId: company.id, appState: appState) else { return }
         guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
         let original = appState.companies[idx]
@@ -110,6 +112,7 @@ final class AppViewModel {
     }
 
     func deleteSub(_ sub: Subscription, appState: AppState) {
+        guard canEdit(companyId: sub.companyId, appState: appState) else { return }
         let original = appState.subscriptions
         appState.subscriptions.removeAll { $0.id == sub.id }
         Task {
@@ -142,6 +145,7 @@ final class AppViewModel {
     }
 
     func deleteCard(_ card: FinancialCard, appState: AppState) {
+        guard canEdit(companyId: card.companyId, appState: appState) else { return }
         cleanUpCustomPaymentMethod(name: card.name)
         let original = appState.cards
         appState.cards.removeAll { $0.id == card.id }
@@ -299,6 +303,7 @@ final class AppViewModel {
     }
 
     func deleteLoan(_ loan: Loan, appState: AppState) {
+        guard canEdit(companyId: loan.companyId, appState: appState) else { return }
         let original = appState.loans
         appState.loans.removeAll { $0.id == loan.id }
         Task {
@@ -331,15 +336,32 @@ final class AppViewModel {
     }
 
     private func canEdit(companyId: UUID, appState: AppState) -> Bool {
+        guard let currentUserId = appState.portfolioUserID,
+              let company = appState.companies.first(where: { $0.id == companyId }) else {
+            appState.error = "Your account access could not be verified. Refresh and try again."
+            return false
+        }
+
+        // A collaboration role is an authorization boundary. Premium access
+        // unlocks product features, but it must never elevate a Viewer share.
+        if company.userId != currentUserId {
+            guard let share = appState.resourceShares.first(where: {
+                $0.resourceId == companyId && $0.userId == currentUserId
+            }) else {
+                appState.error = "You no longer have access to this company."
+                return false
+            }
+            guard ["Editor", "Admin"].contains(share.role) else {
+                appState.error = "Viewer access is read-only."
+                return false
+            }
+            return true
+        }
+
         if appState.entitlementSnapshot.hasProAccess { return true }
-        if appState.resourceShares.contains(where: {
-            $0.resourceId == companyId && ["Editor", "Admin"].contains($0.role)
-        }) { return true }
         let allowedId = appState.entitlementSnapshot.selectedFreeCompanyId
             ?? appState.companies
-                .filter { company in
-                    !appState.resourceShares.contains { $0.resourceId == company.id }
-                }
+                .filter { $0.userId == currentUserId }
                 .sorted { $0.lastModified < $1.lastModified }
                 .first?.id
         guard allowedId == companyId else {
@@ -350,6 +372,7 @@ final class AppViewModel {
     }
 
     func deleteDoc(_ doc: CompanyDocument, appState: AppState) {
+        guard canEdit(companyId: doc.companyId, appState: appState) else { return }
         let original = appState.documents
         appState.documents.removeAll { $0.id == doc.id }
         Task {

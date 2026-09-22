@@ -7,6 +7,7 @@ struct CompanyCardView: View {
     let subscriptionsCount: Int
     let docsCount: Int
     let onEdit: () -> Void
+    var canEdit: Bool = true
     var onShare: (() -> Void)? = nil
     var shareRole: String? = nil
     var isSharedWithMe: Bool = false
@@ -25,6 +26,7 @@ struct CompanyCardView: View {
         subscriptionsCount: Int, 
         docsCount: Int, 
         onEdit: @escaping () -> Void, 
+        canEdit: Bool = true,
         onShare: (() -> Void)? = nil,
         shareRole: String? = nil, 
         isSharedWithMe: Bool = false, 
@@ -40,6 +42,7 @@ struct CompanyCardView: View {
         self.subscriptionsCount = subscriptionsCount
         self.docsCount = docsCount
         self.onEdit = onEdit
+        self.canEdit = canEdit
         self.onShare = onShare
         self.shareRole = shareRole
         self.isSharedWithMe = isSharedWithMe
@@ -109,15 +112,18 @@ struct CompanyCardView: View {
                 }
                 
                 HStack(spacing: 2) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.7))
-                        .frame(width: 36, height: 44)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            onEdit()
-                        }
+                    if canEdit {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.7))
+                            .frame(width: 36, height: 44)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                onEdit()
+                            }
+                            .accessibilityLabel("Edit company")
+                    }
 
                     if let onShare = onShare {
                         Image(systemName: "square.and.arrow.up")

@@ -11,6 +11,8 @@ struct InstitutionCardView: View {
     @Bindable var vm: AppViewModel
     let onEdit: () -> Void
     let onEditLoan: (Loan) -> Void
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
     var isExpanded: Bool = true
     var onCollapse: (() -> Void)? = nil
     var onDragChanged: ((DragGesture.Value) -> Void)? = nil
@@ -101,7 +103,7 @@ struct InstitutionCardView: View {
                         }
                     }
 
-                    if isExpanded {
+                    if isExpanded && canEdit {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             onEdit()
@@ -134,31 +136,37 @@ struct InstitutionCardView: View {
                 }
 
                     // ── Credentials (tap-to-copy) ────
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 12) {
-                            copyableCredential(
-                                id: institution.id.uuidString,
-                                label: "Login ID",
-                                value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
-                                field: "login"
-                            )
-                            copyableCredential(
-                                id: institution.id.uuidString,
-                                label: "Password",
-                                value: institution.password ?? "",
-                                field: "password",
-                                isPassword: true
-                            )
+                    if canAccessCredentials {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 12) {
+                                copyableCredential(
+                                    id: institution.id.uuidString,
+                                    label: "Login ID",
+                                    value: (institution.username ?? "").isEmpty ? ((institution.email ?? "").isEmpty ? "—" : (institution.email ?? "")) : (institution.username ?? ""),
+                                    field: "login"
+                                )
+                                copyableCredential(
+                                    id: institution.id.uuidString,
+                                    label: "Password",
+                                    value: institution.password ?? "",
+                                    field: "password",
+                                    isPassword: true
+                                )
+                            }
+
+                            let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
+                            DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
                         }
-                        
-                        let loginValue = (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? "")
-                        DynamicLoginLabelView(loginId: loginValue, ignoreInstitutionId: institution.id.uuidString)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, institution.isDisconnected ? 16 : 24)
+                    } else {
+                        ownerOnlyCredentials
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 18)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-                    .padding(.bottom, institution.isDisconnected ? 16 : 24)
                     
-                    if institution.isDisconnected {
+                    if canEdit && institution.isDisconnected {
                         PlaidLinkButton(
                             companyId: institution.companyId,
                             institutionId: institution.id,
@@ -182,6 +190,7 @@ struct InstitutionCardView: View {
                 VStack(spacing: 0) {
                     ForEach(institution.accounts) { acc in
                         Button {
+                            guard canEdit, canAccessCredentials else { return }
                             accountDraft = acc
                             editingAccount = acc
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -224,6 +233,7 @@ struct InstitutionCardView: View {
 
                     ForEach(loans) { loan in
                         Button {
+                            guard canEdit else { return }
                             onEditLoan(loan)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
@@ -417,7 +427,25 @@ struct InstitutionCardView: View {
             }
             .buttonStyle(PremiumButtonStyle())
             .disabled(isLocked)
-            .proContextMenu(password: institution.password, loginId: (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? ""), last4: nil, credentialRecordID: "institution:\(institution.id.uuidString)")
+            .proContextMenu(enabled: canAccessCredentials, password: institution.password, loginId: (institution.username ?? "").isEmpty ? (institution.email ?? "") : (institution.username ?? ""), last4: nil, credentialRecordID: "institution:\(institution.id.uuidString)")
         }
+    }
+
+    private var ownerOnlyCredentials: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Credentials are owner-only")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Sharing this account does not share its login or password.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

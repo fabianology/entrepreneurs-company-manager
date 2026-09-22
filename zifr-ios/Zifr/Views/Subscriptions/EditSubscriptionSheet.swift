@@ -22,6 +22,11 @@ struct EditSubscriptionSheet: View {
         return share?.role == "Viewer"
     }
 
+    private var canAccessCredentials: Bool {
+        guard let currentUserId = appState.portfolioUserID else { return false }
+        return sub.userId == currentUserId
+    }
+
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
     @State private var showSecurity = false
@@ -349,39 +354,43 @@ struct EditSubscriptionSheet: View {
                                     .textInputAutocapitalization(.never)
                                 }
                                 
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 12) {
-                                        ZifrAutocompleteField(
-                                            label: "LOGIN ID",
-                                            placeholder: "username or email",
-                                            text: Binding(get: { sub.loginId ?? "" }, set: { sub.loginId = $0 }),
-                                            keyboardType: .emailAddress,
-                                            textContentType: .username,
-                                            suggestions: allSubscriptions.compactMap { $0.loginId }.filter { !$0.isEmpty } + institutions.compactMap { $0.username }.filter { !$0.isEmpty } + institutions.compactMap { $0.email }.filter { !$0.isEmpty }
-                                        )
-                                        
-                                        ZStack(alignment: .bottomTrailing) {
-                                            ZifrField(
-                                                label: "PASSWORD",
-                                                placeholder: "••••••••",
-                                                text: Binding(get: { SecurityService.editableValue(sub.password) }, set: { sub.password = $0 }),
-                                                isSecure: !showPassword,
-                                                textContentType: .password
+                                if canAccessCredentials {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 12) {
+                                            ZifrAutocompleteField(
+                                                label: "LOGIN ID",
+                                                placeholder: "username or email",
+                                                text: Binding(get: { sub.loginId ?? "" }, set: { sub.loginId = $0 }),
+                                                keyboardType: .emailAddress,
+                                                textContentType: .username,
+                                                suggestions: allSubscriptions.compactMap { $0.loginId }.filter { !$0.isEmpty } + institutions.compactMap { $0.username }.filter { !$0.isEmpty } + institutions.compactMap { $0.email }.filter { !$0.isEmpty }
                                             )
-                                            .textInputAutocapitalization(.never)
-                                            
-                                            SecretVisibilityToggle(isVisible: $showPassword)
-                                            .padding(.bottom, 2)
+
+                                            ZStack(alignment: .bottomTrailing) {
+                                                ZifrField(
+                                                    label: "PASSWORD",
+                                                    placeholder: "••••••••",
+                                                    text: Binding(get: { SecurityService.editableValue(sub.password) }, set: { sub.password = $0 }),
+                                                    isSecure: !showPassword,
+                                                    textContentType: .password
+                                                )
+                                                .textInputAutocapitalization(.never)
+
+                                                SecretVisibilityToggle(isVisible: $showPassword)
+                                                    .padding(.bottom, 2)
+                                            }
+                                            if SecurityService.isLockedValue(sub.password) {
+                                                Image(systemName: "lock.trianglebadge.exclamationmark")
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(Color.gray)
+                                                    .accessibilityLabel("Password locked on this device")
+                                            }
                                         }
-                                        if SecurityService.isLockedValue(sub.password) {
-                                            Image(systemName: "lock.trianglebadge.exclamationmark")
-                                                .font(.system(size: 14, weight: .semibold))
-                                                .foregroundStyle(Color.gray)
-                                                .accessibilityLabel("Password locked on this device")
-                                        }
+
+                                        DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                                     }
-                                    
-                                    DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
+                                } else {
+                                    ownerOnlyCredentialNotice
                                 }
                             }
                         }
@@ -687,6 +696,19 @@ struct EditSubscriptionSheet: View {
                 ShareEntitySheet(resourceId: sub.id, resourceType: "subscription", resourceTitle: sub.name.isEmpty ? "Subscription" : sub.name)
             }
         }
+    }
+
+    private var ownerOnlyCredentialNotice: some View {
+        Label {
+            Text("Login details remain private to the owner.")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.6))
+        } icon: {
+            Image(systemName: "lock.shield")
+                .foregroundStyle(Color(hex: "#C1AA78"))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 
     private var paymentMethodWithInstitution: String {

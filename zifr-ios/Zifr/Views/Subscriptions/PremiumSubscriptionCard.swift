@@ -18,6 +18,8 @@ struct PremiumSubscriptionCard: View {
     let onEdit: () -> Void
     var onBankTapped: ((UUID) -> Void)? = nil
     var onSave: ((Subscription) -> Void)? = nil
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
     var revealLevel: CardRevealLevel = .full
     var isExplicitlyFull: Bool = true
     var extendsUnderNextCard: Bool = false
@@ -203,7 +205,7 @@ struct PremiumSubscriptionCard: View {
                             }
                         }
 
-                        if revealLevel == .full {
+                        if revealLevel == .full && canEdit {
                             Button {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 onEdit()
@@ -320,18 +322,24 @@ struct PremiumSubscriptionCard: View {
 
                     // Credentials row — tap-to-copy
                     if revealLevel == .full {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 12) {
-                                copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
-                                copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
+                        if canAccessCredentials {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 12) {
+                                    copyableCredential(id: sub.id.uuidString, label: "Login ID", value: sub.loginId ?? "", field: "login")
+                                    copyableCredential(id: sub.id.uuidString, label: "Password", value: sub.password ?? "", field: "password", isPassword: true)
+                                }
+                                .padding(.top, 4)
+
+                                DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
                             }
-                            .padding(.top, 4)
-                            
-                            DynamicLoginLabelView(loginId: sub.loginId ?? "", ignoreSubscriptionId: sub.id.uuidString)
+                            .padding(.horizontal, 24)
+                            .padding(.top, 16)
+                            .padding(.bottom, 24)
+                        } else {
+                            ownerOnlyCredentials
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 18)
                         }
-                        .padding(.horizontal, 24)
-                        .padding(.top, 16)
-                        .padding(.bottom, 24)
                     }
                 }
                 .contentShape(Rectangle())
@@ -345,6 +353,7 @@ struct PremiumSubscriptionCard: View {
                 VStack(spacing: 0) {
                     ForEach(Array(sub.subServices.enumerated()), id: \.element.id) { i, ss in
                         Button {
+                            guard canEdit else { return }
                             subDraft = ss
                             subDraftID = ss.id
                             isNewSubService = false
@@ -436,22 +445,24 @@ struct PremiumSubscriptionCard: View {
                         .buttonStyle(PremiumButtonStyle())
                     }
                     
-                    Button {
-                        subDraft = SubService()
-                        subDraftID = nil
-                        isNewSubService = true
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        showSubServiceHUD = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus").font(.system(size: 12, weight: .bold))
-                            Text("Add Service").font(.system(size: 13, weight: .semibold))
+                    if canEdit {
+                        Button {
+                            subDraft = SubService()
+                            subDraftID = nil
+                            isNewSubService = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showSubServiceHUD = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                                Text("Add Service").font(.system(size: 13, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
+                        .buttonStyle(MiloomSecondaryButtonStyle())
+                        .padding(.top, sub.subServices.isEmpty ? 0 : 12)
                     }
-                    .buttonStyle(MiloomSecondaryButtonStyle())
-                    .padding(.top, sub.subServices.isEmpty ? 0 : 12)
                 }
                 }
             }
@@ -466,6 +477,7 @@ struct PremiumSubscriptionCard: View {
                     ForEach(sub.linkedEmails.indices, id: \.self) { i in
                         let email = sub.linkedEmails[i]
                         Button {
+                            guard canEdit else { return }
                             emailDraft = email
                             emailDraftIndex = i
                             isNewEmail = false
@@ -511,22 +523,24 @@ struct PremiumSubscriptionCard: View {
                         .buttonStyle(PremiumButtonStyle())
                     }
                     
-                    Button {
-                        emailDraft = LinkedEmail()
-                        emailDraftIndex = nil
-                        isNewEmail = true
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        showEmailHUD = true
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus").font(.system(size: 12, weight: .bold))
-                            Text("Add Email").font(.system(size: 13, weight: .semibold))
+                    if canEdit {
+                        Button {
+                            emailDraft = LinkedEmail()
+                            emailDraftIndex = nil
+                            isNewEmail = true
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showEmailHUD = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus").font(.system(size: 12, weight: .bold))
+                                Text("Add Email").font(.system(size: 13, weight: .semibold))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 36)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 36)
+                        .buttonStyle(MiloomSecondaryButtonStyle())
+                        .padding(.top, sub.linkedEmails.isEmpty ? 0 : 12)
                     }
-                    .buttonStyle(MiloomSecondaryButtonStyle())
-                    .padding(.top, sub.linkedEmails.isEmpty ? 0 : 12)
                 }
                 }
             }
@@ -585,7 +599,7 @@ struct PremiumSubscriptionCard: View {
             .presentationCornerRadius(24)
         }
         // ── Linked email HUD ─────────────────────────────────────────────
-        .proContextMenu(password: sub.password, loginId: sub.loginId, last4: nil, credentialRecordID: "subscription:\(sub.id.uuidString)")
+        .proContextMenu(enabled: canAccessCredentials, password: sub.password, loginId: sub.loginId, last4: nil, credentialRecordID: "subscription:\(sub.id.uuidString)")
         .sheet(isPresented: $showEmailHUD) {
             LinkedEmailHUD(
                 draft: $emailDraft,
@@ -707,6 +721,24 @@ struct PremiumSubscriptionCard: View {
             .buttonStyle(PremiumButtonStyle())
             .disabled(isLocked)
         }
+    }
+
+    private var ownerOnlyCredentials: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "lock.shield")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color(hex: "#C1AA78"))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Credentials are owner-only")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Sharing this service does not share its login or password.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+            }
+            Spacer(minLength: 0)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func detailCell(label: String, value: String) -> some View {

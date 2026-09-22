@@ -33,6 +33,7 @@ class SupabaseService {
     
     let client: SupabaseClient
     let urlString: String
+    let appURLScheme: String
     
     private init() {
         var urlString = Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String ?? ""
@@ -47,6 +48,8 @@ class SupabaseService {
         }
         
         self.urlString = urlString
+        let appURLScheme = Self.registeredMiloomURLScheme() ?? "miloom"
+        self.appURLScheme = appURLScheme
         let supabaseURL = URL(string: urlString) ?? URL(string: "https://xxqdytdbpiqjilhutvhz.supabase.co")!
         
         #if os(iOS)
@@ -72,6 +75,7 @@ class SupabaseService {
             supabaseKey: supabaseKey,
             options: SupabaseClientOptions(
                 auth: SupabaseClientOptions.AuthOptions(
+                    redirectToURL: URL(string: "\(appURLScheme)://auth-callback"),
                     // Emitting the cached value first prevents an auth-state
                     // subscriber from synchronously waiting on token refresh.
                     emitLocalSessionAsInitialSession: true
@@ -82,6 +86,20 @@ class SupabaseService {
                 )
             )
         )
+    }
+
+    func appURL(path: String) -> URL? {
+        URL(string: "\(appURLScheme)://\(path)")
+    }
+
+    private static func registeredMiloomURLScheme() -> String? {
+        guard let urlTypes = Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]] else {
+            return nil
+        }
+        return urlTypes
+            .compactMap { $0["CFBundleURLSchemes"] as? [String] }
+            .flatMap { $0 }
+            .first { $0.lowercased().hasPrefix("miloom") }
     }
     
     func deleteUserAccount() async throws {

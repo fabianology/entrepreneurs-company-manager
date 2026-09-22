@@ -1003,6 +1003,7 @@ struct DashboardView: View {
         let isSharedWithMe = (company.userId != currentUserId)
         let isSharedByMe = (company.userId == currentUserId) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
         let role = appState.resourceShares.first(where: { $0.resourceId == company.id })?.role ?? "Viewer"
+        let canEdit = !isSharedWithMe || ["Editor", "Admin"].contains(role)
 
         let navigateAction: (AppViewModel.CompanyTab) -> Void = { tab in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -1018,7 +1019,8 @@ struct DashboardView: View {
             subscriptionsCount: sCount,
             docsCount: dCount,
             onEdit: { editingCompany = company },
-            onShare: { companyToShare = company },
+            canEdit: canEdit,
+            onShare: isSharedWithMe ? nil : { companyToShare = company },
             shareRole: role,
             isSharedWithMe: isSharedWithMe,
             isSharedByMe: isSharedByMe,

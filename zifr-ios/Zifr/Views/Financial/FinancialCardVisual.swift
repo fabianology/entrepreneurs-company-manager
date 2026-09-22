@@ -63,6 +63,7 @@ struct WalletSleeveView: View {
 struct FinancialCardVisual: View {
     let card: FinancialCard
     let isPopped: Bool
+    var canAccessCredentials: Bool = true
     
     @Environment(AppState.self) private var appState
     
@@ -247,29 +248,31 @@ struct FinancialCardVisual: View {
             HStack {
                 Spacer()
                 
-                // Secure flip activation
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                        isFlipped = true
+                if canAccessCredentials {
+                    // Secure flip activation
+                    Button {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                            isFlipped = true
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "key.fill")
+                            Text("REVEAL DETAILS")
+                        }
+                        .font(.system(size: 9, weight: .black))
+                        .tracking(1.0)
+                        .foregroundStyle(primaryColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.06))
+                                .overlay(Capsule().stroke(isLight ? Color.black.opacity(0.12) : Color.white.opacity(0.12), lineWidth: 0.5))
+                        )
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "key.fill")
-                        Text("REVEAL DETAILS")
-                    }
-                    .font(.system(size: 9, weight: .black))
-                    .tracking(1.0)
-                    .foregroundStyle(primaryColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(isLight ? Color.black.opacity(0.06) : Color.white.opacity(0.06))
-                            .overlay(Capsule().stroke(isLight ? Color.black.opacity(0.12) : Color.white.opacity(0.12), lineWidth: 0.5))
-                    )
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.bottom, 6)
             

@@ -26,6 +26,20 @@ class DataRepository {
         .milliseconds(750)
     ]
 
+    private struct MutationReceipt: Decodable {
+        let id: UUID
+    }
+
+    private func requireUpdatedRow(_ rows: [MutationReceipt], resource: String) throws {
+        guard rows.count == 1 else {
+            throw NSError(
+                domain: "DataRepository",
+                code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "The \(resource) change was not accepted. Refresh your access and try again."]
+            )
+        }
+    }
+
     // Keep this projection compatible with the production transaction schema.
     // `merchant_website` is optional enrichment and has not been deployed to every
     // environment; Transaction's custom decoder safely leaves it nil when omitted.
@@ -529,11 +543,17 @@ class DataRepository {
         try await client.from("companies").insert(company).execute()
     }
     func updateCompany(_ company: Company) async throws {
-        if let session = try? await client.auth.session, company.userId != session.user.id {
+        let session = try? await client.auth.session
+        let rows: [MutationReceipt] = try await client.from("companies")
+            .update(company)
+            .eq("id", value: company.id)
+            .select("id")
+            .execute().value
+        try requireUpdatedRow(rows, resource: "company")
+        if let session, company.userId != session.user.id {
             let log = ActivityLog(userId: company.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_company", message: "\(session.user.email ?? "Someone") updated the shared company '\(company.name)'.", resourceId: company.id, resourceType: "company")
             try? await insertActivityLog(log)
         }
-        try await client.from("companies").update(company).eq("id", value: company.id).execute()
     }
     func deleteCompany(_ id: UUID) async throws {
         try await client.from("companies").delete().eq("id", value: id).execute()
@@ -560,17 +580,22 @@ class DataRepository {
     }
     func updateSubscription(_ sub: Subscription) async throws {
         let session = try? await client.auth.session
-        if let session, sub.userId != session.user.id {
-            let log = ActivityLog(userId: sub.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_subscription", message: "\(session.user.email ?? "Someone") updated the shared subscription '\(sub.name)'.", resourceId: sub.id, resourceType: "subscription")
-            try? await insertActivityLog(log)
-        }
         var secureSub = sub
         if let session, sub.userId != session.user.id {
             secureSub.password = try await storedPassword(table: "subscriptions", id: sub.id)
         } else {
             secureSub.password = SecurityService.shared.encrypt(secureSub.password, context: vaultContext(owner: sub.userId, type: "subscription", id: sub.id, field: "password"))
         }
-        try await client.from("subscriptions").update(secureSub).eq("id", value: sub.id).execute()
+        let rows: [MutationReceipt] = try await client.from("subscriptions")
+            .update(secureSub)
+            .eq("id", value: sub.id)
+            .select("id")
+            .execute().value
+        try requireUpdatedRow(rows, resource: "service")
+        if let session, sub.userId != session.user.id {
+            let log = ActivityLog(userId: sub.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_subscription", message: "\(session.user.email ?? "Someone") updated the shared subscription '\(sub.name)'.", resourceId: sub.id, resourceType: "subscription")
+            try? await insertActivityLog(log)
+        }
     }
     func deleteSubscription(_ id: UUID) async throws {
         try await client.from("subscriptions").delete().eq("id", value: id).execute()
@@ -584,17 +609,22 @@ class DataRepository {
     }
     func updateCard(_ card: FinancialCard) async throws {
         let session = try? await client.auth.session
-        if let session, card.userId != session.user.id {
-            let log = ActivityLog(userId: card.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_card", message: "\(session.user.email ?? "Someone") updated the shared card '\(card.name)'.", resourceId: card.id, resourceType: "card")
-            try? await insertActivityLog(log)
-        }
         var secureCard = card
         if let session, card.userId != session.user.id {
             secureCard.password = try await storedPassword(table: "financial_cards", id: card.id)
         } else {
             secureCard.password = SecurityService.shared.encrypt(secureCard.password, context: vaultContext(owner: card.userId, type: "financial_card", id: card.id, field: "password"))
         }
-        try await client.from("financial_cards").update(secureCard).eq("id", value: card.id).execute()
+        let rows: [MutationReceipt] = try await client.from("financial_cards")
+            .update(secureCard)
+            .eq("id", value: card.id)
+            .select("id")
+            .execute().value
+        try requireUpdatedRow(rows, resource: "card")
+        if let session, card.userId != session.user.id {
+            let log = ActivityLog(userId: card.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_card", message: "\(session.user.email ?? "Someone") updated the shared card '\(card.name)'.", resourceId: card.id, resourceType: "card")
+            try? await insertActivityLog(log)
+        }
     }
     func upsertCard(_ card: FinancialCard) async throws {
         var secureCard = card
@@ -616,17 +646,22 @@ class DataRepository {
     }
     func updateInstitution(_ inst: Institution) async throws {
         let session = try? await client.auth.session
-        if let session, inst.userId != session.user.id {
-            let log = ActivityLog(userId: inst.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_institution", message: "\(session.user.email ?? "Someone") updated the shared institution '\(inst.name)'.", resourceId: inst.id, resourceType: "institution")
-            try? await insertActivityLog(log)
-        }
         let secureInst: Institution
         if let session, inst.userId != session.user.id {
             secureInst = try await preservingStoredInstitutionSecrets(in: inst)
         } else {
             secureInst = encryptInstitutionSecrets(inst)
         }
-        try await client.from("institutions").update(secureInst).eq("id", value: inst.id).execute()
+        let rows: [MutationReceipt] = try await client.from("institutions")
+            .update(secureInst)
+            .eq("id", value: inst.id)
+            .select("id")
+            .execute().value
+        try requireUpdatedRow(rows, resource: "bank")
+        if let session, inst.userId != session.user.id {
+            let log = ActivityLog(userId: inst.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_institution", message: "\(session.user.email ?? "Someone") updated the shared institution '\(inst.name)'.", resourceId: inst.id, resourceType: "institution")
+            try? await insertActivityLog(log)
+        }
     }
     func upsertInstitution(_ inst: Institution) async throws {
         let secureInst: Institution
@@ -1017,11 +1052,17 @@ class DataRepository {
         }
     }
     func updateLoan(_ loan: Loan) async throws {
-        if let session = try? await client.auth.session, loan.userId != session.user.id {
+        let session = try? await client.auth.session
+        let rows: [MutationReceipt] = try await client.from("loans")
+            .update(loan)
+            .eq("id", value: loan.id)
+            .select("id")
+            .execute().value
+        try requireUpdatedRow(rows, resource: "loan")
+        if let session, loan.userId != session.user.id {
             let log = ActivityLog(userId: loan.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_loan", message: "\(session.user.email ?? "Someone") updated the shared loan '\(loan.name)'.", resourceId: loan.id, resourceType: "loan")
             try? await insertActivityLog(log)
         }
-        try await client.from("loans").update(loan).eq("id", value: loan.id).execute()
         
         // Sync loan payments
         try? await client.from("loan_payments").delete().eq("loan_id", value: loan.id).execute()
@@ -1046,11 +1087,17 @@ class DataRepository {
         try await client.from("company_documents").insert(doc).execute()
     }
     func updateDocument(_ doc: CompanyDocument) async throws {
-        if let session = try? await client.auth.session, doc.userId != session.user.id {
+        let session = try? await client.auth.session
+        let rows: [MutationReceipt] = try await client.from("company_documents")
+            .update(doc)
+            .eq("id", value: doc.id)
+            .select("id")
+            .execute().value
+        try requireUpdatedRow(rows, resource: "document")
+        if let session, doc.userId != session.user.id {
             let log = ActivityLog(userId: doc.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_document", message: "\(session.user.email ?? "Someone") updated the shared document '\(doc.name)'.", resourceId: doc.id, resourceType: "document")
             try? await insertActivityLog(log)
         }
-        try await client.from("company_documents").update(doc).eq("id", value: doc.id).execute()
     }
     func deleteDocument(_ id: UUID, fileURL: String? = nil) async throws {
         // Clean up the associated file before deleting the database record

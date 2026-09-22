@@ -15,6 +15,28 @@ struct CompanyDetailView: View {
     private var allLoans: [Loan] { appState.loans }
     private var allDocuments: [CompanyDocument] { appState.documents }
 
+    private var companyShare: ResourceShare? {
+        guard let currentUserId = appState.portfolioUserID else { return nil }
+        return appState.resourceShares.first {
+            $0.resourceId == company.id && $0.userId == currentUserId
+        }
+    }
+
+    private var canEditCompany: Bool {
+        guard let currentUserId = appState.portfolioUserID else { return false }
+        if company.userId == currentUserId { return true }
+        guard let role = companyShare?.role else { return false }
+        return ["Editor", "Admin"].contains(role)
+    }
+
+    /// Company collaboration grants access to business records, never to the
+    /// owner's vault. Secret access remains owner-only until a separate,
+    /// resource-specific secret grant exists.
+    private var canAccessCompanyCredentials: Bool {
+        guard let currentUserId = appState.portfolioUserID else { return false }
+        return company.userId == currentUserId
+    }
+
     var subscriptions: [Subscription] {
         let filtered = allSubscriptions.filter { $0.companyId == company.id }
         guard !vm.searchQuery.isEmpty else { return filtered }
@@ -225,6 +247,8 @@ struct CompanyDetailView: View {
             allSubscriptions: allSubscriptions,
             allCards: allCards,
             allLoans: allLoans,
+            canEdit: canEditCompany,
+            canAccessCredentials: canAccessCompanyCredentials,
             vm: vm,
             activeInternalTab: $vm.activeTab
         )
@@ -384,8 +408,12 @@ struct CompanyDetailView: View {
             // 3. Entities Button (instead of Apple Intelligence)
             entitiesControlMenu
 
-            // 4. Plus Button (far right quick add menu)
-            plusControlMenu
+            // 4. Quick add for editors; a passive role indicator for viewers.
+            if canEditCompany {
+                plusControlMenu
+            } else {
+                readOnlyControl
+            }
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
@@ -448,6 +476,7 @@ struct CompanyDetailView: View {
             .frame(width: 52, height: 52)
             .contentShape(Rectangle())
             .onTapGesture {
+                guard canEditCompany else { return }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showEditCompany = true
             }
@@ -654,6 +683,32 @@ struct CompanyDetailView: View {
         }
         .frame(width: 44, height: 44)
         .contentShape(Rectangle())
+    }
+
+    private var readOnlyControl: some View {
+        ZStack {
+            bottomControlGlass(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(hex: "#918457"), Color(hex: "#918457").opacity(0.3)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "eye")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Color.white.opacity(0.75))
+        }
+        .frame(width: 44, height: 44)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Viewer access")
+        .accessibilityValue("Read-only")
     }
 
     @ViewBuilder

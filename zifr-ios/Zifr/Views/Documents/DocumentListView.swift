@@ -8,6 +8,7 @@ struct DocumentListView: View {
     let documents: [CompanyDocument]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
+    var canEdit: Bool = true
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(AuthViewModel.self) private var authVM
@@ -78,19 +79,8 @@ struct DocumentListView: View {
                                     ForEach(CompanyDocument.types(for: company.structure), id: \.self) { type in
                                         if let docs = grouped[type], !docs.isEmpty {
                                             ForEach(docs) { doc in
-                                                DocumentRow(doc: doc) {
-                                                    selectDocument(doc)
-                                                } onOpen: {
-                                                    openDocument(doc)
-                                                } onShare: {
-                                                    shareResourceId = doc.id
-                                                    shareResourceType = "document"
-                                                    shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                                    if doc.visibility != "owner_private" { showShareSheet = true }
-                                                } onDelete: {
-                                                    documentToDelete = doc
-                                                }
-                                                .padding(.horizontal, 20)
+                                                documentRow(for: doc)
+                                                    .padding(.horizontal, 20)
                                             }
                                         }
                                     }
@@ -112,19 +102,8 @@ struct DocumentListView: View {
                                 } else {
                                     VStack(spacing: 10) {
                                         ForEach(docs) { doc in
-                                            DocumentRow(doc: doc) {
-                                                selectDocument(doc)
-                                            } onOpen: {
-                                                openDocument(doc)
-                                            } onShare: {
-                                                shareResourceId = doc.id
-                                                shareResourceType = "document"
-                                                shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                                if doc.visibility != "owner_private" { showShareSheet = true }
-                                            } onDelete: {
-                                                documentToDelete = doc
-                                            }
-                                            .padding(.horizontal, 20)
+                                            documentRow(for: doc)
+                                                .padding(.horizontal, 20)
                                         }
                                     }
                                 }
@@ -218,12 +197,13 @@ struct DocumentListView: View {
                 .padding(.bottom, 10)
             }
             
-            if !hideActionBar {
+            if !hideActionBar && canEdit {
                 documentActionBar
                     .zIndex(100)
             }
         }.overlay(alignment: .bottom) {
-            Button {
+            if canEdit {
+                Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 guard accessController.request(
                     .documentUpload,
@@ -255,7 +235,8 @@ struct DocumentListView: View {
                 .clipShape(Capsule())
                 .shadow(color: Color.zifrBlue.opacity(0.5), radius: 12, x: 0, y: 0)
             }
-            .padding(.bottom, scanButtonBottomInset)
+                .padding(.bottom, scanButtonBottomInset)
+            }
         }
         .overlay {
             if isProcessingScan {
@@ -400,7 +381,11 @@ struct DocumentListView: View {
                 ForEach(items) { item in
                     ReceiptVaultCard(item: item, sourceEntity: appState.companies.first { $0.id == item.review?.source.sourceCompanyId }?.name,
                                      onOpen: { openDocument(item.document) }, onReview: {
-                        if let review = item.review { receiptReview = review } else { editingDoc = item.document }
+                        if canEdit {
+                            if let review = item.review { receiptReview = review } else { editingDoc = item.document }
+                        } else {
+                            openDocument(item.document)
+                        }
                     })
                 }
             }
@@ -489,41 +474,84 @@ struct DocumentListView: View {
     )
 
     private var emptyState: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
-        }) {
-            DynamicGlassCard(cornerRadius: 20, height: 165) {
-                VStack(spacing: 12) {
-                    ZifrPlusCircle(size: 44, iconSize: 18)
-                    
-                    VStack(spacing: 4) {
-                        Text("ADD A DOCUMENT")
-                            .font(.system(size: 13, weight: .bold))
-                            .textCase(.uppercase)
-                            .tracking(2)
-                            .foregroundStyle(.white)
-                        
-                        Text("Link, scan or upload a document")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.6))
-                            .tracking(0.5)
+        Group {
+            if canEdit {
+                Button(action: {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    newDoc = vm.addDocument(appState: appState, userId: company.userId, companyId: company.id)
+                }) {
+                    DynamicGlassCard(cornerRadius: 20, height: 165) {
+                        VStack(spacing: 12) {
+                            ZifrPlusCircle(size: 44, iconSize: 18)
+                            VStack(spacing: 4) {
+                                Text("ADD A DOCUMENT")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .textCase(.uppercase)
+                                    .tracking(2)
+                                    .foregroundStyle(.white)
+                                Text("Link, scan or upload a document")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                    .tracking(0.5)
+                            }
+                        }
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                     }
+                    .padding(.horizontal, 20)
                 }
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+                .buttonStyle(.plain)
+                .padding(.top, 24)
+                .spotlightTarget(isActive: onboardingState.isSpotlightingNotes)
+            } else {
+                DynamicGlassCard(cornerRadius: 20, height: 165) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 32, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                        Text("NO DOCUMENTS SHARED")
+                            .font(.system(size: 13, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(.white)
+                        Text("You can view documents here when the owner adds them.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.55))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 24)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                .accessibilityElement(children: .combine)
             }
-            .padding(.horizontal, 20)
         }
-        .buttonStyle(.plain)
-        .padding(.top, 24)
-        .spotlightTarget(isActive: onboardingState.isSpotlightingNotes)
     }
 
     private func selectDocument(_ doc: CompanyDocument) {
+        guard canEdit else {
+            openDocument(doc)
+            return
+        }
         if doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
             receiptReview = review
         } else { editingDoc = doc }
+    }
+
+    private func documentRow(for doc: CompanyDocument) -> some View {
+        DocumentRow(
+            doc: doc,
+            onEdit: { selectDocument(doc) },
+            onOpen: { openDocument(doc) },
+            onShare: canEdit ? { shareDocument(doc) } : nil,
+            onDelete: canEdit ? { documentToDelete = doc } : nil
+        )
+    }
+
+    private func shareDocument(_ doc: CompanyDocument) {
+        shareResourceId = doc.id
+        shareResourceType = "document"
+        shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+        if doc.visibility != "owner_private" { showShareSheet = true }
     }
 
     private func openDocument(_ doc: CompanyDocument) {

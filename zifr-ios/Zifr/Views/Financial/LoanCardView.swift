@@ -6,6 +6,7 @@ struct StandaloneLoanGroupCard: View {
     let loans: [Loan]
     let isPaidOff: Bool
     @Binding var isExpanded: Bool
+    var canEdit: Bool = true
     let onEdit: (Loan) -> Void
     let onAddPayment: (Loan) -> Void
     let onTogglePaid: (Loan) -> Void
@@ -131,9 +132,9 @@ struct StandaloneLoanGroupCard: View {
                         ForEach(loans) { loan in
                             LoanCardView(
                                 loan: loan,
-                                onEdit: { onEdit(loan) },
-                                onAddPayment: isPaidOff ? nil : { onAddPayment(loan) },
-                                onMarkPaid: { onTogglePaid(loan) }
+                                onEdit: { if canEdit { onEdit(loan) } },
+                                onAddPayment: canEdit && !isPaidOff ? { onAddPayment(loan) } : nil,
+                                onMarkPaid: canEdit ? { onTogglePaid(loan) } : nil
                             )
                             .id(loan.id)
                         }
@@ -298,7 +299,6 @@ struct LoanCardView: View {
         }
     }
 }
-
 
 
 

@@ -7,6 +7,8 @@ struct SubscriptionListView: View {
     let cards: [FinancialCard]
     @Bindable var vm: AppViewModel
     var hideActionBar: Bool = false
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
     @Environment(AppState.self) private var appState
     @Environment(OnboardingStateManager.self) private var onboardingState
 
@@ -46,17 +48,19 @@ struct SubscriptionListView: View {
                             allSubscriptions: subscriptions,
                             institutions: institutions,
                             cards: cards,
-                            onEdit: { editingSub = $0 },
+                            onEdit: { if canEdit { editingSub = $0 } },
                             onBankTapped: { id in
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 vm.activeTab = .financial
                                 vm.deepLinkModelId = id
                             },
                             onSave: { modifiedSub in
-                                vm.saveSub(modifiedSub, appState: appState)
+                                if canEdit { vm.saveSub(modifiedSub, appState: appState) }
                             },
                             selectedServiceFilter: $selectedServiceFilter,
-                            hideActionBar: hideActionBar
+                            hideActionBar: hideActionBar,
+                            canEdit: canEdit,
+                            canAccessCredentials: canAccessCredentials
                         )
                     }
                 }
@@ -78,7 +82,7 @@ struct SubscriptionListView: View {
                 }
             }
 
-            if !hideActionBar {
+            if !hideActionBar && canEdit {
                 subscriptionActionBar
                     .zIndex(100)
             }
@@ -219,7 +223,7 @@ struct SubscriptionListView: View {
                 .allowsHitTesting(false)
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
-            } else {
+            } else if canEdit {
                 Button(action: {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     newSub = Subscription(userId: company.userId, companyId: company.id)
@@ -249,6 +253,26 @@ struct SubscriptionListView: View {
                 .buttonStyle(.plain)
                 .padding(.top, 24)
                 .spotlightTarget(isActive: onboardingState.isSpotlightingReview)
+            } else {
+                DynamicGlassCard(cornerRadius: 24, height: 190) {
+                    VStack(spacing: 14) {
+                        Image(systemName: "square.3.layers.3d")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundStyle(Color(hex: "#C1AA78"))
+                        Text("NO SERVICES SHARED")
+                            .font(.system(size: 13, weight: .bold))
+                            .tracking(1.5)
+                            .foregroundStyle(.white)
+                        Text("You can view services here when the owner adds them.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.white.opacity(0.55))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 28)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                .accessibilityElement(children: .combine)
             }
         }
     }
@@ -273,6 +297,8 @@ struct StackedSubscriptionDeckView: View {
     let onSave: (Subscription) -> Void
     @Binding var selectedServiceFilter: String
     var hideActionBar: Bool = false
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
 
     var body: some View {
         ScrollView {
@@ -313,6 +339,8 @@ struct StackedSubscriptionDeckView: View {
                         onEdit: onEdit,
                         onBankTapped: onBankTapped,
                         onSave: onSave,
+                        canEdit: canEdit,
+                        canAccessCredentials: canAccessCredentials,
                         isFirstSection: true,
                         showsHeader: false,
                         bottomPadding: 0
@@ -334,6 +362,8 @@ private struct StackedServiceSection: View {
     let onEdit: (Subscription) -> Void
     let onBankTapped: (UUID) -> Void
     let onSave: (Subscription) -> Void
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
     let isFirstSection: Bool
     var showsHeader: Bool = true
     var bottomPadding: CGFloat = 28
@@ -398,6 +428,8 @@ private struct StackedServiceSection: View {
                         onEdit: { onEdit(sub) },
                         onBankTapped: onBankTapped,
                         onSave: onSave,
+                        canEdit: canEdit,
+                        canAccessCredentials: canAccessCredentials,
                         revealLevel: currentLevel,
                         isExplicitlyFull: currentLevel == .full,
                         extendsUnderNextCard: extendsUnderNextCard,

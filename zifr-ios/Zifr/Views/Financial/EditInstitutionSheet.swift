@@ -20,6 +20,11 @@ struct EditInstitutionSheet: View {
         return share?.role == "Viewer"
     }
 
+    private var canAccessCredentials: Bool {
+        guard let currentUserId = appState.portfolioUserID else { return false }
+        return institution.userId == currentUserId
+    }
+
     @State private var showDeleteConfirm = false
     @State private var showPassword = false
     @State private var showShareSheet = false
@@ -201,6 +206,7 @@ struct EditInstitutionSheet: View {
                                     .textInputAutocapitalization(.never)
                                 }
 
+                                if canAccessCredentials {
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack(spacing: 12) {
                                         ZifrAutocompleteField(
@@ -260,10 +266,23 @@ struct EditInstitutionSheet: View {
                                         text: Binding(get: { institution.twoFactor ?? "" }, set: { institution.twoFactor = $0 })
                                     )
                                 }
+                                } else {
+                                    Label {
+                                        Text("Login details remain private to the owner.")
+                                            .font(.system(size: 13, weight: .medium))
+                                            .foregroundStyle(Color.white.opacity(0.6))
+                                    } icon: {
+                                        Image(systemName: "lock.shield")
+                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityElement(children: .combine)
+                                }
                             }
                         }
 
                         // ── Card 2: Accounts ───────────────────────────
+                        if canAccessCredentials {
                         InstitutionAccountsSection(
                             institution: institution,
                             vm: vm,
@@ -279,6 +298,7 @@ struct EditInstitutionSheet: View {
                                 showAccountHUD = true
                             }
                         )
+                        }
 
                         // ── Card 3: Cards ──────────────────────────────
                         InstitutionCardsSection(

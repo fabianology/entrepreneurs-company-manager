@@ -13,6 +13,8 @@ struct StackedInstitutionDeckView: View {
     let loans: [Loan]
     @Environment(AppState.self) private var appState
     @Bindable var vm: AppViewModel
+    var canEdit: Bool = true
+    var canAccessCredentials: Bool = true
     let onEditInst: (Institution) -> Void
     let onEditCard: (FinancialCard) -> Void
     let onEditLoan: (Loan) -> Void
@@ -378,6 +380,8 @@ struct StackedInstitutionDeckView: View {
             vm: vm,
             onEdit: { onEditInst(inst) },
             onEditLoan: { onEditLoan($0) },
+            canEdit: canEdit,
+            canAccessCredentials: canAccessCredentials,
             isExpanded: isExpanded,
             onCollapse: {
                 withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
@@ -439,7 +443,7 @@ struct StackedInstitutionDeckView: View {
         let shadowOpacity: Double = (isPopped || isPulling) ? 0.5 : 0.15
         let zIndex = (isPopped || isFront) ? 25.0 : Double(totalCards - index)
         
-        FinancialCardVisual(card: card, isPopped: isPopped)
+        FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
             .id(card.id)
             .frame(height: isPopped ? fullCardH : cardH)
             .scaleEffect(scale, anchor: .bottom)
@@ -468,7 +472,7 @@ struct StackedInstitutionDeckView: View {
                 togglePop(for: card.id.uuidString)
             }
             .onLongPressGesture {
-                onEditCard(card)
+                if canEdit { onEditCard(card) }
             }
             .highPriorityGesture(
                 DragGesture(minimumDistance: 10)
