@@ -22,8 +22,18 @@ struct EditCardSheet: View {
     private var subscriptions: [Subscription] { appState.subscriptions }
     
     private var isViewer: Bool {
-        let share = appState.resourceShares.first(where: { $0.resourceId == card.id || $0.resourceId == card.companyId })
-        return share?.role == "Viewer"
+        !AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: card.userId, companyID: card.companyId,
+            resourceType: "card", resourceID: card.id
+        )
+    }
+
+    private var canManageSharing: Bool {
+        AppViewModel.resourceAllowsSharing(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: card.userId, companyID: card.companyId
+        )
     }
 
     private var canAccessCredentials: Bool {
@@ -706,30 +716,32 @@ struct EditCardSheet: View {
 
                         // MARK: - Actions Card
                         if !isNew {
-                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
-                                VStack(spacing: 12) {
-                                    // Share Card
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        showShareSheet = true
-                                    } label: {
-                                        VStack(spacing: 4) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "person.crop.circle.badge.plus")
-                                                Text("Share Card")
+                            if canManageSharing {
+                                ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                    VStack(spacing: 12) {
+                                        // Share Card
+                                        Button {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            showShareSheet = true
+                                        } label: {
+                                            VStack(spacing: 4) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "person.crop.circle.badge.plus")
+                                                    Text("Share Card")
+                                                }
+                                                .font(.system(size: 13, weight: .semibold))
+                                                Text("Generate a share link for collaborators")
+                                                    .font(.system(size: 10, weight: .regular))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
                                             }
-                                            .font(.system(size: 13, weight: .semibold))
-                                            Text("Generate a share link for collaborators")
-                                                .font(.system(size: 10, weight: .regular))
-                                                .foregroundStyle(Color.white.opacity(0.6))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
                                         }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
+                                        .buttonStyle(MiloomSecondaryButtonStyle())
                                     }
-                                    .buttonStyle(MiloomSecondaryButtonStyle())
                                 }
-                            }
 
+                            }
                             // ── Unencapsulated Bottom Delete Button ─────
                             Button(role: .destructive) {
                                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -755,7 +767,7 @@ struct EditCardSheet: View {
                                     
                                     let remainingCards = cards.filter { ($0.institutionName ?? "").lowercased() == instNameStr.lowercased() && $0.id != card.id }
                                     if let orphanedInst = institutions.first(where: { $0.name.lowercased() == instNameStr.lowercased() }) {
-                                        if remainingCards.isEmpty && orphanedInst.accounts.isEmpty {
+                                        if orphanedInst.userId == appState.portfolioUserID && remainingCards.isEmpty && orphanedInst.accounts.isEmpty {
                                             institutionToDelete = orphanedInst
                                             
                                             // Slight delay so the first sheet closes cleanly before showing second
@@ -773,7 +785,7 @@ struct EditCardSheet: View {
                             }
                             .alert("Delete Empty Institution?", isPresented: $showDeleteInstitutionConfirm) {
                                 Button("Yes, Delete", role: .destructive) {
-                                    if let inst = institutionToDelete {
+                                    if let inst = institutionToDelete, inst.userId == appState.portfolioUserID {
                                         vm.deleteInstitution(inst, appState: appState)
                                     }
                                     dismiss()
@@ -973,6 +985,9 @@ struct EditCardSheet: View {
 
     private func saveInstitutionData() {
         guard !institutionName.isEmpty else { return }
+        // Saving a shared card must not also write its bank or bank credentials.
+        // Collaborators manage an independently granted bank in its own editor.
+        guard card.userId == appState.portfolioUserID else { return }
 
         if isNewInstitution {
             var newInst = vm.addInstitution(appState: appState, userId: card.userId, companyId: card.companyId)

@@ -51,6 +51,8 @@ struct Loan: Identifiable, Codable, Hashable {
     var notes: String?
     var plaidAccountId: String?
     var payments: [LoanPayment]? = nil
+    // Nil means a new draft or a legacy/incomplete snapshot, never revision zero.
+    var revision: Int64? = nil
 
     var borrower: String? {
         get {
@@ -96,6 +98,7 @@ struct Loan: Identifiable, Codable, Hashable {
         case status
         case notes
         case plaidAccountId = "plaid_account_id"
+        case revision
     }
     
     init(
@@ -273,4 +276,58 @@ struct Loan: Identifiable, Codable, Hashable {
     static let statuses = ["Active", "Paid Off", "Default"]
     static let frequencies = ["Weekly", "Monthly", "Yearly", "N/A"]
     static let interestTypes = ["Percentage", "Fixed"]
+}
+
+struct LoanSnapshot: Decodable {
+    var loan: Loan
+    let payments: [LoanPayment]
+
+    var value: Loan {
+        var result = loan
+        result.payments = payments
+        return result
+    }
+}
+
+struct LoanSaveRequest: Encodable {
+    let p_loan: Loan
+    let p_payments: [LoanPayment]
+    let p_expected_revision: Int64?
+
+    init(_ loan: Loan) throws {
+        guard loan.revision == nil || loan.payments != nil else {
+            throw LoanSaveError.incompleteSnapshot
+        }
+        p_loan = loan
+        p_payments = loan.payments ?? []
+        p_expected_revision = loan.revision
+    }
+
+    enum CodingKeys: String, CodingKey { case p_loan, p_payments, p_expected_revision }
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(p_loan, forKey: .p_loan)
+        try values.encode(p_payments, forKey: .p_payments)
+        // PostgREST requires the null argument to resolve a new-loan RPC call.
+        try values.encode(p_expected_revision, forKey: .p_expected_revision)
+    }
+}
+
+enum LoanSaveError: LocalizedError {
+    case changed, accessDenied, incompleteSnapshot, unavailable, unconfirmed
+
+    var errorDescription: String? {
+        switch self {
+        case .changed:
+            return "This loan changed on another device. Your draft is still here. Reopen the loan after refreshing before making your changes again."
+        case .accessDenied:
+            return "You no longer have permission to save this loan. Your draft has not been submitted."
+        case .incompleteSnapshot:
+            return "The complete payment history is not loaded. Refresh and reopen the loan before saving."
+        case .unavailable:
+            return "Loan saving is not available on this server yet. Your draft is still here."
+        case .unconfirmed:
+            return "Miloom couldn’t confirm the loan save. Your draft is still here. Check your connection and refresh before retrying."
+        }
+    }
 }

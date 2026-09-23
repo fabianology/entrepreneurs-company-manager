@@ -14,6 +14,22 @@ struct DocumentListView: View {
     @Environment(AuthViewModel.self) private var authVM
     @Environment(AccessController.self) private var accessController
 
+    private func canEditDocument(_ doc: CompanyDocument) -> Bool {
+        AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: doc.userId, companyID: doc.companyId,
+            resourceType: "document", resourceID: doc.id, ownerCanEdit: canEdit,
+            isOwnerPrivate: doc.visibility == "owner_private"
+        )
+    }
+
+    private var canManageSharing: Bool {
+        AppViewModel.resourceAllowsSharing(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: company.userId, companyID: company.id
+        )
+    }
+
     @State private var editingDoc: CompanyDocument? = nil
     @State private var newDoc: CompanyDocument? = nil
     @State private var documentToDelete: CompanyDocument? = nil
@@ -381,11 +397,7 @@ struct DocumentListView: View {
                 ForEach(items) { item in
                     ReceiptVaultCard(item: item, sourceEntity: appState.companies.first { $0.id == item.review?.source.sourceCompanyId }?.name,
                                      onOpen: { openDocument(item.document) }, onReview: {
-                        if canEdit {
-                            if let review = item.review { receiptReview = review } else { editingDoc = item.document }
-                        } else {
-                            openDocument(item.document)
-                        }
+                        selectDocument(item.document)
                     })
                 }
             }
@@ -407,40 +419,43 @@ struct DocumentListView: View {
 
             Spacer()
 
-            Menu {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    shareResourceId = company.id
-                    shareResourceType = "all_documents"
-                    shareResourceTitle = "All Documents"
-                    showShareSheet = true
-                } label: {
-                    Label("All Documents", systemImage: "folder.badge.person.crop")
-                }
-                
-                if !documents.isEmpty {
-                    ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
-                        Section(category) {
-                            ForEach(grouped[category] ?? []) { doc in
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    shareResourceId = doc.id
-                                    shareResourceType = "document"
-                                    shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
-                                    showShareSheet = true
-                                } label: {
-                                    Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "doc")
+            if canManageSharing {
+                Menu {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        shareResourceId = company.id
+                        shareResourceType = "all_documents"
+                        shareResourceTitle = "All Documents"
+                        showShareSheet = true
+                    } label: {
+                        Label("All Documents", systemImage: "folder.badge.person.crop")
+                    }
+
+                    if !documents.isEmpty {
+                        ForEach(Array(grouped.keys.sorted()), id: \.self) { category in
+                            Section(category) {
+                                ForEach((grouped[category] ?? []).filter { $0.visibility != "owner_private" }) { doc in
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        shareResourceId = doc.id
+                                        shareResourceType = "document"
+                                        shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
+                                        showShareSheet = true
+                                    } label: {
+                                        Label(doc.name.isEmpty ? "Unnamed Document" : doc.name, systemImage: "doc")
+                                    }
                                 }
                             }
                         }
                     }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(Color(hex: "#A2A2A2"))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
-            } label: {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(Color(hex: "#A2A2A2"))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+
             }
 
             Rectangle()
@@ -528,11 +543,11 @@ struct DocumentListView: View {
     }
 
     private func selectDocument(_ doc: CompanyDocument) {
-        guard canEdit else {
+        guard canEditDocument(doc) else {
             openDocument(doc)
             return
         }
-        if doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
+        if doc.userId == appState.portfolioUserID, doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
             receiptReview = review
         } else { editingDoc = doc }
     }
@@ -542,12 +557,13 @@ struct DocumentListView: View {
             doc: doc,
             onEdit: { selectDocument(doc) },
             onOpen: { openDocument(doc) },
-            onShare: canEdit ? { shareDocument(doc) } : nil,
-            onDelete: canEdit ? { documentToDelete = doc } : nil
+            onShare: canManageSharing && doc.visibility != "owner_private" ? { shareDocument(doc) } : nil,
+            onDelete: canEditDocument(doc) ? { documentToDelete = doc } : nil
         )
     }
 
     private func shareDocument(_ doc: CompanyDocument) {
+        guard canManageSharing, doc.visibility != "owner_private" else { return }
         shareResourceId = doc.id
         shareResourceType = "document"
         shareResourceTitle = doc.name.isEmpty ? "Document" : doc.name
@@ -918,6 +934,9 @@ struct EditDocumentSheet: View {
     @State private var showRemoveFileConfirmation = false
     @State private var showShareSheet = false
     @State private var linkedBusinessReview: BusinessExpenseReview?
+    @State private var isSaving = false
+    @State private var saveError: String?
+    @State private var showSaveError = false
     
     @State private var selectedPhotoItem: PhotosPickerItem? = nil
     @State private var showFileImporter = false
@@ -931,7 +950,7 @@ struct EditDocumentSheet: View {
     }
 
     private var canUploadFile: Bool {
-        canManageSharedFile || (!isNew && canUploadSharedFile)
+        !isViewer && (canManageSharedFile || (!isNew && canUploadSharedFile))
     }
 
     private var cannotReplaceStoredFile: Bool {
@@ -957,15 +976,20 @@ struct EditDocumentSheet: View {
     }
     
     private var isViewer: Bool {
-        if canManageSharedFile { return false }
-        let shares = appState.resourceShares.filter { share in
-            share.userId == authVM.currentUser?.id && (
-                (share.resourceType == "document" && share.resourceId == doc.id)
-                || (["company", "all_documents"].contains(share.resourceType)
-                    && share.resourceId == doc.companyId)
-            )
-        }
-        return !shares.isEmpty && !shares.contains { ["Editor", "Admin"].contains($0.role) }
+        !AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: doc.userId, companyID: doc.companyId,
+            resourceType: "document", resourceID: doc.id,
+            isOwnerPrivate: doc.visibility == "owner_private"
+        )
+    }
+
+    private var canManageSharing: Bool {
+        AppViewModel.resourceAllowsSharing(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: doc.userId, companyID: doc.companyId,
+            isOwnerPrivate: doc.visibility == "owner_private"
+        )
     }
     
     struct Snapshot: Equatable {
@@ -1235,33 +1259,37 @@ struct EditDocumentSheet: View {
                             
                             // MARK: – Actions
                             if !isNew {
-                                ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
-                                    VStack(spacing: 12) {
-                                        if doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
-                                            Button("Open business expense review") { linkedBusinessReview = review }
-                                        }
-                                        // Share Document
-                                        Button {
-                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                            if doc.visibility != "owner_private" { showShareSheet = true }
-                                        } label: {
-                                            VStack(spacing: 4) {
-                                                HStack(spacing: 6) {
-                                                    Image(systemName: "person.crop.circle.badge.plus")
-                                                    Text("Share Document")
-                                                }
-                                                .font(.system(size: 13, weight: .semibold))
-                                                Text("Generate a share link for collaborators")
-                                                    .font(.system(size: 10, weight: .regular))
-                                                    .foregroundStyle(Color.white.opacity(0.6))
+                                if canManageSharing || (canManageSharedFile && doc.visibility == "owner_private") {
+                                    ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                        VStack(spacing: 12) {
+                                            if canManageSharedFile, doc.visibility == "owner_private", let review = appState.businessExpenseReviews.first(where: { $0.documents.contains { $0.id == doc.id } }) {
+                                                Button("Open business expense review") { linkedBusinessReview = review }
                                             }
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 10)
+                                            // Share Document
+                                            if canManageSharing {
+                                                Button {
+                                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                    if doc.visibility != "owner_private" { showShareSheet = true }
+                                                } label: {
+                                                    VStack(spacing: 4) {
+                                                        HStack(spacing: 6) {
+                                                            Image(systemName: "person.crop.circle.badge.plus")
+                                                            Text("Share Document")
+                                                        }
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        Text("Generate a share link for collaborators")
+                                                            .font(.system(size: 10, weight: .regular))
+                                                            .foregroundStyle(Color.white.opacity(0.6))
+                                                    }
+                                                    .frame(maxWidth: .infinity)
+                                                    .padding(.vertical, 10)
+                                                }
+                                                .buttonStyle(MiloomSecondaryButtonStyle())
+                                            }
                                         }
-                                        .buttonStyle(MiloomSecondaryButtonStyle())
                                     }
-                                }
 
+                                }
                                 // ── Unencapsulated Bottom Delete Button ─────
                                 Button(role: .destructive) {
                                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -1295,7 +1323,7 @@ struct EditDocumentSheet: View {
                                 }
                             }
                         }
-                        .disabled(isViewer)
+                        .disabled(isViewer || isSaving)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 16)
@@ -1474,18 +1502,38 @@ struct EditDocumentSheet: View {
                         dismiss() 
                     }
                     .foregroundStyle(Color.white.opacity(0.5))
+                    .disabled(isSaving || isUploading)
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button("Save") { vm.saveDoc(doc, appState: appState); dismiss() }
+                        Button(isSaving ? "Saving…" : "Save") {
+                            guard !isSaving else { return }
+                            let draft = doc
+                            isSaving = true
+                            Task { @MainActor in
+                                defer { isSaving = false }
+                                do {
+                                    try await vm.saveDocumentConfirmed(draft, appState: appState)
+                                    dismiss()
+                                } catch {
+                                    saveError = error.localizedDescription
+                                    showSaveError = true
+                                }
+                            }
+                        }
                             .font(.system(size: 15, weight: .black))
                             .foregroundStyle(isDirty ? Color.green : .white)
-                            .disabled(isUploading)
+                            .disabled(isUploading || isSaving)
                     }
                 }
             }
-            .interactiveDismissDisabled(isNew)
+            .interactiveDismissDisabled(isNew || isSaving || isUploading)
+            .alert("Document Not Saved", isPresented: $showSaveError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(saveError ?? "Your changes have not been saved. Please try again.")
+            }
             .sheet(item: $linkedBusinessReview) { BusinessExpenseReviewSheet(initialReview: $0) }
             .sheet(isPresented: $showShareSheet) {
                 ShareEntitySheet(resourceId: doc.id, resourceType: "document", resourceTitle: doc.name.isEmpty ? "Document" : doc.name)

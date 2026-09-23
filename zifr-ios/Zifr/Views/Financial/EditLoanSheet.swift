@@ -13,10 +13,22 @@ struct EditLoanSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
+    @State private var isSaving = false
+    @State private var saveError: String?
     
     private var isViewer: Bool {
-        let share = appState.resourceShares.first(where: { $0.resourceId == loan.id || $0.resourceId == loan.companyId })
-        return share?.role == "Viewer"
+        !AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: loan.userId, companyID: loan.companyId,
+            resourceType: "loan", resourceID: loan.id
+        )
+    }
+
+    private var canManageSharing: Bool {
+        AppViewModel.resourceAllowsSharing(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: loan.userId, companyID: loan.companyId
+        )
     }
     
     private var isConnectedToInstitution: Bool {
@@ -120,30 +132,32 @@ struct EditLoanSheet: View {
 
                         // MARK: - Actions Card
                         if !isNew {
-                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
-                                VStack(spacing: 12) {
-                                    // Share Loan
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        showShareSheet = true
-                                    } label: {
-                                        VStack(spacing: 4) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "person.crop.circle.badge.plus")
-                                                Text("Share Loan")
+                            if canManageSharing {
+                                ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                    VStack(spacing: 12) {
+                                        // Share Loan
+                                        Button {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            showShareSheet = true
+                                        } label: {
+                                            VStack(spacing: 4) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "person.crop.circle.badge.plus")
+                                                    Text("Share Loan")
+                                                }
+                                                .font(.system(size: 13, weight: .semibold))
+                                                Text("Generate a share link for collaborators")
+                                                    .font(.system(size: 10, weight: .regular))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
                                             }
-                                            .font(.system(size: 13, weight: .semibold))
-                                            Text("Generate a share link for collaborators")
-                                                .font(.system(size: 10, weight: .regular))
-                                                .foregroundStyle(Color.white.opacity(0.6))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
                                         }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
+                                        .buttonStyle(MiloomSecondaryButtonStyle())
                                     }
-                                    .buttonStyle(MiloomSecondaryButtonStyle())
                                 }
-                            }
 
+                            }
                             // ── Unencapsulated Bottom Delete Button ─────
                             Button(role: .destructive) {
                                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
@@ -171,7 +185,7 @@ struct EditLoanSheet: View {
                             }
                         }
                     } // Close Group
-                    .disabled(isViewer)
+                    .disabled(isViewer || isSaving)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
@@ -221,19 +235,36 @@ struct EditLoanSheet: View {
                         }
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
                         Button("Save") {
-                            vm.saveLoan(loan, appState: appState)
-                            dismiss()
+                            isSaving = true
+                            Task { @MainActor in
+                                defer { isSaving = false }
+                                do {
+                                    loan = try await vm.saveLoanConfirmed(loan, appState: appState)
+                                    dismiss()
+                                } catch {
+                                    saveError = error.localizedDescription
+                                }
+                            }
                         }
+                        .disabled(isSaving)
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
                     }
                 }
             }
-            .interactiveDismissDisabled(isNew)
+            .interactiveDismissDisabled(isNew || isSaving)
+            .alert("Loan Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
+            }
             .sheet(isPresented: $showShareSheet) {
                 ShareEntitySheet(resourceId: loan.id, resourceType: "loan", resourceTitle: loan.name.isEmpty ? "Loan" : loan.name)
             }

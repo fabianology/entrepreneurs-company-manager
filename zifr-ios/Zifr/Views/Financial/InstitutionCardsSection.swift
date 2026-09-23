@@ -5,6 +5,8 @@ import SwiftData
 struct InstitutionCardsSection: View {
     @Environment(AppState.self) private var appState
     let cards: [FinancialCard]
+    var canAdd: Bool = false
+    var editableCardIDs: Set<UUID> = []
     let onAdd: () -> Void
     let onEdit: (FinancialCard) -> Void
     let onDelete: (FinancialCard) -> Void
@@ -21,7 +23,7 @@ struct InstitutionCardsSection: View {
                     ForEach(cards, id: \.id) { card in
                         Button { 
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            onEdit(card) 
+                            if editableCardIDs.contains(card.id) { onEdit(card) }
                         } label: {
                             HStack(spacing: 12) {
                                 Text("💳").font(.system(size: 18))
@@ -76,29 +78,33 @@ struct InstitutionCardsSection: View {
                         }
                         .buttonStyle(PremiumButtonStyle())
                         .contextMenu {
-                            Button(role: .destructive) {
-                                withAnimation { onDelete(card) }
-                            } label: {
-                                Label("Delete Card", systemImage: "trash")
+                            if editableCardIDs.contains(card.id) {
+                                Button(role: .destructive) {
+                                    withAnimation { onDelete(card) }
+                                } label: {
+                                    Label("Delete Card", systemImage: "trash")
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Button { 
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                onAdd() 
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("Add Card")
+            if canAdd {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onAdd()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                        Text("Add Card")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
                 }
-                .font(.system(size: 13, weight: .bold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .buttonStyle(MiloomSecondaryButtonStyle())
             }
-            .buttonStyle(MiloomSecondaryButtonStyle())
         }
     }
     

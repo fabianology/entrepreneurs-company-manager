@@ -266,8 +266,7 @@ class DataRepository {
         async let fSubscriptions: [Subscription] = measure("subscriptions") { await searchLoad("services", failures: searchLoadFailures) { try await fetchVisibleSubscriptions() } }
         async let fInstitutions: [Institution] = measure("institutions") { await searchLoad("bank accounts", failures: searchLoadFailures) { try await fetchVisibleInstitutions() } }
         async let fCards: [FinancialCard] = measure("cards") { await searchLoad("cards", failures: searchLoadFailures) { try await fetchVisibleCards() } }
-        async let fLoans: [Loan] = measure("loans") { await searchLoad("loans", failures: searchLoadFailures) { try await client.from("loans").select().execute().value } }
-        async let fLoanPayments: [LoanPayment] = measure("loan_payments") { await searchLoad("loan payments", failures: searchLoadFailures) { try await client.from("loan_payments").select().execute().value } }
+        async let fLoans: [Loan] = measure("loans") { await searchLoad("loans", failures: searchLoadFailures) { try await fetchLoanSnapshots() } }
         async let fDocuments: [CompanyDocument] = measure("documents") { await searchLoad("documents", failures: searchLoadFailures) { try await client.from("company_documents").select().execute().value } }
         async let fShares: [ResourceShare] = measure("shares") { await searchLoad("sharing permissions", failures: searchLoadFailures) { try await client.from("resource_shares").select().execute().value } }
         async let fActivity: [ActivityLog] = measure("activity_logs") { await searchLoad("activity", failures: searchLoadFailures) { try await client.from("activity_logs").select().order("created_at", ascending: false).execute().value } }
@@ -298,7 +297,6 @@ class DataRepository {
         let fetchedInstitutions = await fInstitutions
         let fetchedCards = await fCards
         let fetchedLoans = await fLoans
-        let fetchedLoanPayments = await fLoanPayments
         let fetchedDocuments = await fDocuments
         let fetchedPlaidItems = await fPlaidItems
         let shares = await fShares
@@ -338,13 +336,6 @@ class DataRepository {
             return m
         }
         
-        let paymentsByLoan = Dictionary(grouping: fetchedLoanPayments, by: { $0.loanId })
-        let combinedLoans = fetchedLoans.map { loan -> Loan in
-            var l = loan
-            l.payments = paymentsByLoan[loan.id] ?? []
-            return l
-        }
-        
         let session = try? await client.auth.session
         let currentUserId = session?.user.id
         guard !Task.isCancelled, appState.portfolioLoadID == loadID, currentUserId == loadingUserID else { return }
@@ -353,7 +344,7 @@ class DataRepository {
         appState.subscriptions = normalizedSubscriptions
         appState.institutions = secureInst
         appState.cards = secureCards
-        appState.loans = combinedLoans
+        appState.loans = fetchedLoans
         appState.documents = fetchedDocuments
         appState.plaidItems = fetchedPlaidItems
         appState.resourceShares = shares
@@ -1150,41 +1141,57 @@ class DataRepository {
     }
     
     // MARK: - Loans
-    func insertLoan(_ loan: Loan) async throws {
-        try await client.from("loans").insert(loan).execute()
-        if let payments = loan.payments, !payments.isEmpty {
-            try? await client.from("loan_payments").insert(payments).execute()
+    private func fetchLoanSnapshots() async throws -> [Loan] {
+        do {
+            let snapshots: [LoanSnapshot] = try await client.rpc("miloom_read_loans").execute().value
+            return snapshots.map(\.value)
+        } catch {
+            // Read-only compatibility for servers awaiting this migration. A
+            // legacy snapshot has no revision and cannot overwrite a saved loan.
+            guard isMissingVisibleRecordsRPC(error) else { throw error }
+            let loans: [Loan] = try await client.from("loans").select().execute().value
+            let payments: [LoanPayment] = try await client.from("loan_payments").select().execute().value
+            let grouped = Dictionary(grouping: payments, by: \.loanId)
+            return loans.map { loan in
+                var result = loan
+                result.revision = nil
+                result.payments = grouped[loan.id] ?? []
+                return result
+            }
         }
     }
-    func updateLoan(_ loan: Loan) async throws {
+
+    // No REST fallback: a missing RPC, incomplete ledger or failed transaction
+    // must never turn into a successful metadata-only save.
+    func saveLoan(_ loan: Loan) async throws -> Loan {
+        let request = try LoanSaveRequest(loan)
+        let saved: LoanSnapshot
+        do {
+            saved = try await client.rpc("miloom_save_loan", params: request).execute().value
+        } catch let error as PostgrestError {
+            switch error.code {
+            case "PT409", "40001": throw LoanSaveError.changed
+            case "42501": throw LoanSaveError.accessDenied
+            case "PGRST202": throw LoanSaveError.unavailable
+            default: throw LoanSaveError.unconfirmed
+            }
+        } catch {
+            throw LoanSaveError.unconfirmed
+        }
+        guard saved.loan.id == loan.id, saved.loan.userId == loan.userId,
+              saved.loan.revision != nil else { throw LoanSaveError.unconfirmed }
         let session = try? await client.auth.session
-        let rows: [MutationReceipt] = try await client.from("loans")
-            .update(loan)
-            .eq("id", value: loan.id)
-            .select("id")
-            .execute().value
-        try requireUpdatedRow(rows, resource: "loan")
         if let session, loan.userId != session.user.id {
             let log = ActivityLog(userId: loan.userId, actorEmail: session.user.email ?? "Someone", actionType: "updated_loan", message: "\(session.user.email ?? "Someone") updated the shared loan '\(loan.name)'.", resourceId: loan.id, resourceType: "loan")
             try? await insertActivityLog(log)
         }
-        
-        // Sync loan payments
-        try? await client.from("loan_payments").delete().eq("loan_id", value: loan.id).execute()
-        if let payments = loan.payments, !payments.isEmpty {
-            try? await client.from("loan_payments").insert(payments).execute()
-        }
-    }
-    func upsertLoan(_ loan: Loan) async throws {
-        try await client.from("loans").upsert(loan).execute()
-        try? await client.from("loan_payments").delete().eq("loan_id", value: loan.id).execute()
-        if let payments = loan.payments, !payments.isEmpty {
-            try? await client.from("loan_payments").insert(payments).execute()
-        }
+        return saved.value
     }
     func deleteLoan(_ id: UUID) async throws {
-        try? await client.from("loan_payments").delete().eq("loan_id", value: id).execute()
-        try await client.from("loans").delete().eq("id", value: id).execute()
+        // The foreign key cascades the ledger in the same transaction.
+        let rows: [MutationReceipt] = try await client.from("loans").delete()
+            .eq("id", value: id).select("id").execute().value
+        try requireUpdatedRow(rows, resource: "loan")
     }
     
     // MARK: - Company Documents

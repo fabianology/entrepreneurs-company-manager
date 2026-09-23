@@ -167,6 +167,49 @@ struct ResourceInvitation: Identifiable, Codable, Hashable {
     }
 }
 
+/// Entity/collection choices share the entity ID but retain distinct server scopes.
+enum EntitySharingScope: String, CaseIterable, Identifiable {
+    case company
+    case institutions = "all_institutions"
+    case financials = "all_financials"
+    case services = "all_subscriptions"
+    case documents = "all_documents"
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .company: return "Entire Entity"
+        case .institutions: return "All Institutions"
+        case .financials: return "All Financials"
+        case .services: return "All Services"
+        case .documents: return "All Documents"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .company: return "building.2"
+        case .institutions: return "building.columns"
+        case .financials: return "dollarsign.circle"
+        case .services: return "square.3.layers.3d"
+        case .documents: return "doc.text"
+        }
+    }
+    var explanation: String {
+        switch self {
+        case .company:
+            return "Includes this entity’s current and future shared business records. Owner-private documents and passwords are not included."
+        case .institutions:
+            return "Includes current and future banks and institutions in this entity. Cards, loans, services, documents, and passwords are not included."
+        case .financials:
+            return "Includes current and future institutions, cards, and loans in this entity. Services, documents, and passwords are not included."
+        case .services:
+            return "Includes current and future services and subscriptions in this entity. Financials, documents, and passwords are not included."
+        case .documents:
+            return "Includes current and future entity-shared documents. Owner-private documents, financials, services, and passwords are not included."
+        }
+    }
+}
+
 struct ResourceShare: Identifiable, Codable, Hashable {
     var id: UUID
     var resourceId: UUID

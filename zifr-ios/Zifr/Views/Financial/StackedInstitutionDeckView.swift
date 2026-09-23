@@ -13,7 +13,9 @@ struct StackedInstitutionDeckView: View {
     let loans: [Loan]
     @Environment(AppState.self) private var appState
     @Bindable var vm: AppViewModel
-    var canEdit: Bool = true
+    var editableInstitutionIDs: Set<UUID> = []
+    var editableCardIDs: Set<UUID> = []
+    var editableLoanIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
     let onEditInst: (Institution) -> Void
     let onEditCard: (FinancialCard) -> Void
@@ -380,7 +382,8 @@ struct StackedInstitutionDeckView: View {
             vm: vm,
             onEdit: { onEditInst(inst) },
             onEditLoan: { onEditLoan($0) },
-            canEdit: canEdit,
+            canEdit: editableInstitutionIDs.contains(inst.id),
+            editableLoanIDs: editableLoanIDs,
             canAccessCredentials: canAccessCredentials,
             isExpanded: isExpanded,
             onCollapse: {
@@ -472,7 +475,7 @@ struct StackedInstitutionDeckView: View {
                 togglePop(for: card.id.uuidString)
             }
             .onLongPressGesture {
-                if canEdit { onEditCard(card) }
+                if editableCardIDs.contains(card.id) { onEditCard(card) }
             }
             .highPriorityGesture(
                 DragGesture(minimumDistance: 10)

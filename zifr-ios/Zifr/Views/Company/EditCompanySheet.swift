@@ -1617,6 +1617,19 @@ struct ShareEntitySheet: View {
                                     .font(.system(size: 12, weight: .regular))
                                     .foregroundStyle(Color.white.opacity(0.48))
                                     .fixedSize(horizontal: false, vertical: true)
+
+                                if let scope = EntitySharingScope(rawValue: resourceType) {
+                                    if scope != .company,
+                                       let entity = appState.companies.first(where: { $0.id == resourceId }) {
+                                        Text("In \(entity.name)")
+                                            .font(.subheadline.weight(.medium))
+                                            .foregroundStyle(Color(hex: "#C1AA78"))
+                                    }
+                                    Text(scope.explanation)
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
 
                             Spacer(minLength: 0)

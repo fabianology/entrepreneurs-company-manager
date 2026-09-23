@@ -217,7 +217,10 @@ final class AppViewModel {
                 try await DataRepository.shared.upsertCard(card)
             }
             for loan in loans {
-                try await DataRepository.shared.upsertLoan(loan)
+                let saved = try await DataRepository.shared.saveLoan(loan)
+                if let index = appState.loans.firstIndex(where: { $0.id == saved.id }) {
+                    appState.loans[index] = saved
+                }
             }
         } catch {
             appState.institutions = originalInstitutions
@@ -285,21 +288,29 @@ final class AppViewModel {
     }
 
     func saveLoan(_ loan: Loan, appState: AppState) {
-        guard canEdit(companyId: loan.companyId, resourceType: "loan", resourceId: loan.id, appState: appState) else { return }
-        if let idx = appState.loans.firstIndex(where: { $0.id == loan.id }) {
-            let original = appState.loans[idx]
-            appState.loans[idx] = loan
-            Task {
-                do { try await DataRepository.shared.updateLoan(loan) }
-                catch { await MainActor.run { if let currentIdx = appState.loans.firstIndex(where: { $0.id == loan.id }) { appState.loans[currentIdx] = original }; appState.error = "Failed to update loan." } }
-            }
-        } else {
-            appState.loans.append(loan)
-            Task {
-                do { try await DataRepository.shared.insertLoan(loan) }
-                catch { await MainActor.run { appState.loans.removeAll { $0.id == loan.id }; appState.error = "Failed to add loan." } }
-            }
+        Task { @MainActor in
+            do { _ = try await saveLoanConfirmed(loan, appState: appState) }
+            catch { appState.error = error.localizedDescription }
         }
+    }
+
+    @MainActor
+    func saveLoanConfirmed(
+        _ loan: Loan, appState: AppState,
+        persist: (Loan) async throws -> Loan = { try await DataRepository.shared.saveLoan($0) }
+    ) async throws -> Loan {
+        guard canEdit(companyId: loan.companyId, resourceType: "loan", resourceId: loan.id, appState: appState) else {
+            throw LoanSaveError.accessDenied
+        }
+        let actorID = appState.portfolioUserID
+        let saved = try await persist(loan)
+        guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        if let index = appState.loans.firstIndex(where: { $0.id == saved.id }) {
+            appState.loans[index] = saved
+        } else {
+            appState.loans.append(saved)
+        }
+        return saved
     }
 
     func deleteLoan(_ loan: Loan, appState: AppState) {
@@ -332,6 +343,61 @@ final class AppViewModel {
                 do { try await DataRepository.shared.insertDocument(doc) }
                 catch { await MainActor.run { appState.documents.removeAll { $0.id == doc.id }; appState.error = "Failed to add document." } }
             }
+        }
+    }
+
+    // Edit sheets must wait for the server receipt before dismissing. In
+    // particular, a revoked share can still be present in this device's cache.
+    @MainActor
+    func saveDocumentConfirmed(
+        _ doc: CompanyDocument, appState: AppState,
+        persist: (CompanyDocument, Bool) async throws -> Void = { document, exists in
+            if exists { try await DataRepository.shared.updateDocument(document) }
+            else { try await DataRepository.shared.insertDocument(document) }
+        }
+    ) async throws {
+        guard canEdit(companyId: doc.companyId, resourceType: "document", resourceId: doc.id, appState: appState),
+              doc.visibility != "owner_private" || appState.portfolioUserID == doc.userId else {
+            throw NSError(domain: "Documents", code: 403, userInfo: [
+                NSLocalizedDescriptionKey: "You do not have edit access to this document. Refresh your access and try again."
+            ])
+        }
+        let actorID = appState.portfolioUserID
+        let exists = appState.documents.contains { $0.id == doc.id }
+        try await persist(doc, exists)
+        guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        if let index = appState.documents.firstIndex(where: { $0.id == doc.id }) {
+            appState.documents[index] = doc
+        } else {
+            appState.documents.append(doc)
+        }
+    }
+
+    // Presentation checks only; writes still recheck access here and on the server.
+    // Never inherit a linked resource's permission from its visual parent.
+    static func resourceAllowsEdit(
+        _ shares: [ResourceShare], actorID: UUID?, ownerID: UUID, companyID: UUID,
+        resourceType: String, resourceID: UUID, ownerCanEdit: Bool = true,
+        isOwnerPrivate: Bool = false
+    ) -> Bool {
+        guard let actorID else { return false }
+        if actorID == ownerID { return ownerCanEdit }
+        guard !isOwnerPrivate else { return false }
+        return shareAllowsEdit(
+            shares, actorID: actorID, companyID: companyID,
+            resourceType: resourceType, resourceID: resourceID
+        )
+    }
+
+    static func resourceAllowsSharing(
+        _ shares: [ResourceShare], actorID: UUID?, ownerID: UUID, companyID: UUID,
+        isOwnerPrivate: Bool = false
+    ) -> Bool {
+        guard let actorID, !isOwnerPrivate else { return false }
+        if actorID == ownerID { return true }
+        return shares.contains {
+            $0.userId == actorID && $0.resourceType == "company"
+                && $0.resourceId == companyID && $0.role == "Admin"
         }
     }
 

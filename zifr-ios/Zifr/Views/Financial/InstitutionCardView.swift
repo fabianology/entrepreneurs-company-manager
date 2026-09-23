@@ -12,6 +12,7 @@ struct InstitutionCardView: View {
     let onEdit: () -> Void
     let onEditLoan: (Loan) -> Void
     var canEdit: Bool = true
+    var editableLoanIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
     var isExpanded: Bool = true
     var onCollapse: (() -> Void)? = nil
@@ -98,7 +99,7 @@ struct InstitutionCardView: View {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         if let onCollapse = onCollapse {
                             onCollapse()
-                        } else {
+                        } else if canEdit {
                             onEdit()
                         }
                     }
@@ -111,10 +112,11 @@ struct InstitutionCardView: View {
                             Image(systemName: "line.3.horizontal")
                                 .font(.system(size: 24, weight: .regular))
                                 .foregroundStyle(Color.white.opacity(0.8))
-                                .frame(width: 40, height: 40)
+                                .frame(width: 44, height: 44)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Edit institution")
                     }
                 }
                 .padding(.horizontal, 24)
@@ -166,7 +168,7 @@ struct InstitutionCardView: View {
                             .padding(.vertical, 18)
                     }
                     
-                    if canEdit && institution.isDisconnected {
+                    if canEdit && canAccessCredentials && institution.isDisconnected {
                         PlaidLinkButton(
                             companyId: institution.companyId,
                             institutionId: institution.id,
@@ -233,7 +235,7 @@ struct InstitutionCardView: View {
 
                     ForEach(loans) { loan in
                         Button {
-                            guard canEdit else { return }
+                            guard editableLoanIDs.contains(loan.id) else { return }
                             onEditLoan(loan)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {

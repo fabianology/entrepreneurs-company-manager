@@ -45,12 +45,14 @@ run_sql supabase/tests/delegated_scope_fixture.sql
 psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -p 5432 \
   -d postgres -c 'CREATE ROLE service_role NOLOGIN BYPASSRLS'
 
-for migration_number in $(seq 9 29); do
+for migration_number in $(seq 9 33); do
   case "$migration_number" in
     12) run_sql supabase/tests/resource_secret_foundation_fixture.sql ;;
     22) run_sql supabase/tests/document_storage_exact_read_fixture.sql ;;
     24) run_sql supabase/tests/document_orphan_cleanup_fixture.sql ;;
     26) run_sql supabase/tests/document_upload_reservation_fixture.sql ;;
+    30) run_sql supabase/tests/loan_payment_atomic_fixture.sql ;;
+    32) run_sql supabase/tests/institution_collection_constraint_fixture.sql ;;
   esac
 
   migration_prefix=$(printf '20260922%04d' "$migration_number")
@@ -63,5 +65,7 @@ for migration_number in $(seq 9 29); do
   run_sql "$1"
 done
 
-printf 'Local migration-order rehearsal passed (009–029).\n'
+run_sql supabase/tests/loan_payment_atomic_assertions.sql
+run_sql supabase/tests/institution_collection_constraint_assertions.sql
+printf 'Local migration-order rehearsal, loan and institution-collection contracts passed (009–033).\n'
 printf 'No hosted database was contacted; this does not verify live Storage or behavior.\n'

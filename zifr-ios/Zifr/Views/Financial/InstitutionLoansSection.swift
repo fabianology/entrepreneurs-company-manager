@@ -4,6 +4,8 @@ import SwiftData
 // MARK: - Institution Loans Section
 struct InstitutionLoansSection: View {
     let loans: [Loan]
+    var canAdd: Bool = false
+    var editableLoanIDs: Set<UUID> = []
     let onAdd: () -> Void
     let onEdit: (Loan) -> Void
     let onDelete: (Loan) -> Void
@@ -20,7 +22,7 @@ struct InstitutionLoansSection: View {
                     ForEach(loans, id: \.id) { loan in
                         Button { 
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            onEdit(loan) 
+                            if editableLoanIDs.contains(loan.id) { onEdit(loan) }
                         } label: {
                             HStack(spacing: 12) {
                                 Text("💸").font(.system(size: 18))
@@ -61,29 +63,33 @@ struct InstitutionLoansSection: View {
                         }
                         .buttonStyle(PremiumButtonStyle())
                         .contextMenu {
-                            Button(role: .destructive) {
-                                withAnimation { onDelete(loan) }
-                            } label: {
-                                Label("Delete Loan", systemImage: "trash")
+                            if editableLoanIDs.contains(loan.id) {
+                                Button(role: .destructive) {
+                                    withAnimation { onDelete(loan) }
+                                } label: {
+                                    Label("Delete Loan", systemImage: "trash")
+                                }
                             }
                         }
                     }
                 }
             }
 
-            Button { 
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                onAdd() 
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "plus")
-                    Text("Add Loan")
+            if canAdd {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onAdd()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                        Text("Add Loan")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
                 }
-                .font(.system(size: 13, weight: .bold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .buttonStyle(MiloomSecondaryButtonStyle())
             }
-            .buttonStyle(MiloomSecondaryButtonStyle())
         }
     }
 }

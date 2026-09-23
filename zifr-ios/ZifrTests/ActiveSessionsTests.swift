@@ -4,6 +4,230 @@ import CryptoKit
 @testable import Zifr
 
 final class ActiveSessionsTests: XCTestCase {
+    func testEntitySharingChoicesKeepDistinctServerScopes() {
+        XCTAssertEqual(EntitySharingScope.allCases.map(\.rawValue), [
+            "company", "all_institutions", "all_financials", "all_subscriptions", "all_documents"
+        ])
+        XCTAssertEqual(Set(EntitySharingScope.allCases.map(\.id)).count, 5)
+        XCTAssertEqual(EntitySharingScope.institutions.title, "All Institutions")
+        XCTAssertEqual(EntitySharingScope.financials.title, "All Financials")
+        XCTAssertNil(EntitySharingScope(rawValue: "institution"))
+        XCTAssertNil(EntitySharingScope(rawValue: "unknown"))
+    }
+
+    @MainActor
+    func testDocumentSaveWaitsForReceiptAndRetainsDraftOnFailure() async throws {
+        let state = AppState()
+        let actor = UUID(), owner = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        state.portfolioUserID = actor
+        state.companies = [company]
+        let original = CompanyDocument(userId: owner, companyId: company.id, name: "Original")
+        state.documents = [original]
+        state.resourceShares = [ResourceShare(resourceId: original.id, resourceType: "document", userId: actor, role: "Editor")]
+        var draft = original
+        draft.name = "Unsaved draft"
+        let vm = AppViewModel()
+        do {
+            try await vm.saveDocumentConfirmed(draft, appState: state) { _, exists in
+                XCTAssertTrue(exists)
+                XCTAssertEqual(state.documents, [original])
+                throw NSError(domain: "Documents", code: 403)
+            }
+            XCTFail("Server denial was swallowed")
+        } catch { XCTAssertEqual((error as NSError).code, 403) }
+        XCTAssertEqual(state.documents, [original])
+        XCTAssertEqual(draft.name, "Unsaved draft")
+        try await vm.saveDocumentConfirmed(draft, appState: state) { _, exists in XCTAssertTrue(exists) }
+        XCTAssertEqual(state.documents, [draft])
+        state.resourceShares = []
+        do {
+            try await vm.saveDocumentConfirmed(draft, appState: state) { _, _ in XCTFail("Revoked edit reached persistence") }
+            XCTFail("Revoked edit succeeded")
+        } catch { XCTAssertEqual((error as NSError).code, 403) }
+        XCTAssertEqual(state.documents, [draft])
+    }
+
+    @MainActor
+    func testDocumentCreateFailureAndAccountChangeDoNotPublishDraft() async throws {
+        let state = AppState()
+        let owner = UUID()
+        let company = Company(userId: owner, name: "Owned")
+        state.portfolioUserID = owner
+        state.companies = [company]
+        let draft = CompanyDocument(userId: owner, companyId: company.id)
+        let vm = AppViewModel()
+        do {
+            try await vm.saveDocumentConfirmed(draft, appState: state) { _, exists in
+                XCTAssertFalse(exists)
+                throw URLError(.notConnectedToInternet)
+            }
+            XCTFail("Offline create succeeded")
+        } catch { XCTAssertTrue(error is URLError) }
+        XCTAssertTrue(state.documents.isEmpty)
+        do {
+            try await vm.saveDocumentConfirmed(draft, appState: state) { _, _ in state.portfolioUserID = UUID() }
+            XCTFail("Saved data crossed account boundary")
+        } catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertTrue(state.documents.isEmpty)
+    }
+
+    func testLoanSaveRequestKeepsLedgerAndRevisionInOneContract() throws {
+        var loan = Loan(userId: UUID(), companyId: UUID(), name: "Loan")
+        let encoder = JSONEncoder()
+        let draftJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(LoanSaveRequest(loan))) as? [String: Any])
+        XCTAssertTrue(draftJSON["p_expected_revision"] is NSNull)
+        XCTAssertEqual((draftJSON["p_payments"] as? [Any])?.count, 0)
+        loan.revision = 9
+        XCTAssertThrowsError(try LoanSaveRequest(loan), "An unloaded ledger must not become an empty replacement")
+        loan.payments = [LoanPayment(userId: loan.userId, loanId: loan.id, amount: 25)]
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: encoder.encode(LoanSaveRequest(loan))) as? [String: Any])
+        XCTAssertEqual(json["p_expected_revision"] as? Int, 9)
+        XCTAssertEqual((json["p_payments"] as? [[String: Any]])?.first?["amount"] as? Double, 25)
+        XCTAssertNil((json["p_loan"] as? [String: Any])?["payments"])
+    }
+
+    func testLoanSnapshotRestoresLedgerAndReturnedRevision() throws {
+        var loan = Loan(userId: UUID(), companyId: UUID(), name: "Loan")
+        loan.revision = 12
+        let payment = LoanPayment(userId: loan.userId, loanId: loan.id, amount: 25)
+        struct WireSnapshot: Encodable { let loan: Loan; let payments: [LoanPayment] }
+        let data = try JSONEncoder().encode(WireSnapshot(loan: loan, payments: [payment]))
+        let snapshot = try JSONDecoder().decode(LoanSnapshot.self, from: data)
+        XCTAssertEqual(snapshot.value.revision, 12)
+        XCTAssertEqual(snapshot.value.payments, [payment])
+        loan.revision = nil
+        XCTAssertNil(try JSONDecoder().decode(Loan.self, from: JSONEncoder().encode(loan)).revision)
+    }
+
+    @MainActor
+    func testLoanSaveWaitsForConfirmationAndPreservesStateOnFailure() async throws {
+        let state = AppState()
+        let actor = UUID(), owner = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        state.portfolioUserID = actor
+        state.companies = [company]
+        var original = Loan(userId: owner, companyId: company.id, name: "Original", payments: [])
+        original.revision = 3
+        state.loans = [original]
+        state.resourceShares = [ResourceShare(resourceId: original.id, resourceType: "loan", userId: actor, role: "Editor")]
+        var draft = original
+        draft.name = "Edited"
+        draft.payments = [LoanPayment(userId: owner, loanId: draft.id, amount: 25)]
+        let vm = AppViewModel()
+        do {
+            _ = try await vm.saveLoanConfirmed(draft, appState: state) { _ in
+                XCTAssertEqual(state.loans, [original], "Unconfirmed data must not replace saved state")
+                throw LoanSaveError.changed
+            }
+            XCTFail("Failure was swallowed")
+        } catch { XCTAssertTrue(error is LoanSaveError) }
+        XCTAssertEqual(state.loans, [original])
+        let saved = try await vm.saveLoanConfirmed(draft, appState: state) { value in
+            var confirmed = value
+            confirmed.revision = 5
+            return confirmed
+        }
+        XCTAssertEqual(state.loans, [saved])
+        XCTAssertEqual(state.loans.first?.revision, 5)
+        XCTAssertEqual(state.loans.first?.payments?.count, 1)
+        state.resourceShares = []
+        do {
+            _ = try await vm.saveLoanConfirmed(draft, appState: state) { _ in
+                XCTFail("Revoked edit reached persistence")
+                return original
+            }
+            XCTFail("Revoked edit succeeded")
+        } catch { XCTAssertTrue(error is LoanSaveError) }
+        XCTAssertEqual(state.loans, [saved])
+    }
+
+    func testResourceEditorPresentationIsExactFailClosedAndOrderIndependent() {
+        let actor = UUID(), owner = UUID(), company = UUID(), item = UUID(), sibling = UUID()
+        let companyViewer = ResourceShare(resourceId: company, resourceType: "company", userId: actor, role: "Viewer")
+        for type in ["institution", "card", "loan", "document"] {
+            let editor = ResourceShare(resourceId: item, resourceType: type, userId: actor, role: "Editor")
+            for shares in [[companyViewer, editor], [editor, companyViewer]] {
+                func allows(_ resourceID: UUID, _ resourceType: String = type, _ userID: UUID? = actor) -> Bool {
+                    AppViewModel.resourceAllowsEdit(
+                        shares, actorID: userID, ownerID: owner, companyID: company,
+                        resourceType: resourceType, resourceID: resourceID
+                    )
+                }
+                XCTAssertTrue(allows(item), type)
+                XCTAssertFalse(allows(sibling), type)
+                XCTAssertFalse(allows(company, "company"), type)
+                XCTAssertFalse(allows(item, type, nil), type)
+                XCTAssertFalse(allows(item, type, UUID()), type)
+                // An item ID with the wrong type must not match either.
+                XCTAssertFalse(allows(item, "subscription"), type)
+            }
+        }
+        XCTAssertFalse(AppViewModel.resourceAllowsEdit(
+            [], actorID: actor, ownerID: owner, companyID: company,
+            resourceType: "document", resourceID: item
+        ))
+        XCTAssertTrue(AppViewModel.resourceAllowsEdit(
+            [], actorID: owner, ownerID: owner, companyID: company,
+            resourceType: "document", resourceID: item
+        ))
+        XCTAssertFalse(AppViewModel.resourceAllowsEdit(
+            [], actorID: owner, ownerID: owner, companyID: company,
+            resourceType: "document", resourceID: item, ownerCanEdit: false
+        ))
+    }
+
+    func testCollectionEditorsDoNotInheritVisualChildPermissions() {
+        let actor = UUID(), owner = UUID(), company = UUID(), item = UUID()
+        let scopes: [String: Set<String>] = [
+            "all_institutions": ["institution"],
+            "all_financials": ["institution", "card", "loan"],
+            "all_documents": ["document"],
+            "all_subscriptions": ["subscription"]
+        ]
+        for (scope, allowedTypes) in scopes {
+            let shares = [ResourceShare(resourceId: company, resourceType: scope, userId: actor, role: "Editor")]
+            for type in ["company", "institution", "card", "loan", "document", "subscription"] {
+                XCTAssertEqual(AppViewModel.resourceAllowsEdit(
+                    shares, actorID: actor, ownerID: owner, companyID: company,
+                    resourceType: type, resourceID: item
+                ), allowedTypes.contains(type), "\(scope) → \(type)")
+            }
+            XCTAssertFalse(AppViewModel.resourceAllowsEdit(
+                shares, actorID: actor, ownerID: owner, companyID: UUID(),
+                resourceType: allowedTypes.first!, resourceID: item
+            ))
+        }
+    }
+
+    func testSharingManagementAndOwnerPrivateDocumentsRemainSeparateFromEditing() {
+        let actor = UUID(), owner = UUID(), company = UUID(), document = UUID()
+        for (type, id, role, expected) in [
+            ("company", company, "Admin", true),
+            ("company", company, "Editor", false),
+            ("company", company, "Viewer", false),
+            ("all_documents", company, "Admin", false),
+            ("document", document, "Editor", false),
+            ("document", document, "Admin", false),
+            ("company", UUID(), "Admin", false)
+        ] {
+            let shares = [ResourceShare(resourceId: id, resourceType: type, userId: actor, role: role)]
+            XCTAssertEqual(AppViewModel.resourceAllowsSharing(
+                shares, actorID: actor, ownerID: owner, companyID: company
+            ), expected, "\(type) / \(role)")
+            XCTAssertFalse(AppViewModel.resourceAllowsEdit(
+                shares, actorID: actor, ownerID: owner, companyID: company,
+                resourceType: "document", resourceID: document, isOwnerPrivate: true
+            ))
+            XCTAssertFalse(AppViewModel.resourceAllowsSharing(
+                shares, actorID: actor, ownerID: owner, companyID: company, isOwnerPrivate: true
+            ))
+        }
+        XCTAssertTrue(AppViewModel.resourceAllowsSharing([], actorID: owner, ownerID: owner, companyID: company))
+        XCTAssertFalse(AppViewModel.resourceAllowsSharing([], actorID: nil, ownerID: owner, companyID: company))
+        XCTAssertFalse(AppViewModel.resourceAllowsSharing([], actorID: owner, ownerID: owner, companyID: company, isOwnerPrivate: true))
+    }
+
     func testSharedEditorScopesMatchTheExactResourceAndCollections() {
         let actor = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
         let otherActor = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!

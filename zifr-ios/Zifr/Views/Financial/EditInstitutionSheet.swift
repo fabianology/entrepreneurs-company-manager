@@ -17,8 +17,31 @@ struct EditInstitutionSheet: View {
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
     private var isViewer: Bool {
-        let share = appState.resourceShares.first(where: { $0.resourceId == institution.id || $0.resourceId == institution.companyId })
-        return share?.role == "Viewer"
+        !AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: institution.userId, companyID: institution.companyId,
+            resourceType: "institution", resourceID: institution.id
+        )
+    }
+
+    private var canManageSharing: Bool {
+        AppViewModel.resourceAllowsSharing(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: institution.userId, companyID: institution.companyId
+        )
+    }
+
+    private func canEditResource(_ type: String, _ id: UUID) -> Bool {
+        AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: institution.userId, companyID: institution.companyId,
+            resourceType: type, resourceID: id
+        )
+    }
+
+    // Keep creation separate from editing an existing institution or child.
+    private var canAddRelatedItems: Bool {
+        canEditResource("company", institution.companyId)
     }
 
     private var canAccessCredentials: Bool {
@@ -310,17 +333,22 @@ struct EditInstitutionSheet: View {
                         // ── Card 3: Cards ──────────────────────────────
                         InstitutionCardsSection(
                             cards: instCards,
+                            canAdd: canAddRelatedItems,
+                            editableCardIDs: Set(instCards.filter { canEditResource("card", $0.id) }.map(\.id)),
                             onAdd: {
+                                guard canAddRelatedItems else { return }
                                 cardDraft = vm.addCard(appState: appState, userId: institution.userId, companyId: institution.companyId)
                                 cardDraft?.institutionName = institution.name 
                                 showCardHUD = true
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             },
                             onEdit: { card in
+                                guard canEditResource("card", card.id) else { return }
                                 cardDraft = card
                                 showCardHUD = true
                             },
                             onDelete: { card in
+                                guard canEditResource("card", card.id) else { return }
                                 vm.deleteCard(card, appState: appState)
                             }
                         )
@@ -328,164 +356,178 @@ struct EditInstitutionSheet: View {
                         // ── Card 4: Loans ──────────────────────────────
                         InstitutionLoansSection(
                             loans: instLoans,
+                            canAdd: canAddRelatedItems,
+                            editableLoanIDs: Set(instLoans.filter { canEditResource("loan", $0.id) }.map(\.id)),
                             onAdd: {
+                                guard canAddRelatedItems else { return }
                                 loanDraft = vm.addLoan(appState: appState, userId: institution.userId, companyId: institution.companyId)
                                 loanDraft?.lender = institution.name 
                                 showLoanHUD = true
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             },
                             onEdit: { loan in
+                                guard canEditResource("loan", loan.id) else { return }
                                 loanDraft = loan
                                 showLoanHUD = true
                             },
                             onDelete: { loan in
+                                guard canEditResource("loan", loan.id) else { return }
                                 vm.deleteLoan(loan, appState: appState)
                             }
                         )
 
                         // ── Card 5: Actions ────────────────────────────
                         if !isNew {
-                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
-                                VStack(spacing: 12) {
-                                    // Share Institution
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        showShareSheet = true
-                                    } label: {
-                                        VStack(spacing: 4) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "person.crop.circle.badge.plus")
-                                                Text("Share Institution")
+                            if canManageSharing {
+                                ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                    VStack(spacing: 12) {
+                                        // Share Institution
+                                        if canManageSharing {
+                                            Button {
+                                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                                showShareSheet = true
+                                            } label: {
+                                                VStack(spacing: 4) {
+                                                    HStack(spacing: 6) {
+                                                        Image(systemName: "person.crop.circle.badge.plus")
+                                                        Text("Share Institution")
+                                                    }
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    Text("Generate a share link for collaborators")
+                                                        .font(.system(size: 10, weight: .regular))
+                                                        .foregroundStyle(Color.white.opacity(0.6))
+                                                }
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 10)
                                             }
-                                            .font(.system(size: 13, weight: .semibold))
-                                            Text("Generate a share link for collaborators")
-                                                .font(.system(size: 10, weight: .regular))
-                                                .foregroundStyle(Color.white.opacity(0.6))
+                                            .buttonStyle(MiloomSecondaryButtonStyle())
                                         }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                    }
-                                    .buttonStyle(MiloomSecondaryButtonStyle())
 
-                                    // Sync Latest Data
-                                    VStack(spacing: 6) {
-                                        Button {
-                                            guard !isSyncing else { return }
-                                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                            isSyncing = true
-                                            syncSuccess = false
-                                            Task {
-                                                do {
-                                                    try await PlaidService.shared.syncLatestAvailableData(institutionId: institution.id)
-                                                    await DataRepository.shared.fetchAllData(appState: appState)
-                                                    if let updatedInst = appState.institutions.first(where: { $0.id == institution.id }) {
-                                                        self.institution = updatedInst
-                                                    }
-                                                    isSyncing = false
-                                                    syncSuccess = true
-                                                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                                                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                                        // Sync Latest Data
+                                        if institution.userId == appState.portfolioUserID {
+                                            VStack(spacing: 6) {
+                                                Button {
+                                                    guard !isSyncing else { return }
+                                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                                    isSyncing = true
                                                     syncSuccess = false
-                                                } catch {
-                                                    isSyncing = false
-                                                    syncErrorMsg = error.localizedDescription
-                                                    AppDiagnostics.failure("plaid", "sync_institution", error: error)
-                                                }
-                                            }
-                                        } label: {
-                                            VStack(spacing: 4) {
-                                                HStack(spacing: 6) {
-                                                    if isSyncing {
-                                                        ProgressView()
-                                                            .tint(.white)
-                                                            .scaleEffect(0.8)
-                                                        Text("Syncing...")
-                                                    } else if syncSuccess {
-                                                        Image(systemName: "checkmark.circle.fill")
-                                                            .foregroundStyle(Color.zifrGreen)
-                                                        Text("Sync Complete")
-                                                            .foregroundStyle(Color.zifrGreen)
-                                                    } else {
-                                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                                        Text("Sync Available Data")
+                                                    Task {
+                                                        do {
+                                                            try await PlaidService.shared.syncLatestAvailableData(institutionId: institution.id)
+                                                            await DataRepository.shared.fetchAllData(appState: appState)
+                                                            if let updatedInst = appState.institutions.first(where: { $0.id == institution.id }) {
+                                                                self.institution = updatedInst
+                                                            }
+                                                            isSyncing = false
+                                                            syncSuccess = true
+                                                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                                                            syncSuccess = false
+                                                        } catch {
+                                                            isSyncing = false
+                                                            syncErrorMsg = error.localizedDescription
+                                                            AppDiagnostics.failure("plaid", "sync_institution", error: error)
+                                                        }
                                                     }
+                                                } label: {
+                                                    VStack(spacing: 4) {
+                                                        HStack(spacing: 6) {
+                                                            if isSyncing {
+                                                                ProgressView()
+                                                                    .tint(.white)
+                                                                    .scaleEffect(0.8)
+                                                                Text("Syncing...")
+                                                            } else if syncSuccess {
+                                                                Image(systemName: "checkmark.circle.fill")
+                                                                    .foregroundStyle(Color.zifrGreen)
+                                                                Text("Sync Complete")
+                                                                    .foregroundStyle(Color.zifrGreen)
+                                                            } else {
+                                                                Image(systemName: "arrow.triangle.2.circlepath")
+                                                                Text("Sync Available Data")
+                                                            }
+                                                        }
+                                                        .font(.system(size: 13, weight: .semibold))
+                                                        Text("Get the latest data available from Plaid")
+                                                            .font(.system(size: 10, weight: .regular))
+                                                            .foregroundStyle(Color.white.opacity(0.6))
+                                                    }
+                                                    .frame(maxWidth: .infinity)
+                                                    .padding(.vertical, 10)
                                                 }
-                                                .font(.system(size: 13, weight: .semibold))
-                                                Text("Get the latest data available from Plaid")
+                                                .buttonStyle(MiloomSecondaryButtonStyle())
+
+                                                Text(balanceRetrievalDetail)
                                                     .font(.system(size: 10, weight: .regular))
                                                     .foregroundStyle(Color.white.opacity(0.6))
-                                            }
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 10)
-                                        }
-                                        .buttonStyle(MiloomSecondaryButtonStyle())
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                    .fixedSize(horizontal: false, vertical: true)
 
-                                        Text(balanceRetrievalDetail)
-                                            .font(.system(size: 10, weight: .regular))
-                                            .foregroundStyle(Color.white.opacity(0.6))
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .fixedSize(horizontal: false, vertical: true)
-                                        
-                                        if let syncHealth {
-                                            HStack(alignment: .top, spacing: 8) {
-                                                Image(systemName: syncHealth.icon)
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundStyle(syncHealth.color)
-                                                    .padding(.top, 1)
+                                                if let syncHealth {
+                                                    HStack(alignment: .top, spacing: 8) {
+                                                        Image(systemName: syncHealth.icon)
+                                                            .font(.system(size: 12, weight: .bold))
+                                                            .foregroundStyle(syncHealth.color)
+                                                            .padding(.top, 1)
 
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(syncHealth.title)
-                                                        .font(.system(size: 12, weight: .semibold))
-                                                        .foregroundStyle(syncHealth.color)
-                                                    Text(syncHealth.detail)
-                                                        .font(.system(size: 10, weight: .medium))
-                                                        .foregroundStyle(Color.white.opacity(0.48))
+                                                        VStack(alignment: .leading, spacing: 2) {
+                                                            Text(syncHealth.title)
+                                                                .font(.system(size: 12, weight: .semibold))
+                                                                .foregroundStyle(syncHealth.color)
+                                                            Text(syncHealth.detail)
+                                                                .font(.system(size: 10, weight: .medium))
+                                                                .foregroundStyle(Color.white.opacity(0.48))
+                                                        }
+
+                                                        Spacer(minLength: 0)
+                                                    }
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                                    .padding(.horizontal, 12)
+                                                    .padding(.vertical, 10)
+                                                    .background(syncHealth.color.opacity(0.08))
+                                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 10)
+                                                            .stroke(syncHealth.color.opacity(0.2), lineWidth: 1)
+                                                    )
                                                 }
-
-                                                Spacer(minLength: 0)
                                             }
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 10)
-                                            .background(syncHealth.color.opacity(0.08))
-                                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .stroke(syncHealth.color.opacity(0.2), lineWidth: 1)
-                                            )
                                         }
                                     }
                                 }
-                            }
 
-                            // ── Unencapsulated Bottom Delete Button ─────
-                            Button(role: .destructive) {
-                                UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                showDeleteConfirm = true
-                            } label: {
-                                HStack {
-                                    Spacer()
-                                    Image(systemName: "trash")
-                                    Text("Delete \(institution.name.isEmpty ? "Institution" : institution.name)")
-                                    Spacer()
-                                }
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.red)
-                                .padding(.vertical, 14)
-                                .background(Color.white.opacity(0.05))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
-                            .buttonStyle(.plain)
-                            .confirmationDialog(
-                                "Delete Bank?",
-                                isPresented: $showDeleteConfirm,
-                                titleVisibility: .visible
-                            ) {
-                                Button("Delete Bank", role: .destructive) {
-                                    vm.deleteInstitution(institution, appState: appState)
-                                    dismiss()
+                            // ── Unencapsulated Bottom Delete Button ─────
+                            // Unlinking a bank also affects its Plaid connection and children.
+                            if institution.userId == appState.portfolioUserID {
+                                Button(role: .destructive) {
+                                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                                    showDeleteConfirm = true
+                                } label: {
+                                    HStack {
+                                        Spacer()
+                                        Image(systemName: "trash")
+                                        Text("Delete \(institution.name.isEmpty ? "Institution" : institution.name)")
+                                        Spacer()
+                                    }
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(.red)
+                                    .padding(.vertical, 14)
+                                    .background(Color.white.opacity(0.05))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
                                 }
-                                Button("Cancel", role: .cancel) {}
+                                .buttonStyle(.plain)
+                                .confirmationDialog(
+                                    "Delete Bank?",
+                                    isPresented: $showDeleteConfirm,
+                                    titleVisibility: .visible
+                                ) {
+                                    Button("Delete Bank", role: .destructive) {
+                                        vm.deleteInstitution(institution, appState: appState)
+                                        dismiss()
+                                    }
+                                    Button("Cancel", role: .cancel) {}
+                                }
                             }
                         }
                     }

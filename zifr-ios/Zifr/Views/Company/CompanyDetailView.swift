@@ -29,6 +29,13 @@ struct CompanyDetailView: View {
         return ["Editor", "Admin"].contains(role)
     }
 
+    private var canManageSharing: Bool {
+        AppViewModel.resourceAllowsSharing(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: company.userId, companyID: company.id
+        )
+    }
+
     /// Company collaboration grants access to business records, never to the
     /// owner's vault. Secret access remains owner-only until a separate,
     /// resource-specific secret grant exists.
@@ -69,6 +76,7 @@ struct CompanyDetailView: View {
     }
 
     @State private var showEditCompany = false
+    @State private var sharingScope: EntitySharingScope?
     @State private var swipeHandled = false
     @State private var tabBounces: [EntityHomeTab: Int] = [:]
     @State private var searchBounce: Int = 0
@@ -129,6 +137,12 @@ struct CompanyDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEditCompany) {
             NewEntitySheet(vm: vm, company: company) { _ in }
+        }
+        .sheet(item: $sharingScope) { scope in
+            ShareEntitySheet(
+                resourceId: company.id, resourceType: scope.rawValue,
+                resourceTitle: scope == .company ? company.name : scope.title
+            )
         }
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
@@ -549,23 +563,39 @@ struct CompanyDetailView: View {
     @ViewBuilder
     private var headerActionMenu: some View {
         Menu {
-            Button {
-                showFinancialReport = true
-            } label: {
-                Label("Financial Report", systemImage: "dollarsign.circle")
+            if canManageSharing {
+                Section("Share Access") {
+                    ForEach(EntitySharingScope.allCases) { scope in
+                        Button {
+                            sharingScope = scope
+                        } label: {
+                            Label(scope.title, systemImage: scope.icon)
+                        }
+                    }
+                }
             }
-            Button {
-                showSubscriptionReport = true
-            } label: {
-                Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+            Section("Reports") {
+                Button {
+                    showFinancialReport = true
+                } label: {
+                    Label("Financial Report", systemImage: "dollarsign.circle")
+                }
+                Button {
+                    showSubscriptionReport = true
+                } label: {
+                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+                }
             }
         } label: {
-            Image(systemName: "receipt")
+            Image(systemName: "ellipsis")
                 .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.45))
-                .frame(width: 28, height: 28)
-                .contentShape(Rectangle())
+                .foregroundStyle(Color(hex: "#C1AA78"))
+                .frame(width: 44, height: 44)
+                .background(.ultraThinMaterial, in: Circle())
+                .contentShape(Circle())
         }
+        .accessibilityLabel("Entity actions")
+        .accessibilityHint(canManageSharing ? "Sharing scopes and reports" : "Entity reports")
     }
 
     @ViewBuilder

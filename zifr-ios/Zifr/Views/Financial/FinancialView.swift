@@ -14,6 +14,26 @@ struct FinancialView: View {
     @Environment(AuthViewModel.self) private var authVM
     @Environment(OnboardingStateManager.self) private var onboardingState
 
+    private func canEditResource(_ type: String, _ id: UUID) -> Bool {
+        AppViewModel.resourceAllowsEdit(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: company.userId, companyID: company.id,
+            resourceType: type, resourceID: id, ownerCanEdit: canEdit
+        )
+    }
+
+    private var editableInstitutionIDs: Set<UUID> {
+        Set(institutions.filter { canEditResource("institution", $0.id) }.map(\.id))
+    }
+
+    private var editableCardIDs: Set<UUID> {
+        Set(cards.filter { canEditResource("card", $0.id) }.map(\.id))
+    }
+
+    private var editableLoanIDs: Set<UUID> {
+        Set(loans.filter { canEditResource("loan", $0.id) }.map(\.id))
+    }
+
     private var canManageSharing: Bool {
         guard let userId = authVM.currentUser?.id else { return false }
         if company.userId == userId { return true }
@@ -241,11 +261,13 @@ struct FinancialView: View {
                                 cards: cards,
                                 loans: loans,
                                 vm: vm,
-                                canEdit: canEdit,
+                                editableInstitutionIDs: editableInstitutionIDs,
+                                editableCardIDs: editableCardIDs,
+                                editableLoanIDs: editableLoanIDs,
                                 canAccessCredentials: canAccessCredentials,
-                                onEditInst: { editingInst = $0 },
-                                onEditCard: { editingCard = $0 },
-                                onEditLoan: { editingLoan = $0 }
+                                onEditInst: { if canEditResource("institution", $0.id) { editingInst = $0 } },
+                                onEditCard: { if canEditResource("card", $0.id) { editingCard = $0 } },
+                                onEditLoan: { if canEditResource("loan", $0.id) { editingLoan = $0 } }
                             )
                         }
                         
@@ -335,6 +357,7 @@ struct FinancialView: View {
                     institutions: institutions,
                     cards: cards,
                     onSave: {
+                        guard canEditResource("loan", pLoan.id) else { return }
                         var updatedLoan = pLoan
                         if updatedLoan.payments == nil { updatedLoan.payments = [] }
                         updatedLoan.payments?.append(paymentDraft)
@@ -537,7 +560,7 @@ struct FinancialView: View {
                             togglePop(for: card.id.uuidString)
                         }
                         .onLongPressGesture {
-                            if canEdit { editingCard = card }
+                            if canEditResource("card", card.id) { editingCard = card }
                         }
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 10)
@@ -558,9 +581,10 @@ struct FinancialView: View {
                 loanCount: instLoans.count,
                 loans: instLoans,
                 vm: vm,
-                onEdit: { editingInst = inst },
-                onEditLoan: { editingLoan = $0 },
-                canEdit: canEdit,
+                onEdit: { if canEditResource("institution", inst.id) { editingInst = inst } },
+                onEditLoan: { if canEditResource("loan", $0.id) { editingLoan = $0 } },
+                canEdit: canEditResource("institution", inst.id),
+                editableLoanIDs: editableLoanIDs,
                 canAccessCredentials: canAccessCredentials
             )
             .id(inst.id)
@@ -619,7 +643,7 @@ struct FinancialView: View {
                             }
                         }
                         .onLongPressGesture {
-                            if canEdit { editingCard = card }
+                            if canEditResource("card", card.id) { editingCard = card }
                         }
                         .highPriorityGesture(
                             DragGesture(minimumDistance: 10)
@@ -652,9 +676,10 @@ struct FinancialView: View {
             loans: loans,
             isPaidOff: isPaidOff,
             isExpanded: isExpanded,
-            canEdit: canEdit,
-            onEdit: { editingLoan = $0 },
+            editableLoanIDs: editableLoanIDs,
+            onEdit: { if canEditResource("loan", $0.id) { editingLoan = $0 } },
             onAddPayment: { loan in
+                guard canEditResource("loan", loan.id) else { return }
                 paymentLoan = loan
                 paymentDraft = LoanPayment(
                     id: UUID(),
@@ -667,6 +692,7 @@ struct FinancialView: View {
                 showLoanPaymentHUD = true
             },
             onTogglePaid: { loan in
+                guard canEditResource("loan", loan.id) else { return }
                 var updatedLoan = loan
                 if updatedLoan.status == "Paid Off" {
                     updatedLoan.status = "Active"
