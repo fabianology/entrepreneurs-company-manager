@@ -4,6 +4,13 @@ Track: Collaboration and Vault, staging acceptance gate
 
 Baseline: `0cdaf4cbf43e54f9808d397dc4552ae4a2d1907d`
 
+Update, 2026-09-22: The gates below record the **initial** staging rollout and
+are not a claim about current live state. The last documented live backend
+check reached migration `202609220008`; live state must be queried again
+before any mutation. Local source now includes migrations through
+`202609220029` and native checkpoint `69574861`. The read-only preflight checks
+the local artifacts and staging CLI link, not migration drift or readiness.
+
 This runbook is the first phase after source implementation. It deliberately
 separates staging validation from production release and does not authorize a
 production deployment.
@@ -169,8 +176,11 @@ Do not use production accounts or real financial records.
 - Linked-session revocation, current-session preservation, stale-token behavior,
   replacement recovery code, audit events, offline/error recovery, and retry
   idempotence.
-- A collaborator can edit allowed non-secret fields but receives no password,
-  account number, account vault key, device wrap, or recovery material.
+- Before the separate scoped-secret cutover, a collaborator can edit allowed
+  non-secret fields but receives no password or account number. After cutover,
+  only an explicitly approved Editor/Admin device may reveal credentials for
+  its exact granted resource; no collaborator receives the account vault key or
+  recovery material. Viewer and unapproved devices remain credential-blind.
 
 Capture the exact app commit/build, device/OS versions, staging project ref, and
 evidence for every case. A successful build alone is not acceptance evidence.
@@ -194,3 +204,41 @@ review closes its findings, the previously exposed email-provider credential is
 rotated, rollback is rehearsed, monitoring is defined, and an internal TestFlight
 candidate is built from one clean, pushed commit. Production deployment remains
 a separate, explicit owner decision.
+
+## Continuation gate — scoped credentials and document files
+
+This is the next staging gate, not evidence that it has passed. Obtain explicit
+approval for staging-only changes before any migration, Edge Function deployment,
+secret change, Storage configuration, or scheduled job. Confirm the project ref
+is `bvtuyzhyospqxvpzcrmv` at every write step; never use the production ref.
+
+1. Record a fresh, read-only inventory of the staging migration ledger, active
+   function versions, required secrets, private `CompanyDocuments` bucket
+   configuration, and any migration drift. Resolve discrepancies before writes.
+   The local preflight cannot establish this state.
+2. Rehearse the exact pending migrations `202609220009`–`202609220029`, in
+   order, against a disposable production-shaped database with representative
+   legacy shares, credentials, documents, and full-URL file references. Check
+   SQL assertions and rollback/recreate steps. Keep migration `017`'s initial
+   resource-secret cutover closed until its separate acceptance gate passes.
+3. On approved staging only, apply the reviewed migrations and configure the
+   private document bucket (25 MB maximum). Deploy and configure
+   `prepare-document-upload` and `cleanup-document-files`; verify their
+   authorized service credentials and health without logging tokens or files.
+4. Use two disposable accounts and two devices to exercise upload, open,
+   replace, remove, entity deletion, revocation, orphan cleanup, and retry.
+   Check both metadata and the actual `storage.objects` rows, including
+   `owner_id`, while ensuring an external document link opens without a Storage
+   request. Viewer and unrelated-resource access must be denied. Run the
+   cleanup worker manually first; only then install the schedule from
+   `supabase/ops/schedule_document_file_cleanup.sql` and observe a real run.
+5. Separately exercise scoped credential grants: exact resource and device
+   approval, Editor/Admin reveal and edit, Viewer denial, revoke/rotation,
+   recovery, and legacy migration. No collaborator may receive the owner's
+   account vault key or another resource's secret. Record the client build,
+   migration state, role, device, and outcome for every case.
+
+Do not distribute a client that assumes this backend until these checks pass.
+The previously installed build 13 has a different sharing contract; inventory
+test devices and coordinate an upgrade before enabling new flows. Production
+requires its own explicit decision and release gate above.

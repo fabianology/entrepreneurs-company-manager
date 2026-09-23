@@ -5,10 +5,11 @@ set -eu
 production_project_ref="xxqdytdbpiqjilhutvhz"
 approved_staging_ref="bvtuyzhyospqxvpzcrmv"
 required_commit="0cdaf4cbf43e54f9808d397dc4552ae4a2d1907d"
+required_document_commit="69574861"
 
 usage() {
   echo "Usage: $0 <expected-staging-project-ref>"
-  echo "Performs read-only rollout checks. It never links, migrates, deploys, or sets secrets."
+  echo "Checks local artifacts and the CLI link only. It never queries live migration state, links, migrates, deploys, or sets secrets."
 }
 
 fail() {
@@ -61,6 +62,7 @@ case "$(printf '%s' "$linked_name" | tr '[:upper:]' '[:lower:]')" in
 esac
 
 git merge-base --is-ancestor "$required_commit" HEAD || fail "HEAD does not contain the verified Phase 5 commit $required_commit."
+git merge-base --is-ancestor "$required_document_commit" HEAD || fail "HEAD does not contain the current local document checkpoint $required_document_commit."
 
 release_paths="
 miloom-web/.well-known/apple-app-site-association
@@ -70,6 +72,13 @@ supabase/functions/approve-vault-device
 supabase/functions/_shared/share_email.ts
 supabase/functions/_shared/share_email_test.ts
 supabase/functions/send-share-email
+supabase/functions/prepare-document-upload
+supabase/functions/cleanup-document-files
+supabase/functions/_shared/document_upload_request.ts
+supabase/functions/_shared/document_upload_request_test.ts
+supabase/functions/_shared/document_file_cleanup.ts
+supabase/functions/_shared/document_file_cleanup_test.ts
+supabase/ops/schedule_document_file_cleanup.sql
 supabase/migrations/202609210001_secure_active_sessions.sql
 supabase/migrations/202609210002_canonical_resource_access.sql
 supabase/migrations/202609210003_invitation_lifecycle.sql
@@ -81,6 +90,30 @@ supabase/migrations/202609220002_harden_legacy_resource_access.sql
 supabase/migrations/202609220003_restore_auth_user_triggers.sql
 supabase/migrations/202609220004_disable_automatic_invitation_acceptance.sql
 supabase/migrations/202609220005_allow_revoked_vault_device_reregistration.sql
+supabase/migrations/202609220006_enable_editor_resource_mutations.sql
+supabase/migrations/202609220007_redact_shared_resource_secrets.sql
+supabase/migrations/202609220008_restrict_shared_secret_table_reads.sql
+supabase/migrations/202609220009_admin_entity_scope_guard.sql
+supabase/migrations/202609220010_all_institutions_scope.sql
+supabase/migrations/202609220011_admin_viewer_management.sql
+supabase/migrations/202609220012_resource_secret_key_foundation.sql
+supabase/migrations/202609220013_owner_resource_secret_staging.sql
+supabase/migrations/202609220014_resource_secret_device_grant_gate.sql
+supabase/migrations/202609220015_resource_secret_owner_rewrap_gate.sql
+supabase/migrations/202609220016_resource_secret_source_revision.sql
+supabase/migrations/202609220017_resource_secret_cutover_closed.sql
+supabase/migrations/202609220018_resource_secret_rotation.sql
+supabase/migrations/202609220019_resource_secret_lifecycle_guards.sql
+supabase/migrations/202609220020_resource_secret_access_status.sql
+supabase/migrations/202609220021_resource_secret_scoped_updates.sql
+supabase/migrations/202609220022_document_storage_exact_read.sql
+supabase/migrations/202609220023_document_file_cleanup_queue.sql
+supabase/migrations/202609220024_queue_orphan_document_uploads.sql
+supabase/migrations/202609220025_close_direct_document_file_attachment.sql
+supabase/migrations/202609220026_scoped_document_upload_reservations.sql
+supabase/migrations/202609220027_scoped_document_file_removal.sql
+supabase/migrations/202609220028_document_storage_write_boundary.sql
+supabase/migrations/202609220029_preserve_legacy_document_file_references.sql
 supabase/tests/canonical_resource_access_contracts.sql
 supabase/tests/auth_user_trigger_contracts.sql
 supabase/tests/active_sessions_contracts.sql
@@ -89,6 +122,18 @@ supabase/tests/vault_key_foundation_contracts.sql
 supabase/tests/vault_phase4_contracts.sql
 supabase/tests/vault_phase5_contracts.sql
 supabase/tests/vault_device_reregistration_contracts.sql
+supabase/tests/resource_secret_foundation_assertions.sql
+supabase/tests/resource_secret_cutover_closed_assertions.sql
+supabase/tests/resource_secret_rotation_assertions.sql
+supabase/tests/resource_secret_lifecycle_assertions.sql
+supabase/tests/resource_secret_scoped_update_assertions.sql
+supabase/tests/document_storage_exact_read_assertions.sql
+supabase/tests/document_file_cleanup_assertions.sql
+supabase/tests/document_orphan_cleanup_assertions.sql
+supabase/tests/document_upload_reservation_assertions.sql
+supabase/tests/document_file_removal_assertions.sql
+supabase/tests/document_storage_write_boundary_assertions.sql
+supabase/tests/document_legacy_url_cleanup_assertions.sql
 "
 
 for required_path in $release_paths; do
@@ -112,4 +157,6 @@ fi
 echo "PRECHECK PASSED"
 echo "Linked staging project: $linked_name ($linked_ref)"
 echo "Verified Phase 5 baseline: $required_commit"
+echo "Current local document checkpoint: $required_document_commit"
+echo "Live staging migration, secret, bucket, and function state were not checked."
 echo "No deployment or external mutation was performed."
