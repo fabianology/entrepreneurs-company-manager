@@ -257,3 +257,45 @@ Do not distribute a client that assumes this backend until these checks pass.
 The previously installed build 13 has a different sharing contract; inventory
 test devices and coordinate an upgrade before enabling new flows. Production
 requires its own explicit decision and release gate above.
+
+### Staging continuation checkpoint — 2026-09-22 PDT
+
+This is evidence for **Miloom Staging only**, not production acceptance. The
+read-only preflight, migration ledger inspection, and dry run identified exactly
+`202609220009`–`202609220029` as pending. Those 21 migrations were applied to
+`bvtuyzhyospqxvpzcrmv`; the post-push ledger showed no pending migration.
+The `CompanyDocuments` bucket was created through the Storage API as private,
+with a 25 MiB file-size limit. The scoped-secret activation function remains
+closed to the authenticated role.
+
+`prepare-document-upload` v2 is active with gateway JWT verification.
+`cleanup-document-files` v1 is active without gateway JWT verification and
+requires a staging-only `x-cron-secret` in its handler. Both rejected anonymous
+requests with HTTP 401. The cron secret was stored in staging Edge secrets and
+encrypted database Vault; the cleanup URL is a staging-only Vault secret.
+No secret value was recorded here. The manually invoked worker returned
+`removed=0, failed=0` before scheduling. `pg_net` and `pg_cron` are enabled in
+staging. The single active `*/15 * * * *` cleanup job is installed; a
+database-origin `net.http_post` returned HTTP 200 and
+`{"removed":0,"failed":0}`. Observation of an actual clock-triggered job is
+still pending at this checkpoint.
+
+The disposable hosted smoke in `supabase/ops/staging_document_file_smoke.ts`
+passed on three separate signed-in staging accounts. An exact document Editor
+uploaded, finalized, read, and replaced a file; the old file was queued and
+removed. A company Viewer could read but not upload. Direct Editor upload into
+the owner's folder was denied. Revoking the exact Editor share denied a new
+signed read URL while the independent company Viewer share still worked.
+Owner deletion queued and removed the replacement file. The smoke inspected
+the actual `storage.objects` row: `owner_id` was null for the service-issued
+signed upload, while the owner folder and stored byte count matched. The
+implementation checks the owner folder when `owner_id` is null. Post-test
+counts were zero disposable users, companies, document rows, Storage objects,
+and cleanup queue rows. This automated smoke is not a substitute for the
+two-physical-device UI matrix or every legacy/orphan/retry case above.
+
+Remaining before the staging gate can pass: observe a real scheduled cleanup
+run; test entity deletion, orphan/retry and external-link behavior; test the
+separate scoped-secret/device/role matrix while cutover stays closed; and
+record a compatible native build plus two-device acceptance. An independent
+security review and separate production authorization remain required.
