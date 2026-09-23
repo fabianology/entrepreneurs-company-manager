@@ -212,6 +212,19 @@ approval for staging-only changes before any migration, Edge Function deployment
 secret change, Storage configuration, or scheduled job. Confirm the project ref
 is `bvtuyzhyospqxvpzcrmv` at every write step; never use the production ref.
 
+Read-only inventory on 2026-09-22: the linked staging migration ledger ends at
+`202609220008`. Active Edge Functions are `send-share-email` v1 and
+`approve-vault-device` v2; neither document-file function is deployed.
+Metadata-only SQL confirmed the relevant public and Storage tables exist, but
+the `CompanyDocuments` bucket does not. Aggregate counts were zero documents,
+zero document objects, zero invitations, and one company Viewer share. This
+inventory is dated; repeat it before any write. A schema-only CLI dump could
+not run because Docker was unavailable, so the synthetic database rehearsal
+does not prove compatibility with every live constraint, trigger, or policy.
+The staging policy inventory showed no `storage.objects` policies and multiple
+legacy `company_documents` policies; test the new restrictive Storage policies
+and document mutation triggers against those existing grants after rollout.
+
 1. Record a fresh, read-only inventory of the staging migration ledger, active
    function versions, required secrets, private `CompanyDocuments` bucket
    configuration, and any migration drift. Resolve discrepancies before writes.
@@ -223,8 +236,8 @@ is `bvtuyzhyospqxvpzcrmv` at every write step; never use the production ref.
    legacy shares, credentials, documents, and full-URL file references. Check
    SQL assertions and rollback/recreate steps. Keep migration `017`'s initial
    resource-secret cutover closed until its separate acceptance gate passes.
-3. On approved staging only, apply the reviewed migrations and configure the
-   private document bucket (25 MB maximum). Deploy and configure
+3. On approved staging only, apply the reviewed migrations and create the
+   private `CompanyDocuments` bucket (25 MB maximum). Deploy and configure
    `prepare-document-upload` and `cleanup-document-files`; verify their
    authorized service credentials and health without logging tokens or files.
 4. Use two disposable accounts and two devices to exercise upload, open,
