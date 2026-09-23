@@ -84,6 +84,7 @@ struct ResourceCredentialAccessCard: View {
     @State private var isWorking = false
     @State private var errorMessage: String?
     @State private var operationID = UUID()
+    @State private var isRevealing = false
 
     private struct AccountCredentials: Codable, Identifiable {
         let id: String
@@ -249,7 +250,12 @@ struct ResourceCredentialAccessCard: View {
             .task(id: resourceID) { await loadStatus() }
             .onDisappear { clearPlaintext() }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { clearPlaintext() }
+                if phase != .active {
+                    // Face ID temporarily makes the app inactive. Clear visible
+                    // secrets, but keep its pending reveal alive; actual background
+                    // entry or dismissal must still invalidate the result.
+                    clearPlaintext(invalidateOperation: phase == .background || !isRevealing)
+                }
             }
     }
 
@@ -277,8 +283,8 @@ struct ResourceCredentialAccessCard: View {
         .disabled(isWorking)
     }
 
-    private func clearPlaintext() {
-        operationID = UUID()
+    private func clearPlaintext(invalidateOperation: Bool = true) {
+        if invalidateOperation { operationID = UUID() }
         plaintextFields.removeAll()
         draftFields.removeAll()
         draftAccounts.removeAll()
@@ -391,8 +397,10 @@ struct ResourceCredentialAccessCard: View {
         guard !isWorking else { return }
         let token = operationID
         isWorking = true
+        isRevealing = true
         errorMessage = nil
         Task {
+            defer { isRevealing = false; isWorking = false }
             do {
                 let fields = try await VaultService.shared.revealResourceSecret(
                     type: resourceType, id: resourceID,

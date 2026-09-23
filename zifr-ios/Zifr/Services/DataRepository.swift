@@ -934,7 +934,8 @@ class DataRepository {
             switch migrateSecret(subscription.password, using: snapshot.key, context: context) {
             case .migrated(let value):
                 do {
-                    try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).execute()
+                    let rows: [MutationReceipt] = try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).select("id").execute().value
+                    try requireUpdatedRow(rows, resource: "service")
                     report.migratedFields += 1
                 } catch {
                     report.failedRecords += 1
@@ -952,7 +953,8 @@ class DataRepository {
             switch migrateSecret(card.password, using: snapshot.key, context: context) {
             case .migrated(let value):
                 do {
-                    try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).execute()
+                    let rows: [MutationReceipt] = try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).select("id").execute().value
+                    try requireUpdatedRow(rows, resource: "card")
                     report.migratedFields += 1
                 } catch {
                     report.failedRecords += 1
@@ -1003,11 +1005,12 @@ class DataRepository {
             report.skippedLockedFields += lockedCount
             guard migratedCount > 0 else { continue }
             do {
-                try await client.from("institutions")
+                let rows: [MutationReceipt] = try await client.from("institutions")
                     .update(InstitutionSecretsPatch(password: password, accountsData: accounts))
                     .eq("id", value: institution.id)
                     .eq("user_id", value: owner)
-                    .execute()
+                    .select("id").execute().value
+                try requireUpdatedRow(rows, resource: "bank")
                 report.migratedFields += migratedCount
             } catch {
                 report.failedRecords += 1
@@ -1033,7 +1036,8 @@ class DataRepository {
             switch rotateSecret(subscription.password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
             case .migrated(let value):
                 do {
-                    try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).execute()
+                    let rows: [MutationReceipt] = try await client.from("subscriptions").update(PasswordPatch(password: value)).eq("id", value: subscription.id).eq("user_id", value: owner).select("id").execute().value
+                    try requireUpdatedRow(rows, resource: "service")
                     report.migratedFields += 1
                 } catch {
                     report.failedRecords += 1
@@ -1051,7 +1055,8 @@ class DataRepository {
             switch rotateSecret(card.password, snapshot: snapshot, fromKeyVersion: fromKeyVersion, context: context) {
             case .migrated(let value):
                 do {
-                    try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).execute()
+                    let rows: [MutationReceipt] = try await client.from("financial_cards").update(PasswordPatch(password: value)).eq("id", value: card.id).eq("user_id", value: owner).select("id").execute().value
+                    try requireUpdatedRow(rows, resource: "card")
                     report.migratedFields += 1
                 } catch {
                     report.failedRecords += 1
@@ -1108,11 +1113,12 @@ class DataRepository {
             report.skippedLockedFields += legacyLockedCount
             guard migratedCount > 0 else { continue }
             do {
-                try await client.from("institutions")
+                let rows: [MutationReceipt] = try await client.from("institutions")
                     .update(InstitutionSecretsPatch(password: password, accountsData: accounts))
                     .eq("id", value: institution.id)
                     .eq("user_id", value: owner)
-                    .execute()
+                    .select("id").execute().value
+                try requireUpdatedRow(rows, resource: "bank")
                 report.migratedFields += migratedCount
             } catch {
                 report.failedRecords += 1

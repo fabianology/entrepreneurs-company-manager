@@ -1009,9 +1009,22 @@ private struct VaultSecuritySheet: View {
     @State private var controller = VaultSecurityController()
     @State private var showingMigrationConfirmation = false
     @State private var showingPreparationConfirmation = false
-    @State private var deviceToRevoke: VaultDeviceRecord?
-    @State private var secretRequestToApprove: ResourceSecretAccessRequest?
-    @State private var lockedResourceToRotate: LockedResourceSecret?
+    private enum VaultAlert: Identifiable {
+        case revoke(VaultDeviceRecord)
+        case approve(ResourceSecretAccessRequest)
+        case rotate(LockedResourceSecret)
+        case error(String)
+
+        var id: String {
+            switch self {
+            case .revoke(let device): return "revoke-\(device.id)"
+            case .approve(let request): return "approve-\(request.id)"
+            case .rotate(let secret): return "rotate-\(secret.id)"
+            case .error(let message): return "error-\(message)"
+            }
+        }
+    }
+    @State private var pendingAlert: VaultAlert?
 
     var body: some View {
         NavigationStack {
@@ -1092,14 +1105,6 @@ private struct VaultSecuritySheet: View {
         }
         .task { await controller.load() }
         .refreshable { await controller.load() }
-        .alert("Vault Security", isPresented: Binding(
-            get: { controller.errorMessage != nil },
-            set: { if !$0 { controller.errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { controller.errorMessage = nil }
-        } message: {
-            Text(controller.errorMessage ?? "")
-        }
         .confirmationDialog("Encrypt Existing Passwords?", isPresented: $showingMigrationConfirmation, titleVisibility: .visible) {
             Button("Encrypt Existing Passwords") {
                 Task {
@@ -1120,8 +1125,16 @@ private struct VaultSecuritySheet: View {
         } message: {
             Text("Miloom will encrypt readable credentials under separate resource keys and verify them. Your existing records stay unchanged, and this step grants no new access.")
         }
-        .alert(item: $deviceToRevoke) { device in
-            Alert(
+        // One presenter prevents sibling alerts from masking approval/revocation.
+        .alert(item: Binding<VaultAlert?>(
+            get: { controller.errorMessage.map(VaultAlert.error) ?? pendingAlert },
+            set: { pendingAlert = $0; if $0 == nil { controller.errorMessage = nil } }
+        )) { alert in
+            switch alert {
+            case .error(let message):
+                return Alert(title: Text("Vault Security"), message: Text(message), dismissButton: .default(Text("OK")))
+            case .revoke(let device):
+                return Alert(
                 title: Text(device.status == "pending" ? "Cancel Device Request?" : "Revoke \(device.label)?"),
                 message: Text(device.status == "pending"
                     ? "This pending device will need to request access again."
@@ -1131,9 +1144,8 @@ private struct VaultSecuritySheet: View {
                 },
                 secondaryButton: .cancel()
             )
-        }
-        .alert(item: $secretRequestToApprove) { request in
-            Alert(
+            case .approve(let request):
+                return Alert(
                 title: Text("Grant Credential Access?"),
                 message: Text("\(request.recipientEmail) on \(request.recipientDeviceLabel) will be able to reveal credentials for \(request.resourceTitle ?? request.resourceType.capitalized) in \(request.companyName). Previously viewed passwords cannot be taken back."),
                 primaryButton: .default(Text("Grant Access")) {
@@ -1141,9 +1153,8 @@ private struct VaultSecuritySheet: View {
                 },
                 secondaryButton: .cancel()
             )
-        }
-        .alert(item: $lockedResourceToRotate) { secret in
-            Alert(
+            case .rotate(let secret):
+                return Alert(
                 title: Text("Replace Locked Credential Key?"),
                 message: Text("Miloom will re-encrypt \(secret.resourceTitle ?? secret.resourceType.capitalized) in \(secret.companyName) under a new resource key. Previous collaborator device grants will not carry over. Passwords already viewed outside Miloom cannot be recalled; change them at the provider if needed."),
                 primaryButton: .default(Text("Replace Key")) {
@@ -1151,6 +1162,7 @@ private struct VaultSecuritySheet: View {
                 },
                 secondaryButton: .cancel()
             )
+        }
         }
         .presentationDetents([.fraction(0.9), .large])
         .presentationDragIndicator(.visible)
@@ -1328,7 +1340,7 @@ private struct VaultSecuritySheet: View {
                                     .buttonStyle(.bordered)
                                     .tint(Color.zifrGold)
                                     .controlSize(.small)
-                                Button(role: .destructive) { deviceToRevoke = device } label: {
+                                Button(role: .destructive) { pendingAlert = .revoke(device) } label: {
                                     Image(systemName: "xmark")
                                         .frame(width: 30, height: 30)
                                 }
@@ -1336,7 +1348,7 @@ private struct VaultSecuritySheet: View {
                                 .accessibilityLabel("Cancel access request for \(device.label)")
                             }
                         } else if device.status == "approved" && device.id != controller.currentDevice?.id {
-                            Button(role: .destructive) { deviceToRevoke = device } label: {
+                            Button(role: .destructive) { pendingAlert = .revoke(device) } label: {
                                 Image(systemName: "trash")
                                     .frame(width: 32, height: 32)
                             }
@@ -1376,7 +1388,7 @@ private struct VaultSecuritySheet: View {
                 VStack(spacing: 0) {
                     ForEach(controller.pendingSecretRequests) { request in
                         Button {
-                            secretRequestToApprove = request
+                            pendingAlert = .approve(request)
                         } label: {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: "person.crop.circle.badge.checkmark")
@@ -1441,7 +1453,7 @@ private struct VaultSecuritySheet: View {
                                     .foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 8)
-                            Button("Replace Key") { lockedResourceToRotate = secret }
+                            Button("Replace Key") { pendingAlert = .rotate(secret) }
                                 .buttonStyle(.bordered)
                                 .tint(Color.zifrGold)
                                 .disabled(controller.activeOperation != nil)
