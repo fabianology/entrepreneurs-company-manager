@@ -324,7 +324,7 @@ struct DocumentListView: View {
                 documentToDelete = nil
             }
         } message: { doc in
-            Text("“\(doc.name.isEmpty ? "This document" : doc.name)” and all associated files will be completely and permanently removed from the server. This action cannot be undone.")
+            Text("“\(doc.name.isEmpty ? "This document" : doc.name)” will be removed from Miloom. Its stored file may take a short time to finish deleting. This action cannot be undone.")
         }
     }
     

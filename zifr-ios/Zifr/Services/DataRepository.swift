@@ -1202,38 +1202,45 @@ class DataRepository {
         }
     }
     func deleteDocument(_ id: UUID, fileURL: String? = nil, ownerUserID: UUID) async throws {
-        // Clean up the associated file before deleting the database record
-        if let fileURL = fileURL, !fileURL.isEmpty {
-            if fileURL.hasPrefix("file://") || fileURL.hasPrefix("/") {
-                // Remove only a file within this app's Documents directory,
-                // and only when the signed-in user owns this document.
-                let session = try await client.auth.session
-                if session.user.id == ownerUserID,
-                   let documents = FileManager.default.urls(
-                       for: .documentDirectory, in: .userDomainMask
-                   ).first {
-                    let path = fileURL.hasPrefix("file://")
-                        ? URL(string: fileURL)?.path ?? ""
-                        : fileURL
-                    let candidate = URL(fileURLWithPath: path).standardizedFileURL.path
-                    let root = documents.standardizedFileURL.path + "/"
-                    if candidate.hasPrefix(root) {
-                        try? FileManager.default.removeItem(atPath: candidate)
-                    }
-                }
-            } else if let storagePath = Self.companyDocumentStoragePath(fileURL) {
-                let session = try await client.auth.session
-                guard session.user.id == ownerUserID else {
-                    throw DocumentFileOwnershipError.ownerRequired
-                }
-                // An exact path (not a whole folder) is removed before its
-                // document row. A failure leaves the row available to retry.
-                _ = try await client.storage
-                    .from("CompanyDocuments")
-                    .remove(paths: [storagePath])
+        let session = try await client.auth.session
+        if let fileURL, Self.companyDocumentStoragePath(fileURL) != nil,
+           session.user.id != ownerUserID {
+            throw DocumentFileOwnershipError.ownerRequired
+        }
+        // Delete the row first. The server queues its exact Storage path for
+        // retryable cleanup, so a rejected delete never destroys a live file.
+        let query = client.from("company_documents")
+            .delete()
+            .eq("id", value: id)
+            .eq("user_id", value: ownerUserID)
+        let rows: [MutationReceipt]
+        if let fileURL {
+            rows = try await query.eq("url", value: fileURL).select("id").execute().value
+        } else {
+            rows = try await query.is("url", value: nil).select("id").execute().value
+        }
+        try requireUpdatedRow(rows, resource: "document")
+
+        guard let fileURL, session.user.id == ownerUserID else { return }
+        if let storagePath = Self.companyDocumentStoragePath(fileURL) {
+            do {
+                _ = try await client.storage.from("CompanyDocuments").remove(paths: [storagePath])
+            } catch {
+                // A durable server-side cleanup queue retries this object.
+                // Do not restore a deleted row or report its deletion as failed.
+                AppDiagnostics.failure("documents", "cleanup_deleted_document", error: error)
+            }
+        } else if fileURL.hasPrefix("file://") || fileURL.hasPrefix("/") {
+            guard let documents = FileManager.default.urls(
+                for: .documentDirectory, in: .userDomainMask
+            ).first else { return }
+            let path = fileURL.hasPrefix("file://") ? URL(string: fileURL)?.path ?? "" : fileURL
+            let candidate = URL(fileURLWithPath: path).standardizedFileURL.path
+            let root = documents.standardizedFileURL.path + "/"
+            if candidate.hasPrefix(root) {
+                try? FileManager.default.removeItem(atPath: candidate)
             }
         }
-        try await client.from("company_documents").delete().eq("id", value: id).execute()
     }
     
     // MARK: - Sharing
