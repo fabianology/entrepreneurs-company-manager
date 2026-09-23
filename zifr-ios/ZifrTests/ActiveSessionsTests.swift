@@ -49,6 +49,24 @@ final class ActiveSessionsTests: XCTestCase {
         XCTAssertNil(DataRepository.companyDocumentStoragePath("other/document.pdf"))
     }
 
+    func testDocumentOpeningDistinguishesExternalLinksAndPrivateStorage() {
+        let path = "00000000-0000-0000-0000-000000000001/document.pdf"
+        XCTAssertEqual(DataRepository.companyDocumentStorageReadPath(path), path)
+        XCTAssertEqual(DataRepository.companyDocumentStorageReadPath(
+            "https://example.test/storage/v1/object/sign/CompanyDocuments/\(path)?token=old"
+        ), path)
+        XCTAssertEqual(DataRepository.companyDocumentStorageReadPath(
+            "https://example.test/CompanyDocuments/\(path.replacingOccurrences(of: "/", with: "%2F"))#preview"
+        ), path)
+        XCTAssertNil(DataRepository.companyDocumentStorageReadPath("https://drive.example.test/report.pdf"))
+        XCTAssertNil(DataRepository.companyDocumentStorageReadPath("file:///private/tmp/document.pdf"))
+        XCTAssertEqual(DataRepository.externalDocumentURL("https://drive.example.test/report.pdf")?.host,
+                       "drive.example.test")
+        XCTAssertNil(DataRepository.externalDocumentURL(
+            "https://example.test/CompanyDocuments/\(path)"
+        ))
+    }
+
     func testSessionDecodesServerCurrentFlag() throws {
         let data = Data(
             #"{"id":"25000000-0000-0000-0000-000000000001","created_at":0,"updated_at":0,"user_agent":"Miloom iOS App (iPhone; iOS 26.0)","ip_address":"203.0.113.10","is_current":true}"#.utf8

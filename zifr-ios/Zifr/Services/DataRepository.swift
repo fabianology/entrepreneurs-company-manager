@@ -1582,20 +1582,33 @@ class DataRepository {
     }
 
     func getSignedUrl(for docUrl: String) async throws -> URL {
-        let storagePath: String
-        if docUrl.contains("/CompanyDocuments/") {
-            if let range = docUrl.range(of: "/CompanyDocuments/") {
-                storagePath = String(docUrl[range.upperBound...])
-            } else {
-                throw URLError(.badURL)
-            }
-        } else {
-            storagePath = docUrl
+        guard let storagePath = Self.companyDocumentStorageReadPath(docUrl) else {
+            throw URLError(.badURL)
         }
         
         return try await client.storage
             .from("CompanyDocuments")
             .createSignedURL(path: storagePath, expiresIn: 60)
+    }
+
+    static func externalDocumentURL(_ raw: String) -> URL? {
+        guard !raw.contains("/CompanyDocuments/"), let url = URL(string: raw),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme) else { return nil }
+        return url
+    }
+
+    static func companyDocumentStorageReadPath(_ raw: String) -> String? {
+        if let marker = raw.range(of: "/CompanyDocuments/") {
+            let suffix = String(raw[marker.upperBound...])
+                .components(separatedBy: CharacterSet(charactersIn: "?#"))[0]
+            guard let decoded = suffix.removingPercentEncoding,
+                  !decoded.isEmpty, !decoded.hasPrefix("/") else { return nil }
+            return decoded
+        }
+        guard !raw.isEmpty, !raw.contains("://"), !raw.hasPrefix("/"),
+              !raw.contains("?"), !raw.contains("#") else { return nil }
+        return raw
     }
 
     static func companyDocumentStoragePath(_ url: String) -> String? {

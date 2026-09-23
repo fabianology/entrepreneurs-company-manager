@@ -23,7 +23,7 @@ struct DocumentListView: View {
     @State private var receiptYear = "All years"
     @State private var receiptCategory = "All categories"
     @State private var receiptReview: BusinessExpenseReview?
-    @State private var receiptOpenError = false
+    @State private var documentOpenError = false
     @State private var isScanning = false
     @State private var isProcessingScan = false
     @State private var showShareSheet = false
@@ -259,9 +259,9 @@ struct DocumentListView: View {
         .sheet(item: $receiptReview) { review in
             BusinessExpenseReviewSheet(initialReview: review)
         }
-        .alert("Could not open receipt", isPresented: $receiptOpenError) {
+        .alert("Could not open document", isPresented: $documentOpenError) {
             Button("OK", role: .cancel) {}
-        } message: { Text("Please try again. The private file could not be loaded.") }
+        } message: { Text("The file is unavailable or your access has changed. Refresh and try again.") }
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
         }
@@ -557,11 +557,16 @@ struct DocumentListView: View {
     private func openDocument(_ doc: CompanyDocument) {
         guard let docUrl = doc.url, !docUrl.isEmpty else { return }
         
-        if docUrl.hasPrefix("file://") || docUrl.hasPrefix("/") {
-            let cleanPath = docUrl.hasPrefix("file://") ? docUrl : "file://\(docUrl)"
-            if let u = URL(string: cleanPath) {
-                openURL = IdentifiableURL(url: u)
+        if docUrl.hasPrefix("/") {
+            openURL = IdentifiableURL(url: URL(fileURLWithPath: docUrl))
+        } else if docUrl.hasPrefix("file://") {
+            if let localURL = URL(string: docUrl) {
+                openURL = IdentifiableURL(url: localURL)
+            } else {
+                documentOpenError = true
             }
+        } else if let externalURL = DataRepository.externalDocumentURL(docUrl) {
+            openURL = IdentifiableURL(url: externalURL)
         } else {
             Task {
                 do {
@@ -569,14 +574,7 @@ struct DocumentListView: View {
                     await MainActor.run { openURL = IdentifiableURL(url: signedUrl) }
                 } catch {
                     AppDiagnostics.failure("documents", "signed_url", error: error)
-                    if doc.visibility == "owner_private" {
-                        receiptOpenError = true
-                        return
-                    }
-                    // Fallback to try opening as regular URL if signed URL fails
-                    if let u = URL(string: docUrl.hasPrefix("http") ? docUrl : "https://\(docUrl)") {
-                        await MainActor.run { openURL = IdentifiableURL(url: u) }
-                    }
+                    await MainActor.run { documentOpenError = true }
                 }
             }
         }

@@ -55,7 +55,9 @@ final class SearchDocumentIndexer {
     nonisolated static func load(_ document: CompanyDocument) async throws -> Data {
         guard let path = document.url, !path.isEmpty else { throw URLError(.fileDoesNotExist) }
         let url: URL
-        if let local = URL(string: path), local.isFileURL { url = local }
+        if path.hasPrefix("/") { url = URL(fileURLWithPath: path) }
+        else if let local = URL(string: path), local.isFileURL { url = local }
+        else if let external = DataRepository.externalDocumentURL(path) { url = external }
         else { url = try await DataRepository.shared.getSignedUrl(for: path) }
         let maximumBytes = 25 * 1024 * 1024
         if url.isFileURL {
