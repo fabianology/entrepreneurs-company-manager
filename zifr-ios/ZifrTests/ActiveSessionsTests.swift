@@ -127,3 +127,78 @@ final class ResourceVaultCryptographyTests: XCTestCase {
             using: P256.KeyAgreement.PrivateKey(), context: deviceContext))
     }
 }
+
+final class ResourceSecretPreparationTests: XCTestCase {
+    private let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    private let device = UUID(uuidString: "70000000-0000-0000-0000-000000000001")!
+    private let bank = UUID(uuidString: "30000000-0000-0000-0000-000000000001")!
+
+    private func snapshot() -> VaultKeySession.Snapshot {
+        let key = SymmetricKey(size: .bits256)
+        return VaultKeySession.Snapshot(
+            userID: owner, deviceID: device, keyVersion: 1, key: key, keys: [1: key]
+        )
+    }
+
+    func testReadableVaultFieldIsPreparedOnlyWithMatchingRecordContext() throws {
+        let snapshot = snapshot()
+        let field = VaultFieldContext(
+            ownerUserID: owner, resourceType: "institution", resourceID: bank,
+            fieldName: "password", keyVersion: 1
+        )
+        let encrypted = try VaultCryptography.encryptField(
+            "test-password", using: snapshot.key, context: field
+        )
+        XCTAssertEqual(
+            try ResourceSecretPreparation.verifiedPlaintext(
+                encrypted, snapshot: snapshot, storedResourceType: "institution",
+                resourceID: bank, fieldName: "password"
+            ), "test-password"
+        )
+        XCTAssertThrowsError(try ResourceSecretPreparation.verifiedPlaintext(
+            encrypted, snapshot: snapshot, storedResourceType: "institution",
+            resourceID: bank, fieldName: "username"
+        ))
+        XCTAssertThrowsError(try ResourceSecretPreparation.verifiedPlaintext(
+            encrypted, snapshot: snapshot, storedResourceType: "institution",
+            resourceID: UUID(), fieldName: "password"
+        ))
+    }
+
+    func testLockedFieldsSkipEntireResourceInsteadOfStagingLiteralCiphertext() throws {
+        let snapshot = snapshot()
+        let institution = Institution(
+            userId: owner, companyId: UUID(), name: "Test Bank",
+            username: "readable-user", password: "enc:not-a-readable-legacy-envelope"
+        )
+        var collection = ResourceSecretCandidateCollection()
+        collection.append {
+            try ResourceSecretPreparation.candidate(for: institution, snapshot: snapshot)
+        }
+        XCTAssertTrue(collection.candidates.isEmpty)
+        XCTAssertEqual(collection.skippedLockedRecords, 1)
+        XCTAssertEqual(collection.failedRecords, 0)
+    }
+
+    func testBankAccountNumbersAreBoundToAccountIdentityWithoutMetadata() throws {
+        let snapshot = snapshot()
+        let account = InstitutionAccount(
+            id: "account-1", name: "Checking", accountNumber: "12345678",
+            routingNumber: "021000021"
+        )
+        let institution = Institution(
+            id: bank, userId: owner, companyId: UUID(), name: "Test Bank",
+            accounts: [account]
+        )
+        let candidate = try XCTUnwrap(ResourceSecretPreparation.candidate(
+            for: institution, snapshot: snapshot
+        ))
+        let json = try XCTUnwrap(candidate.plaintextFields["accounts_data"])
+        XCTAssertEqual(candidate.resourceType, "institution")
+        XCTAssertEqual(candidate.resourceID, bank)
+        XCTAssertTrue(json.contains("account-1"))
+        XCTAssertTrue(json.contains("12345678"))
+        XCTAssertFalse(json.contains("Checking"))
+        XCTAssertFalse(json.contains("Test Bank"))
+    }
+}

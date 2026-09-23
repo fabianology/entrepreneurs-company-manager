@@ -2,6 +2,7 @@ import Foundation
 import Supabase
 import CryptoKit
 import Security
+import LocalAuthentication
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -815,6 +816,28 @@ class DataRepository {
     private func vaultContext(owner: UUID, type: String, id: UUID, field: String) -> VaultFieldContext? {
         guard let snapshot = VaultKeySession.shared.snapshot(for: owner) else { return nil }
         return VaultFieldContext(ownerUserID: owner, resourceType: type, resourceID: id, fieldName: field, keyVersion: snapshot.keyVersion)
+    }
+
+    func collectOwnedResourceSecretCandidates(
+        snapshot: VaultKeySession.Snapshot
+    ) async throws -> ResourceSecretCandidateCollection {
+        async let subscriptions = fetchVisibleSubscriptions()
+        async let cards = fetchVisibleCards()
+        async let institutions = fetchVisibleInstitutions()
+        let (ownedSubscriptions, ownedCards, ownedInstitutions) = try await (
+            subscriptions, cards, institutions
+        )
+        var result = ResourceSecretCandidateCollection()
+        for subscription in ownedSubscriptions where subscription.userId == snapshot.userID {
+            result.append { try ResourceSecretPreparation.candidate(for: subscription, snapshot: snapshot) }
+        }
+        for card in ownedCards where card.userId == snapshot.userID {
+            result.append { try ResourceSecretPreparation.candidate(for: card, snapshot: snapshot) }
+        }
+        for institution in ownedInstitutions where institution.userId == snapshot.userID {
+            result.append { try ResourceSecretPreparation.candidate(for: institution, snapshot: snapshot) }
+        }
+        return result
     }
 
     func migrateLegacyVaultSecrets(snapshot: VaultKeySession.Snapshot) async throws -> VaultMigrationReport {
@@ -1959,6 +1982,275 @@ struct VaultKeyTransitionRecord: Decodable {
     }
 }
 
+private struct ResourceSecretOwnerWrapRecord: Decodable {
+    let resourceType: String
+    let resourceID: UUID
+    let keyVersion: Int
+    let ownerAccountKeyVersion: Int
+    let ownerWrappedResourceKey: String
+
+    enum CodingKeys: String, CodingKey {
+        case resourceType = "resource_type"
+        case resourceID = "resource_id"
+        case keyVersion = "key_version"
+        case ownerAccountKeyVersion = "owner_account_key_version"
+        case ownerWrappedResourceKey = "owner_wrapped_resource_key"
+    }
+}
+
+struct ResourceSecretAccessRequest: Decodable, Identifiable, Equatable {
+    let requestID: UUID
+    let resourceType: String
+    let resourceID: UUID
+    let keyVersion: Int
+    let resourceTitle: String?
+    let companyName: String
+    let recipientUserID: UUID
+    let recipientEmail: String
+    let recipientDeviceID: UUID
+    let recipientDeviceLabel: String
+    let agreementPublicKey: String
+    let requestedAt: Date
+
+    var id: UUID { requestID }
+
+    enum CodingKeys: String, CodingKey {
+        case requestID = "request_id"
+        case resourceType = "resource_type"
+        case resourceID = "resource_id"
+        case keyVersion = "key_version"
+        case resourceTitle = "resource_title"
+        case companyName = "company_name"
+        case recipientUserID = "recipient_user_id"
+        case recipientEmail = "recipient_email"
+        case recipientDeviceID = "recipient_device_id"
+        case recipientDeviceLabel = "recipient_device_label"
+        case agreementPublicKey = "agreement_public_key"
+        case requestedAt = "requested_at"
+    }
+}
+
+private struct OwnerResourceSecretRecord: Decodable {
+    let resourceType: String
+    let resourceID: UUID
+    let keyVersion: Int
+    let ownerAccountKeyVersion: Int
+    let ownerWrappedResourceKey: String
+    let encryptedFields: [String: String]
+    let state: String
+
+    enum CodingKeys: String, CodingKey {
+        case resourceType = "resource_type"
+        case resourceID = "resource_id"
+        case keyVersion = "key_version"
+        case ownerAccountKeyVersion = "owner_account_key_version"
+        case ownerWrappedResourceKey = "owner_wrapped_resource_key"
+        case encryptedFields = "encrypted_fields"
+        case state
+    }
+}
+
+enum ResourceSecretGrantError: LocalizedError {
+    case confirmationUnavailable
+    case confirmationCancelled
+    case staleRequest
+    case invalidSecret
+
+    var errorDescription: String? {
+        switch self {
+        case .confirmationUnavailable:
+            return "Face ID or your device passcode is required to approve credential access."
+        case .confirmationCancelled:
+            return "Approval was cancelled. No credential key was granted."
+        case .staleRequest:
+            return "This request changed or is no longer valid. Refresh the vault before approving."
+        case .invalidSecret:
+            return "Miloom couldn't verify the encrypted credentials. No key was granted."
+        }
+    }
+}
+
+struct ResourceSecretPreparationCandidate {
+    let resourceType: String
+    let resourceID: UUID
+    let plaintextFields: [String: String]
+}
+
+struct ResourceSecretPreparationReport {
+    var preparedRecords = 0
+    var alreadyPreparedRecords = 0
+    var skippedLockedRecords = 0
+    var skippedEmptyRecords = 0
+    var failedRecords = 0
+    var deferredRecords = 0
+}
+
+struct ResourceSecretCandidateCollection {
+    var candidates: [ResourceSecretPreparationCandidate] = []
+    var skippedLockedRecords = 0
+    var skippedEmptyRecords = 0
+    var failedRecords = 0
+
+    mutating func append(_ build: () throws -> ResourceSecretPreparationCandidate?) {
+        do {
+            if let candidate = try build() {
+                candidates.append(candidate)
+            } else {
+                skippedEmptyRecords += 1
+            }
+        } catch ResourceSecretPreparationError.lockedValue {
+            skippedLockedRecords += 1
+        } catch {
+            failedRecords += 1
+            AppDiagnostics.failure("vault", "prepare_resource_candidate", error: error)
+        }
+    }
+}
+
+enum ResourceSecretPreparationError: Error {
+    case lockedValue
+    case activeResource
+    case verificationFailed
+}
+
+private struct ResourceBankAccountCredentials: Codable, Equatable {
+    let id: String
+    let accountNumber: String?
+    let routingNumber: String?
+    let wireRoutingNumber: String?
+}
+
+enum ResourceSecretPreparation {
+    // Never re-encrypt an unreadable legacy envelope as if its literal bytes
+    // were a password. Leave the entire resource unchanged for owner review.
+    static func verifiedPlaintext(
+        _ value: String?, snapshot: VaultKeySession.Snapshot,
+        storedResourceType: String, resourceID: UUID, fieldName: String
+    ) throws -> String? {
+        guard let value, !value.isEmpty else { return nil }
+        if value.hasPrefix("miloom:") {
+            guard let version = VaultCryptography.fieldKeyVersion(in: value),
+                  let key = snapshot.key(for: version) else {
+                throw ResourceSecretPreparationError.lockedValue
+            }
+            let context = VaultFieldContext(
+                ownerUserID: snapshot.userID, resourceType: storedResourceType,
+                resourceID: resourceID, fieldName: fieldName, keyVersion: version
+            )
+            guard let plaintext = try? VaultCryptography.decryptField(
+                value, using: key, context: context
+            ) else { throw ResourceSecretPreparationError.lockedValue }
+            return plaintext
+        }
+        if value.hasPrefix("enc:") {
+            guard let plaintext = SecurityService.shared.decryptLegacyStrict(value) else {
+                throw ResourceSecretPreparationError.lockedValue
+            }
+            return plaintext
+        }
+        if value.hasPrefix("miloom-resource:") {
+            throw ResourceSecretPreparationError.lockedValue
+        }
+        return value
+    }
+
+    static func candidate(
+        for subscription: Subscription, snapshot: VaultKeySession.Snapshot
+    ) throws -> ResourceSecretPreparationCandidate? {
+        var fields: [String: String] = [:]
+        func include(_ name: String, _ value: String?) throws {
+            if let plaintext = try verifiedPlaintext(
+                value, snapshot: snapshot, storedResourceType: "subscription",
+                resourceID: subscription.id, fieldName: name
+            ) { fields[name] = plaintext }
+        }
+        try include("login_id", subscription.loginId)
+        try include("password", subscription.password)
+        if subscription.twoFactorAuth != "None" {
+            try include("two_factor_auth", subscription.twoFactorAuth)
+        }
+        try include("recovery_method", subscription.recoveryMethod)
+        guard !fields.isEmpty else { return nil }
+        return ResourceSecretPreparationCandidate(
+            resourceType: "subscription", resourceID: subscription.id, plaintextFields: fields
+        )
+    }
+
+    static func candidate(
+        for card: FinancialCard, snapshot: VaultKeySession.Snapshot
+    ) throws -> ResourceSecretPreparationCandidate? {
+        var fields: [String: String] = [:]
+        func include(_ name: String, _ value: String?, storedField: String? = nil) throws {
+            if let plaintext = try verifiedPlaintext(
+                value, snapshot: snapshot, storedResourceType: "financial_card",
+                resourceID: card.id, fieldName: storedField ?? name
+            ) { fields[name] = plaintext }
+        }
+        try include("login", card.login)
+        try include("password", card.password)
+        try include("card_number", card.cardNumber, storedField: "card_number")
+        try include("expiry", card.expiry)
+        guard !fields.isEmpty else { return nil }
+        return ResourceSecretPreparationCandidate(
+            resourceType: "card", resourceID: card.id, plaintextFields: fields
+        )
+    }
+
+    static func candidate(
+        for institution: Institution, snapshot: VaultKeySession.Snapshot
+    ) throws -> ResourceSecretPreparationCandidate? {
+        var fields: [String: String] = [:]
+        func include(_ name: String, _ value: String?) throws {
+            if let plaintext = try verifiedPlaintext(
+                value, snapshot: snapshot, storedResourceType: "institution",
+                resourceID: institution.id, fieldName: name
+            ) { fields[name] = plaintext }
+        }
+        try include("login_url", institution.loginUrl)
+        try include("username", institution.username)
+        try include("email", institution.email)
+        try include("password", institution.password)
+        try include("two_factor", institution.twoFactor)
+
+        var accountCredentials: [ResourceBankAccountCredentials] = []
+        for account in institution.accounts {
+            let prefix = "accounts.\(account.id)"
+            let accountNumber = try verifiedPlaintext(
+                account.accountNumber, snapshot: snapshot,
+                storedResourceType: "institution", resourceID: institution.id,
+                fieldName: "\(prefix).account_number"
+            )
+            let routingNumber = try verifiedPlaintext(
+                account.routingNumber, snapshot: snapshot,
+                storedResourceType: "institution", resourceID: institution.id,
+                fieldName: "\(prefix).routing_number"
+            )
+            let wireRoutingNumber = try verifiedPlaintext(
+                account.wireRoutingNumber, snapshot: snapshot,
+                storedResourceType: "institution", resourceID: institution.id,
+                fieldName: "\(prefix).wire_routing_number"
+            )
+            if accountNumber != nil || routingNumber != nil || wireRoutingNumber != nil {
+                accountCredentials.append(ResourceBankAccountCredentials(
+                    id: account.id, accountNumber: accountNumber,
+                    routingNumber: routingNumber, wireRoutingNumber: wireRoutingNumber
+                ))
+            }
+        }
+        if !accountCredentials.isEmpty {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            fields["accounts_data"] = String(
+                decoding: try encoder.encode(accountCredentials), as: UTF8.self
+            )
+        }
+        guard !fields.isEmpty else { return nil }
+        return ResourceSecretPreparationCandidate(
+            resourceType: "institution", resourceID: institution.id, plaintextFields: fields
+        )
+    }
+}
+
 struct VaultAuditEventRecord: Decodable, Identifiable {
     let id: UUID
     let actorDeviceID: UUID?
@@ -2458,6 +2750,281 @@ final class VaultService: @unchecked Sendable {
         try await client.rpc("miloom_list_vault_devices").execute().value
     }
 
+    func listPendingResourceSecretRequests() async throws -> [ResourceSecretAccessRequest] {
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        return try await client.rpc("miloom_list_resource_secret_requests", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute().value
+    }
+
+    func approveResourceSecretRequest(_ displayedRequest: ResourceSecretAccessRequest) async throws {
+        try await confirmResourceSecretPresence(
+            reason: "Approve credential access for one trusted collaborator device."
+        )
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        let pending = try await listPendingResourceSecretRequests()
+        guard let request = pending.first(where: { $0.id == displayedRequest.id }),
+              request == displayedRequest else {
+            throw ResourceSecretGrantError.staleRequest
+        }
+        struct SecretParams: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        let confirmation = VaultCryptography.keyConfirmation(for: snapshot.key)
+        let secrets: [OwnerResourceSecretRecord] = try await client.rpc(
+            "miloom_get_owner_resource_secret", params: SecretParams(
+                p_resource_type: request.resourceType,
+                p_resource_id: request.resourceID,
+                p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: confirmation
+            )
+        ).execute().value
+        guard let secret = secrets.first,
+              secret.state == "active",
+              secret.resourceType == request.resourceType,
+              secret.resourceID == request.resourceID,
+              secret.keyVersion == request.keyVersion,
+              !secret.encryptedFields.isEmpty,
+              let accountKey = snapshot.key(for: secret.ownerAccountKeyVersion) else {
+            throw ResourceSecretGrantError.staleRequest
+        }
+        let resource = ResourceKeyContext(
+            ownerUserID: snapshot.userID,
+            resourceType: request.resourceType,
+            resourceID: request.resourceID,
+            keyVersion: request.keyVersion
+        )
+        let ownerContext = ResourceOwnerWrapContext(
+            resource: resource, accountKeyVersion: secret.ownerAccountKeyVersion
+        )
+        let resourceKey: SymmetricKey
+        do {
+            resourceKey = try VaultCryptography.unwrapResourceKeyForOwner(
+                secret.ownerWrappedResourceKey, using: accountKey, context: ownerContext
+            )
+            // A structurally valid wrap is not enough: check every field's
+            // authenticated data before making the key available to a device.
+            for (field, envelope) in secret.encryptedFields {
+                _ = try VaultCryptography.decryptResourceSecret(
+                    envelope, using: resourceKey,
+                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+                )
+            }
+        } catch {
+            throw ResourceSecretGrantError.invalidSecret
+        }
+        let deviceContext = ResourceDeviceWrapContext(
+            resource: resource,
+            recipientUserID: request.recipientUserID,
+            recipientDeviceID: request.recipientDeviceID
+        )
+        let wrap = try VaultCryptography.wrapResourceKeyForDevice(
+            resourceKey, for: request.agreementPublicKey, context: deviceContext
+        )
+        struct ApprovalParams: Encodable {
+            let p_request_id: UUID
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+            let p_ephemeral_public_key: String
+            let p_wrapped_resource_key: String
+        }
+        try await client.rpc("miloom_approve_resource_secret_access", params: ApprovalParams(
+            p_request_id: request.id,
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: confirmation,
+            p_ephemeral_public_key: wrap.ephemeralPublicKey,
+            p_wrapped_resource_key: wrap.wrappedKey
+        )).execute()
+    }
+
+    func prepareOwnedResourceSecrets() async throws -> ResourceSecretPreparationReport {
+        try await confirmResourceSecretPresence(
+            reason: "Prepare encrypted copies of your credentials without sharing them."
+        )
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        let collection = try await DataRepository.shared.collectOwnedResourceSecretCandidates(
+            snapshot: snapshot
+        )
+        var report = ResourceSecretPreparationReport()
+        report.skippedLockedRecords = collection.skippedLockedRecords
+        report.skippedEmptyRecords = collection.skippedEmptyRecords
+        report.failedRecords = collection.failedRecords
+        for candidate in collection.candidates {
+            if report.preparedRecords >= 25 {
+                report.deferredRecords += 1
+                continue
+            }
+            do {
+                if try await stageAndVerifyResourceSecret(candidate, snapshot: snapshot) {
+                    report.preparedRecords += 1
+                } else {
+                    report.alreadyPreparedRecords += 1
+                }
+            } catch {
+                report.failedRecords += 1
+                AppDiagnostics.failure("vault", "prepare_resource_secret", error: error)
+            }
+        }
+        return report
+    }
+
+    private func stageAndVerifyResourceSecret(
+        _ candidate: ResourceSecretPreparationCandidate,
+        snapshot: VaultKeySession.Snapshot
+    ) async throws -> Bool {
+        guard !candidate.plaintextFields.isEmpty else {
+            throw ResourceSecretPreparationError.verificationFailed
+        }
+        let existing = try await ownerResourceSecret(
+            type: candidate.resourceType, id: candidate.resourceID, snapshot: snapshot
+        )
+        if let existing {
+            guard existing.state == "staging" else {
+                throw ResourceSecretPreparationError.activeResource
+            }
+            if try plaintextFields(in: existing, snapshot: snapshot) == candidate.plaintextFields {
+                return false
+            }
+        }
+        let version = existing?.keyVersion ?? 1
+        let resource = ResourceKeyContext(
+            ownerUserID: snapshot.userID,
+            resourceType: candidate.resourceType,
+            resourceID: candidate.resourceID,
+            keyVersion: version
+        )
+        let resourceKey = SymmetricKey(size: .bits256)
+        let ownerWrap = try VaultCryptography.wrapResourceKeyForOwner(
+            resourceKey, using: snapshot.key,
+            context: ResourceOwnerWrapContext(
+                resource: resource, accountKeyVersion: snapshot.keyVersion
+            )
+        )
+        var ciphertext: [String: String] = [:]
+        for (field, plaintext) in candidate.plaintextFields {
+            ciphertext[field] = try VaultCryptography.encryptResourceSecret(
+                plaintext, using: resourceKey,
+                context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+            )
+        }
+        struct StageParams: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_key_version: Int
+            let p_owner_account_key_version: Int
+            let p_owner_wrapped_resource_key: String
+            let p_encrypted_fields: [String: String]
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_stage_resource_secret", params: StageParams(
+            p_resource_type: candidate.resourceType,
+            p_resource_id: candidate.resourceID,
+            p_key_version: version,
+            p_owner_account_key_version: snapshot.keyVersion,
+            p_owner_wrapped_resource_key: ownerWrap,
+            p_encrypted_fields: ciphertext,
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute()
+        guard let readback = try await ownerResourceSecret(
+            type: candidate.resourceType, id: candidate.resourceID, snapshot: snapshot
+        ), readback.state == "staging",
+           readback.keyVersion == version,
+           readback.ownerAccountKeyVersion == snapshot.keyVersion,
+           readback.ownerWrappedResourceKey == ownerWrap,
+           readback.encryptedFields == ciphertext,
+           try plaintextFields(in: readback, snapshot: snapshot) == candidate.plaintextFields else {
+            throw ResourceSecretPreparationError.verificationFailed
+        }
+        return true
+    }
+
+    private func ownerResourceSecret(
+        type: String, id: UUID, snapshot: VaultKeySession.Snapshot
+    ) async throws -> OwnerResourceSecretRecord? {
+        struct Params: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        let rows: [OwnerResourceSecretRecord] = try await client.rpc(
+            "miloom_get_owner_resource_secret", params: Params(
+                p_resource_type: type,
+                p_resource_id: id,
+                p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+            )
+        ).execute().value
+        guard rows.count <= 1 else { throw ResourceSecretPreparationError.verificationFailed }
+        guard let row = rows.first else { return nil }
+        guard row.resourceType == type, row.resourceID == id else {
+            throw ResourceSecretPreparationError.verificationFailed
+        }
+        return row
+    }
+
+    private func plaintextFields(
+        in record: OwnerResourceSecretRecord, snapshot: VaultKeySession.Snapshot
+    ) throws -> [String: String] {
+        guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion),
+              !record.encryptedFields.isEmpty else {
+            throw ResourceSecretPreparationError.verificationFailed
+        }
+        let resource = ResourceKeyContext(
+            ownerUserID: snapshot.userID,
+            resourceType: record.resourceType,
+            resourceID: record.resourceID,
+            keyVersion: record.keyVersion
+        )
+        let resourceKey = try VaultCryptography.unwrapResourceKeyForOwner(
+            record.ownerWrappedResourceKey, using: accountKey,
+            context: ResourceOwnerWrapContext(
+                resource: resource, accountKeyVersion: record.ownerAccountKeyVersion
+            )
+        )
+        var result: [String: String] = [:]
+        for (field, envelope) in record.encryptedFields {
+            result[field] = try VaultCryptography.decryptResourceSecret(
+                envelope, using: resourceKey,
+                context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+            )
+        }
+        return result
+    }
+
+    @MainActor
+    private func confirmResourceSecretPresence(reason: String) async throws {
+        let context = LAContext()
+        context.localizedCancelTitle = "Cancel"
+        var policyError: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
+            throw ResourceSecretGrantError.confirmationUnavailable
+        }
+        do {
+            guard try await context.evaluatePolicy(
+                .deviceOwnerAuthentication,
+                localizedReason: reason
+            ) else {
+                throw ResourceSecretGrantError.confirmationCancelled
+            }
+        } catch {
+            throw ResourceSecretGrantError.confirmationCancelled
+        }
+    }
+
     private func currentDevice(in devices: [VaultDeviceRecord], identity: VaultDeviceIdentity) -> VaultDeviceRecord? {
         devices.first {
             $0.agreementPublicKey == identity.publicKeys.agreementPublicKey
@@ -2473,6 +3040,10 @@ final class VaultService: @unchecked Sendable {
     }
 
     private func completeRotation(snapshot: VaultKeySession.Snapshot) async throws {
+        // The account transition key is intentionally discarded on completion.
+        // Rewrap every staged or locked resource key first, and let the server
+        // refuse completion if any owner wrap still names an older account key.
+        try await rewrapResourceSecretsForRotation(snapshot: snapshot)
         struct Params: Encodable {
             let p_actor_device_id: UUID
             let p_key_version: Int
@@ -2483,6 +3054,64 @@ final class VaultService: @unchecked Sendable {
             p_key_version: snapshot.keyVersion,
             p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
         )).execute()
+    }
+
+    private func rewrapResourceSecretsForRotation(snapshot: VaultKeySession.Snapshot) async throws {
+        let confirmation = VaultCryptography.keyConfirmation(for: snapshot.key)
+        struct ListParams: Encodable {
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        let params = ListParams(
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: confirmation
+        )
+        let wraps: [ResourceSecretOwnerWrapRecord] = try await client.rpc(
+            "miloom_list_resource_secret_owner_wraps_for_rotation", params: params
+        ).execute().value
+        for wrap in wraps {
+            guard let previousKey = snapshot.key(for: wrap.ownerAccountKeyVersion) else {
+                throw VaultCryptographyError.invalidKeyVersion
+            }
+            let resource = ResourceKeyContext(
+                ownerUserID: snapshot.userID,
+                resourceType: wrap.resourceType,
+                resourceID: wrap.resourceID,
+                keyVersion: wrap.keyVersion
+            )
+            let oldContext = ResourceOwnerWrapContext(
+                resource: resource,
+                accountKeyVersion: wrap.ownerAccountKeyVersion
+            )
+            let resourceKey = try VaultCryptography.unwrapResourceKeyForOwner(
+                wrap.ownerWrappedResourceKey, using: previousKey, context: oldContext
+            )
+            let newContext = ResourceOwnerWrapContext(
+                resource: resource,
+                accountKeyVersion: snapshot.keyVersion
+            )
+            let newWrap = try VaultCryptography.wrapResourceKeyForOwner(
+                resourceKey, using: snapshot.key, context: newContext
+            )
+            struct RewrapParams: Encodable {
+                let p_resource_type: String
+                let p_resource_id: UUID
+                let p_key_version: Int
+                let p_expected_owner_account_key_version: Int
+                let p_new_owner_wrapped_resource_key: String
+                let p_actor_device_id: UUID
+                let p_key_confirmation: String
+            }
+            try await client.rpc("miloom_rewrap_resource_secret_owner_key", params: RewrapParams(
+                p_resource_type: wrap.resourceType,
+                p_resource_id: wrap.resourceID,
+                p_key_version: wrap.keyVersion,
+                p_expected_owner_account_key_version: wrap.ownerAccountKeyVersion,
+                p_new_owner_wrapped_resource_key: newWrap,
+                p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: confirmation
+            )).execute()
+        }
     }
 
     private func bindCurrentSession(deviceID: UUID, key: SymmetricKey) async throws {

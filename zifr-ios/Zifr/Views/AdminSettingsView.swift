@@ -722,6 +722,9 @@ private enum VaultPresenceError: LocalizedError {
 @Observable
 private final class VaultSecurityController {
     var overview: VaultOverview?
+    var pendingSecretRequests: [ResourceSecretAccessRequest] = []
+    var secretRequestLoadFailed = false
+    var scopedSecretServiceAvailable = false
     var isLoading = false
     var hasLoaded = false
     var activeOperation: String?
@@ -729,6 +732,7 @@ private final class VaultSecurityController {
     var recoveryCode: String?
     var recoveryInput = ""
     var migrationReport: VaultMigrationReport?
+    var preparationReport: ResourceSecretPreparationReport?
 
     var isInitialized: Bool { overview?.metadata != nil }
     var isUnlocked: Bool { overview?.isUnlocked == true }
@@ -746,7 +750,31 @@ private final class VaultSecurityController {
         }
         do {
             overview = try await VaultService.shared.overview()
+            if overview?.isUnlocked == true {
+                do {
+                    pendingSecretRequests = try await VaultService.shared.listPendingResourceSecretRequests()
+                    secretRequestLoadFailed = false
+                    scopedSecretServiceAvailable = true
+                } catch let error as PostgrestError where error.code == "PGRST202" {
+                    // The scoped-secret migration has not been deployed yet.
+                    pendingSecretRequests = []
+                    secretRequestLoadFailed = false
+                    scopedSecretServiceAvailable = false
+                } catch {
+                    pendingSecretRequests = []
+                    secretRequestLoadFailed = true
+                    scopedSecretServiceAvailable = false
+                    AppDiagnostics.failure("vault", "load_credential_requests", error: error)
+                }
+            } else {
+                pendingSecretRequests = []
+                secretRequestLoadFailed = false
+                scopedSecretServiceAvailable = false
+            }
         } catch {
+            pendingSecretRequests = []
+            secretRequestLoadFailed = false
+            scopedSecretServiceAvailable = false
             AppDiagnostics.failure("vault", "load_settings", error: error)
             errorMessage = "Vault security couldn’t be loaded. Check your connection and try again."
         }
@@ -818,6 +846,40 @@ private final class VaultSecurityController {
         }
     }
 
+    func approveSecretRequest(_ request: ResourceSecretAccessRequest) async {
+        await perform(
+            "Granting Credential Access…",
+            reason: "Approve credential access for one collaborator device.",
+            requiresPresence: false
+        ) {
+            // VaultService authenticates locally and re-fetches the exact
+            // request before wrapping any key for the recipient device.
+            try await VaultService.shared.approveResourceSecretRequest(request)
+            self.pendingSecretRequests.removeAll { $0.id == request.id }
+            do {
+                self.pendingSecretRequests = try await VaultService.shared.listPendingResourceSecretRequests()
+                self.secretRequestLoadFailed = false
+            } catch {
+                // An already-accepted grant must not be reported as failed
+                // merely because the follow-up refresh is unavailable.
+                self.secretRequestLoadFailed = true
+                AppDiagnostics.failure("vault", "refresh_credential_requests", error: error)
+            }
+        }
+    }
+
+    func prepareResourceSecrets() async {
+        await perform(
+            "Preparing Encrypted Copies…",
+            reason: "Prepare encrypted copies of your credentials for future resource-specific access.",
+            requiresPresence: false
+        ) {
+            // The vault service authenticates locally before reading or staging
+            // any credentials, then verifies each encrypted server readback.
+            self.preparationReport = try await VaultService.shared.prepareOwnedResourceSecrets()
+        }
+    }
+
     @discardableResult
     func migrate() async -> Bool {
         var completed = false
@@ -828,12 +890,15 @@ private final class VaultSecurityController {
         return completed
     }
 
-    private func perform(_ operation: String, reason: String, work: () async throws -> Void) async {
+    private func perform(
+        _ operation: String, reason: String,
+        requiresPresence: Bool = true, work: () async throws -> Void
+    ) async {
         activeOperation = operation
         errorMessage = nil
         defer { activeOperation = nil }
         do {
-            try await confirmUserPresence(reason: reason)
+            if requiresPresence { try await confirmUserPresence(reason: reason) }
             try await work()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         } catch let error as VaultPresenceError {
@@ -857,6 +922,9 @@ private final class VaultSecurityController {
     }
 
     private func friendlyMessage(for error: Error) -> String {
+        if let grantError = error as? ResourceSecretGrantError {
+            return grantError.localizedDescription
+        }
         if error is AuthError {
             return "This device was signed out when vault access was revoked. Sign in again, then request access."
         }
@@ -900,7 +968,9 @@ private struct VaultSecuritySheet: View {
     @Environment(AppState.self) private var appState
     @State private var controller = VaultSecurityController()
     @State private var showingMigrationConfirmation = false
+    @State private var showingPreparationConfirmation = false
     @State private var deviceToRevoke: VaultDeviceRecord?
+    @State private var secretRequestToApprove: ResourceSecretAccessRequest?
 
     var body: some View {
         NavigationStack {
@@ -919,7 +989,13 @@ private struct VaultSecuritySheet: View {
 
                     if controller.isUnlocked {
                         trustedDevicesCard
+                        if !controller.pendingSecretRequests.isEmpty || controller.secretRequestLoadFailed {
+                            credentialRequestsCard
+                        }
                         migrationCard
+                        if controller.scopedSecretServiceAvailable {
+                            resourcePreparationCard
+                        }
                         auditCard
                         secretSharingBoundaryCard
                     }
@@ -992,6 +1068,14 @@ private struct VaultSecuritySheet: View {
         } message: {
             Text("Miloom will migrate passwords this device can read. Locked legacy values will be skipped and never overwritten.")
         }
+        .confirmationDialog("Prepare Encrypted Copies?", isPresented: $showingPreparationConfirmation, titleVisibility: .visible) {
+            Button("Prepare Encrypted Copies") {
+                Task { await controller.prepareResourceSecrets() }
+            }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Miloom will encrypt readable credentials under separate resource keys and verify them. Your existing records stay unchanged, and this step grants no new access.")
+        }
         .alert(item: $deviceToRevoke) { device in
             Alert(
                 title: Text(device.status == "pending" ? "Cancel Device Request?" : "Revoke \(device.label)?"),
@@ -1000,6 +1084,16 @@ private struct VaultSecuritySheet: View {
                     : "Miloom will revoke this device, end its linked sign-in session, rotate the account vault key, rewrap it for remaining devices, and re-encrypt protected records. Existing access tokens may remain valid briefly, and this cannot erase passwords the device already viewed."),
                 primaryButton: .destructive(Text(device.status == "pending" ? "Cancel Request" : "Revoke & Rotate")) {
                     Task { await controller.revoke(device) }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(item: $secretRequestToApprove) { request in
+            Alert(
+                title: Text("Grant Credential Access?"),
+                message: Text("\(request.recipientEmail) on \(request.recipientDeviceLabel) will be able to reveal credentials for \(request.resourceTitle ?? request.resourceType.capitalized) in \(request.companyName). Previously viewed passwords cannot be taken back."),
+                primaryButton: .default(Text("Grant Access")) {
+                    Task { await controller.approveSecretRequest(request) }
                 },
                 secondaryButton: .cancel()
             )
@@ -1213,6 +1307,59 @@ private struct VaultSecuritySheet: View {
         }
     }
 
+    private var credentialRequestsCard: some View {
+        ZifrSheetCard(title: "CREDENTIAL ACCESS REQUESTS", icon: "key.horizontal.fill") {
+            if controller.secretRequestLoadFailed {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Credential requests couldn’t be checked. Your existing vault access was not changed.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Try Again") { Task { await controller.load() } }
+                        .buttonStyle(.bordered)
+                        .tint(Color.zifrGold)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(controller.pendingSecretRequests) { request in
+                        Button {
+                            secretRequestToApprove = request
+                        } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: "person.crop.circle.badge.checkmark")
+                                    .foregroundStyle(Color.zifrGold)
+                                    .frame(width: 28)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(request.resourceTitle ?? request.resourceType.capitalized)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                    Text(request.companyName)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text("\(request.recipientEmail) · \(request.recipientDeviceLabel)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Review credential access for \(request.recipientEmail), \(request.resourceTitle ?? request.resourceType), \(request.companyName)")
+                        if request.id != controller.pendingSecretRequests.last?.id {
+                            Divider().background(Color.white.opacity(0.1))
+                        }
+                    }
+                }
+            }
+        }
+        .privacySensitive()
+    }
+
     private var migrationCard: some View {
         ZifrSheetCard(title: "ENCRYPTION MIGRATION", icon: "arrow.triangle.2.circlepath") {
             VStack(alignment: .leading, spacing: 12) {
@@ -1251,6 +1398,55 @@ private struct VaultSecuritySheet: View {
                     .buttonStyle(.bordered)
                     .tint(Color.zifrGold)
                     .controlSize(.large)
+            }
+        }
+    }
+
+    private var resourcePreparationCard: some View {
+        ZifrSheetCard(title: "RESOURCE CREDENTIALS", icon: "key.horizontal.fill") {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Prepare separate encrypted copies of credentials for future, precisely scoped sharing. This step grants no new access and leaves your existing passwords unchanged.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let report = controller.preparationReport {
+                    if report.preparedRecords > 0 {
+                        Label("\(report.preparedRecords) resource\(report.preparedRecords == 1 ? "" : "s") prepared and verified", systemImage: "checkmark.shield.fill")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.green)
+                    }
+                    if report.preparedRecords == 0 && report.alreadyPreparedRecords == 0 && report.failedRecords == 0 && report.skippedLockedRecords == 0 {
+                        Text("No readable credentials needed preparation.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if report.alreadyPreparedRecords > 0 {
+                        Text("\(report.alreadyPreparedRecords) already prepared.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    if report.skippedLockedRecords > 0 {
+                        Text("\(report.skippedLockedRecords) locked resource\(report.skippedLockedRecords == 1 ? " was" : "s were") left unchanged.")
+                            .font(.caption)
+                            .foregroundStyle(Color.orange)
+                    }
+                    if report.failedRecords > 0 {
+                        Text("\(report.failedRecords) resource\(report.failedRecords == 1 ? "" : "s") couldn’t be verified. You can retry safely.")
+                            .font(.caption)
+                            .foregroundStyle(Color.orange)
+                    }
+                    if report.deferredRecords > 0 {
+                        Text("\(report.deferredRecords) more to prepare. Run again to continue.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Button("Prepare Encrypted Copies") {
+                    showingPreparationConfirmation = true
+                }
+                .buttonStyle(.bordered)
+                .tint(Color.zifrGold)
+                .controlSize(.large)
+                .disabled(controller.activeOperation != nil)
             }
         }
     }
