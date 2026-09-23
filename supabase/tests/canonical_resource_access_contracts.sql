@@ -1,4 +1,4 @@
--- Run against a disposable database after 202609210002_canonical_resource_access.sql.
+-- Run against a disposable database with current collaboration migrations.
 begin;
 
 insert into auth.users (id, email) values
@@ -24,7 +24,7 @@ declare
     v_result jsonb;
 begin
     v_result := public.miloom_share_resource(
-        'Collaborator@Example.com', 'Editor',
+        'Collaborator@Example.com', 'Viewer',
         '82000000-0000-0000-0000-000000000001', 'company'
     );
     if v_result->>'status' <> 'shared_directly' then
@@ -35,7 +35,7 @@ begin
          where access_kind = 'direct'
            and email = 'collaborator@example.com'
            and company_id = '82000000-0000-0000-0000-000000000001'
-           and role = 'Editor'
+           and role = 'Viewer'
            and status = 'Active'
     ) then
         raise exception 'Direct share missing from unified management list';

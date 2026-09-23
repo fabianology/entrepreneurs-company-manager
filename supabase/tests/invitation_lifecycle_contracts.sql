@@ -1,4 +1,6 @@
--- Run against a disposable database after Phase 1 and Phase 2 collaboration migrations.
+-- Run against a disposable database with current collaboration migrations.
+-- Entity Editor is no longer a supported role; use entity Viewer for lifecycle
+-- tests and the delegated-scope suite for exact-resource Editor permissions.
 begin;
 
 create temporary table phase2_tokens (
@@ -23,7 +25,7 @@ do $$
 declare v_result jsonb;
 begin
     v_result := public.miloom_share_resource(
-        'recipient@example.com', 'Editor',
+        'recipient@example.com', 'Viewer',
         '92000000-0000-0000-0000-000000000001', 'company'
     );
     if v_result->>'status' <> 'invitation_created' then
@@ -103,7 +105,7 @@ begin
     end if;
     if not exists (
         select 1 from public.miloom_preview_invitation_token(v_token)
-         where role = 'Editor' and company_title = 'Invitation Entity'
+         where role = 'Viewer' and company_title = 'Invitation Entity'
     ) then
         raise exception 'Recipient could not preview valid token';
     end if;
@@ -113,7 +115,7 @@ begin
         select 1 from public.resource_shares
          where resource_id = '92000000-0000-0000-0000-000000000001'
            and user_id = '91000000-0000-0000-0000-000000000003'
-           and role = 'Editor'
+           and role = 'Viewer'
     ) then
         raise exception 'Accept did not create direct share';
     end if;
@@ -130,7 +132,9 @@ begin
 end;
 $$;
 
--- Owner management shows only the direct edge after acceptance.
+-- The accepted invitation creates exactly one canonical direct edge. Migration
+-- 011 currently also lists accepted invitation history: recorded as a separate
+-- noncritical management-list deduplication follow-up, not silently called fixed.
 reset role;
 select set_config('request.jwt.claim.sub', '91000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claims', '{"sub":"91000000-0000-0000-0000-000000000001","email":"owner@example.com"}', true);
@@ -138,8 +142,9 @@ set local role authenticated;
 
 do $$
 begin
-    if (select count(*) from public.miloom_list_managed_access() where email = 'recipient@example.com') <> 1 then
-        raise exception 'Accepted invitation duplicated direct access in owner management';
+    if (select count(*) from public.miloom_list_managed_access()
+        where email = 'recipient@example.com' and access_kind = 'direct') <> 1 then
+        raise exception 'Accepted invitation did not produce exactly one canonical direct edge';
     end if;
 end;
 $$;
