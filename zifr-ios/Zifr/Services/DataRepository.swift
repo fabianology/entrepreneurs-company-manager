@@ -19,13 +19,10 @@ enum ShareInviteResult {
 }
 
 enum DocumentFileOwnershipError: LocalizedError {
-    case ownerRequired
     case saveDocumentFirst
 
     var errorDescription: String? {
         switch self {
-        case .ownerRequired:
-            "Only the document owner can remove this shared file directly."
         case .saveDocumentFirst:
             "Save this document first, then add its file."
         }
@@ -1207,11 +1204,54 @@ class DataRepository {
             try? await insertActivityLog(log)
         }
     }
+
+    func clearSharedDocumentFile(_ id: UUID, expectedURL: String) async throws {
+        struct Params: Encodable {
+            let p_document_id: UUID
+            let p_expected_url: String
+        }
+        struct Result: Decodable { let status: String }
+        let result: Result = try await client.rpc(
+            "miloom_clear_document_file",
+            params: Params(p_document_id: id, p_expected_url: expectedURL)
+        ).execute().value
+        guard result.status == "cleared" else {
+            throw NSError(domain: "Documents", code: 409, userInfo: [
+                NSLocalizedDescriptionKey: "The document file was not removed. Refresh and try again."
+            ])
+        }
+    }
+
     func deleteDocument(_ id: UUID, fileURL: String? = nil, ownerUserID: UUID) async throws {
         let session = try await client.auth.session
-        if let fileURL, Self.companyDocumentStoragePath(fileURL) != nil,
-           session.user.id != ownerUserID {
-            throw DocumentFileOwnershipError.ownerRequired
+        if session.user.id != ownerUserID {
+            struct Params: Encodable {
+                let p_document_id: UUID
+                let p_expected_url: String?
+
+                enum CodingKeys: String, CodingKey { case p_document_id, p_expected_url }
+
+                func encode(to encoder: Encoder) throws {
+                    var box = encoder.container(keyedBy: CodingKeys.self)
+                    try box.encode(p_document_id, forKey: .p_document_id)
+                    if let p_expected_url {
+                        try box.encode(p_expected_url, forKey: .p_expected_url)
+                    } else {
+                        try box.encodeNil(forKey: .p_expected_url)
+                    }
+                }
+            }
+            struct Result: Decodable { let status: String }
+            let result: Result = try await client.rpc(
+                "miloom_delete_document_with_file",
+                params: Params(p_document_id: id, p_expected_url: fileURL)
+            ).execute().value
+            guard result.status == "deleted" else {
+                throw NSError(domain: "Documents", code: 409, userInfo: [
+                    NSLocalizedDescriptionKey: "The document was not deleted. Refresh and try again."
+                ])
+            }
+            return
         }
         // Delete the row first. The server queues its exact Storage path for
         // retryable cleanup, so a rejected delete never destroys a live file.

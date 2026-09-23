@@ -917,6 +917,7 @@ struct EditDocumentSheet: View {
     @Environment(AccessController.self) private var accessController
     @Environment(\.dismiss) private var dismiss
     @State private var showDelete = false
+    @State private var showRemoveFileConfirmation = false
     @State private var showShareSheet = false
     @State private var linkedBusinessReview: BusinessExpenseReview?
     
@@ -1078,7 +1079,8 @@ struct EditDocumentSheet: View {
                                                     .foregroundStyle(.secondary)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
                                             }
-                                            if let url = doc.url, !url.isEmpty, !url.hasPrefix("http") {
+                                            if let url = doc.url, !url.isEmpty,
+                                               !url.hasPrefix("http") || url.contains("/CompanyDocuments/") {
                                                 HStack {
                                                     Image(systemName: "doc.circle.fill")
                                                         .font(.system(size: 22))
@@ -1096,13 +1098,56 @@ struct EditDocumentSheet: View {
                                                     Spacer()
                                                     
                                                     Button(role: .destructive) {
-                                                        doc.url = nil
+                                                        showRemoveFileConfirmation = true
                                                     } label: {
                                                         Image(systemName: "xmark.circle.fill")
                                                             .foregroundStyle(.red)
                                                             .font(.system(size: 16))
                                                     }
-                                                    .disabled(!canManageSharedFile)
+                                                    .accessibilityLabel("Remove document file")
+                                                    .disabled(!canUploadFile || isUploading)
+                                                    .confirmationDialog(
+                                                        "Remove this file?",
+                                                        isPresented: $showRemoveFileConfirmation,
+                                                        titleVisibility: .visible
+                                                    ) {
+                                                        Button("Remove File", role: .destructive) {
+                                                            guard doc.url == url else { return }
+                                                            if canManageSharedFile {
+                                                                doc.url = nil
+                                                            } else {
+                                                                isUploading = true
+                                                                uploadError = nil
+                                                                Task {
+                                                                    do {
+                                                                        try await DataRepository.shared.clearSharedDocumentFile(
+                                                                            doc.id, expectedURL: url
+                                                                        )
+                                                                        await MainActor.run {
+                                                                            doc.url = nil
+                                                                            snapshot?.url = ""
+                                                                            if let index = appState.documents.firstIndex(
+                                                                                where: { $0.id == doc.id }
+                                                                            ) {
+                                                                                appState.documents[index].url = nil
+                                                                            }
+                                                                            isUploading = false
+                                                                        }
+                                                                    } catch {
+                                                                        await MainActor.run {
+                                                                            uploadError = "Could not remove file: \(error.localizedDescription)"
+                                                                            isUploading = false
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                        Button("Cancel", role: .cancel) {}
+                                                    } message: {
+                                                        Text(canManageSharedFile
+                                                             ? "The file will be detached when you save this document."
+                                                             : "The file will be detached now. A stored file may take a short time to finish deleting.")
+                                                    }
                                                 }
                                                 .padding(12)
                                                 .background(Color.white.opacity(0.05))
@@ -1158,7 +1203,7 @@ struct EditDocumentSheet: View {
                                                 HStack(spacing: 8) {
                                                     ProgressView()
                                                         .tint(.zifrBlue)
-                                                    Text("Uploading document...")
+                                                    Text("Updating document...")
                                                         .font(.system(size: 12))
                                                         .foregroundStyle(Color.white.opacity(0.6))
                                                 }
@@ -1275,7 +1320,8 @@ struct EditDocumentSheet: View {
                     df.dateFormat = "MMM d, yyyy"
                     doc.uploadDate = df.string(from: Date())
                 }
-                if let url = doc.url, url.hasPrefix("http") {
+                if let url = doc.url, url.hasPrefix("http"),
+                   !url.contains("/CompanyDocuments/") {
                     inputMode = 1
                 }
             }
@@ -1311,7 +1357,12 @@ struct EditDocumentSheet: View {
                             
                             await MainActor.run {
                                 doc.url = uploadUrl
-                                if !canManageSharedFile { snapshot?.url = uploadUrl }
+                                if !canManageSharedFile {
+                                    snapshot?.url = uploadUrl
+                                    if let index = appState.documents.firstIndex(where: { $0.id == doc.id }) {
+                                        appState.documents[index].url = uploadUrl
+                                    }
+                                }
                                 if doc.name.isEmpty || doc.name == "New Document" {
                                     doc.name = "Photo - \(doc.type)"
                                 }
@@ -1379,7 +1430,12 @@ struct EditDocumentSheet: View {
                             
                             await MainActor.run {
                                 doc.url = uploadUrl
-                                if !canManageSharedFile { snapshot?.url = uploadUrl }
+                                if !canManageSharedFile {
+                                    snapshot?.url = uploadUrl
+                                    if let index = appState.documents.firstIndex(where: { $0.id == doc.id }) {
+                                        appState.documents[index].url = uploadUrl
+                                    }
+                                }
                                 if doc.name.isEmpty || doc.name == "New Document" {
                                     doc.name = url.deletingPathExtension().lastPathComponent
                                 }
