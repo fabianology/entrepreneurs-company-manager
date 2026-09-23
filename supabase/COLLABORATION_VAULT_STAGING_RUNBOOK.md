@@ -258,6 +258,57 @@ The previously installed build 13 has a different sharing contract; inventory
 test devices and coordinate an upgrade before enabling new flows. Production
 requires its own explicit decision and release gate above.
 
+## Frozen completion gates — current checkpoint, 2026-09-23
+
+Original Phases 0–7 remain the implementation plan (initial containment plus
+seven phases); later milestone numbers in this historical runbook are not
+substitutes for that plan. Current evidence is maintained in
+`../zifr-ios/COLLABORATION_UI_ACCEPTANCE_20260922.md`.
+
+- Documents incremental staging checkpoint passed, including native PDF,
+  revoked operations and orphan cleanup. Staging correction
+  `202609230001_fix_orphan_document_uuid_filter` is applied/ledger verified.
+- Lifecycle backend contracts passed on current staging. Actual delivered email
+  and native universal-link acceptance remain open: staging lacks provider key
+  and sender configuration; published association lists production bundle only.
+- Scoped-vault local contracts passed seven isolated scenarios. Subsequent native
+  owner recovery/two-device reveal, one-field migration, exact-card Editor
+  approval/decrypt, post-revocation denial and key replacement/owner reveal
+  passed on incremental staging builds. Those disposable fixtures are cleaned.
+  Remaining preservation/isolation and candidate-build boundaries are listed in
+  `../zifr-ios/COLLABORATION_CHECKPOINT_RECONCILIATION_20260923.md`.
+  Global collaborator-secret activation remains closed; fixture-only privileged
+  activation was not proof of normal-client activation or release readiness.
+- Older-client restriction is confirmed, not resolved: source `d3b05f24` uses
+  full-row table reads. Current staging denies authenticated full-table reads
+  on subscriptions/cards/institutions and direct invitation DELETE, while
+  retaining both legacy share RPC signatures. Do not deploy this backend to
+  clients with that old read/revoke contract. Minimum supported build and actual
+  tester upgrade inventory are release prerequisites; do not restore secret
+  column access merely to support an old build.
+- Local containment rehearsal passed on populated synthetic scoped secrets:
+  revoke device-secret delivery EXECUTE, verify authenticated call denial,
+  restore exactly that privilege, retain anonymous denial, and compare exact
+  encrypted version/wrap/audit contents unchanged. See
+  `tests/resource_secret_containment_rollback_assertions.sql` and
+  `ops/rehearse_scoped_vault_contracts.sh rotation`. This is delivery containment
+  and reversal, NOT a full migration downgrade, live recovery rehearsal or
+  permission to erase key history. No hosted privilege changes were made.
+- **Final external gate: independent security review — outstanding.** Reviewer
+  must be independent of implementation and review the exact candidate commit,
+  migrations, RLS/privileges, invitation lifecycle, device/resource-key binding,
+  recovery/rotation/revocation, document Storage and failure/data-loss paths.
+  Record reviewer, date, candidate, findings and disposition. This task has not
+  obtained that review; no internal tests substitute for it. Production secret
+  sharing must not be released with unresolved critical findings.
+- Final deliverable still requires reconciled commits, one clean staging build,
+  bounded native checklist on that build and updated handoff. Do not call the
+  overall goal complete from incremental builds or local SQL success.
+
+No whole-app polish or additional phases. Production remains a separate explicit
+authorization. Keep existing data, revoke/disable risky capabilities for
+containment, and use a forward repair rather than destructive schema rollback.
+
 ### Staging continuation checkpoint — 2026-09-22 PDT
 
 This is evidence for **Miloom Staging only**, not production acceptance. The

@@ -724,3 +724,333 @@ document file interruption/orphan/PDF, email/universal links, actual foreground/
 offline revocation, two-device vault/scoped-secret matrix, older-client rollout
 policy, independent security review, checkpoint/release candidate and separately
 authorized production deployment. Password-sharing cutover remains closed.
+
+## 2026-09-23 — Nested save checkpoint and staged photo-upload retry
+
+The previous verified checkpoint is committed as `07499ec1` (`Preserve scoped
+editor drafts and verify native save retries`), not pushed. This continuation is
+local/uncommitted native code plus test/evidence changes on top of that commit.
+No migration, function deployment, production, phone FX, original-simulator,
+Face ID, signing, entitlement or secret-sharing-cutover change occurred.
+
+### Changed behavior
+
+- The overview Add Payment sheet now awaits the existing atomic loan save and
+  keeps its draft on rejection. Its coordinator retains the original revision,
+  ledger and payment ID, rejects incomplete/duplicate/mismatched payments, and
+  does not silently rebase a stale ledger. The same HUD inside Edit Loan still
+  adds only to the parent draft until the parent Save is confirmed.
+- Both owner service-wizard save actions await confirmation, keep the current
+  step/draft on failure, and prevent duplicate saves or dismissal while pending.
+  The final step says Ready to save rather than incorrectly announcing success.
+- Photo selection resets after success or failure, allowing the same image to
+  be selected again without reopening the document editor.
+- The existing opt-in DEBUG staging-simulator fault hook now allowlists the
+  prepare-upload, signed CompanyDocuments upload, and finalize-upload endpoints.
+  Tests enforce the exact staging host/bundle and exclude reads, deletes, other
+  buckets, other paths and non-opt-in launches. No production/device hook exists.
+
+### Verification actually performed
+
+- Final focused native suite: **34 passed, 0 failed, 0 skipped**, result
+  `/private/tmp/miloom-nested-save-upload-copy-20260923.xcresult`, staging build
+  12, iOS 26.4, disposable simulator
+  `EFAF2008-6AD5-4D66-BD6A-452EADFB0AB3`. Earlier same-source save/upload suite
+  before the wording-only correction also passed 34/34 at
+  `/private/tmp/miloom-nested-save-upload-final-20260923.xcresult`.
+- Actual owner-wizard toolbar Save and final Done each showed Service Not Saved
+  under the controlled connection fault, kept their step and entered name, and
+  left no service row. Retrying with the hook off saved exactly one row per
+  draft under the original owner/company. Titles: `Native Owner Wizard Retry`
+  and `Native Owner Wizard Done Retry`. No credentials or linked emails entered.
+- Rebuilt wording was visibly verified at the final step using
+  `Native Unsaved Wizard`; Cancel returned to the list and the server query
+  confirmed that draft was absent. The wording-only rebuild was not counted as
+  a new repetition of both save-failure passes.
+- Native nested Edit Loan -> Add Payment retained a $25 payment in the parent
+  draft, while an exact server query returned zero payments. Canceling the
+  parent left zero payments. **This is not the overview quick-payment flow.**
+  The overview context-menu Add Payment action could not be invoked through the
+  available native-control long-press/AX interface; its network/denial/stale
+  failure and stable-ID retry are coordinator-tested, not native-flow verified.
+
+Native upload checks used the exact shared fixture document and repository logo
+images, never personal files. Staging queries checked its URL, reservations,
+actual Storage objects and cleanup queue after each step:
+
+| Controlled stage failure | Native/backend result | Same-image retry |
+| --- | --- | --- |
+| Prepare offline | Editor stays open, safe error, no reservation/object/attachment | Same image selected again successfully reaches the next tested stage |
+| Signed upload interrupted before transmission | Unfinalized reservation, no object or attachment | Same-image selection triggers another request |
+| Finalize timeout before transmission | Bytes exist but document URL remains null; unattached object retained for cleanup | With faults off, one attachment finalized and shown in native UI |
+| Replacement finalize timeout | Existing attachment remains in UI and backend; it is not queued for removal | Same replacement image succeeds, new URL shown; only then is previous attachment queued |
+
+The failure hook intercepts each selected request **before transmission**.
+For finalize faults, preparation and byte upload genuinely completed first,
+so real orphaned test objects existed. This does not prove recovery from a lost
+response after the server has already committed, real packet loss, Files/PDF
+import, or automatic cleanup of newly abandoned objects after the 24-hour grace.
+Sibling/private document URLs remained unchanged. All uploaded paths belonged
+to the original owner, not the Editor.
+
+### Cleanup and boundaries
+
+Native sign-out and login were verified. Four test Storage objects, five upload
+reservations, the old-file cleanup entry, exact fixture records/shares and both
+marked dummy accounts were removed; absence was verified, including Auth 404s
+and zero loan payments. Service-role company deletion initially hit the intended
+`DOCUMENT_FILE_OWNER_REQUIRED` guard and rolled back. Cleanup then used the
+existing authenticated fixture owner, preserving the guard; no schema bypass.
+This manual cleanup is not evidence that the scheduled orphan worker passed.
+Removed the temporary fault-instruction file and relaunched the disposable app
+without the fault argument/environment; normal signed-out login remains visible.
+
+### Frozen completion boundary and original phase map
+
+**Correction, 2026-09-23:** the previous table reused later implementation
+milestone labels and incorrectly called them the original phases. The original
+plan was Phases 1–7 plus initial Phase 0. Historical commits `1d4693ff`,
+`e6d91120`, `9619af5b`, and `0cdaf4cb` are implementation checkpoints, not proof
+that the original phase acceptance criteria are complete. The original phases,
+assessed against their full acceptance and the frozen gates, are:
+
+| Original phase | Status | Remaining completion boundary |
+| --- | --- | --- |
+| 0 — Security containment | In progress | Final compatibility/cutover verification |
+| 1 — Shared security schema/contracts | In progress | Final role/scope backend and native acceptance |
+| 2 — Personal cross-device vault | In progress | Final migration/recovery acceptance on candidate build |
+| 3 — Collaboration authorization without secrets | In progress | Lifecycle/deep-link and revoked-access acceptance |
+| 4 — Collaborator access to protected fields | In progress | Scoped-secret two-device/isolation gate; sharing remains disabled |
+| 5 — Revocation and cryptographic rotation | In progress | Scoped key rotation/removal/revocation acceptance |
+| 6 — Unified management experience | In progress | Required native management flows on candidate build |
+| 7 — Testing and controlled rollout | In progress | Clean build/checklist, rollback and independent review gate |
+
+These statuses do not mean no implementation exists. Phase 4 originally
+proposed Admin-only protected access; the user subsequently approved scoped
+Editor secret access. Rollout order remains additive backend/email, flagged
+personal vault, safe readable-legacy migration, new client before legacy-write
+closure, nonsecret collaboration, scoped-secret sharing only after the entire
+security gate, then evidence-backed legacy retirement. Production deployment
+and production secret sharing remain separately authorized, with independent
+security review an explicit final external gate.
+
+The later user-approved delegated Admin/Editor model, resource-key sharing and
+staging acceptance remain **In progress**. Production release is **Not started**
+for this rollout and remains separately authorized. The remaining bounded gates
+are:
+
+1. **Roles/scopes — In progress:** close final native/direct-backend permission
+   evidence for Owner, entity Admin (Viewer management only), exact/collection
+   Editor and credential-blind Viewer. Restrict further save-path fixes to these
+   boundaries, critical data loss or unauthorized access; general app QA is not
+   an added phase.
+2. **Collaboration lifecycle — In progress:** actual invitation email/deep-link
+   acceptance for existing/new users, resource/entity removal, owner-only block
+   and foreground/offline revoked-access checks on staging. Prior native Send
+   and API acceptance do not substitute for the email-opening flow.
+3. **Documents — Incremental staging checkpoint passed (2026-09-23):**
+   native upload/open/replace/remove, controlled retry and revoked operations
+   have recorded evidence; orphan discovery/worker correction is verified below.
+   Final acceptance on the clean candidate build remains part of gate 6.
+   Controlled request failures are not a claim of real packet-loss or
+   post-commit lost-response testing.
+4. **Scoped vault — In progress:** safe readable-credential migration, two
+   approved devices and exact-resource decrypt isolation, recovery/rotation and
+   removal/revocation. Keep collaborator password sharing disabled until all of
+   this gate passes. Account-vault two-device evidence alone is insufficient.
+5. **Release safety — In progress:** older-client compatibility/rollback and no
+   unresolved critical data-loss/unauthorized-access defect. Independent security
+   review is **Not started** in this task and remains an explicit external gate.
+6. **Final deliverable — In progress:** identifiable commits, one clean staging
+   build, the bounded acceptance checklist on that exact build and updated
+   evidence/handoff. Current native checks are incremental dirty-worktree builds,
+   not the clean release candidate. State the exact incomplete gate, not that the
+   overall goal is complete.
+
+Noncritical adjacent discoveries (general owner/Free-tier regressions, unrelated
+inline save polish, wider visual cleanup) are follow-ups, not new phases. The
+overview payment native check stays tied only to the scoped loan save/data-loss
+gate. All unresolved security/release gates above remain required.
+
+## 2026-09-23 — Bounded Documents continuation: PDF and revoked operations
+
+Same canonical branch, HEAD `07499ec1`, existing staging simulator build 12
+from `/private/tmp/miloom-staging-owner-build.2Qprr8`. No runtime source change,
+rebuild, suite rerun, commit, push or backend deployment in this continuation.
+Prior 34/34 focused suite evidence remains prior evidence, not a new run.
+
+| Check | Result and evidence |
+| --- | --- |
+| Native Files/PDF upload | Passed: selected `Miloom-Staging-Document-Test.pdf` from On My iPhone in the native picker; finalized 1,728-byte object under the original owner's prefix, exact document only. |
+| Native PDF open | Passed: actual PDF rendered in the in-app browser, marker `DOC-GATE-20260923`, page 1 of 1. Synthetic document created/render-verified using the PDF skill; no personal files. |
+| Revocation between bytes and finalize | Passed via API: Editor prepared/uploaded replacement, Owner revoked exact document Editor grant, finalize returned 403/42501; original attachment unchanged. New reservation remained unfinalized. |
+| Native removal after revocation | Passed: editor form opened before revoke; Remove File confirmed afterward displayed safe authorization error and retained attachment/form. Backend original URL unchanged; no cleanup queued for it. |
+| Native opening after full read revocation | Passed: Owner also removed independent company Viewer grant; stale paperclip returned “Could not open document” / access-changed message rather than a new signed URL/PDF. Already downloaded copies and previously issued short-lived URLs are not remotely erased by this test. |
+| Abandoned upload cleanup | **Failed gate prerequisite:** live staging function `miloom_queue_orphan_document_uploads()` has a malformed UUID-path regex. Actual abandoned object does not match it and therefore cannot become a cleanup candidate even after the grace period. No worker or simulated aging run claimed. |
+
+The deployed filter expects a six-group owner identifier and a four-group
+filename identifier, rather than standard five-group UUIDs for both. Read-only
+`pg_get_functiondef` confirmed the live staging definition matches migration
+`202609220029_preserve_legacy_document_file_references.sql`; SQL against the
+actual unfinalized object returned `attached=false` and
+`matches_deployed_cleanup_filter=false`. This is a cleanup/storage-retention
+blocker, not observed unauthorized access or deletion of an attached file.
+Earlier detached-file cleanup passes do not establish orphan discovery, and
+legacy-linked-object exclusion tests alone do not detect a filter matching no
+valid uploads. Requested permission for a narrow backend correction, positive
+orphan regression test after migration 029, and staging-only deployment/test.
+
+Cleanup complete: native sign-out/login screen verified; two synthetic Storage
+objects, two reservations, cleanup queue, exact fixture rows/shares/payments and
+both marked dummy accounts removed (Auth 404 checks). The copied PDF was removed
+from the disposable simulator Files container. This deliberately deletes only
+disposable test data, permanently; no real-user data was removed. No production,
+phone FX, original simulator, signing, entitlement, Face ID or password-sharing
+cutover changes.
+
+**Next bounded gate action:** correct and verify orphan cleanup after explicit
+backend approval. Documents remains In progress, not complete. Do not advance
+to lifecycle/vault or add adjacent QA while this gate remains open.
+
+## 2026-09-23 — Documents orphan-cleanup correction: checkpoint passed
+
+User explicitly authorized the narrow backend correction and staging test.
+Added migration `202609230001_fix_orphan_document_uuid_filter.sql`; only the
+UUID-path predicate changes. The 24-hour grace, owner binding, normalized
+relative/legacy live-reference protection, bounded batch and service-only
+privileges are preserved. Applied only this migration to Miloom Staging
+`bvtuyzhyospqxvpzcrmv` and recorded/verified its migration ledger entry. No broad
+database push, Edge redeployment, production or phone change.
+
+- **SQL regression passed:** isolated local PostgreSQL, actual migration 029
+  followed by the correction. Positive aged orphan discovery; fresh-upload
+  grace; preservation of relative and encoded absolute legacy references;
+  wrong-owner/unrelated-bucket/non-app-filename exclusion; idempotency and
+  service-only execution. Reproducible test:
+  `supabase/tests/document_orphan_uuid_regression.sql` (disposable database only).
+- **Worker unit test passed, 1/1:** `deno test --no-config --cached-only
+  supabase/functions/_shared/document_file_cleanup_test.ts`. The initial command
+  inherited unrelated compiler configuration and could not resolve `Deno`;
+  rerunning without that config passed type checking and execution.
+- **Hosted worker passed:** three actual synthetic PDF uploads through the
+  existing scoped upload contract. Fresh run removed 0/failed 0. Simulated
+  25-hour `created_at` applied only to the exact orphan and attached fixture
+  objects; next run removed 1/failed 0. Attached PDF and fresh unfinalized upload
+  remained, document URL unchanged, queue empty. Repeat removed 0/failed 0.
+  This exercises the real deployed worker, not a 24-hour real-time wait or a
+  new clock-triggered scheduler proof. Preflight checked for unrelated queued
+  or aged-unreferenced objects before every invocation; none were processed.
+- First direct service-key invocation returned 401 and performed no cleanup;
+  successful runs used the existing scheduler's `x-cron-secret` configuration,
+  validated to the exact staging URL, held only in memory and never printed.
+- **Cleanup verified:** all marked fixture records/shares/payments, Storage
+  objects, reservations and cleanup entries absent; both dummy users Auth 404.
+  Only disposable data was permanently deleted. Local test PostgreSQL stopped.
+  Native simulator remained signed out; no native source/build changes needed.
+
+The previously reported orphan-filter blocker is resolved on staging. Documents
+incremental acceptance is passed; it is not final clean-build release signoff.
+Original phase numbering and six frozen gates remain unchanged. **Next bounded
+checkpoint: collaboration lifecycle — actual email/deep-link acceptance for
+existing/new users and remaining removal/block/revoked-access evidence.**
+Scoped-vault security, compatibility/rollback, external independent review and
+the clean committed candidate/checklist remain required afterward. Password
+sharing remains disabled. No commit or push this turn; the migration, regression
+test and evidence are local changes, with the migration applied to staging only.
+
+## 2026-09-23 — Lifecycle current-state verification (not complete)
+
+Current staging secret metadata lists no `RESEND_API_KEY` or `SHARE_EMAIL_FROM`.
+The sender function requires both, so actual invitation delivery remains blocked.
+Requested staging-only secure configuration and an approved test inbox; no
+provider credential was obtained, no email was sent, no secret was changed.
+Read-only HTTPS retrieval of the live Apple association file returned only
+`WYYJ6FGYRP.com.vibing.miloom` with `/invite` paths, not the installed disposable
+`com.vibing.miloom.staging` app. Thus this build cannot establish real
+email-to-app universal-link acceptance with the current website association.
+No website, bundle identifier, entitlement or signing change was made.
+
+Two rollback-only SQL suites ran against the current staging schema and passed:
+
+- `invitation_lifecycle_contracts.sql`: token issuance/rate limit, wrong-account
+  preview/accept denial, new-recipient inbox, token acceptance producing one
+  direct grant, replay rejection, decline without grant, expiry and privileges.
+- `canonical_resource_access_contracts.sql`: existing-user direct grant,
+  cross-owner denial, legacy RPC response/sender authorization, resource-only
+  revoke, entity revoke preserving other entities, person block preventing
+  regrant, unblock, owner isolation and anonymous privilege denial.
+
+Updated both historical test fixtures from unsupported company Editor to company
+Viewer, matching the approved entity roles. Exact-resource Editor tests remain
+separate. The first lifecycle run exposed migration 011 listing accepted
+invitation history alongside the canonical direct grant. This is recorded as a
+**noncritical follow-up: deduplicate accepted history in owner management**,
+not a security fix or a passed display check. The suite now explicitly checks
+one canonical direct edge; it does not claim the management list is deduplicated.
+All other lifecycle assertions remain. Post-run staging counts confirmed zero
+fixture Auth users and companies for both suites; no persistent test records.
+
+This advances backend evidence, not native email/deep-link/foreground-offline
+acceptance. Lifecycle gate remains In progress. Next available work is the
+remaining bounded native/security evidence while email/link prerequisites are
+resolved; no whole-app QA or additional phase is authorized. No commit, push,
+deployment, native rebuild or production change in this continuation.
+
+## 2026-09-23 — Scoped-vault bounded contract checkpoint
+
+Added repeatable local-only `supabase/ops/rehearse_scoped_vault_contracts.sh`:
+seven fresh isolated database scenarios run actual migrations 009–021 and the
+existing scoped-vault assertions. **All seven passed**: foundation, owner
+staging, device grant, owner rewrap, source-revision/cutover/rotation/lifecycle,
+access status and scoped update. Logs retained under
+`/private/tmp/miloom-scoped-vault.X5trS7`; local PostgreSQL shut down on exit.
+No hosted fixtures or credentials are used by this runner.
+
+Coverage includes request-before-approval denial, Viewer and wrong-device
+denial, approval replay, source-revision preservation, closed activation
+privileges, block-induced wrap revocation/rotation-required state, and blocked
+cross-owner rebinding. These tests intentionally use synthetic ciphertext and
+privileged isolated fixture activation: they do **not** prove real cryptographic
+decryption, the native device workflow, or hosted post-revocation behavior.
+
+Read-only staging verification separately confirmed both `authenticated` and
+`anon` lack EXECUTE on `miloom_activate_staged_resource_secret`; collaborator
+password activation remains disabled. No schema/Edge deployment, native build,
+signing/device change, commit or push. Native two-device decrypt/isolation,
+recovery/migration/rotation and final candidate acceptance remain open. Existing
+SQL and native crypto-unit evidence must not be combined into a false end-to-end
+pass. Next work must target the actual two-device path, not more repetitions of
+these now-green contract scenarios. Email/link prerequisites remain separate
+open lifecycle items.
+
+## 2026-09-23 — Native recovery, migration and owner cross-device reveal
+
+- User completed recovery on disposable second device `59D3304A-CD59-4F65-8416-8806D6DE1A0B`; native UI shows Vault Unlocked, two trusted devices and Device recovered activity.
+- Actual migration of one synthetic card password exposed a blocker: the SDK's default full-row update representation conflicts with migration 008's column SELECT restrictions. Staging same-value PATCH reproduced full projection 403/42501 and ID projection 200. No permissions loosened.
+- Fixed six native migration/rotation updates (services/cards/banks) to select only ID and require a nonempty mutation receipt, preserving failure accounting. Simulator build passed with existing warnings and established staging configuration; installed only on second disposable device. No backend deployment or signing/project changes.
+- Native Face ID-authenticated retry reports **1 field encrypted**; read-only helper confirmed the exact dummy card holds `miloom:v1:` ciphertext. First disposable device `EFAF2008-6AD5-4D66-BD6A-452EADFB0AB3`, still on its prior build, relaunched and revealed the exact synthetic plaintext from that migrated card, then hid it. This is owner account-vault cross-device decryption, NOT collaborator resource-key decryption.
+- Remaining gate 4: broader migration preservation boundaries, actual scoped collaborator decryption/isolation and rotation/revocation. Password sharing remains disabled. Fixtures retained for these checks; no commit/push, production or phone changes. These incremental builds are not gate 6's final clean candidate.
+
+### Native resource preparation follow-up
+
+Second disposable simulator completed Prepare Encrypted Copies with Face ID: **1 resource prepared and verified**. Staging confirms card `891612a8-9f24-4c20-ae53-512633b29103` at version 1/source revision 2 in `staging`; its existing account-encrypted password remains present. This tests native resource-key encryption/read-back verification without granting collaborator access. Fixture-only activation authorization is the next prerequisite; collaborator decrypt/isolation and rotation/revocation remain unverified.
+
+## 2026-09-23 — Scoped native decrypt, revoke and key replacement checkpoint
+
+- Subsequently, user-authorized privileged activation was limited to the exact dummy card above. Global client activation privileges were not opened. This is fixture preparation, not proof of normal-client activation.
+- Native Editor Request Access, owner explicit Grant Credential Access confirmation and Face ID succeeded. After fixing competing alert presenters and biometric inactive-transition cancellation, Editor Reveal Credentials displayed the exact synthetic password. No secret was visible before approval.
+- Home/background followed by foregrounding the recipient app cleared the displayed plaintext. This verifies clearing of an already displayed value; interruption during an in-flight reveal and sheet-dismissal races remain unverified.
+- Authenticated owner helper revoked only the exact card Editor share (one share removed; independent shares preserved). A fresh native recipient reveal, including Face ID, did not expose the password; the card became read-only and credential controls disappeared. This revocation step used the owner RPC helper, not the native revoke confirmation.
+- Owner reopened Password Vault and saw Locked Resource Credentials for Editable Test Card. Native Replace Key displayed its explicit scope/no-grant-carryover warning. Confirmation and simulated Face ID completed; the locked-resource row disappeared.
+- Read-only staging metadata verified version 1 retired, version 2 active, and the recipient version-1 wrap revoked, with no version-2 recipient wrap. No ciphertext or key material was logged. Post-rotation owner native reveal remains unverified.
+- Incremental staging simulator builds only, not the final clean candidate. Entire gate 4 remains open: remaining isolation/preservation checks, post-rotation owner reveal, and checkpoint cleanup are not claimed complete. Fixtures retained without an active card recipient grant. No production/phone changes, commit or push. `git diff --check` passed; unit tests were not rerun in this checkpoint.
+
+### Post-rotation denial follow-up
+
+Authenticated disposable Editor checks returned `unavailable` for the revoked card, Viewer-only sibling card and Viewer-only bank. Direct reads of resource-secret versions and device wraps both returned HTTP 403 / SQLSTATE 42501. These are hosted authorization checks, not proof of cross-scope cryptographic isolation; no payloads or keys were retrieved. Owner simulator is at Editable Test Card —1111 awaiting the manual long-press needed to open its edit sheet for post-rotation reveal. Fixtures are retained until that check completes, then require cleanup.
+
+### Owner post-rotation reveal and checkpoint cleanup — completed
+
+- Owner second simulator was updated to the same existing reveal-fix staging build used by the recipient (debug dylib SHA-256 `544432fac1b092b835f935265831aaad7edc958dd95b6c054407b79a3fa2de65`). After user opened its edit sheet, native Reveal Credentials plus simulated Face ID displayed the original synthetic password under the rotated resource key. Hide removed plaintext. Post-rotation owner access/preservation passes for this exact card.
+- Guarded fixture cleanup removed the exact test company/resources, loan payments, Storage objects, upload reservations/cleanup queue and both marker-validated disposable accounts; account lookups returned 404. Additional read-only staging query returned zero resource-secret versions, device wraps, access requests, vault devices and shares for the fixture identifiers. Hosted checkpoint fixtures are now absent; local simulator app/keychain storage was not erased.
+- No source change, new build, commit/push, schema/function deployment or production/phone action. This closes the fixture checkpoint, not the entire gate 4 or final-build acceptance. Prior broader cryptographic-isolation/migration-boundary and release prerequisites remain as recorded; do not recreate this fixture merely to repeat passed checks.
