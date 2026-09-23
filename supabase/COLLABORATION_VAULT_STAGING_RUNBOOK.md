@@ -216,8 +216,10 @@ is `bvtuyzhyospqxvpzcrmv` at every write step; never use the production ref.
    function versions, required secrets, private `CompanyDocuments` bucket
    configuration, and any migration drift. Resolve discrepancies before writes.
    The local preflight cannot establish this state.
-2. Rehearse the exact pending migrations `202609220009`–`202609220029`, in
-   order, against a disposable production-shaped database with representative
+2. Run `sh supabase/ops/rehearse_collaboration_vault_pending_migrations.sh`
+   for the repeatable synthetic migration-order check. Then rehearse the exact
+   pending migrations `202609220009`–`202609220029`, in order, against a
+   disposable production-shaped database with representative
    legacy shares, credentials, documents, and full-URL file references. Check
    SQL assertions and rollback/recreate steps. Keep migration `017`'s initial
    resource-secret cutover closed until its separate acceptance gate passes.

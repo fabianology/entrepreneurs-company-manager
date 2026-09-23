@@ -79,6 +79,7 @@ supabase/functions/_shared/document_upload_request_test.ts
 supabase/functions/_shared/document_file_cleanup.ts
 supabase/functions/_shared/document_file_cleanup_test.ts
 supabase/ops/schedule_document_file_cleanup.sql
+supabase/ops/rehearse_collaboration_vault_pending_migrations.sh
 supabase/migrations/202609210001_secure_active_sessions.sql
 supabase/migrations/202609210002_canonical_resource_access.sql
 supabase/migrations/202609210003_invitation_lifecycle.sql
