@@ -331,7 +331,7 @@ struct EditCardSheet: View {
                 }
                 } else {
                     Label {
-                        Text("Card number remains private to the owner.")
+                        Text("Card credentials require a separate, device-specific owner grant. If available, use Secure Credentials above.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.6))
                     } icon: {
@@ -607,6 +607,10 @@ struct EditCardSheet: View {
                     if !isNew {
                         ResourceConnectionsSection(
                             reference: ResourceReference(kind: .card, resourceId: card.id)
+                        )
+                        ResourceCredentialAccessCard(
+                            resourceType: "card", resourceID: card.id,
+                            ownerUserID: card.userId
                         )
                     }
 

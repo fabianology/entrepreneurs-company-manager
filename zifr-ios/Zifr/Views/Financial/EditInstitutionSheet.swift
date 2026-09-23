@@ -184,6 +184,10 @@ struct EditInstitutionSheet: View {
                         ResourceConnectionsSection(
                             reference: ResourceReference(kind: .institution, resourceId: institution.id)
                         )
+                        ResourceCredentialAccessCard(
+                            resourceType: "institution", resourceID: institution.id,
+                            ownerUserID: institution.userId
+                        )
                     }
                     
                     Group {
@@ -268,7 +272,7 @@ struct EditInstitutionSheet: View {
                                 }
                                 } else {
                                     Label {
-                                        Text("Login details remain private to the owner.")
+                                        Text("Credentials require a separate, device-specific owner grant. If available, use Secure Credentials above.")
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.6))
                                     } icon: {

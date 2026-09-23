@@ -317,6 +317,10 @@ struct EditSubscriptionSheet: View {
                         ResourceConnectionsSection(
                             reference: ResourceReference(kind: .subscription, resourceId: sub.id)
                         )
+                        ResourceCredentialAccessCard(
+                            resourceType: "subscription", resourceID: sub.id,
+                            ownerUserID: sub.userId
+                        )
                     }
 
                     Group {
@@ -700,7 +704,7 @@ struct EditSubscriptionSheet: View {
 
     private var ownerOnlyCredentialNotice: some View {
         Label {
-            Text("Login details remain private to the owner.")
+            Text("Credentials require a separate, device-specific owner grant. If available, use Secure Credentials below.")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(Color.white.opacity(0.6))
         } icon: {

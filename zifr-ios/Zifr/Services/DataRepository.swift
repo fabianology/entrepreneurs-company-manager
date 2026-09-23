@@ -2112,6 +2112,10 @@ struct DeviceResourceSecretRecord: Decodable {
     }
 }
 
+struct ResourceSecretAccessStatus: Decodable {
+    let status: String
+}
+
 enum ResourceSecretRevealError: LocalizedError {
     case deviceNeedsApproval
     case unavailable
@@ -2987,6 +2991,23 @@ final class VaultService: @unchecked Sendable {
         } catch {
             throw ResourceSecretRotationError.postActivationVerificationUnavailable
         }
+    }
+
+    func resourceSecretAccessStatus(type: String, id: UUID) async throws -> String {
+        let session = try await client.auth.refreshSession()
+        struct Params: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_device_id: UUID?
+        }
+        let rows: [ResourceSecretAccessStatus] = try await client.rpc(
+            "miloom_resource_secret_access_status", params: Params(
+                p_resource_type: type, p_resource_id: id,
+                p_device_id: VaultKeySession.shared.snapshot(for: session.user.id)?.deviceID
+            )
+        ).execute().value
+        guard rows.count == 1 else { throw ResourceSecretRevealError.unavailable }
+        return rows[0].status
     }
 
     func requestResourceSecretAccess(type: String, id: UUID) async throws {
