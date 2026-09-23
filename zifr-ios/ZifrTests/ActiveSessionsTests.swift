@@ -126,6 +126,60 @@ final class ResourceVaultCryptographyTests: XCTestCase {
         XCTAssertThrowsError(try VaultCryptography.unwrapResourceKeyForDevice(envelope,
             using: P256.KeyAgreement.PrivateKey(), context: deviceContext))
     }
+
+    func testDeviceSecretResponseDecodesAndRevealsOnlyBoundResource() throws {
+        let identity = P256.KeyAgreement.PrivateKey()
+        let key = SymmetricKey(size: .bits256)
+        let resource = ResourceKeyContext(
+            ownerUserID: owner, resourceType: "institution", resourceID: bank,
+            keyVersion: 1
+        )
+        let context = ResourceDeviceWrapContext(
+            resource: resource, recipientUserID: recipient, recipientDeviceID: device
+        )
+        let wrapped = try VaultCryptography.wrapResourceKeyForDevice(
+            key, for: identity.publicKey.x963Representation.base64EncodedString(),
+            context: context
+        )
+        let field = ResourceSecretFieldContext(resource: resource, fieldName: "password")
+        let ciphertext = try VaultCryptography.encryptResourceSecret(
+            "test-bank-secret", using: key, context: field
+        )
+        let response: [String: Any] = [
+            "owner_user_id": owner.uuidString,
+            "resource_type": "institution",
+            "resource_id": bank.uuidString,
+            "key_version": 1,
+            "encrypted_fields": ["password": ciphertext],
+            "ephemeral_public_key": wrapped.ephemeralPublicKey,
+            "wrapped_resource_key": wrapped.wrappedKey
+        ]
+        let record = try JSONDecoder().decode(
+            DeviceResourceSecretRecord.self,
+            from: JSONSerialization.data(withJSONObject: response)
+        )
+        XCTAssertEqual(record.ownerUserID, owner)
+        XCTAssertEqual(record.resourceID, bank)
+        let deliveredKey = try VaultCryptography.unwrapResourceKeyForDevice(
+            VaultDeviceKeyWrapEnvelope(
+                version: 1, keyVersion: record.keyVersion,
+                ephemeralPublicKey: record.ephemeralPublicKey,
+                wrappedKey: record.wrappedResourceKey
+            ), using: identity, context: context
+        )
+        XCTAssertEqual(try VaultCryptography.decryptResourceSecret(
+            try XCTUnwrap(record.encryptedFields["password"]),
+            using: deliveredKey, context: field
+        ), "test-bank-secret")
+        XCTAssertThrowsError(try VaultCryptography.decryptResourceSecret(
+            ciphertext, using: deliveredKey,
+            context: ResourceSecretFieldContext(
+                resource: ResourceKeyContext(ownerUserID: owner,
+                    resourceType: "institution", resourceID: otherBank,
+                    keyVersion: 1), fieldName: "password"
+            )
+        ))
+    }
 }
 
 final class ResourceSecretPreparationTests: XCTestCase {

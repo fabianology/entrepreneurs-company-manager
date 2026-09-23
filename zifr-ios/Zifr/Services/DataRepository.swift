@@ -2038,6 +2038,8 @@ private struct OwnerResourceSecretRecord: Decodable {
     let ownerWrappedResourceKey: String
     let encryptedFields: [String: String]
     let state: String
+    let sourceSecretRevision: Int64?
+    let currentSecretRevision: Int64?
 
     enum CodingKeys: String, CodingKey {
         case resourceType = "resource_type"
@@ -2047,6 +2049,45 @@ private struct OwnerResourceSecretRecord: Decodable {
         case ownerWrappedResourceKey = "owner_wrapped_resource_key"
         case encryptedFields = "encrypted_fields"
         case state
+        case sourceSecretRevision = "source_secret_revision"
+        case currentSecretRevision = "current_secret_revision"
+    }
+}
+
+struct DeviceResourceSecretRecord: Decodable {
+    let ownerUserID: UUID
+    let resourceType: String
+    let resourceID: UUID
+    let keyVersion: Int
+    let encryptedFields: [String: String]
+    let ephemeralPublicKey: String
+    let wrappedResourceKey: String
+
+    enum CodingKeys: String, CodingKey {
+        case ownerUserID = "owner_user_id"
+        case resourceType = "resource_type"
+        case resourceID = "resource_id"
+        case keyVersion = "key_version"
+        case encryptedFields = "encrypted_fields"
+        case ephemeralPublicKey = "ephemeral_public_key"
+        case wrappedResourceKey = "wrapped_resource_key"
+    }
+}
+
+enum ResourceSecretRevealError: LocalizedError {
+    case deviceNeedsApproval
+    case unavailable
+    case invalidSecret
+
+    var errorDescription: String? {
+        switch self {
+        case .deviceNeedsApproval:
+            return "This device needs vault approval before it can request credentials."
+        case .unavailable:
+            return "These credentials are not available on this device. Access may need owner approval or key rotation."
+        case .invalidSecret:
+            return "Miloom couldn't verify these encrypted credentials. Nothing was revealed."
+        }
     }
 }
 
@@ -2763,6 +2804,101 @@ final class VaultService: @unchecked Sendable {
         )).execute().value
     }
 
+    func requestResourceSecretAccess(type: String, id: UUID) async throws {
+        let session = try await client.auth.refreshSession()
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)
+        let devices = try await listDevices()
+        guard let device = currentDevice(in: devices, identity: identity),
+              device.status == "approved" else {
+            throw ResourceSecretRevealError.deviceNeedsApproval
+        }
+        struct Params: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_recipient_device_id: UUID
+        }
+        try await client.rpc("miloom_request_resource_secret_access", params: Params(
+            p_resource_type: type, p_resource_id: id,
+            p_recipient_device_id: device.deviceID
+        )).execute()
+    }
+
+    /// Reveal only one exact resource after device presence. Callers must keep
+    /// the returned plaintext in ephemeral UI state and clear it on dismissal.
+    func revealResourceSecret(
+        type: String, id: UUID, expectedOwnerUserID: UUID
+    ) async throws -> [String: String] {
+        try await confirmResourceSecretPresence(
+            reason: "Reveal credentials for this Miloom resource."
+        )
+        let session = try await client.auth.refreshSession()
+        if session.user.id == expectedOwnerUserID {
+            let snapshot = try requireSnapshot(for: session.user.id)
+            guard let record = try await ownerResourceSecret(
+                type: type, id: id, snapshot: snapshot
+            ), record.state == "active", !record.encryptedFields.isEmpty else {
+                throw ResourceSecretRevealError.unavailable
+            }
+            do {
+                return try plaintextFields(in: record, snapshot: snapshot)
+            } catch {
+                throw ResourceSecretRevealError.invalidSecret
+            }
+        }
+
+        let identity = try VaultDeviceKeyStore.shared.loadOrCreateIdentity(for: session.user.id)
+        let devices = try await listDevices()
+        guard let device = currentDevice(in: devices, identity: identity),
+              device.status == "approved" else {
+            throw ResourceSecretRevealError.deviceNeedsApproval
+        }
+        struct Params: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_device_id: UUID
+        }
+        let records: [DeviceResourceSecretRecord] = try await client.rpc(
+            "miloom_get_resource_secret_for_device", params: Params(
+                p_resource_type: type, p_resource_id: id,
+                p_device_id: device.deviceID
+            )
+        ).execute().value
+        guard records.count <= 1, let record = records.first,
+              record.ownerUserID == expectedOwnerUserID,
+              record.resourceType == type, record.resourceID == id,
+              !record.encryptedFields.isEmpty else {
+            throw ResourceSecretRevealError.unavailable
+        }
+        let resource = ResourceKeyContext(
+            ownerUserID: record.ownerUserID, resourceType: record.resourceType,
+            resourceID: record.resourceID, keyVersion: record.keyVersion
+        )
+        let envelope = VaultDeviceKeyWrapEnvelope(
+            version: 1, keyVersion: record.keyVersion,
+            ephemeralPublicKey: record.ephemeralPublicKey,
+            wrappedKey: record.wrappedResourceKey
+        )
+        do {
+            let key = try VaultCryptography.unwrapResourceKeyForDevice(
+                envelope, using: identity.agreementPrivateKey,
+                context: ResourceDeviceWrapContext(
+                    resource: resource, recipientUserID: session.user.id,
+                    recipientDeviceID: device.deviceID
+                )
+            )
+            var plaintext: [String: String] = [:]
+            for (field, ciphertext) in record.encryptedFields {
+                plaintext[field] = try VaultCryptography.decryptResourceSecret(
+                    ciphertext, using: key,
+                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+                )
+            }
+            return plaintext
+        } catch {
+            throw ResourceSecretRevealError.invalidSecret
+        }
+    }
+
     func approveResourceSecretRequest(_ displayedRequest: ResourceSecretAccessRequest) async throws {
         try await confirmResourceSecretPresence(
             reason: "Approve credential access for one trusted collaborator device."
@@ -2893,8 +3029,19 @@ final class VaultService: @unchecked Sendable {
             guard existing.state == "staging" else {
                 throw ResourceSecretPreparationError.activeResource
             }
-            if try plaintextFields(in: existing, snapshot: snapshot) == candidate.plaintextFields {
-                return false
+            let revisionsMatch: Bool
+            if let staged = existing.sourceSecretRevision,
+               let current = existing.currentSecretRevision {
+                revisionsMatch = staged >= 0 && staged == current
+            } else {
+                // 014 has no revision contract yet. It is safe to retain a
+                // staged copy, but 016 must restamp it before activation.
+                revisionsMatch = true
+            }
+            if revisionsMatch {
+                if try plaintextFields(in: existing, snapshot: snapshot) == candidate.plaintextFields {
+                    return false
+                }
             }
         }
         let version = existing?.keyVersion ?? 1
@@ -2945,6 +3092,9 @@ final class VaultService: @unchecked Sendable {
            readback.ownerAccountKeyVersion == snapshot.keyVersion,
            readback.ownerWrappedResourceKey == ownerWrap,
            readback.encryptedFields == ciphertext,
+           readback.sourceSecretRevision == nil ||
+                (readback.sourceSecretRevision == readback.currentSecretRevision &&
+                 (readback.sourceSecretRevision ?? -1) >= 0),
            try plaintextFields(in: readback, snapshot: snapshot) == candidate.plaintextFields else {
             throw ResourceSecretPreparationError.verificationFailed
         }

@@ -1,5 +1,15 @@
 -- Minimal pre-012 vault schema for isolated resource-key foundation tests.
 -- Run only in a disposable database after delegated_scope_fixture.sql.
+alter table public.subscriptions
+    add column login_id text, add column password text,
+    add column two_factor_auth text, add column recovery_method text;
+alter table public.financial_cards
+    add column login text, add column password text,
+    add column card_number text, add column expiry text;
+alter table public.institutions
+    add column login_url text, add column username text, add column email text,
+    add column password text, add column two_factor text,
+    add column accounts_data jsonb not null default '[]'::jsonb;
 create table public.account_vaults (
     user_id uuid primary key, current_key_version integer not null,
     key_confirmation text not null, rotation_status text not null default 'stable'
