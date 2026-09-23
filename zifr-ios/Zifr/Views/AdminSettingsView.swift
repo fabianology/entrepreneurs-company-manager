@@ -725,6 +725,8 @@ private final class VaultSecurityController {
     var pendingSecretRequests: [ResourceSecretAccessRequest] = []
     var secretRequestLoadFailed = false
     var scopedSecretServiceAvailable = false
+    var lockedResourceSecrets: [LockedResourceSecret] = []
+    var lockedResourceLoadFailed = false
     var isLoading = false
     var hasLoaded = false
     var activeOperation: String?
@@ -766,15 +768,31 @@ private final class VaultSecurityController {
                     scopedSecretServiceAvailable = false
                     AppDiagnostics.failure("vault", "load_credential_requests", error: error)
                 }
+                do {
+                    lockedResourceSecrets = try await VaultService.shared.listLockedResourceSecrets()
+                    lockedResourceLoadFailed = false
+                } catch let error as PostgrestError where error.code == "PGRST202" {
+                    // The resource-key rotation migration is not deployed.
+                    lockedResourceSecrets = []
+                    lockedResourceLoadFailed = false
+                } catch {
+                    lockedResourceSecrets = []
+                    lockedResourceLoadFailed = true
+                    AppDiagnostics.failure("vault", "load_locked_resource_secrets", error: error)
+                }
             } else {
                 pendingSecretRequests = []
                 secretRequestLoadFailed = false
                 scopedSecretServiceAvailable = false
+                lockedResourceSecrets = []
+                lockedResourceLoadFailed = false
             }
         } catch {
             pendingSecretRequests = []
             secretRequestLoadFailed = false
             scopedSecretServiceAvailable = false
+            lockedResourceSecrets = []
+            lockedResourceLoadFailed = false
             AppDiagnostics.failure("vault", "load_settings", error: error)
             errorMessage = "Vault security couldn’t be loaded. Check your connection and try again."
         }
@@ -880,6 +898,25 @@ private final class VaultSecurityController {
         }
     }
 
+    func rotateLockedResourceSecret(_ secret: LockedResourceSecret) async {
+        await perform(
+            "Replacing Resource Key…",
+            reason: "Replace a locked resource credential key.",
+            requiresPresence: false
+        ) {
+            try await VaultService.shared.rotateLockedResourceSecret(secret)
+            do {
+                self.lockedResourceSecrets = try await VaultService.shared.listLockedResourceSecrets()
+                self.lockedResourceLoadFailed = false
+            } catch {
+                // The verified rotation completed. A failed list refresh does
+                // not undo it or turn this action into a false failure.
+                self.lockedResourceLoadFailed = true
+                AppDiagnostics.failure("vault", "refresh_locked_resource_secrets", error: error)
+            }
+        }
+    }
+
     @discardableResult
     func migrate() async -> Bool {
         var completed = false
@@ -924,6 +961,9 @@ private final class VaultSecurityController {
     private func friendlyMessage(for error: Error) -> String {
         if let grantError = error as? ResourceSecretGrantError {
             return grantError.localizedDescription
+        }
+        if let rotationError = error as? ResourceSecretRotationError {
+            return rotationError.localizedDescription
         }
         if error is AuthError {
             return "This device was signed out when vault access was revoked. Sign in again, then request access."
@@ -971,6 +1011,7 @@ private struct VaultSecuritySheet: View {
     @State private var showingPreparationConfirmation = false
     @State private var deviceToRevoke: VaultDeviceRecord?
     @State private var secretRequestToApprove: ResourceSecretAccessRequest?
+    @State private var lockedResourceToRotate: LockedResourceSecret?
 
     var body: some View {
         NavigationStack {
@@ -991,6 +1032,9 @@ private struct VaultSecuritySheet: View {
                         trustedDevicesCard
                         if !controller.pendingSecretRequests.isEmpty || controller.secretRequestLoadFailed {
                             credentialRequestsCard
+                        }
+                        if !controller.lockedResourceSecrets.isEmpty || controller.lockedResourceLoadFailed {
+                            lockedResourceSecretsCard
                         }
                         migrationCard
                         if controller.scopedSecretServiceAvailable {
@@ -1094,6 +1138,16 @@ private struct VaultSecuritySheet: View {
                 message: Text("\(request.recipientEmail) on \(request.recipientDeviceLabel) will be able to reveal credentials for \(request.resourceTitle ?? request.resourceType.capitalized) in \(request.companyName). Previously viewed passwords cannot be taken back."),
                 primaryButton: .default(Text("Grant Access")) {
                     Task { await controller.approveSecretRequest(request) }
+                },
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(item: $lockedResourceToRotate) { secret in
+            Alert(
+                title: Text("Replace Locked Credential Key?"),
+                message: Text("Miloom will re-encrypt \(secret.resourceTitle ?? secret.resourceType.capitalized) in \(secret.companyName) under a new resource key. Previous collaborator device grants will not carry over. Passwords already viewed outside Miloom cannot be recalled; change them at the provider if needed."),
+                primaryButton: .default(Text("Replace Key")) {
+                    Task { await controller.rotateLockedResourceSecret(secret) }
                 },
                 secondaryButton: .cancel()
             )
@@ -1353,6 +1407,46 @@ private struct VaultSecuritySheet: View {
                         if request.id != controller.pendingSecretRequests.last?.id {
                             Divider().background(Color.white.opacity(0.1))
                         }
+                    }
+                }
+            }
+        }
+        .privacySensitive()
+    }
+
+    private var lockedResourceSecretsCard: some View {
+        ZifrSheetCard(title: "LOCKED RESOURCE CREDENTIALS", icon: "lock.shield") {
+            if controller.lockedResourceLoadFailed {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Locked credentials couldn't be checked. Existing access was not changed.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Button("Try Again") { Task { await controller.load() } }
+                        .buttonStyle(.bordered)
+                        .tint(Color.zifrGold)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Access stays locked until each credential is re-encrypted with a fresh key. Previous device approvals will not be reused.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    ForEach(controller.lockedResourceSecrets) { secret in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(secret.resourceTitle ?? secret.resourceType.capitalized)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                Text(secret.companyName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 8)
+                            Button("Replace Key") { lockedResourceToRotate = secret }
+                                .buttonStyle(.bordered)
+                                .tint(Color.zifrGold)
+                                .disabled(controller.activeOperation != nil)
+                        }
+                        .frame(minHeight: 52)
                     }
                 }
             }

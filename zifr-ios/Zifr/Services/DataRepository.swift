@@ -2030,6 +2030,44 @@ struct ResourceSecretAccessRequest: Decodable, Identifiable, Equatable {
     }
 }
 
+struct LockedResourceSecret: Decodable, Identifiable, Equatable {
+    let resourceType: String
+    let resourceID: UUID
+    let keyVersion: Int
+    let resourceTitle: String?
+    let companyName: String
+
+    var id: String { "\(resourceType):\(resourceID.uuidString):\(keyVersion)" }
+
+    enum CodingKeys: String, CodingKey {
+        case resourceType = "resource_type"
+        case resourceID = "resource_id"
+        case keyVersion = "key_version"
+        case resourceTitle = "resource_title"
+        case companyName = "company_name"
+    }
+}
+
+enum ResourceSecretRotationError: LocalizedError {
+    case staleResource
+    case invalidSecret
+    case verificationFailed
+    case postActivationVerificationUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .staleResource:
+            return "This credential changed. Refresh Password Vault and try again."
+        case .invalidSecret:
+            return "The locked credential couldn't be verified. It was not replaced."
+        case .verificationFailed:
+            return "The replacement credential couldn't be verified. Access remains locked."
+        case .postActivationVerificationUnavailable:
+            return "The server accepted the new key, but this device couldn't confirm the final readback. Refresh Password Vault before trying again."
+        }
+    }
+}
+
 private struct OwnerResourceSecretRecord: Decodable {
     let resourceType: String
     let resourceID: UUID
@@ -2802,6 +2840,153 @@ final class VaultService: @unchecked Sendable {
             p_actor_device_id: snapshot.deviceID,
             p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
         )).execute().value
+    }
+
+    func listLockedResourceSecrets() async throws -> [LockedResourceSecret] {
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        struct Params: Encodable {
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        return try await client.rpc("miloom_list_owner_locked_resource_secrets", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute().value
+    }
+
+    func rotateLockedResourceSecret(_ displayed: LockedResourceSecret) async throws {
+        try await confirmResourceSecretPresence(
+            reason: "Replace the locked credential key for \(displayed.resourceTitle ?? displayed.resourceType)."
+        )
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        let current = try await listLockedResourceSecrets()
+        guard current.contains(displayed) else { throw ResourceSecretRotationError.staleResource }
+        let confirmation = VaultCryptography.keyConfirmation(for: snapshot.key)
+        struct OldParams: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_key_version: Int
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        let oldRows: [OwnerResourceSecretRecord] = try await client.rpc(
+            "miloom_get_owner_resource_secret_version", params: OldParams(
+                p_resource_type: displayed.resourceType,
+                p_resource_id: displayed.resourceID,
+                p_key_version: displayed.keyVersion,
+                p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: confirmation
+            )
+        ).execute().value
+        guard oldRows.count == 1, let old = oldRows.first,
+              old.state == "rotation_required",
+              old.resourceType == displayed.resourceType,
+              old.resourceID == displayed.resourceID,
+              old.keyVersion == displayed.keyVersion else {
+            throw ResourceSecretRotationError.staleResource
+        }
+        let plaintext: [String: String]
+        do {
+            plaintext = try plaintextFields(in: old, snapshot: snapshot)
+        } catch {
+            throw ResourceSecretRotationError.invalidSecret
+        }
+        let newVersion = old.keyVersion + 1
+        var replacement = try await ownerResourceSecret(
+            type: old.resourceType, id: old.resourceID, snapshot: snapshot
+        )
+        let reusable: Bool
+        if let replacement, replacement.state == "staging",
+           replacement.keyVersion == newVersion,
+           replacement.ownerAccountKeyVersion == snapshot.keyVersion {
+            reusable = (try? plaintextFields(in: replacement, snapshot: snapshot)) == plaintext
+        } else {
+            reusable = false
+        }
+        if !reusable {
+            let resource = ResourceKeyContext(
+                ownerUserID: snapshot.userID, resourceType: old.resourceType,
+                resourceID: old.resourceID, keyVersion: newVersion
+            )
+            let resourceKey = SymmetricKey(size: .bits256)
+            let wrap = try VaultCryptography.wrapResourceKeyForOwner(
+                resourceKey, using: snapshot.key,
+                context: ResourceOwnerWrapContext(
+                    resource: resource, accountKeyVersion: snapshot.keyVersion
+                )
+            )
+            var encrypted: [String: String] = [:]
+            for (field, value) in plaintext {
+                encrypted[field] = try VaultCryptography.encryptResourceSecret(
+                    value, using: resourceKey,
+                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+                )
+            }
+            struct StageParams: Encodable {
+                let p_resource_type: String
+                let p_resource_id: UUID
+                let p_old_key_version: Int
+                let p_new_owner_account_key_version: Int
+                let p_new_owner_wrapped_resource_key: String
+                let p_new_encrypted_fields: [String: String]
+                let p_actor_device_id: UUID
+                let p_key_confirmation: String
+            }
+            try await client.rpc("miloom_stage_rotated_resource_secret", params: StageParams(
+                p_resource_type: old.resourceType,
+                p_resource_id: old.resourceID,
+                p_old_key_version: old.keyVersion,
+                p_new_owner_account_key_version: snapshot.keyVersion,
+                p_new_owner_wrapped_resource_key: wrap,
+                p_new_encrypted_fields: encrypted,
+                p_actor_device_id: snapshot.deviceID,
+                p_key_confirmation: confirmation
+            )).execute()
+            replacement = try await ownerResourceSecret(
+                type: old.resourceType, id: old.resourceID, snapshot: snapshot
+            )
+            guard replacement?.ownerWrappedResourceKey == wrap,
+                  replacement?.encryptedFields == encrypted else {
+                throw ResourceSecretRotationError.verificationFailed
+            }
+        }
+        guard let replacement, replacement.state == "staging",
+              replacement.resourceType == old.resourceType,
+              replacement.resourceID == old.resourceID,
+              replacement.keyVersion == newVersion,
+              (try? plaintextFields(in: replacement, snapshot: snapshot)) == plaintext else {
+            throw ResourceSecretRotationError.verificationFailed
+        }
+        struct ActivateParams: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_old_key_version: Int
+            let p_expected_new_encrypted_fields: [String: String]
+            let p_expected_new_owner_wrapped_resource_key: String
+            let p_actor_device_id: UUID
+            let p_key_confirmation: String
+        }
+        try await client.rpc("miloom_activate_rotated_resource_secret", params: ActivateParams(
+            p_resource_type: old.resourceType,
+            p_resource_id: old.resourceID,
+            p_old_key_version: old.keyVersion,
+            p_expected_new_encrypted_fields: replacement.encryptedFields,
+            p_expected_new_owner_wrapped_resource_key: replacement.ownerWrappedResourceKey,
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: confirmation
+        )).execute()
+        do {
+            guard let activated = try await ownerResourceSecret(
+                type: old.resourceType, id: old.resourceID, snapshot: snapshot
+            ), activated.state == "active", activated.keyVersion == newVersion,
+               (try? plaintextFields(in: activated, snapshot: snapshot)) == plaintext else {
+                throw ResourceSecretRotationError.postActivationVerificationUnavailable
+            }
+        } catch {
+            throw ResourceSecretRotationError.postActivationVerificationUnavailable
+        }
     }
 
     func requestResourceSecretAccess(type: String, id: UUID) async throws {

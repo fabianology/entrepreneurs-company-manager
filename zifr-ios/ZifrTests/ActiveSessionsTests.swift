@@ -180,6 +180,47 @@ final class ResourceVaultCryptographyTests: XCTestCase {
             )
         ))
     }
+
+    func testRotationReencryptsEveryFieldUnderNewVersion() throws {
+        let originalKey = SymmetricKey(size: .bits256)
+        let replacementKey = SymmetricKey(size: .bits256)
+        let original = ResourceKeyContext(
+            ownerUserID: owner, resourceType: "card", resourceID: bank,
+            keyVersion: 1
+        )
+        let replacement = ResourceKeyContext(
+            ownerUserID: owner, resourceType: "card", resourceID: bank,
+            keyVersion: 2
+        )
+        let values = ["login": "test-user", "password": "test-password"]
+        var rotated: [String: String] = [:]
+        for (field, value) in values {
+            let oldCiphertext = try VaultCryptography.encryptResourceSecret(
+                value, using: originalKey,
+                context: ResourceSecretFieldContext(resource: original, fieldName: field)
+            )
+            let recovered = try VaultCryptography.decryptResourceSecret(
+                oldCiphertext, using: originalKey,
+                context: ResourceSecretFieldContext(resource: original, fieldName: field)
+            )
+            rotated[field] = try VaultCryptography.encryptResourceSecret(
+                recovered, using: replacementKey,
+                context: ResourceSecretFieldContext(resource: replacement, fieldName: field)
+            )
+        }
+        XCTAssertEqual(Set(rotated.keys), Set(values.keys))
+        for (field, value) in values {
+            let newCiphertext = try XCTUnwrap(rotated[field])
+            XCTAssertEqual(try VaultCryptography.decryptResourceSecret(
+                newCiphertext, using: replacementKey,
+                context: ResourceSecretFieldContext(resource: replacement, fieldName: field)
+            ), value)
+            XCTAssertThrowsError(try VaultCryptography.decryptResourceSecret(
+                newCiphertext, using: originalKey,
+                context: ResourceSecretFieldContext(resource: replacement, fieldName: field)
+            ))
+        }
+    }
 }
 
 final class ResourceSecretPreparationTests: XCTestCase {
