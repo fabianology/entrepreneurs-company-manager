@@ -144,6 +144,21 @@ final class AuthViewModel: NSObject {
         self.isAuthenticated = !(self.isBiometricEnabled && self.isBiometricsAvailable)
     }
 
+    private func requireSavedSession(_ session: Session) throws {
+        // Supabase can return a successful sign-in even when Keychain rejected
+        // its session write. Do not enter the app with only an in-memory user.
+        let savedSession = SupabaseService.shared.client.auth.currentSession
+        guard savedSession?.user.id == session.user.id,
+              savedSession?.accessToken == session.accessToken else {
+            AppDiagnostics.failure("auth", "session_storage_unavailable")
+            throw NSError(
+                domain: "AuthSessionStorage",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Your sign-in couldn’t be saved securely on this device. Try again or contact support."]
+            )
+        }
+    }
+
     func authenticateWithBiometrics() async {
         checkBiometrics()
         guard isBiometricsAvailable else { return }
@@ -345,6 +360,7 @@ final class AuthViewModel: NSObject {
         let attemptID = await beginAuthenticationAttempt()
         do {
             let response = try await SupabaseService.shared.client.auth.signIn(email: email, password: password)
+            try requireSavedSession(response)
             await MainActor.run {
                 guard self.finishAuthenticationAttempt(attemptID) else { return }
                 self.session = response
@@ -381,6 +397,9 @@ final class AuthViewModel: NSObject {
         let attemptID = await beginAuthenticationAttempt()
         do {
             let response = try await SupabaseService.shared.client.auth.signUp(email: email, password: password)
+            if let session = response.session {
+                try requireSavedSession(session)
+            }
             await MainActor.run {
                 guard self.finishAuthenticationAttempt(attemptID) else { return }
                 if let session = response.session {
@@ -440,6 +459,7 @@ final class AuthViewModel: NSObject {
                 let response = try await SupabaseService.shared.client.auth.signInWithIdToken(
                     credentials: .init(provider: .google, idToken: idToken, nonce: nil)
                 )
+                try self.requireSavedSession(response)
                 
                 await MainActor.run {
                     guard self.finishAuthenticationAttempt(attemptID) else { return }
@@ -561,6 +581,7 @@ extension AuthViewModel: ASAuthorizationControllerDelegate {
                     let response = try await SupabaseService.shared.client.auth.signInWithIdToken(
                         credentials: .init(provider: .apple, idToken: idTokenString, nonce: nonce)
                     )
+                    try self.requireSavedSession(response)
                     await MainActor.run {
                         guard self.finishAuthenticationAttempt(attemptID) else { return }
                         self.session = response

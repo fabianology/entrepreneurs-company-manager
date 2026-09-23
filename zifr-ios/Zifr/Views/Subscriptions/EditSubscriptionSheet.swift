@@ -19,8 +19,20 @@ struct EditSubscriptionSheet: View {
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
     private var isViewer: Bool {
-        let share = appState.resourceShares.first(where: { $0.resourceId == sub.id || $0.resourceId == sub.companyId })
-        return share?.role == "Viewer"
+        guard let actorID = appState.portfolioUserID else { return true }
+        if sub.userId == actorID { return false }
+        return !AppViewModel.shareAllowsEdit(
+            appState.resourceShares, actorID: actorID, companyID: sub.companyId,
+            resourceType: "subscription", resourceID: sub.id
+        )
+    }
+
+    private var canManageSharing: Bool {
+        guard let actorID = appState.portfolioUserID else { return false }
+        return sub.userId == actorID || appState.resourceShares.contains {
+            $0.userId == actorID && $0.resourceType == "company"
+                && $0.resourceId == sub.companyId && $0.role == "Admin"
+        }
     }
 
     private var canAccessCredentials: Bool {
@@ -502,27 +514,28 @@ struct EditSubscriptionSheet: View {
 
                         // MARK: – Actions
                         if !isNew {
-                            ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
-                                VStack(spacing: 12) {
-                                    // Share Service
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        showShareSheet = true
-                                    } label: {
-                                        VStack(spacing: 4) {
-                                            HStack(spacing: 6) {
-                                                Image(systemName: "person.crop.circle.badge.plus")
-                                                Text("Share Service")
+                            if canManageSharing {
+                                ZifrSheetCard(title: "ACTIONS", icon: "slider.horizontal.3") {
+                                    VStack(spacing: 12) {
+                                        Button {
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            showShareSheet = true
+                                        } label: {
+                                            VStack(spacing: 4) {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "person.crop.circle.badge.plus")
+                                                    Text("Share Service")
+                                                }
+                                                .font(.system(size: 13, weight: .semibold))
+                                                Text("Generate a share link for collaborators")
+                                                    .font(.system(size: 10, weight: .regular))
+                                                    .foregroundStyle(Color.white.opacity(0.6))
                                             }
-                                            .font(.system(size: 13, weight: .semibold))
-                                            Text("Generate a share link for collaborators")
-                                                .font(.system(size: 10, weight: .regular))
-                                                .foregroundStyle(Color.white.opacity(0.6))
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 10)
                                         }
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
+                                        .buttonStyle(MiloomSecondaryButtonStyle())
                                     }
-                                    .buttonStyle(MiloomSecondaryButtonStyle())
                                 }
                             }
 

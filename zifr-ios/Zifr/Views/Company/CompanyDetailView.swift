@@ -18,7 +18,7 @@ struct CompanyDetailView: View {
     private var companyShare: ResourceShare? {
         guard let currentUserId = appState.portfolioUserID else { return nil }
         return appState.resourceShares.first {
-            $0.resourceId == company.id && $0.userId == currentUserId
+            $0.resourceType == "company" && $0.resourceId == company.id && $0.userId == currentUserId
         }
     }
 
@@ -707,8 +707,8 @@ struct CompanyDetailView: View {
         }
         .frame(width: 44, height: 44)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Viewer access")
-        .accessibilityValue("Read-only")
+        .accessibilityLabel("Company access")
+        .accessibilityValue("Cannot add items. Shared items may have separate edit access.")
     }
 
     @ViewBuilder

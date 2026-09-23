@@ -213,10 +213,11 @@ struct PremiumSubscriptionCard: View {
                                 Image(systemName: "line.3.horizontal")
                                     .font(.system(size: 24, weight: .regular))
                                     .foregroundStyle(Color.white.opacity(0.8))
-                                    .frame(width: 40, height: 40)
+                                    .frame(width: 44, height: 44)
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel("Edit service")
                         }
                     }
                     .padding(.leading, 24)

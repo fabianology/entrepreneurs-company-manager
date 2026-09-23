@@ -20,6 +20,19 @@ struct SubscriptionListView: View {
     @State private var shareResourceTitle: String = "All Subscriptions"
     @State private var selectedServiceFilter = "All"
 
+    // Existing-item edits are independent of company-level creation rights.
+    // An exact Editor grant must not unlock sibling services.
+    private var editableSubscriptionIDs: Set<UUID> {
+        guard let actorID = appState.portfolioUserID else { return [] }
+        return Set(subscriptions.filter { sub in
+            if company.userId == actorID { return canEdit }
+            return AppViewModel.shareAllowsEdit(
+                appState.resourceShares, actorID: actorID, companyID: company.id,
+                resourceType: "subscription", resourceID: sub.id
+            )
+        }.map(\.id))
+    }
+
     private var filteredSubscriptions: [Subscription] {
         switch selectedServiceFilter {
         case "Bills":
@@ -48,18 +61,20 @@ struct SubscriptionListView: View {
                             allSubscriptions: subscriptions,
                             institutions: institutions,
                             cards: cards,
-                            onEdit: { if canEdit { editingSub = $0 } },
+                            onEdit: { if editableSubscriptionIDs.contains($0.id) { editingSub = $0 } },
                             onBankTapped: { id in
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 vm.activeTab = .financial
                                 vm.deepLinkModelId = id
                             },
                             onSave: { modifiedSub in
-                                if canEdit { vm.saveSub(modifiedSub, appState: appState) }
+                                if editableSubscriptionIDs.contains(modifiedSub.id) {
+                                    vm.saveSub(modifiedSub, appState: appState)
+                                }
                             },
                             selectedServiceFilter: $selectedServiceFilter,
                             hideActionBar: hideActionBar,
-                            canEdit: canEdit,
+                            editableSubscriptionIDs: editableSubscriptionIDs,
                             canAccessCredentials: canAccessCredentials
                         )
                     }
@@ -297,7 +312,7 @@ struct StackedSubscriptionDeckView: View {
     let onSave: (Subscription) -> Void
     @Binding var selectedServiceFilter: String
     var hideActionBar: Bool = false
-    var canEdit: Bool = true
+    var editableSubscriptionIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
 
     var body: some View {
@@ -339,7 +354,7 @@ struct StackedSubscriptionDeckView: View {
                         onEdit: onEdit,
                         onBankTapped: onBankTapped,
                         onSave: onSave,
-                        canEdit: canEdit,
+                        editableSubscriptionIDs: editableSubscriptionIDs,
                         canAccessCredentials: canAccessCredentials,
                         isFirstSection: true,
                         showsHeader: false,
@@ -362,7 +377,7 @@ private struct StackedServiceSection: View {
     let onEdit: (Subscription) -> Void
     let onBankTapped: (UUID) -> Void
     let onSave: (Subscription) -> Void
-    var canEdit: Bool = true
+    var editableSubscriptionIDs: Set<UUID> = []
     var canAccessCredentials: Bool = true
     let isFirstSection: Bool
     var showsHeader: Bool = true
@@ -428,7 +443,7 @@ private struct StackedServiceSection: View {
                         onEdit: { onEdit(sub) },
                         onBankTapped: onBankTapped,
                         onSave: onSave,
-                        canEdit: canEdit,
+                        canEdit: editableSubscriptionIDs.contains(sub.id),
                         canAccessCredentials: canAccessCredentials,
                         revealLevel: currentLevel,
                         isExplicitlyFull: currentLevel == .full,

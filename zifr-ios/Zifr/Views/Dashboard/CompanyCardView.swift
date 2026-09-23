@@ -113,28 +113,33 @@ struct CompanyCardView: View {
                 
                 HStack(spacing: 2) {
                     if canEdit {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.7))
-                            .frame(width: 36, height: 44)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                onEdit()
-                            }
-                            .accessibilityLabel("Edit company")
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onEdit()
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.7))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Edit company")
                     }
 
                     if let onShare = onShare {
-                        Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.7))
-                            .frame(width: 36, height: 44)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                onShare()
-                            }
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onShare()
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.7))
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Share company")
                     }
                 }
             }

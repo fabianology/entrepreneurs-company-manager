@@ -34,6 +34,20 @@ final class ActiveSessionsTests: XCTestCase {
         ], "document", document))
         XCTAssertFalse(allows([share("document", document, "Editor", otherActor)], "document", document))
         XCTAssertTrue(allows([share("company", company, "Admin")], "document", document))
+        let service = UUID()
+        let siblingService = UUID()
+        XCTAssertTrue(allows([share("subscription", service)], "subscription", service))
+        XCTAssertFalse(allows([share("subscription", service)], "subscription", siblingService))
+        XCTAssertFalse(allows([share("subscription", service)], "company", company))
+        XCTAssertTrue(allows([share("all_subscriptions", company)], "subscription", service))
+        XCTAssertFalse(allows([share("all_subscriptions", company)], "company", company))
+        XCTAssertFalse(allows([share("all_subscriptions", company)], "document", document))
+        XCTAssertTrue(allows([
+            share("company", company, "Viewer"), share("subscription", service)
+        ], "subscription", service))
+        XCTAssertFalse(allows([
+            share("company", company, "Viewer"), share("subscription", service)
+        ], "subscription", siblingService))
     }
 
     func testDocumentDeletionAcceptsOnlyAppGeneratedRelativeStoragePath() {

@@ -1728,7 +1728,7 @@ struct ShareEntitySheet: View {
     private var roleDescription: String {
         switch role {
         case "Admin":
-            return "Entity-wide editing. Only the owner can manage collaborators or grant password access for now."
+            return "Entity-wide editing and Viewer management. Only the owner can manage Editors and Admins, block people, or grant password access."
         case "Editor":
             return "Can edit this resource’s business details. Passwords remain owner-only for now."
         default:

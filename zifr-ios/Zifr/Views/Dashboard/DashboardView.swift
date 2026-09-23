@@ -1002,7 +1002,9 @@ struct DashboardView: View {
         
         let isSharedWithMe = (company.userId != currentUserId)
         let isSharedByMe = (company.userId == currentUserId) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
-        let role = appState.resourceShares.first(where: { $0.resourceId == company.id })?.role ?? "Viewer"
+        let role = appState.resourceShares.first(where: {
+            $0.resourceType == "company" && $0.resourceId == company.id && $0.userId == currentUserId
+        })?.role ?? "Limited access"
         let canEdit = !isSharedWithMe || ["Editor", "Admin"].contains(role)
 
         let navigateAction: (AppViewModel.CompanyTab) -> Void = { tab in
