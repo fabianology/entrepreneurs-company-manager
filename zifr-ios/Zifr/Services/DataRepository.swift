@@ -2133,6 +2133,20 @@ enum ResourceSecretRevealError: LocalizedError {
     }
 }
 
+enum ResourceSecretUpdateError: LocalizedError {
+    case invalidFields
+    case verificationUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidFields:
+            return "These credential fields could not be saved safely. Nothing was changed."
+        case .verificationUnavailable:
+            return "The server accepted the change, but this device couldn't confirm the readback. Refresh this resource before trying again."
+        }
+    }
+}
+
 enum ResourceSecretGrantError: LocalizedError {
     case confirmationUnavailable
     case confirmationCancelled
@@ -3037,6 +3051,109 @@ final class VaultService: @unchecked Sendable {
         try await confirmResourceSecretPresence(
             reason: "Reveal credentials for this Miloom resource."
         )
+        let material = try await loadResourceSecretMaterial(
+            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+        )
+        do { return try material.plaintextFields() }
+        catch { throw ResourceSecretRevealError.invalidSecret }
+    }
+
+    /// The caller sends the complete edited field set; only resource-bound
+    /// ciphertext crosses the network. Optimistic compare rejects stale edits.
+    func updateResourceSecret(
+        type: String, id: UUID, expectedOwnerUserID: UUID,
+        plaintextFields: [String: String]
+    ) async throws {
+        try await confirmResourceSecretPresence(
+            reason: "Save the encrypted credentials for this Miloom resource."
+        )
+        let material = try await loadResourceSecretMaterial(
+            type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+        )
+        let allowed: Set<String>
+        switch type {
+        case "institution":
+            allowed = ["login_url", "username", "email", "password", "two_factor", "accounts_data"]
+        case "card":
+            allowed = ["login", "password", "card_number", "expiry"]
+        case "subscription":
+            allowed = ["login_id", "password", "two_factor_auth", "recovery_method"]
+        default:
+            throw ResourceSecretUpdateError.invalidFields
+        }
+        guard !plaintextFields.isEmpty,
+              Set(plaintextFields.keys).isSubset(of: allowed),
+              !plaintextFields.values.contains(where: { $0.isEmpty }) else {
+            throw ResourceSecretUpdateError.invalidFields
+        }
+        if let accountJSON = plaintextFields["accounts_data"] {
+            guard let data = accountJSON.data(using: .utf8),
+                  (try? JSONDecoder().decode([ResourceBankAccountCredentials].self, from: data)) != nil else {
+                throw ResourceSecretUpdateError.invalidFields
+            }
+        }
+        let oldPlaintext: [String: String]
+        do { oldPlaintext = try material.plaintextFields() }
+        catch { throw ResourceSecretRevealError.invalidSecret }
+        if oldPlaintext == plaintextFields { return }
+
+        var encrypted: [String: String] = [:]
+        for (field, value) in plaintextFields {
+            encrypted[field] = try VaultCryptography.encryptResourceSecret(
+                value, using: material.key,
+                context: ResourceSecretFieldContext(resource: material.resource, fieldName: field)
+            )
+        }
+        struct Params: Encodable {
+            let p_resource_type: String
+            let p_resource_id: UUID
+            let p_key_version: Int
+            let p_expected_encrypted_fields: [String: String]
+            let p_new_encrypted_fields: [String: String]
+            let p_actor_device_id: UUID
+        }
+        try await client.rpc("miloom_update_resource_secret", params: Params(
+            p_resource_type: type, p_resource_id: id,
+            p_key_version: material.resource.keyVersion,
+            p_expected_encrypted_fields: material.encryptedFields,
+            p_new_encrypted_fields: encrypted,
+            p_actor_device_id: material.deviceID
+        )).execute()
+        do {
+            let readback = try await loadResourceSecretMaterial(
+                type: type, id: id, expectedOwnerUserID: expectedOwnerUserID
+            )
+            guard readback.resource.keyVersion == material.resource.keyVersion,
+                  readback.encryptedFields == encrypted,
+                  try readback.plaintextFields() == plaintextFields else {
+                throw ResourceSecretUpdateError.verificationUnavailable
+            }
+        } catch {
+            throw ResourceSecretUpdateError.verificationUnavailable
+        }
+    }
+
+    private struct ResourceSecretMaterial {
+        let resource: ResourceKeyContext
+        let key: SymmetricKey
+        let deviceID: UUID
+        let encryptedFields: [String: String]
+
+        func plaintextFields() throws -> [String: String] {
+            var result: [String: String] = [:]
+            for (field, ciphertext) in encryptedFields {
+                result[field] = try VaultCryptography.decryptResourceSecret(
+                    ciphertext, using: key,
+                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
+                )
+            }
+            return result
+        }
+    }
+
+    private func loadResourceSecretMaterial(
+        type: String, id: UUID, expectedOwnerUserID: UUID
+    ) async throws -> ResourceSecretMaterial {
         let session = try await client.auth.refreshSession()
         if session.user.id == expectedOwnerUserID {
             let snapshot = try requireSnapshot(for: session.user.id)
@@ -3046,7 +3163,24 @@ final class VaultService: @unchecked Sendable {
                 throw ResourceSecretRevealError.unavailable
             }
             do {
-                return try plaintextFields(in: record, snapshot: snapshot)
+                guard let accountKey = snapshot.key(for: record.ownerAccountKeyVersion) else {
+                    throw ResourceSecretRevealError.invalidSecret
+                }
+                let resource = ResourceKeyContext(
+                    ownerUserID: session.user.id, resourceType: type,
+                    resourceID: id, keyVersion: record.keyVersion
+                )
+                let key = try VaultCryptography.unwrapResourceKeyForOwner(
+                    record.ownerWrappedResourceKey, using: accountKey,
+                    context: ResourceOwnerWrapContext(
+                        resource: resource,
+                        accountKeyVersion: record.ownerAccountKeyVersion
+                    )
+                )
+                return ResourceSecretMaterial(
+                    resource: resource, key: key, deviceID: snapshot.deviceID,
+                    encryptedFields: record.encryptedFields
+                )
             } catch {
                 throw ResourceSecretRevealError.invalidSecret
             }
@@ -3092,14 +3226,10 @@ final class VaultService: @unchecked Sendable {
                     recipientDeviceID: device.deviceID
                 )
             )
-            var plaintext: [String: String] = [:]
-            for (field, ciphertext) in record.encryptedFields {
-                plaintext[field] = try VaultCryptography.decryptResourceSecret(
-                    ciphertext, using: key,
-                    context: ResourceSecretFieldContext(resource: resource, fieldName: field)
-                )
-            }
-            return plaintext
+            return ResourceSecretMaterial(
+                resource: resource, key: key, deviceID: device.deviceID,
+                encryptedFields: record.encryptedFields
+            )
         } catch {
             throw ResourceSecretRevealError.invalidSecret
         }

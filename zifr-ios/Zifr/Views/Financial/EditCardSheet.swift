@@ -12,6 +12,7 @@ struct EditCardSheet: View {
     var customTitle: String? = nil
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @State private var resourceCredentialStatus = "checking"
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
     @State private var showDeleteInstitutionConfirm = false
@@ -27,7 +28,8 @@ struct EditCardSheet: View {
 
     private var canAccessCredentials: Bool {
         guard let currentUserId = appState.portfolioUserID else { return false }
-        return card.userId == currentUserId
+        return card.userId == currentUserId &&
+            (isNew || resourceCredentialStatus == "not_ready" || resourceCredentialStatus == "legacy")
     }
     
     @State private var showFinancials = false
@@ -331,7 +333,7 @@ struct EditCardSheet: View {
                 }
                 } else {
                     Label {
-                        Text("Card credentials require a separate, device-specific owner grant. If available, use Secure Credentials above.")
+                        Text("Use Secure Credentials above when available. Access is specific to this resource and device.")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.6))
                     } icon: {
@@ -610,7 +612,8 @@ struct EditCardSheet: View {
                         )
                         ResourceCredentialAccessCard(
                             resourceType: "card", resourceID: card.id,
-                            ownerUserID: card.userId
+                            ownerUserID: card.userId,
+                            onStatusChange: { resourceCredentialStatus = $0 }
                         )
                     }
 

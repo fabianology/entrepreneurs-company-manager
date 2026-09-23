@@ -12,6 +12,7 @@ struct EditInstitutionSheet: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @State private var resourceCredentialStatus = "checking"
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
@@ -22,7 +23,8 @@ struct EditInstitutionSheet: View {
 
     private var canAccessCredentials: Bool {
         guard let currentUserId = appState.portfolioUserID else { return false }
-        return institution.userId == currentUserId
+        return institution.userId == currentUserId &&
+            (isNew || resourceCredentialStatus == "not_ready" || resourceCredentialStatus == "legacy")
     }
 
     @State private var showDeleteConfirm = false
@@ -186,7 +188,8 @@ struct EditInstitutionSheet: View {
                         )
                         ResourceCredentialAccessCard(
                             resourceType: "institution", resourceID: institution.id,
-                            ownerUserID: institution.userId
+                            ownerUserID: institution.userId,
+                            onStatusChange: { resourceCredentialStatus = $0 }
                         )
                     }
                     
@@ -272,7 +275,7 @@ struct EditInstitutionSheet: View {
                                 }
                                 } else {
                                     Label {
-                                        Text("Credentials require a separate, device-specific owner grant. If available, use Secure Credentials above.")
+                                        Text("Use Secure Credentials above when available. Access is specific to this resource and device.")
                                             .font(.system(size: 13, weight: .medium))
                                             .foregroundStyle(Color.white.opacity(0.6))
                                     } icon: {

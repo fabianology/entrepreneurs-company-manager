@@ -73,19 +73,23 @@ struct ResourceCredentialAccessCard: View {
     let resourceType: String
     let resourceID: UUID
     let ownerUserID: UUID
+    var onStatusChange: ((String) -> Void)? = nil
 
     @Environment(\.scenePhase) private var scenePhase
     @State private var status: String?
     @State private var plaintextFields: [String: String] = [:]
+    @State private var draftFields: [String: String] = [:]
+    @State private var draftAccounts: [AccountCredentials] = []
+    @State private var isEditing = false
     @State private var isWorking = false
     @State private var errorMessage: String?
     @State private var operationID = UUID()
 
-    private struct AccountCredentials: Decodable, Identifiable {
+    private struct AccountCredentials: Codable, Identifiable {
         let id: String
-        let accountNumber: String?
-        let routingNumber: String?
-        let wireRoutingNumber: String?
+        var accountNumber: String?
+        var routingNumber: String?
+        var wireRoutingNumber: String?
     }
 
     private var accounts: [AccountCredentials]? {
@@ -108,13 +112,65 @@ struct ResourceCredentialAccessCard: View {
         }
     }
 
+    private var editableFields: [(String, String)] {
+        switch resourceType {
+        case "institution":
+            return [("login_url", "Website"), ("username", "Login ID"),
+                    ("email", "Email"), ("password", "Password"),
+                    ("two_factor", "Two-factor method")]
+        case "card":
+            return [("login", "Login ID"), ("password", "Password"),
+                    ("card_number", "Card number"), ("expiry", "Expiry")]
+        case "subscription":
+            return [("login_id", "Login ID"), ("password", "Password"),
+                    ("two_factor_auth", "Two-factor method"),
+                    ("recovery_method", "Recovery method")]
+        default:
+            return []
+        }
+    }
+
     var body: some View {
         if let status, status != "not_ready", status != "unavailable" {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 14) {
                     switch status {
                     case "ready":
-                        if plaintextFields.isEmpty {
+                        if isEditing {
+                            Text("Changes are encrypted for this resource only. Clearing a field removes it from the shared credential.")
+                                .foregroundStyle(.secondary)
+                            ForEach(editableFields, id: \.0) { field in
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(field.1.uppercased())
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(Color(hex: "#C1AA78"))
+                                    if field.0 == "password" {
+                                        SecureField(field.1, text: binding(for: field.0))
+                                    } else {
+                                        TextField(field.1, text: binding(for: field.0))
+                                            .textInputAutocapitalization(.never)
+                                    }
+                                }
+                                .textFieldStyle(.roundedBorder)
+                            }
+                            ForEach(draftAccounts.indices, id: \.self) { index in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("ACCOUNT \(index + 1)")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Color(hex: "#C1AA78"))
+                                    TextField("Account number", text: accountBinding(index, \.accountNumber))
+                                    TextField("Routing number", text: accountBinding(index, \.routingNumber))
+                                    TextField("Wire routing number", text: accountBinding(index, \.wireRoutingNumber))
+                                }
+                                .textFieldStyle(.roundedBorder)
+                                .keyboardType(.numberPad)
+                            }
+                            HStack {
+                                actionButton("Cancel", symbol: "xmark") { isEditing = false }
+                                actionButton("Save", symbol: "checkmark", action: save)
+                            }
+                            .disabled(isWorking)
+                        } else if plaintextFields.isEmpty {
                             Text("Credentials are available for this resource only. Face ID or your passcode is required to reveal them.")
                                 .foregroundStyle(.secondary)
                             actionButton("Reveal Credentials", symbol: "eye", action: reveal)
@@ -138,8 +194,17 @@ struct ResourceCredentialAccessCard: View {
                                 Text("Account details could not be displayed.")
                                     .foregroundStyle(.orange)
                             }
-                            actionButton("Hide Credentials", symbol: "eye.slash") {
-                                plaintextFields.removeAll()
+                            HStack {
+                                if plaintextFields["accounts_data"] == nil || accounts != nil {
+                                    actionButton("Edit", symbol: "pencil") {
+                                        draftFields = plaintextFields
+                                        draftAccounts = accounts ?? []
+                                        isEditing = true
+                                    }
+                                }
+                                actionButton("Hide", symbol: "eye.slash") {
+                                    clearPlaintext()
+                                }
                             }
                         }
                     case "request":
@@ -215,6 +280,61 @@ struct ResourceCredentialAccessCard: View {
     private func clearPlaintext() {
         operationID = UUID()
         plaintextFields.removeAll()
+        draftFields.removeAll()
+        draftAccounts.removeAll()
+        isEditing = false
+    }
+
+    private func binding(for key: String) -> Binding<String> {
+        Binding(
+            get: { draftFields[key] ?? "" },
+            set: { draftFields[key] = $0 }
+        )
+    }
+
+    private func accountBinding(
+        _ index: Int, _ keyPath: WritableKeyPath<AccountCredentials, String?>
+    ) -> Binding<String> {
+        Binding(
+            get: { draftAccounts.indices.contains(index) ? draftAccounts[index][keyPath: keyPath] ?? "" : "" },
+            set: { value in
+                guard draftAccounts.indices.contains(index) else { return }
+                draftAccounts[index][keyPath: keyPath] = value.isEmpty ? nil : value
+            }
+        )
+    }
+
+    private func save() {
+        guard !isWorking else { return }
+        let token = operationID
+        var updated = draftFields.filter { !$0.value.isEmpty && $0.key != "accounts_data" }
+        if !draftAccounts.isEmpty,
+           draftAccounts.contains(where: {
+               $0.accountNumber != nil || $0.routingNumber != nil || $0.wireRoutingNumber != nil
+           }) {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            guard let data = try? encoder.encode(draftAccounts) else {
+                errorMessage = "Account details couldn't be encoded. Nothing was changed."
+                return
+            }
+            updated["accounts_data"] = String(decoding: data, as: UTF8.self)
+        }
+        isWorking = true
+        errorMessage = nil
+        Task {
+            do {
+                try await VaultService.shared.updateResourceSecret(
+                    type: resourceType, id: resourceID,
+                    expectedOwnerUserID: ownerUserID,
+                    plaintextFields: updated
+                )
+                if token == operationID { clearPlaintext() }
+            } catch {
+                if token == operationID { errorMessage = error.localizedDescription }
+            }
+            isWorking = false
+        }
     }
 
     private func loadStatus() async {
@@ -225,13 +345,17 @@ struct ResourceCredentialAccessCard: View {
             )
             guard !Task.isCancelled, token == operationID else { return }
             status = result
+            onStatusChange?(result)
             errorMessage = nil
             if result != "ready" { plaintextFields.removeAll() }
         } catch {
             guard !Task.isCancelled, token == operationID else { return }
             // A missing RPC means this build is talking to an older backend.
             status = "unavailable"
-            if !error.localizedDescription.contains("PGRST202") {
+            if error.localizedDescription.contains("PGRST202") {
+                onStatusChange?("legacy")
+            } else {
+                onStatusChange?("check_failed")
                 errorMessage = error.localizedDescription
             }
         }
