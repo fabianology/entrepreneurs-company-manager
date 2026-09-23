@@ -285,8 +285,55 @@ try {
     `Cleanup worker returned removed=${cleaned.removed}, failed=${cleaned.failed}`);
   const deletedObject = await service.storage.from("CompanyDocuments").info(replacement.path);
   assert(deletedObject.error, "Deleted document file remained in Storage after cleanup");
+
+  const cascadingDocumentId = crypto.randomUUID();
+  requireData(await service.from("company_documents").insert({
+    id: cascadingDocumentId, user_id: owner.id, company_id: companyId,
+    name: "Disposable cascade document", visibility: "entity",
+  }).select("id").single(), "create cascade document");
+  const cascadeBytes = new TextEncoder().encode(`MILOOM cascade ${fixture}`);
+  const cascadeIssued = await fetch(`${url}/functions/v1/prepare-document-upload`, {
+    method: "POST",
+    headers: {
+      apikey: anonKey,
+      Authorization: `Bearer ${owner.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      document_id: cascadingDocumentId, expected_url: null,
+      extension: "txt", byte_count: cascadeBytes.length,
+    }),
+  });
+  assert(cascadeIssued.ok, `Cascade upload issuer returned HTTP ${cascadeIssued.status}`);
+  const cascade = await cascadeIssued.json() as {
+    reservation_id?: string; path?: string; token?: string;
+  };
+  assert(cascade.reservation_id && cascade.path && cascade.token,
+    "Cascade upload issuer omitted reservation details");
+  uploadedPaths.push(cascade.path);
+  const cascadeUpload = await clients.owner.storage.from("CompanyDocuments")
+    .uploadToSignedUrl(cascade.path, cascade.token,
+      new Blob([cascadeBytes], { type: "text/plain" }), { contentType: "text/plain" });
+  assert(!cascadeUpload.error, `Cascade signed upload failed: ${cascadeUpload.error?.message}`);
+  await verifyHostedObject(owner.id, cascade.path, cascadeBytes.length);
+  requireData(await clients.owner.rpc("miloom_finalize_document_upload", {
+    p_reservation_id: cascade.reservation_id,
+  }), "finalize cascade file");
+  const deletedCompany = await clients.owner.from("companies").delete().eq("id", companyId);
+  assert(!deletedCompany.error, `Owner entity deletion failed: ${deletedCompany.error?.message}`);
+  const cascadedDocument = requireData(await service.from("company_documents")
+    .select("id").eq("id", cascadingDocumentId), "read cascaded document") as Array<unknown>;
+  assert(cascadedDocument.length === 0, "Entity deletion left its document row");
+  const cascadeWorker = await fetch(`${url}/functions/v1/cleanup-document-files`, {
+    method: "POST",
+    headers: { "x-cron-secret": cronSecret, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert(cascadeWorker.ok, `Cascade cleanup returned HTTP ${cascadeWorker.status}`);
+  const cascadeObject = await service.storage.from("CompanyDocuments").info(cascade.path);
+  assert(cascadeObject.error, "Entity deletion left its file in Storage");
   workerCompleted = true;
-  console.log(`STAGING DOCUMENT SMOKE PASSED: signed upload/read/replace, Viewer boundary, revoke, cleanup; Storage owner_id ${storageOwner}`);
+  console.log(`STAGING DOCUMENT SMOKE PASSED: signed upload/read/replace, Viewer boundary, revoke, entity deletion, cleanup; Storage owner_id ${storageOwner}`);
 } catch (error) {
   mainError = error instanceof Error ? error : new Error(String(error));
 } finally {

@@ -277,8 +277,9 @@ No secret value was recorded here. The manually invoked worker returned
 `removed=0, failed=0` before scheduling. `pg_net` and `pg_cron` are enabled in
 staging. The single active `*/15 * * * *` cleanup job is installed; a
 database-origin `net.http_post` returned HTTP 200 and
-`{"removed":0,"failed":0}`. Observation of an actual clock-triggered job is
-still pending at this checkpoint.
+`{"removed":0,"failed":0}`. The first actual clock-triggered run succeeded at
+2026-09-23 02:30 UTC (`cron.job_run_details` job 1); its `pg_net` response was
+HTTP 200 with `{"removed":0,"failed":0}`.
 
 The disposable hosted smoke in `supabase/ops/staging_document_file_smoke.ts`
 passed on three separate signed-in staging accounts. An exact document Editor
@@ -286,7 +287,9 @@ uploaded, finalized, read, and replaced a file; the old file was queued and
 removed. A company Viewer could read but not upload. Direct Editor upload into
 the owner's folder was denied. Revoking the exact Editor share denied a new
 signed read URL while the independent company Viewer share still worked.
-Owner deletion queued and removed the replacement file. The smoke inspected
+Owner document deletion queued and removed the replacement file. Owner entity
+deletion then cascaded a second document row and its file was removed by the
+worker. The smoke inspected
 the actual `storage.objects` row: `owner_id` was null for the service-issued
 signed upload, while the owner folder and stored byte count matched. The
 implementation checks the owner folder when `owner_id` is null. Post-test
@@ -294,8 +297,8 @@ counts were zero disposable users, companies, document rows, Storage objects,
 and cleanup queue rows. This automated smoke is not a substitute for the
 two-physical-device UI matrix or every legacy/orphan/retry case above.
 
-Remaining before the staging gate can pass: observe a real scheduled cleanup
-run; test entity deletion, orphan/retry and external-link behavior; test the
+Remaining before the staging gate can pass: test hosted orphan/retry and
+external-link behavior; test the
 separate scoped-secret/device/role matrix while cutover stays closed; and
 record a compatible native build plus two-device acceptance. An independent
 security review and separate production authorization remain required.
