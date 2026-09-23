@@ -148,12 +148,23 @@ final class StagingSaveFailureProtocol: URLProtocol {
 
     static func errorCode(for request: URLRequest, instruction: String) -> URLError.Code? {
         guard request.url?.scheme == "https",
-              request.url?.host == "bvtuyzhyospqxvpzcrmv.supabase.co",
-              ["POST", "PATCH"].contains(request.httpMethod ?? "") else { return nil }
+              request.url?.host == "bvtuyzhyospqxvpzcrmv.supabase.co" else { return nil }
         let parts = instruction.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
-        guard parts.count == 2,
-              ["institutions", "financial_cards", "subscriptions", "company_documents", "rpc/miloom_save_loan"].contains(String(parts[1])),
-              request.url?.path == "/rest/v1/\(parts[1])" else { return nil }
+        guard parts.count == 2 else { return nil }
+        let path = request.url?.path ?? "", method = request.httpMethod ?? ""
+        switch parts[1] {
+        case "document-prepare":
+            guard method == "POST", path == "/functions/v1/prepare-document-upload" else { return nil }
+        case "document-upload":
+            guard method == "PUT",
+                  path.range(of: "^/storage/v1/object/upload/sign/CompanyDocuments/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36}\\.[a-z0-9]{1,12}$", options: .regularExpression) != nil else { return nil }
+        case "document-finalize":
+            guard method == "POST", path == "/rest/v1/rpc/miloom_finalize_document_upload" else { return nil }
+        default:
+            guard ["POST", "PATCH"].contains(method),
+                  ["institutions", "financial_cards", "subscriptions", "company_documents", "rpc/miloom_save_loan"].contains(String(parts[1])),
+                  path == "/rest/v1/\(parts[1])" else { return nil }
+        }
         switch parts[0] {
         case "offline": return .notConnectedToInternet
         case "interrupted": return .networkConnectionLost

@@ -11,6 +11,8 @@ struct AddSubscriptionWizard: View {
 
     @State private var currentStep: Int = 1
     @State private var completedSteps: Set<Int> = []
+    @State private var isSaving = false
+    @State private var saveError: String?
     
     // HUD states
     @State private var showSubServiceHUD = false
@@ -24,6 +26,21 @@ struct AddSubscriptionWizard: View {
     @State private var isNewEmail = false
     @State private var hasSkippedEmail = false
     @State private var hasManuallyEditedWebsite = false
+
+    @MainActor
+    private func save() {
+        guard !isSaving else { return }
+        isSaving = true
+        Task { @MainActor in
+            defer { isSaving = false }
+            do {
+                sub = try await vm.saveSubscriptionConfirmed(sub, appState: appState)
+                dismiss()
+            } catch {
+                saveError = ResourceSaveFailure.message(for: error, resource: "service")
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -52,15 +69,14 @@ struct AddSubscriptionWizard: View {
                                 let canSubmit = !sub.name.isEmpty && (!sub.linkedEmails.isEmpty || hasSkippedEmail)
                                 Button {
                                     UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                                    vm.saveSub(sub, appState: appState)
-                                    dismiss()
+                                    save()
                                 } label: {
-                                    Text("Done")
+                                    Text(isSaving ? "Saving…" : "Done")
                                         .font(.system(size: 16, weight: .bold))
                                         .frame(maxWidth: .infinity)
                                         .frame(height: 54)
                                 }
-                                .disabled(!canSubmit)
+                                .disabled(!canSubmit || isSaving)
                                 .buttonStyle(MiloomPrimaryButtonStyle())
                                 .padding(.top, 16)
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -76,6 +92,7 @@ struct AddSubscriptionWizard: View {
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
+            .disabled(isSaving)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -85,19 +102,27 @@ struct AddSubscriptionWizard: View {
                     }
                     .font(.system(size: 16, weight: .regular))
                     .foregroundStyle(Color.white.opacity(0.65))
+                    .disabled(isSaving)
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
                     let canSave = completedSteps.contains(1)
-                    Button("Save") {
+                    Button(isSaving ? "Saving…" : "Save") {
                         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                        vm.saveSub(sub, appState: appState)
-                        dismiss()
+                        save()
                     }
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(canSave ? Color(hex: "#30D158") : Color.white.opacity(0.3))
-                    .disabled(!canSave)
+                    .disabled(!canSave || isSaving)
                 }
+            }
+            .interactiveDismissDisabled(isSaving)
+            .alert("Service Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
             }
             // HUDs
             .sheet(isPresented: $showSubServiceHUD) {
@@ -235,7 +260,7 @@ struct AddSubscriptionWizard: View {
                 case 2: return "Billing information"
                 case 3: return "Connect a secondary service"
                 case 4: return "What emails do you use"
-                default: return "\(sub.name.isEmpty ? "Subscription" : sub.name) added"
+                default: return "Ready to save \(sub.name.isEmpty ? "subscription" : sub.name)"
                 }
             }()
             let subtitle: String = {
@@ -244,7 +269,7 @@ struct AddSubscriptionWizard: View {
                 case 2: return "Track costs, renewals, and payment methods"
                 case 3: return "if you have a subscription within a subscription"
                 case 4: return "Reasons and use for the emails"
-                default: return "more context for your org"
+                default: return "Tap Done to save this service."
                 }
             }()
             
@@ -255,12 +280,6 @@ struct AddSubscriptionWizard: View {
                     .id("headerTitle-\(currentStep)")
                     .transition(.opacity)
                 
-                if currentStep >= 5 {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundStyle(Color(hex: "#30D158"))
-                        .transition(.scale.combined(with: .opacity))
-                }
             }
                 
             Text(subtitle)

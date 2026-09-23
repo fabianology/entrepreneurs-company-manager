@@ -6,6 +6,107 @@ import Supabase
 
 final class ActiveSessionsTests: XCTestCase {
     @MainActor
+    func testOverviewPaymentFailureRetryKeepsDraftIdentityAndOriginalOwner() async throws {
+        for failure: Error in [URLError(.networkConnectionLost), LoanSaveError.accessDenied, LoanSaveError.changed] {
+            let state = AppState(), vm = AppViewModel()
+            let owner = UUID(), editor = UUID()
+            let company = Company(userId: owner, name: "Shared")
+            var loan = Loan(userId: owner, companyId: company.id)
+            loan.principalAmount = 100
+            loan.remainingBalance = 100
+            loan.revision = 7
+            loan.payments = []
+            state.portfolioUserID = editor
+            state.companies = [company]
+            state.loans = [loan]
+            state.resourceShares = [ResourceShare(resourceId: loan.id, resourceType: "loan", userId: editor, role: "Editor")]
+            let payment = LoanPayment(userId: owner, loanId: loan.id, amount: 25, source: "Dummy payment")
+            do {
+                _ = try await vm.saveLoanPaymentConfirmed(payment, for: loan, appState: state) { proposed in
+                    XCTAssertEqual(proposed.payments, [payment])
+                    XCTAssertEqual(proposed.revision, 7)
+                    XCTAssertEqual(state.loans, [loan])
+                    throw failure
+                }
+                XCTFail("Payment failure swallowed")
+            } catch {}
+            XCTAssertEqual(state.loans, [loan])
+            XCTAssertNil(state.error)
+            let saved = try await vm.saveLoanPaymentConfirmed(payment, for: loan, appState: state) { proposed in
+                XCTAssertEqual(proposed.userId, owner)
+                XCTAssertEqual(proposed.payments, [payment])
+                XCTAssertEqual(proposed.revision, 7)
+                var receipt = proposed
+                receipt.revision = 8
+                return receipt
+            }
+            XCTAssertEqual(state.loans, [saved])
+            XCTAssertEqual(saved.payments, [payment])
+            XCTAssertEqual(saved.revision, 8)
+        }
+    }
+
+    @MainActor
+    func testOverviewPaymentFailsClosedForWrongBindingMissingLedgerDuplicateAndRevocation() async throws {
+        let state = AppState(), vm = AppViewModel(), owner = UUID(), editor = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        var loan = Loan(userId: owner, companyId: company.id)
+        loan.payments = []
+        loan.revision = 1
+        let payment = LoanPayment(userId: owner, loanId: loan.id, amount: 25)
+        state.portfolioUserID = editor
+        state.companies = [company]
+        state.loans = [loan]
+        state.resourceShares = [ResourceShare(resourceId: loan.id, resourceType: "loan", userId: editor, role: "Editor")]
+        var wrongOwner = payment, wrongLoan = payment, invalidAmount = payment
+        wrongOwner.userId = editor
+        wrongLoan.loanId = UUID()
+        invalidAmount.amount = 0
+        var missingLedger = loan, missingRevision = loan, duplicate = loan
+        missingLedger.payments = nil
+        missingRevision.revision = nil
+        duplicate.payments = [payment]
+        for (draft, snapshot) in [(wrongOwner, loan), (wrongLoan, loan), (invalidAmount, loan), (payment, missingLedger), (payment, missingRevision), (payment, duplicate)] {
+            do {
+                _ = try await vm.saveLoanPaymentConfirmed(draft, for: snapshot, appState: state) { _ in XCTFail("Invalid payment submitted"); return loan }
+                XCTFail("Invalid draft accepted")
+            } catch {}
+        }
+        state.resourceShares = []
+        do {
+            _ = try await vm.saveLoanPaymentConfirmed(payment, for: loan, appState: state) { _ in XCTFail("Revoked payment submitted"); return loan }
+            XCTFail("Revoked payment accepted")
+        } catch { XCTAssertEqual(error as? LoanSaveError, .accessDenied) }
+        XCTAssertEqual(state.loans, [loan])
+        XCTAssertNil(state.error)
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    func testDocumentFailureHookIsLimitedToThreeUploadStages() {
+        let base = URL(string: "https://bvtuyzhyospqxvpzcrmv.supabase.co")!
+        let signed = "storage/v1/object/upload/sign/CompanyDocuments/\(UUID().uuidString)/\(UUID().uuidString).png"
+        for (stage, path, method) in [
+            ("document-prepare", "functions/v1/prepare-document-upload", "POST"),
+            ("document-upload", signed, "PUT"),
+            ("document-finalize", "rest/v1/rpc/miloom_finalize_document_upload", "POST")
+        ] {
+            var request = URLRequest(url: base.appendingPathComponent(path))
+            request.httpMethod = method
+            XCTAssertEqual(StagingSaveFailureProtocol.errorCode(for: request, instruction: "interrupted:\(stage)"), .networkConnectionLost)
+            request.httpMethod = "DELETE"
+            XCTAssertNil(StagingSaveFailureProtocol.errorCode(for: request, instruction: "interrupted:\(stage)"))
+            request.httpMethod = "GET"
+            XCTAssertNil(StagingSaveFailureProtocol.errorCode(for: request, instruction: "interrupted:\(stage)"))
+        }
+        for path in ["storage/v1/object/CompanyDocuments/any.png", "storage/v1/object/upload/sign/avatars/any.png", "auth/v1/token"] {
+            var request = URLRequest(url: base.appendingPathComponent(path))
+            request.httpMethod = "PUT"
+            XCTAssertNil(StagingSaveFailureProtocol.errorCode(for: request, instruction: "interrupted:document-upload"))
+        }
+    }
+    #endif
+
+    @MainActor
     func testConfirmedBankCardServiceFailuresAndRetryPreserveDrafts() async throws {
         let failures: [Error] = [URLError(.notConnectedToInternet), URLError(.networkConnectionLost),
             URLError(.timedOut), PostgrestError(code: "42501", message: "private backend detail")]

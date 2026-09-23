@@ -7,8 +7,10 @@ struct LoanPaymentHUD: View {
     let isNew: Bool
     let institutions: [Institution]
     let cards: [FinancialCard]
-    let onSave: () -> Void
+    let onSave: () async throws -> Void
     let onCancel: () -> Void
+    @State private var isSaving = false
+    @State private var saveError: String?
     
     var body: some View {
         NavigationStack {
@@ -105,6 +107,7 @@ struct LoanPaymentHUD: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(hex: "#1C1C1E"))
+            .disabled(isSaving)
             .navigationTitle(isNew ? "Add Payment" : "Edit Payment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -115,12 +118,30 @@ struct LoanPaymentHUD: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
+                        .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isNew ? "Add" : "Save", action: onSave)
+                    Button(isSaving ? "Saving…" : (isNew ? "Add" : "Save")) {
+                        guard !isSaving else { return }
+                        isSaving = true
+                        Task { @MainActor in
+                            defer { isSaving = false }
+                            do { try await onSave() }
+                            catch { saveError = ResourceSaveFailure.message(for: error, resource: "loan payment") }
+                        }
+                    }
                         .fontWeight(.semibold)
                         .tint(.green)
+                        .disabled(isSaving || !draft.amount.isFinite || draft.amount <= 0)
                 }
+            }
+            .interactiveDismissDisabled(isSaving)
+            .alert("Payment Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
             }
         }
     }

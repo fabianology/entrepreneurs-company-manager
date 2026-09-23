@@ -1393,6 +1393,7 @@ struct EditDocumentSheet: View {
                                     doc.name = "Photo - \(doc.type)"
                                 }
                                 isUploading = false
+                                selectedPhotoItem = nil
                             }
                         } else {
                             throw NSError(domain: "App", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to load photo data."])
@@ -1401,6 +1402,9 @@ struct EditDocumentSheet: View {
                         await MainActor.run {
                             uploadError = DocumentFileFailure.message(for: error)
                             isUploading = false
+                            // Let the same photo trigger a new attempt after a
+                            // failed upload; PhotosPicker otherwise keeps it selected.
+                            selectedPhotoItem = nil
                         }
                     }
                 }

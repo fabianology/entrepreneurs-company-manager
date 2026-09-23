@@ -378,11 +378,33 @@ final class AppViewModel {
     }
 
     @MainActor
+    func saveLoanPaymentConfirmed(
+        _ payment: LoanPayment, for loan: Loan, appState: AppState,
+        persist: (Loan) async throws -> Loan = { try await DataRepository.shared.saveLoan($0) }
+    ) async throws -> Loan {
+        guard payment.userId == loan.userId, payment.loanId == loan.id,
+              payment.amount.isFinite, payment.amount > 0 else { throw LoanSaveError.unconfirmed }
+        guard loan.revision != nil, let payments = loan.payments else { throw LoanSaveError.incompleteSnapshot }
+        guard !payments.contains(where: { $0.id == payment.id }) else { throw LoanSaveError.changed }
+        // Build from the snapshot that opened the form. Never rebase a stale
+        // ledger silently; the server revision check must reject conflicts.
+        var updated = loan
+        updated.payments = payments + [payment]
+        updated.recalculateBalance()
+        if updated.remainingBalance <= 0 {
+            updated.status = "Paid Off"
+            updated.paidOffDate = Date()
+        }
+        return try await saveLoanConfirmed(updated, appState: appState, persist: persist)
+    }
+
+    @MainActor
     func saveLoanConfirmed(
         _ loan: Loan, appState: AppState,
         persist: (Loan) async throws -> Loan = { try await DataRepository.shared.saveLoan($0) }
     ) async throws -> Loan {
-        guard canEdit(companyId: loan.companyId, resourceType: "loan", resourceId: loan.id, appState: appState) else {
+        guard canEdit(companyId: loan.companyId, resourceType: "loan", resourceId: loan.id,
+                      appState: appState, reportError: false) else {
             throw LoanSaveError.accessDenied
         }
         let actorID = appState.portfolioUserID

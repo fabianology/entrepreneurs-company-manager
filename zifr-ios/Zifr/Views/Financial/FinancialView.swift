@@ -376,16 +376,8 @@ struct FinancialView: View {
                     institutions: institutions,
                     cards: cards,
                     onSave: {
-                        guard canEditResource("loan", pLoan.id) else { return }
-                        var updatedLoan = pLoan
-                        if updatedLoan.payments == nil { updatedLoan.payments = [] }
-                        updatedLoan.payments?.append(paymentDraft)
-                        updatedLoan.recalculateBalance()
-                        if updatedLoan.remainingBalance <= 0 {
-                            updatedLoan.status = "Paid Off"
-                            updatedLoan.paidOffDate = Date()
-                        }
-                        vm.saveLoan(updatedLoan, appState: appState)
+                        guard canEditResource("loan", pLoan.id) else { throw LoanSaveError.accessDenied }
+                        _ = try await vm.saveLoanPaymentConfirmed(paymentDraft, for: pLoan, appState: appState)
                         showLoanPaymentHUD = false
                         paymentLoan = nil
                     },
