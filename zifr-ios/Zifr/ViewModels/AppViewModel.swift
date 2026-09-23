@@ -111,6 +111,30 @@ final class AppViewModel {
         }
     }
 
+    @MainActor
+    func saveSubscriptionConfirmed(
+        _ sub: Subscription, appState: AppState,
+        persist: (Subscription, Bool) async throws -> Void = { value, exists in
+            if exists { try await DataRepository.shared.updateSubscription(value) }
+            else { try await DataRepository.shared.insertSubscription(value) }
+        }
+    ) async throws -> Subscription {
+        let exists = appState.subscriptions.contains { $0.id == sub.id }
+        try requireResourceSaveAccess(ownerID: sub.userId, companyID: sub.companyId,
+            type: "subscription", id: sub.id, exists: exists, appState: appState)
+        let actorID = appState.portfolioUserID
+        var saved = SubscriptionRenewalScheduler.normalized(sub)
+        saved.lastUpdated = Date()
+        try await persist(saved, exists)
+        guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        if let index = appState.subscriptions.firstIndex(where: { $0.id == saved.id }) {
+            appState.subscriptions[index] = saved
+        } else {
+            appState.subscriptions.append(saved)
+        }
+        return saved
+    }
+
     func deleteSub(_ sub: Subscription, appState: AppState) {
         guard canEdit(companyId: sub.companyId, resourceType: "subscription", resourceId: sub.id, appState: appState) else { return }
         let original = appState.subscriptions
@@ -141,6 +165,27 @@ final class AppViewModel {
                 do { try await DataRepository.shared.insertCard(card) }
                 catch { await MainActor.run { appState.cards.removeAll { $0.id == card.id }; appState.error = "Failed to add card." } }
             }
+        }
+    }
+
+    @MainActor
+    func saveCardConfirmed(
+        _ card: FinancialCard, appState: AppState,
+        persist: (FinancialCard, Bool) async throws -> Void = { value, exists in
+            if exists { try await DataRepository.shared.updateCard(value) }
+            else { try await DataRepository.shared.insertCard(value) }
+        }
+    ) async throws {
+        let exists = appState.cards.contains { $0.id == card.id }
+        try requireResourceSaveAccess(ownerID: card.userId, companyID: card.companyId,
+            type: "card", id: card.id, exists: exists, appState: appState)
+        let actorID = appState.portfolioUserID
+        try await persist(card, exists)
+        guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        if let index = appState.cards.firstIndex(where: { $0.id == card.id }) {
+            appState.cards[index] = card
+        } else {
+            appState.cards.append(card)
         }
     }
 
@@ -175,6 +220,44 @@ final class AppViewModel {
                 do { try await DataRepository.shared.insertInstitution(inst) }
                 catch { await MainActor.run { appState.institutions.removeAll { $0.id == inst.id }; appState.error = "Failed to add bank." } }
             }
+        }
+    }
+
+    @MainActor
+    func saveInstitutionConfirmed(
+        _ institution: Institution, appState: AppState,
+        persist: (Institution, Bool) async throws -> Void = { value, exists in
+            if exists { try await DataRepository.shared.updateInstitution(value) }
+            else { try await DataRepository.shared.insertInstitution(value) }
+        }
+    ) async throws {
+        let exists = appState.institutions.contains { $0.id == institution.id }
+        try requireResourceSaveAccess(ownerID: institution.userId, companyID: institution.companyId,
+            type: "institution", id: institution.id, exists: exists, appState: appState)
+        let actorID = appState.portfolioUserID
+        try await persist(institution, exists)
+        guard appState.portfolioUserID == actorID else { throw CancellationError() }
+        if let index = appState.institutions.firstIndex(where: { $0.id == institution.id }) {
+            appState.institutions[index] = institution
+        } else {
+            appState.institutions.append(institution)
+        }
+    }
+
+    // Confirmed form saves report errors locally, not through a second global
+    // alert. Recheck creation separately so an item grant cannot create siblings.
+    private func requireResourceSaveAccess(
+        ownerID: UUID, companyID: UUID, type: String, id: UUID,
+        exists: Bool, appState: AppState
+    ) throws {
+        guard let company = appState.companies.first(where: { $0.id == companyID }),
+              company.userId == ownerID,
+              canEdit(companyId: companyID, resourceType: type, resourceId: id,
+                      appState: appState, reportError: false),
+              exists || Self.resourceAllowsCreation(appState.resourceShares,
+                  actorID: appState.portfolioUserID, ownerID: ownerID,
+                  companyID: companyID, resourceType: type) else {
+            throw NSError(domain: "ResourceSave", code: 403)
         }
     }
 
@@ -401,6 +484,31 @@ final class AppViewModel {
         }
     }
 
+    /// A grant for one existing item never grants creation of its siblings.
+    /// Presentation only: the server rechecks the collection and owner on INSERT.
+    static func resourceAllowsCreation(
+        _ shares: [ResourceShare], actorID: UUID?, ownerID: UUID, companyID: UUID,
+        resourceType: String, ownerCanEdit: Bool = true
+    ) -> Bool {
+        let collection: String
+        switch resourceType {
+        case "institution": collection = "all_institutions"
+        case "card", "loan": collection = "all_financials"
+        case "subscription": collection = "all_subscriptions"
+        case "document": collection = "all_documents"
+        default: return false
+        }
+        guard let actorID else { return false }
+        if actorID == ownerID { return ownerCanEdit }
+        return shares.contains {
+            guard $0.userId == actorID, $0.resourceId == companyID else { return false }
+            if $0.resourceType == "company" { return ["Editor", "Admin"].contains($0.role) }
+            guard $0.role == "Editor" else { return false }
+            return $0.resourceType == collection ||
+                (resourceType == "institution" && $0.resourceType == "all_financials")
+        }
+    }
+
     static func shareAllowsEdit(
         _ shares: [ResourceShare], actorID: UUID, companyID: UUID,
         resourceType: String, resourceID: UUID
@@ -426,11 +534,12 @@ final class AppViewModel {
     }
 
     private func canEdit(
-        companyId: UUID, resourceType: String, resourceId: UUID, appState: AppState
+        companyId: UUID, resourceType: String, resourceId: UUID, appState: AppState,
+        reportError: Bool = true
     ) -> Bool {
         guard let currentUserId = appState.portfolioUserID,
               let company = appState.companies.first(where: { $0.id == companyId }) else {
-            appState.error = "Your account access could not be verified. Refresh and try again."
+            if reportError { appState.error = "Your account access could not be verified. Refresh and try again." }
             return false
         }
 
@@ -441,7 +550,7 @@ final class AppViewModel {
                 appState.resourceShares, actorID: currentUserId, companyID: companyId,
                 resourceType: resourceType, resourceID: resourceId
             ) else {
-                appState.error = "You do not have edit access to this shared item. Refresh your access and try again."
+                if reportError { appState.error = "You do not have edit access to this shared item. Refresh your access and try again." }
                 return false
             }
             return true
@@ -454,7 +563,7 @@ final class AppViewModel {
                 .sorted { $0.lastModified < $1.lastModified }
                 .first?.id
         guard allowedId == companyId else {
-            appState.error = "This company is read-only on Free. Choose it as your Free company or resubscribe to Pro."
+            if reportError { appState.error = "This company is read-only on Free. Choose it as your Free company or resubscribe to Pro." }
             return false
         }
         return true

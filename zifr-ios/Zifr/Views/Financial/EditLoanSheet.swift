@@ -247,7 +247,7 @@ struct EditLoanSheet: View {
                                     loan = try await vm.saveLoanConfirmed(loan, appState: appState)
                                     dismiss()
                                 } catch {
-                                    saveError = error.localizedDescription
+                                    saveError = ResourceSaveFailure.message(for: error, resource: "loan")
                                 }
                             }
                         }

@@ -13,6 +13,8 @@ struct EditSubscriptionSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var resourceCredentialStatus = "checking"
+    @State private var isSaving = false
+    @State private var saveError: String?
     @State private var showDelete = false
     @State private var showShareSheet = false
     
@@ -580,6 +582,7 @@ struct EditSubscriptionSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(hex: "#1C1C1E"))
+            .disabled(isSaving)
             .onAppear {
                 if (sub.nextRenewal ?? "").isEmpty {
                     if sub.billingCycle == "Monthly" {
@@ -618,43 +621,41 @@ struct EditSubscriptionSheet: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if isNew { 
-                            vm.deleteSub(sub, appState: appState) 
-                        } else if let snap = snapshot {
-                            sub.name = snap.name
-                            sub.website = snap.website
-                            sub.pricingModel = snap.pricingModel
-                            sub.status = snap.status
-                            sub.billingCycle = snap.billingCycle
-                            sub.nextRenewal = snap.nextRenewal
-                            sub.paymentMethod = snap.paymentMethod
-                            sub.renew = snap.renew
-                            sub.loginId = snap.loginId
-                            sub.password = snap.password
-                            sub.twoFactorAuth = snap.twoFactorAuth
-                            sub.recoveryMethod = snap.recoveryMethod
-                            sub.notes = snap.notes
-                            sub.cost = snap.cost
-                            sub.showSubServicesTab = snap.showSubServicesTab
-                            sub.showLinkedEmailsTab = snap.showLinkedEmailsTab
-                        }
+                        // Cancel discards this value-type draft without a DELETE.
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button("Save") {
-                            vm.saveSub(sub, appState: appState)
-                            onSave?()
-                            dismiss()
+                        Button(isSaving ? "Saving…" : "Save") {
+                            guard !isSaving else { return }
+                            isSaving = true
+                            Task { @MainActor in
+                                defer { isSaving = false }
+                                do {
+                                    sub = try await vm.saveSubscriptionConfirmed(sub, appState: appState)
+                                    onSave?()
+                                    dismiss()
+                                } catch {
+                                    saveError = ResourceSaveFailure.message(for: error, resource: "service")
+                                }
+                            }
                         }
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
-                        .disabled(sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(isSaving || sub.name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
             }
-            .interactiveDismissDisabled(isNew)
+            .interactiveDismissDisabled(isNew || isSaving)
+            .alert("Service Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
+            }
             .sheet(isPresented: $showSubServiceHUD) {
                 SubServiceHUD(
                     draft: $subDraft,

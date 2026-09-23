@@ -397,3 +397,330 @@ Face ID, signing and entitlements were not changed; secret cutover stays closed.
   save entry points and legacy-client rollout policy.
 - Independent security review, clean scoped commits/release candidate and
   separately authorized production rollout. This is not production sign-off.
+
+## Continuation — checkpoint, collection creation and file errors (2026-09-23)
+
+User requested **commit and continue**. Committed the preceding scoped native
+edit/save/sharing work, approved staging migrations 030–033 and their tests as
+`5b0381ae` (`Harden scoped collaboration saves and native sharing flows`),
+28 intended files only. Unrelated Plaid/account-deletion/project/web/coordination
+changes were excluded. No push. The new native changes below are uncommitted.
+
+### Implemented
+
+- Added a separate, tested collection-creation policy. Matching collection
+  Editors and company Editor/Admin grants can create only the covered record
+  types; an exact-item Editor cannot create siblings. Missing actor, unknown
+  types, unrelated companies/recipients and Viewer-only grants fail closed.
+  Server authorization remains authoritative; no new server privilege added.
+- Entity quick-add menus now use the active tab's creation scope. All
+  Institutions offers manual institution creation; All Financials offers
+  institutions/cards/loans. Services and documents use their own collection
+  scopes. Standalone loan creation no longer requires an existing bank.
+  Financial empty-state/action-bar controls use the same policy.
+- Collaborators create institutions through the existing manual form, not the
+  owner-only Plaid/multi-resource wizard; service creation uses the existing
+  credential-restricted editor. Related card/loan Add controls resolve their
+  own collection permissions and wait until the parent institution is saved.
+  Shared-card editing no longer offers the misleading bank **Create New**
+  choice; institution writes remain separate. Owner workflows are retained.
+- Photo/file upload and shared-file removal errors use a common safe formatter:
+  sign-in, permission, conflict, size, rate-limit and network problems have
+  recovery guidance. Unknown/finalization failures instruct the user to reopen
+  the document before retrying rather than claiming a rollback. Raw backend
+  messages, signed tokens and object paths are not displayed. The preparation
+  endpoint uses 403 for several reasons, so the copy does not falsely state
+  that every 403 means revocation. No backend error contract changed.
+
+### Verification and limitations
+
+- Native staging build 12 and focused tests **23 passed, 0 failed/skipped** on
+  disposable simulator `EFAF2008-6AD5-4D66-BD6A-452EADFB0AB3`. New tests cover
+  the creation scope/role matrix, owner gate, mixed-role ordering and safe error
+  messages. Result `/private/tmp/miloom-collection-create-native-20260923.xcresult`;
+  log `/private/tmp/miloom-collection-create-native-20260923.log`.
+- Authenticated staging creation matrix **20 checks passed**: no-collection
+  (independent exact-item grants plus company Viewer), then each of the four
+  collections, against institution/card/service/document INSERTs. Allowed rows
+  were stored under the original owner's company; unrelated types returned
+  403/42501 and stored nothing. Each permitted test row was deleted by exact ID.
+  First harness attempt used nonexistent subscription `price`; corrected the
+  fixture to actual `cost`, then the full matrix passed. No production/schema
+  change. Loan creation is earlier atomic-loan evidence, not a new matrix case.
+- Native bank-only menu showed **Add Institution Manually** only; its draft
+  opened without bank-linking, credential inputs or child Add controls. Native
+  all-financials menu showed institution/card/loan creation only. Switching to
+  Documents showed the passive cannot-add indicator despite the independent
+  exact-document Editor grant. These are genuine native presentation checks.
+- **Native new-record Save remains unverified.** Computer control returned
+  `windowNotFoundAtPosition` for coordinate clicks on the toolbar Save button;
+  the navigation toolbar is absent from its accessibility tree. Indexed form
+  and menu controls worked. Restarting only the disposable app dismissed the
+  system password-save prompt and discarded the unsaved dummy bank draft, but
+  did not resolve toolbar targeting. No API write was counted as native Save.
+  File-error text is unit-tested, not freshly reproduced in native upload UI.
+- Signed out through the app and verified login. Removed both marked dummy
+  users (confirmed 404), company/resources/shares/payments; no Storage objects
+  were created this turn. Original simulator window restored after temporary
+  minimization; app data, physical phone, production, Face ID, project signing
+  and entitlements unchanged. `git diff --check`, script syntax checks and
+  checkpoint staged-diff check passed.
+
+Remaining: native create/save and failure/revocation acceptance for each scope,
+remaining alternate creation entry points, owner/free-tier regressions, clearer
+pre-save manual-institution helper copy, document retry/orphan/PDF checks,
+invitation email/universal links, foreground/offline revocation and two-device
+vault/scoped secrets. Existing name-based grouping and legacy-client rollout
+risks, independent security review and separate production approval still apply.
+Password-sharing cutover remains closed. This is not release sign-off.
+
+## Continuation — collection failure audit (2026-09-23)
+
+Active goal: finish native creation/save coverage for each collection and
+connection-loss/revocation-with-open-form checks. Canonical branch
+`codex/phase-7-notification-experience`, base `5b0381ae`. This run added tests
+and evidence only; it did not fix the newly identified form behavior, commit,
+push, deploy, modify production, or install on the physical phone.
+
+### Additional verified evidence
+
+- Native service-collection Editor: Financial shows cannot-add; Services
+  exposes Add Service and opens the existing credential-restricted service
+  editor. Entered a synthetic name; the Save button visibly enabled. A
+  keyboard shortcut did not submit it and coordinate Save failed in the
+  computer-control service. Exact staging query confirmed no service row.
+- Native document-collection Editor: Financial and Services cannot-add;
+  Documents exposes Add Document and opens a draft. Only the two nonprivate
+  fixture documents were listed. The new document form disables file upload
+  before first save, but its owner-only explanatory copy is misleading for
+  a collaborator who can upload after saving. No native Save was completed.
+- After all collection grants were revoked and the app relaunched, the
+  independent item grants/company Viewer remained readable, and document
+  Add was hidden. This is relaunch acceptance, not foreground-with-open-form
+  revocation acceptance.
+- Added three focused tests. Confirmed document/loan coordinators propagate
+  injected disconnected, connection-lost and timeout errors for both creates
+  and edits, do not publish unconfirmed state, and retain caller drafts.
+  Stale cached collection grants do not override injected server denial.
+  Bank/card/service coordinators reject edits when their local grant is
+  already gone. Those tests do not prove the UI retains its form.
+- Native build/test result: **26 passed, 0 failed, 0 skipped**, including all
+  previous focused tests. Result:
+  `/private/tmp/miloom-scope-failure-audit-20260923.xcresult`; log:
+  `/private/tmp/miloom-scope-failure-audit-20260923.log`.
+- Hosted staging **12 checks passed**: six creation attempts while allowed
+  (bank-only institution; all-financials institution/card/loan; service;
+  document) and six denied attempts after the owner revoked each collection.
+  The same Editor JWT was reused throughout, with independent item grants
+  and company Viewer retained. Successful rows belonged to the original
+  owner/company; revoked writes returned 403/42501 and created no rows.
+  Each synthetic row was removed by exact ID. These are API checks, not
+  native Save or offline-network acceptance.
+
+### Confirmed code-level blocker and remaining native test blocker
+
+- `EditInstitutionSheet`, `EditCardSheet`, and `EditSubscriptionSheet` call
+  fire-and-forget `saveInstitution` / `saveCard` / `saveSub`, then dismiss
+  unconditionally. The coordinator publishes optimistically and rolls back
+  after an asynchronous server failure. Unlike the document and loan sheets,
+  these three forms cannot wait for a receipt or preserve their open draft
+  on a rejected save. Code inspection establishes this behavior; this run
+  did not reproduce a failed toolbar Save in the simulator. Fix and test
+  these forms before release; don't call the injected coordinator tests a
+  passing whole-form failure flow.
+- `windowNotFoundAtPosition` remained reproducible after window positioning,
+  full-screen enter/exit, bringing windows forward, and resetting/rebinding
+  computer control. Indexed native fields/buttons continue to work; toolbar
+  Save/Cancel are absent from the exposed tree. Requested a user-assisted
+  move of the disposable simulator onto the main display. No alternative
+  input-injection technology or security/signing changes were used.
+- Native per-collection new-record Save, full open-form failure/retry and
+  actual isolated connection-loss checks remain **unverified**. The active
+  two-step goal is not complete; these narrower checks do not replace it.
+
+Cleanup: signed out in native UI and verified login; removed marked fixture
+users (Auth 404 confirmed), exact company/resources/shares/payments, with
+subscriptions included in the cleanup verification. No Storage files were
+created. Original simulator restored after temporary minimization; original
+app data, Face ID and signing/entitlements unchanged. `git diff --check` and
+fixture script syntax check passed. All new tests/evidence remain uncommitted.
+
+## Continuation — native creation and open-form revocation (2026-09-23)
+
+User-assisted repositioning restored coordinate input on **Miloom UI Acceptance
+2026-09-22**. Actual native toolbar Save/Cancel now work. This supersedes the
+earlier input blocker and unverified new-record Save status, not the remaining
+connection-loss or release gates. Same disposable staging simulator, build 12,
+branch `codex/phase-7-notification-experience`, base `5b0381ae`.
+
+### Native creation results
+
+Each row below used the app's actual form and Save button. A separate exact
+staging query confirmed one saved record with the original owner's user ID and
+company ID, not the Editor's. Collection grants were rotated on the marked dummy
+fixture; independent company Viewer and exact-item Editor grants remained.
+
+| Editor collection | Native-created record | Result |
+| --- | --- | --- |
+| All Institutions | Native Bank Collection Create | Passed |
+| All Services | Native Service Collection Create | Passed |
+| All Documents | Native Document Collection Create | Passed |
+| All Financials | Native Financial Bank Create | Passed |
+| All Financials | Native Financial Card Create (linked institution) | Passed |
+| All Financials | Native Financial Loan Create ($1,000, one year) | Passed |
+
+Bank-only Add offered only manual institution creation. Service-only and
+document-only roles exposed their corresponding forms, not financial creation.
+Financial Editor Add offered institution/card/loan; Services and Documents
+showed **Cannot add items**. The owner-private fixture document stayed excluded.
+No Plaid linking, shared credential fields, or owner-only bank side writes were
+used in these creation flows.
+
+### Revocation while the native form stayed open
+
+The owner revoked the relevant collection through the canonical staging RPC
+after each draft was entered and before its native Save was tapped. The app was
+not relaunched between revocation and Save.
+
+| Open draft | Native result | Persistence check |
+| --- | --- | --- |
+| New bank | **Failed:** form dismissed; global “Failed to add bank.”; draft lost | No new row |
+| Existing service name edit | **Failed:** form dismissed; global “Failed to update service.”; draft lost | Original name retained; rejected name absent |
+| Existing document name edit | **Passed:** “Document Not Saved”; form and edited name retained after OK | Original name retained; rejected name absent |
+| New card | **Failed:** form dismissed; global “Failed to add card.”; draft lost | No new row |
+| New loan | **Passed:** “Loan Not Saved”; name, principal and term retained after OK | No new row |
+
+The retained loan draft was then retried **without re-entry** after restoring
+the dummy financial collection grant. Native Save dismissed on success, and
+the exact row was verified under the original owner. No loan payments were
+added in this continuation. Backend authorization held in all denied cases;
+the three form-dismissal failures are native UX/data-entry loss, not evidence
+of a permission bypass.
+
+### Additional issue and remaining work
+
+- New shared-card helper text says the card may remain standalone, but Save
+  stays disabled with no institution selected, and the menu has no standalone
+  choice. Selecting an existing institution enables Save. Source confirms
+  `canSave` requires a nonempty institution name. Resolve that inconsistency
+  explicitly; the linked-card pass is not a standalone-card pass.
+- Bank/card/service confirmed-save and draft-retention fixes remain required.
+  An asynchronous approval request was sent for those native fixes and an
+  opt-in, isolated simulator-only connection-failure test hook. No runtime fix
+  or test hook was implemented in this test-only continuation.
+- Whole-form connection-loss/retry remains unverified. Prior 26/26 focused
+  tests cover injected coordinator errors, not actual network interruption of
+  the running form. No Mac-wide network/security setting was changed.
+- Alternate creation paths, owner/free-tier regressions, document file
+  interruption/orphan/PDF, invitation email/universal links, two-device vault
+  and scoped-secret checks, legacy-client policy, independent security review,
+  and separate production authorization remain release gates. Secret-sharing
+  cutover remains closed; this is not release sign-off.
+
+Cleanup verified: native sign-out returned to the login screen; the exact
+marked dummy users were deleted and returned Auth 404; fixture companies,
+institutions, cards, loans, services and documents were absent. The fixture had
+no Storage objects, upload reservations or cleanup queue entries. No original
+simulator data, phone FX, production, Face ID, signing or entitlements changed.
+This continuation changed only this evidence file, the shared handoff and the
+temporary fixture assertion helper. No build/test-suite rerun, runtime source
+edit, commit, push, migration or deployment was performed.
+
+## Continuation — confirmed main-form saves and native failure/retry (2026-09-23)
+
+User accepted the recommended native fixes and isolated simulator failure checks.
+Same canonical checkout, branch `codex/phase-7-notification-experience`, base
+`5b0381ae`, disposable simulator `EFAF2008-6AD5-4D66-BD6A-452EADFB0AB3`,
+staging bundle `com.vibing.miloom.staging`, build 12. Changes remain local,
+uncommitted and unpushed. No backend schema/function deployment was needed.
+
+### Implemented
+
+- Main bank/card/service sheets await confirmed persistence before publishing
+  portfolio state or dismissing. Rejection keeps the value-type draft and shows
+  a local native alert; pending saves disable duplicate Save, Cancel and interactive
+  dismissal. Cancel no longer issues DELETE for an unsaved draft.
+- Confirmed coordinators recheck original-company owner binding, exact edit vs
+  collection creation scope, owner Free-plan restrictions, and active account
+  identity before publishing a successful receipt. Errors no longer trigger a
+  second global alert for these three forms.
+- Card owner-side institution changes are awaited and use a stable draft ID
+  across retries. Copy acknowledges separately confirmed institution changes if
+  the card then fails. Collaborators still cannot write institution data through
+  card Save. Native owner partial-save coverage remains a follow-up.
+- Bank/card/service/document errors use safe, actionable copy without raw SQL,
+  payloads or a claim that uncertain responses rolled back. Loan-specific safe
+  conflict/ledger/access messages are preserved by the same formatter.
+- Shared-card helper copy now matches the existing requirement to select an
+  institution. This resolves misleading copy; it does not implement standalone
+  card creation in that sheet.
+
+### Failure injection boundary
+
+`StagingSaveFailureProtocol` is compiled only for DEBUG simulator builds and is
+enabled only with the exact staging URL, staging bundle and explicit launch
+argument. An explicitly named temporary instruction file selects one allowed
+save endpoint and URL error. Authentication, reads, other endpoints and other
+hosts are not intercepted. No phone, production, Mac networking, TLS, Face ID,
+signing or entitlement changes. Device and Release builds exclude this helper.
+
+These tests use the real native Save button, form, coordinator, repository and
+URLSession error path. Requests fail **before transmission**. They verify native
+error handling and same-draft retry, not real Wi-Fi disruption, mid-flight server
+commit ambiguity, file-upload interruption, or offline vault revocation.
+
+### Native results with exact staging persistence checks
+
+| Main form | Controlled connection failure | Open-form revocation | Same-draft retry |
+| --- | --- | --- | --- |
+| New bank | Offline error; draft retained; no row | Denied; draft retained; no row | One original-owner row |
+| New card linked to test bank | Connection-lost error; draft retained; no row | Denied; draft retained; no row | One original-owner row |
+| New service | Timeout; draft retained; no row | Denied; draft retained; no row | One original-owner row |
+| Existing service edit | Offline error; original row unchanged | Denied; original row unchanged | Same ID updated, no duplicate |
+| Existing document metadata | Offline error; edited title absent | Passed in prior continuation, not repeated here | Same ID updated |
+| Existing loan metadata | Connection-lost error; edited title absent | Passed in prior continuation, not repeated here | Same ID updated |
+
+The first four rows used owner RPC revocation/restoration while the native form
+remained open, with no relaunch or re-entry between failure and retry. These
+fresh passes supersede the prior bank/card/service main-form draft-loss failures.
+Bank/card existing-record edits are covered by coordinator tests, not a new
+native edit pass in this continuation. No new payments or file attachments were
+created. Document and loan error copy were rechecked in rebuilt native apps.
+
+Fixture titles: `Native Bank Failure Retry`, `Native Card Failure Retry`,
+`Native Service Failure Retry` -> `Native Service Edited Retry`,
+`Native Document Verified Retry`, and `Native Loan Verified Retry`.
+All successful server assertions checked original-owner/company identity.
+Initial hook setup attempts saved two additional dummy banks normally because
+the temporary-path guard was inactive; those attempts are **not** counted as
+failure passes. Foundation's existing/nonexistent /tmp alias behavior was fixed,
+guard-tested, and the failure cases above were rerun successfully.
+
+### Verification and cleanup
+
+- Final focused suite: **31 passed, 0 failed, 0 skipped** in
+  `/private/tmp/miloom-confirmed-saves-final-copy-20260923.xcresult`.
+  Coverage includes create/edit network errors and permission rejection,
+  unchanged state on failure, same-draft retry, account-switch receipt rejection,
+  original-owner and Free-plan gates, safe messages, preserved loan errors, and
+  staging hook restrictions. An intermediate path-guard test failed and was
+  corrected before the final successful suites; intermediate results are not
+  final acceptance evidence.
+- `git diff --check` passed. Final build installed only on the disposable
+  simulator. Existing project signing/configuration changes were not edited.
+- Native sign-out reached login. Marked dummy users were deleted and verified
+  Auth 404; exact company/resources/shares and loan-payment cleanup completed.
+  Storage objects, upload reservations and cleanup queue were empty.
+- Removed the temporary failure-instruction file and relaunched signed out
+  **without** the opt-in argument/environment. The app is left in normal mode.
+
+### Remaining release gates
+
+The primary collection creation matrix and controlled main-form save failure/
+retry checks are now verified. This is **not release sign-off**. Alternate and
+nested save entry points still include optimistic wrappers; owner/Free native
+regressions and card/institution partial-save acceptance remain. Also outstanding:
+document file interruption/orphan/PDF, email/universal links, actual foreground/
+offline revocation, two-device vault/scoped-secret matrix, older-client rollout
+policy, independent security review, checkpoint/release candidate and separately
+authorized production deployment. Password-sharing cutover remains closed.

@@ -13,6 +13,8 @@ struct EditInstitutionSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var resourceCredentialStatus = "checking"
+    @State private var isSaving = false
+    @State private var saveError: String?
     
     private var allSubscriptions: [Subscription] { appState.subscriptions }
 
@@ -40,8 +42,11 @@ struct EditInstitutionSheet: View {
     }
 
     // Keep creation separate from editing an existing institution or child.
-    private var canAddRelatedItems: Bool {
-        canEditResource("company", institution.companyId)
+    private func canAddRelatedItem(_ type: String) -> Bool {
+        !isNew && AppViewModel.resourceAllowsCreation(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: institution.userId, companyID: institution.companyId, resourceType: type
+        )
     }
 
     private var canAccessCredentials: Bool {
@@ -333,10 +338,10 @@ struct EditInstitutionSheet: View {
                         // ── Card 3: Cards ──────────────────────────────
                         InstitutionCardsSection(
                             cards: instCards,
-                            canAdd: canAddRelatedItems,
+                            canAdd: canAddRelatedItem("card"),
                             editableCardIDs: Set(instCards.filter { canEditResource("card", $0.id) }.map(\.id)),
                             onAdd: {
-                                guard canAddRelatedItems else { return }
+                                guard canAddRelatedItem("card") else { return }
                                 cardDraft = vm.addCard(appState: appState, userId: institution.userId, companyId: institution.companyId)
                                 cardDraft?.institutionName = institution.name 
                                 showCardHUD = true
@@ -356,10 +361,10 @@ struct EditInstitutionSheet: View {
                         // ── Card 4: Loans ──────────────────────────────
                         InstitutionLoansSection(
                             loans: instLoans,
-                            canAdd: canAddRelatedItems,
+                            canAdd: canAddRelatedItem("loan"),
                             editableLoanIDs: Set(instLoans.filter { canEditResource("loan", $0.id) }.map(\.id)),
                             onAdd: {
-                                guard canAddRelatedItems else { return }
+                                guard canAddRelatedItem("loan") else { return }
                                 loanDraft = vm.addLoan(appState: appState, userId: institution.userId, companyId: institution.companyId)
                                 loanDraft?.lender = institution.name 
                                 showLoanHUD = true
@@ -539,6 +544,7 @@ struct EditInstitutionSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(hex: "#1C1C1E"))
+            .disabled(isSaving)
             .onAppear {
                 snapshot = currentSnapshot
             }
@@ -552,30 +558,40 @@ struct EditInstitutionSheet: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if isNew { 
-                            vm.deleteInstitution(institution, appState: appState) 
-                        } else if let snap = snapshot {
-                            institution.name = snap.name
-                            institution.loginUrl = snap.loginUrl
-                            institution.username = snap.username
-                            institution.email = snap.email
-                            institution.password = snap.password
-                        }
+                        // The form owns a value-type draft, not a saved row.
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button("Save") {
-                            vm.saveInstitution(institution, appState: appState)
-                            dismiss()
+                        Button(isSaving ? "Saving…" : "Save") {
+                            guard !isSaving else { return }
+                            isSaving = true
+                            Task { @MainActor in
+                                defer { isSaving = false }
+                                do {
+                                    try await vm.saveInstitutionConfirmed(institution, appState: appState)
+                                    dismiss()
+                                } catch {
+                                    saveError = ResourceSaveFailure.message(for: error, resource: "bank")
+                                }
+                            }
                         }
+                        .disabled(isSaving)
                         .fontWeight(.semibold)
                         .tint(isDirty ? .green : nil)
                     }
                 }
             }
-            .interactiveDismissDisabled(isNew)
+            .interactiveDismissDisabled(isNew || isSaving)
+            .alert("Bank Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
+            }
             .sheet(isPresented: $showShareSheet) {
                 ShareEntitySheet(resourceId: institution.id, resourceType: "institution", resourceTitle: institution.name.isEmpty ? "Institution" : institution.name)
             }

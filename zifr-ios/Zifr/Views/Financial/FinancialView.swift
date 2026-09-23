@@ -26,6 +26,25 @@ struct FinancialView: View {
         Set(institutions.filter { canEditResource("institution", $0.id) }.map(\.id))
     }
 
+    private func canCreate(_ type: String) -> Bool {
+        AppViewModel.resourceAllowsCreation(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: company.userId, companyID: company.id,
+            resourceType: type, ownerCanEdit: canEdit
+        )
+    }
+
+    private var canCreateFinancialItem: Bool {
+        ["institution", "card", "loan"].contains { canCreate($0) }
+    }
+
+    private func beginInstitutionCreation() {
+        guard canCreate("institution") else { return }
+        let draft = Institution(userId: company.userId, companyId: company.id)
+        if appState.portfolioUserID == company.userId { wizardInstitution = draft }
+        else { newInst = draft }
+    }
+
     private var editableCardIDs: Set<UUID> {
         Set(cards.filter { canEditResource("card", $0.id) }.map(\.id))
     }
@@ -218,24 +237,24 @@ struct FinancialView: View {
                             .allowsHitTesting(false)
                             .padding(.top, 40)
                             .id("tutorialWallet")
-                        } else if canEdit {
+                        } else if canCreate("institution") {
                             VStack(spacing: 0) {
                                 Button {
                                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
+                                    beginInstitutionCreation()
                                 } label: {
                                     DynamicGlassCard(cornerRadius: 24, height: 215) {
                                         VStack(spacing: 16) {
                                             ZifrPlusCircle(size: 44, iconSize: 18)
                                             
                                             VStack(spacing: 6) {
-                                                Text("CONNECT FINANCIAL INSTITUTION")
+                                                Text(appState.portfolioUserID == company.userId ? "CONNECT FINANCIAL INSTITUTION" : "ADD INSTITUTION MANUALLY")
                                                     .font(.system(size: 13, weight: .bold))
                                                     .textCase(.uppercase)
                                                     .tracking(2)
                                                     .foregroundStyle(.white)
                                                 
-                                                Text("Link accounts, credit cards and loans")
+                                                Text(appState.portfolioUserID == company.userId ? "Link accounts, credit cards and loans" : "Add a manual record within your shared access")
                                                     .font(.system(size: 13, weight: .medium))
                                                     .foregroundStyle(Color.white.opacity(0.6))
                                                     .tracking(0.5)
@@ -399,7 +418,7 @@ struct FinancialView: View {
             }
         }
             
-            if !hideActionBar && canEdit {
+            if !hideActionBar && (canCreateFinancialItem || canManageSharing) {
                 financialActionBar
                     .zIndex(100)
             }
@@ -866,35 +885,43 @@ struct FinancialView: View {
             }
             }
 
+            if canCreateFinancialItem {
             Rectangle()
                 .fill(Color.white.opacity(0.08))
                 .frame(width: 1, height: 20)
 
             Menu {
-                if !institutions.isEmpty {
+                if canCreate("loan") {
                     Button {
+                        guard canCreate("loan") else { return }
                         newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
                     } label: {
                         Label("Add Loan", systemImage: "dollarsign.circle")
                     }
                 }
-                Button {
-                    newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                } label: {
-                    Label("Add Card", systemImage: "creditcard")
+                if canCreate("card") {
+                    Button {
+                        guard canCreate("card") else { return }
+                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Card", systemImage: "creditcard")
+                    }
                 }
-                Button {
-                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                } label: {
-                    Label("Add Account", systemImage: "building.columns")
+                if canCreate("institution") {
+                    Button {
+                        beginInstitutionCreation()
+                    } label: {
+                        Label(appState.portfolioUserID == company.userId ? "Add Account" : "Add Institution Manually", systemImage: "building.columns")
+                    }
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Text("ADD ACCOUNT").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
+                    Text("ADD FINANCIAL ITEM").font(.system(size: 13, weight: .bold)).tracking(1).foregroundStyle(.white)
                     Image(systemName: "chevron.down").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.white.opacity(0.5))
                 }
-                .frame(width: 164, height: 44)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
+            }
             }
         }
         .premiumDarkBar(cornerRadius: 12)

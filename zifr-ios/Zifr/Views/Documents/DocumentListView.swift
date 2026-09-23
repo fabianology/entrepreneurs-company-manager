@@ -1157,7 +1157,7 @@ struct EditDocumentSheet: View {
                                                                         }
                                                                     } catch {
                                                                         await MainActor.run {
-                                                                            uploadError = "Could not remove file: \(error.localizedDescription)"
+                                                                            uploadError = DocumentFileFailure.message(for: error)
                                                                             isUploading = false
                                                                         }
                                                                     }
@@ -1399,7 +1399,7 @@ struct EditDocumentSheet: View {
                         }
                     } catch {
                         await MainActor.run {
-                            uploadError = "Upload failed: \(error.localizedDescription)"
+                            uploadError = DocumentFileFailure.message(for: error)
                             isUploading = false
                         }
                     }
@@ -1469,13 +1469,13 @@ struct EditDocumentSheet: View {
                             }
                         } catch {
                             await MainActor.run {
-                                uploadError = "Upload failed: \(error.localizedDescription)"
+                                uploadError = DocumentFileFailure.message(for: error)
                                 isUploading = false
                             }
                         }
                     }
                 case .failure(let error):
-                    uploadError = "Failed to select file: \(error.localizedDescription)"
+                    uploadError = "Miloom couldn’t open the selected file. Choose it again from Files."
                 }
             }
             .toolbar {
@@ -1517,7 +1517,7 @@ struct EditDocumentSheet: View {
                                     try await vm.saveDocumentConfirmed(draft, appState: appState)
                                     dismiss()
                                 } catch {
-                                    saveError = error.localizedDescription
+                                    saveError = ResourceSaveFailure.message(for: error, resource: "document")
                                     showSaveError = true
                                 }
                             }

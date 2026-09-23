@@ -18,6 +18,30 @@ enum ShareInviteResult {
     case invitationCreatedEmailFailed
 }
 
+/// Safe form copy: an interrupted response does not prove a remote rollback.
+enum ResourceSaveFailure {
+    static func message(for error: Error, resource: String) -> String {
+        // These app-owned errors already distinguish stale ledgers and access
+        // denial safely; never flatten their specific recovery instructions.
+        if let loanError = error as? LoanSaveError { return loanError.localizedDescription }
+        let code = (error as? PostgrestError)?.code
+        let local = error as NSError
+        if code == "42501" || ((local.domain == "ResourceSave" || local.domain == "DataRepository") && local.code == 403) {
+            return "Miloom couldn’t authorize this \(resource) change. Your draft is still here. Ask the owner to check your access, or check which company is editable on your plan, then try again."
+        }
+        if code == "23505" {
+            return "This \(resource) may already have been saved. Your draft is still here. Reopen the saved record to check it before making more changes."
+        }
+        if error is CancellationError {
+            return "Your account changed before the save could be confirmed. Reopen this \(resource) in the correct account."
+        }
+        if error is URLError || local.domain == NSURLErrorDomain {
+            return "Miloom couldn’t confirm the \(resource) save. Your draft is still here. Check your connection and try again. If a previous attempt was saved, reopen that record before making more changes."
+        }
+        return "Miloom couldn’t confirm the \(resource) save. Your draft is still here. Try again, or reopen the record to check whether the change was saved."
+    }
+}
+
 enum DocumentFileOwnershipError: LocalizedError {
     case saveDocumentFirst
 
@@ -25,6 +49,61 @@ enum DocumentFileOwnershipError: LocalizedError {
         switch self {
         case .saveDocumentFirst:
             "Save this document first, then add its file."
+        }
+    }
+}
+
+/// Keep server details, object paths and signed tokens out of user-facing errors.
+/// An interrupted finalize may have committed, so unknown failures require a refresh.
+enum DocumentFileFailure {
+    static func message(for error: Error) -> String {
+        if let local = error as? DocumentFileOwnershipError { return local.localizedDescription }
+        if case let FunctionsError.httpError(code, _) = error { return message(status: code) }
+        if let storage = error as? StorageError {
+            return message(status: Int(storage.statusCode ?? "") ?? 0)
+        }
+        if let database = error as? PostgrestError {
+            switch database.code {
+            case "42501": return message(status: 403)
+            case "PT409", "40001": return message(status: 409)
+            case "PGRST202": return message(status: 503)
+            default: return message(status: 0)
+            }
+        }
+        if let network = error as? URLError {
+            if network.code == .userAuthenticationRequired { return message(status: 401) }
+            return "Miloom couldn’t confirm the file change. Check your connection, then reopen the document before trying again."
+        }
+        let local = error as NSError
+        if local.domain == "App" {
+            switch local.code {
+            case -3: return "Choose a file smaller than 25 MB."
+            case -2: return "Miloom couldn’t read this file. Choose it again from Files and allow access."
+            case -1: return "Miloom couldn’t load this photo. Choose the photo again."
+            default: break
+            }
+        }
+        if local.domain == "Documents", local.code == 409 { return message(status: 409) }
+        return message(status: 0)
+    }
+
+    private static func message(status: Int) -> String {
+        switch status {
+        case 401:
+            return "Your sign-in needs to be refreshed. Sign in again, then reopen this document."
+        case 403:
+            // The prepare endpoint also uses 403 for changed URLs and upload limits.
+            return "Miloom couldn’t authorize this file change. Reopen the document to refresh your access. If it still fails, ask the owner to check your permissions or try again later."
+        case 409:
+            return "This document’s file may have changed. Reopen the document to check its latest file before trying again."
+        case 413:
+            return "Choose a file smaller than 25 MB."
+        case 429:
+            return "Too many file changes were requested. Wait a little, then reopen the document and try again."
+        case 503:
+            return "File changes are temporarily unavailable. Reopen the document and try again later."
+        default:
+            return "Miloom couldn’t confirm the file change. Reopen the document to check its latest file before trying again."
         }
     }
 }

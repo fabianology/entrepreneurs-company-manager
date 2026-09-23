@@ -1,9 +1,400 @@
 import XCTest
 import SwiftUI
 import CryptoKit
+import Supabase
 @testable import Zifr
 
 final class ActiveSessionsTests: XCTestCase {
+    @MainActor
+    func testConfirmedBankCardServiceFailuresAndRetryPreserveDrafts() async throws {
+        let failures: [Error] = [URLError(.notConnectedToInternet), URLError(.networkConnectionLost),
+            URLError(.timedOut), PostgrestError(code: "42501", message: "private backend detail")]
+        for editing in [false, true] {
+            for failure in failures {
+                let state = AppState(), vm = AppViewModel()
+                let owner = UUID(), actor = UUID()
+                let company = Company(userId: owner, name: "Shared")
+                state.portfolioUserID = actor
+                state.companies = [company]
+                state.resourceShares = ["all_financials", "all_subscriptions"].map {
+                    ResourceShare(resourceId: company.id, resourceType: $0, userId: actor, role: "Editor")
+                }
+                let bank = Institution(userId: owner, companyId: company.id, name: "Saved bank")
+                let card = FinancialCard(userId: owner, companyId: company.id)
+                let service = Subscription(userId: owner, companyId: company.id)
+                state.institutions = editing ? [bank] : []
+                state.cards = editing ? [card] : []
+                state.subscriptions = editing ? [service] : []
+                var bankDraft = bank, cardDraft = card, serviceDraft = service
+                bankDraft.name = "Bank draft"
+                cardDraft.name = "Card draft"
+                serviceDraft.name = "Service draft"
+                var attempts = 0
+                do {
+                    try await vm.saveInstitutionConfirmed(bankDraft, appState: state) { proposed, exists in
+                        attempts += 1
+                        XCTAssertEqual(proposed, bankDraft)
+                        XCTAssertEqual(exists, editing)
+                        XCTAssertEqual(state.institutions, editing ? [bank] : [])
+                        await Task.yield()
+                        throw failure
+                    }
+                    XCTFail("Bank failure swallowed")
+                } catch {}
+                do {
+                    try await vm.saveCardConfirmed(cardDraft, appState: state) { proposed, exists in
+                        attempts += 1
+                        XCTAssertEqual(proposed, cardDraft)
+                        XCTAssertEqual(exists, editing)
+                        XCTAssertEqual(state.cards, editing ? [card] : [])
+                        await Task.yield()
+                        throw failure
+                    }
+                    XCTFail("Card failure swallowed")
+                } catch {}
+                do {
+                    _ = try await vm.saveSubscriptionConfirmed(serviceDraft, appState: state) { proposed, exists in
+                        attempts += 1
+                        XCTAssertEqual(proposed.id, serviceDraft.id)
+                        XCTAssertEqual(proposed.userId, owner)
+                        XCTAssertEqual(proposed.name, serviceDraft.name)
+                        XCTAssertEqual(exists, editing)
+                        XCTAssertEqual(state.subscriptions, editing ? [service] : [])
+                        await Task.yield()
+                        throw failure
+                    }
+                    XCTFail("Service failure swallowed")
+                } catch {}
+                XCTAssertEqual(attempts, 3)
+                XCTAssertNil(state.error, "Form errors must not trigger another global alert")
+                XCTAssertEqual(state.institutions, editing ? [bank] : [])
+                XCTAssertEqual(state.cards, editing ? [card] : [])
+                XCTAssertEqual(state.subscriptions, editing ? [service] : [])
+                // Retry the identical drafts, publish only after confirmation.
+                try await vm.saveInstitutionConfirmed(bankDraft, appState: state) { _, exists in XCTAssertEqual(exists, editing) }
+                try await vm.saveCardConfirmed(cardDraft, appState: state) { _, exists in XCTAssertEqual(exists, editing) }
+                let saved = try await vm.saveSubscriptionConfirmed(serviceDraft, appState: state) { _, exists in XCTAssertEqual(exists, editing) }
+                XCTAssertEqual(state.institutions, [bankDraft])
+                XCTAssertEqual(state.cards, [cardDraft])
+                XCTAssertEqual(state.subscriptions, [saved])
+                XCTAssertEqual(saved.name, "Service draft")
+                XCTAssertEqual(saved.id, serviceDraft.id)
+            }
+        }
+    }
+
+    @MainActor
+    func testConfirmedResourceSavesFailClosedAndDiscardAccountSwitchedReceipts() async throws {
+        let state = AppState(), vm = AppViewModel()
+        let actor = UUID(), owner = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        state.portfolioUserID = actor
+        state.companies = [company]
+        let bank = Institution(userId: owner, companyId: company.id)
+        let card = FinancialCard(userId: owner, companyId: company.id)
+        let service = Subscription(userId: owner, companyId: company.id)
+        // Exact item grants do not permit inserting a missing row, even with
+        // its same ID. Revoked grants also fail before persistence.
+        for grants in [[], [
+            ResourceShare(resourceId: bank.id, resourceType: "institution", userId: actor, role: "Editor"),
+            ResourceShare(resourceId: card.id, resourceType: "card", userId: actor, role: "Editor"),
+            ResourceShare(resourceId: service.id, resourceType: "subscription", userId: actor, role: "Editor")
+        ]] {
+            state.resourceShares = grants
+            do { try await vm.saveInstitutionConfirmed(bank, appState: state) { _, _ in XCTFail("Unauthorized bank write") }; XCTFail() }
+            catch { XCTAssertEqual((error as NSError).code, 403) }
+            do { try await vm.saveCardConfirmed(card, appState: state) { _, _ in XCTFail("Unauthorized card write") }; XCTFail() }
+            catch { XCTAssertEqual((error as NSError).code, 403) }
+            do { _ = try await vm.saveSubscriptionConfirmed(service, appState: state) { _, _ in XCTFail("Unauthorized service write") }; XCTFail() }
+            catch { XCTAssertEqual((error as NSError).code, 403) }
+        }
+        state.resourceShares = [ResourceShare(resourceId: company.id, resourceType: "company", userId: actor, role: "Editor")]
+        do { try await vm.saveInstitutionConfirmed(bank, appState: state) { _, _ in state.portfolioUserID = UUID() }; XCTFail() }
+        catch { XCTAssertTrue(error is CancellationError) }
+        state.portfolioUserID = actor
+        do { try await vm.saveCardConfirmed(card, appState: state) { _, _ in state.portfolioUserID = UUID() }; XCTFail() }
+        catch { XCTAssertTrue(error is CancellationError) }
+        state.portfolioUserID = actor
+        do { _ = try await vm.saveSubscriptionConfirmed(service, appState: state) { _, _ in state.portfolioUserID = UUID() }; XCTFail() }
+        catch { XCTAssertTrue(error is CancellationError) }
+        XCTAssertTrue(state.institutions.isEmpty)
+        XCTAssertTrue(state.cards.isEmpty)
+        XCTAssertTrue(state.subscriptions.isEmpty)
+        XCTAssertNil(state.error)
+    }
+
+    @MainActor
+    func testConfirmedSaveKeepsOwnerPlanGateAndOriginalOwnerBinding() async throws {
+        let state = AppState(), vm = AppViewModel()
+        let owner = UUID()
+        var first = Company(userId: owner, name: "First")
+        first.lastModified = Date(timeIntervalSince1970: 0)
+        let second = Company(userId: owner, name: "Second")
+        state.portfolioUserID = owner
+        state.companies = [first, second]
+        let allowed = Institution(userId: owner, companyId: first.id)
+        try await vm.saveInstitutionConfirmed(allowed, appState: state) { _, _ in }
+        let blocked = Institution(userId: owner, companyId: second.id)
+        do { try await vm.saveInstitutionConfirmed(blocked, appState: state) { _, _ in XCTFail("Free plan bypass") }; XCTFail() }
+        catch { XCTAssertEqual((error as NSError).code, 403) }
+        let foreign = Institution(userId: UUID(), companyId: first.id)
+        do { try await vm.saveInstitutionConfirmed(foreign, appState: state) { _, _ in XCTFail("Owner changed") }; XCTFail() }
+        catch { XCTAssertEqual((error as NSError).code, 403) }
+        XCTAssertEqual(state.institutions, [allowed])
+    }
+
+    func testResourceSaveErrorsAreSafeAndDoNotClaimNetworkRollback() {
+        for resource in ["bank", "card", "service", "document", "loan"] {
+            let failure = PostgrestError(code: "42501", message: "SECRET SQL payload")
+            XCTAssertFalse(ResourceSaveFailure.message(for: failure, resource: resource).contains("SECRET"))
+            XCTAssertTrue(ResourceSaveFailure.message(for: failure, resource: resource).contains("draft is still here"))
+            let network = ResourceSaveFailure.message(for: URLError(.networkConnectionLost), resource: resource)
+            XCTAssertTrue(network.contains("couldn’t confirm"))
+            XCTAssertFalse(network.contains("not submitted"))
+            XCTAssertTrue(ResourceSaveFailure.message(for: PostgrestError(code: "23505", message: "detail"), resource: resource).contains("already have been saved"))
+        }
+        for failure: LoanSaveError in [.changed, .accessDenied, .incompleteSnapshot, .unavailable, .unconfirmed] {
+            XCTAssertEqual(ResourceSaveFailure.message(for: failure, resource: "loan"), failure.localizedDescription)
+        }
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    func testStagingSaveFaultHookCannotTargetProductionAuthReadsOrDeviceBundle() {
+        XCTAssertTrue(StagingSaveFailureProtocol.isAllowedInstructionPath("/private/tmp/miloom-staging-save-fault-check.txt"))
+        XCTAssertTrue(StagingSaveFailureProtocol.isAllowedInstructionPath("/tmp/miloom-staging-save-fault-check.txt"))
+        XCTAssertFalse(StagingSaveFailureProtocol.isAllowedInstructionPath("/private/tmp/unrelated.txt"))
+        XCTAssertFalse(StagingSaveFailureProtocol.isAllowedInstructionPath("/private/tmp/miloom-staging-save-fault-test/../../unrelated"))
+        let url = URL(string: "https://bvtuyzhyospqxvpzcrmv.supabase.co")!
+        let arguments = ["--miloom-staging-save-faults"]
+        XCTAssertTrue(StagingSaveFailureProtocol.isEnabled(url: url, bundleID: "com.vibing.miloom.staging", arguments: arguments))
+        XCTAssertFalse(StagingSaveFailureProtocol.isEnabled(url: url, bundleID: "com.vibing.miloom", arguments: arguments))
+        XCTAssertFalse(StagingSaveFailureProtocol.isEnabled(url: url, bundleID: "com.vibing.miloom.staging", arguments: []))
+        XCTAssertFalse(StagingSaveFailureProtocol.isEnabled(url: URL(string: "https://xxqdytdbpiqjilhutvhz.supabase.co")!, bundleID: "com.vibing.miloom.staging", arguments: arguments))
+        for resource in ["institutions", "financial_cards", "subscriptions", "company_documents", "rpc/miloom_save_loan"] {
+            var request = URLRequest(url: url.appendingPathComponent("rest/v1/\(resource)"))
+            request.httpMethod = "POST"
+            XCTAssertEqual(StagingSaveFailureProtocol.errorCode(for: request, instruction: "offline:\(resource)"), .notConnectedToInternet)
+            XCTAssertEqual(StagingSaveFailureProtocol.errorCode(for: request, instruction: "interrupted:\(resource)"), .networkConnectionLost)
+            XCTAssertEqual(StagingSaveFailureProtocol.errorCode(for: request, instruction: "timeout:\(resource)"), .timedOut)
+            request.httpMethod = "GET"
+            XCTAssertNil(StagingSaveFailureProtocol.errorCode(for: request, instruction: "offline:\(resource)"))
+        }
+        for path in ["auth/v1/token", "rest/v1/activity_logs", "rest/v1/rpc/miloom_share_resource"] {
+            var request = URLRequest(url: url.appendingPathComponent(path))
+            request.httpMethod = "POST"
+            XCTAssertNil(StagingSaveFailureProtocol.errorCode(for: request, instruction: "offline:institutions"))
+        }
+    }
+    #endif
+
+    @MainActor
+    func testCollectionDocumentAndLoanDraftsSurviveConnectionFailures() async throws {
+        // Exercise the real save coordinator with a failing transport boundary.
+        // This is not native UI or physical network-interruption acceptance.
+        for code in [URLError.notConnectedToInternet, .networkConnectionLost, .timedOut] {
+            for editing in [false, true] {
+                let state = AppState()
+                let actor = UUID(), owner = UUID()
+                let company = Company(userId: owner, name: "Shared")
+                state.portfolioUserID = actor
+                state.companies = [company]
+                state.resourceShares = [
+                    ResourceShare(resourceId: company.id, resourceType: "company", userId: actor, role: "Viewer"),
+                    ResourceShare(resourceId: company.id, resourceType: "all_documents", userId: actor, role: "Editor"),
+                    ResourceShare(resourceId: company.id, resourceType: "all_financials", userId: actor, role: "Editor")
+                ]
+                let originalDoc = CompanyDocument(userId: owner, companyId: company.id, name: "Saved document")
+                let originalLoan = Loan(userId: owner, companyId: company.id, name: "Saved loan", payments: [])
+                state.documents = editing ? [originalDoc] : []
+                state.loans = editing ? [originalLoan] : []
+                var doc = originalDoc
+                var loan = originalLoan
+                doc.name = "Document draft"
+                loan.name = "Loan draft"
+                let vm = AppViewModel()
+                var documentAttempted = false, loanAttempted = false
+                do {
+                    try await vm.saveDocumentConfirmed(doc, appState: state) { proposed, exists in
+                        documentAttempted = true
+                        XCTAssertEqual(exists, editing)
+                        XCTAssertEqual(proposed.userId, owner)
+                        XCTAssertEqual(state.documents, editing ? [originalDoc] : [])
+                        await Task.yield()
+                        throw URLError(code)
+                    }
+                    XCTFail("Document connection failure was swallowed")
+                } catch { XCTAssertEqual((error as? URLError)?.code, code) }
+                do {
+                    _ = try await vm.saveLoanConfirmed(loan, appState: state) { proposed in
+                        loanAttempted = true
+                        XCTAssertEqual(proposed.userId, owner)
+                        XCTAssertEqual(state.loans, editing ? [originalLoan] : [])
+                        await Task.yield()
+                        throw URLError(code)
+                    }
+                    XCTFail("Loan connection failure was swallowed")
+                } catch { XCTAssertEqual((error as? URLError)?.code, code) }
+                XCTAssertTrue(documentAttempted)
+                XCTAssertTrue(loanAttempted)
+                XCTAssertEqual(state.documents, editing ? [originalDoc] : [])
+                XCTAssertEqual(state.loans, editing ? [originalLoan] : [])
+                XCTAssertEqual(doc.name, "Document draft")
+                XCTAssertEqual(loan.name, "Loan draft")
+            }
+        }
+    }
+
+    @MainActor
+    func testCollectionSavesPropagateServerRevocationDespiteCachedGrant() async throws {
+        let state = AppState()
+        let actor = UUID(), owner = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        state.portfolioUserID = actor
+        state.companies = [company]
+        let grants = [
+            ResourceShare(resourceId: company.id, resourceType: "all_documents", userId: actor, role: "Editor"),
+            ResourceShare(resourceId: company.id, resourceType: "all_financials", userId: actor, role: "Editor")
+        ]
+        state.resourceShares = grants
+        let document = CompanyDocument(userId: owner, companyId: company.id, name: "Unsaved document")
+        let loan = Loan(userId: owner, companyId: company.id, name: "Unsaved loan", payments: [])
+        let vm = AppViewModel()
+        var attempts = 0
+        do {
+            try await vm.saveDocumentConfirmed(document, appState: state) { _, _ in
+                attempts += 1
+                await Task.yield()
+                throw PostgrestError(code: "42501", message: "Synthetic revoked grant")
+            }
+            XCTFail("Stale cached document grant overrode server rejection")
+        } catch { XCTAssertEqual((error as? PostgrestError)?.code, "42501") }
+        do {
+            _ = try await vm.saveLoanConfirmed(loan, appState: state) { _ in
+                attempts += 1
+                await Task.yield()
+                throw LoanSaveError.accessDenied
+            }
+            XCTFail("Stale cached loan grant overrode server rejection")
+        } catch { XCTAssertTrue(error is LoanSaveError) }
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(state.resourceShares, grants, "Test must retain stale local grants")
+        XCTAssertTrue(state.documents.isEmpty)
+        XCTAssertTrue(state.loans.isEmpty)
+    }
+
+    @MainActor
+    func testRevokedBankCardAndServiceDraftsDoNotChangeSavedState() {
+        let state = AppState()
+        let actor = UUID(), owner = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        state.portfolioUserID = actor
+        state.companies = [company]
+        state.resourceShares = [ResourceShare(resourceId: company.id, resourceType: "company", userId: actor, role: "Viewer")]
+        let bank = Institution(userId: owner, companyId: company.id)
+        let card = FinancialCard(userId: owner, companyId: company.id)
+        let service = Subscription(userId: owner, companyId: company.id)
+        state.institutions = [bank]
+        state.cards = [card]
+        state.subscriptions = [service]
+        var bankDraft = bank, cardDraft = card, serviceDraft = service
+        bankDraft.name = "Revoked bank draft"
+        cardDraft.name = "Revoked card draft"
+        serviceDraft.name = "Revoked service draft"
+        let vm = AppViewModel()
+        vm.saveInstitution(bankDraft, appState: state)
+        XCTAssertNotNil(state.error)
+        state.error = nil
+        vm.saveCard(cardDraft, appState: state)
+        XCTAssertNotNil(state.error)
+        state.error = nil
+        vm.saveSub(serviceDraft, appState: state)
+        XCTAssertNotNil(state.error)
+        XCTAssertEqual(state.institutions, [bank])
+        XCTAssertEqual(state.cards, [card])
+        XCTAssertEqual(state.subscriptions, [service])
+        XCTAssertEqual(bankDraft.name, "Revoked bank draft")
+        XCTAssertEqual(cardDraft.name, "Revoked card draft")
+        XCTAssertEqual(serviceDraft.name, "Revoked service draft")
+        // Legacy non-form entry points still use these synchronous wrappers;
+        // the main forms now use the confirmed async coordinators above.
+    }
+
+    func testCreationUsesOnlyCompanyOrMatchingCollectionGrants() {
+        let owner = UUID(), actor = UUID(), company = UUID(), otherCompany = UUID()
+        let types = ["institution", "card", "loan", "subscription", "document"]
+        let expectations: [(String, Set<String>)] = [
+            ("all_institutions", ["institution"]),
+            ("all_financials", ["institution", "card", "loan"]),
+            ("all_subscriptions", ["subscription"]),
+            ("all_documents", ["document"]),
+            ("company", Set(types))
+        ]
+        for (scope, allowed) in expectations {
+            for role in ["Viewer", "Editor", "Admin"] {
+                let grant = ResourceShare(resourceId: company, resourceType: scope, userId: actor, role: role)
+                for type in types {
+                    XCTAssertEqual(AppViewModel.resourceAllowsCreation(
+                        [grant], actorID: actor, ownerID: owner, companyID: company, resourceType: type
+                    ), allowed.contains(type) && (role == "Editor" || (scope == "company" && role == "Admin")), "\(scope)/\(role)/\(type)")
+                    XCTAssertFalse(AppViewModel.resourceAllowsCreation(
+                        [grant], actorID: actor, ownerID: owner, companyID: otherCompany, resourceType: type
+                    ))
+                }
+            }
+        }
+    }
+
+    func testCreationRejectsExactItemsMissingActorAndUnrelatedRecipients() {
+        let owner = UUID(), actor = UUID(), company = UUID()
+        for type in ["institution", "card", "loan", "subscription", "document"] {
+            // Even an exact resource ID equal to the company ID is not a collection.
+            let item = ResourceShare(resourceId: company, resourceType: type, userId: actor, role: "Editor")
+            XCTAssertFalse(AppViewModel.resourceAllowsCreation([item], actorID: actor, ownerID: owner, companyID: company, resourceType: type))
+            XCTAssertFalse(AppViewModel.resourceAllowsCreation([], actorID: nil, ownerID: owner, companyID: company, resourceType: type))
+            XCTAssertTrue(AppViewModel.resourceAllowsCreation([], actorID: owner, ownerID: owner, companyID: company, resourceType: type))
+            XCTAssertFalse(AppViewModel.resourceAllowsCreation([], actorID: owner, ownerID: owner, companyID: company, resourceType: type, ownerCanEdit: false))
+        }
+        let foreign = ResourceShare(resourceId: company, resourceType: "company", userId: UUID(), role: "Admin")
+        XCTAssertFalse(AppViewModel.resourceAllowsCreation([foreign], actorID: actor, ownerID: owner, companyID: company, resourceType: "card"))
+        XCTAssertFalse(AppViewModel.resourceAllowsCreation([], actorID: owner, ownerID: owner, companyID: company, resourceType: "unknown"))
+    }
+
+    func testCreationMixedGrantsAreOrderIndependent() {
+        let owner = UUID(), actor = UUID(), company = UUID()
+        let viewer = ResourceShare(resourceId: company, resourceType: "company", userId: actor, role: "Viewer")
+        let editor = ResourceShare(resourceId: company, resourceType: "all_documents", userId: actor, role: "Editor")
+        for grants in [[viewer, editor], [editor, viewer]] {
+            XCTAssertTrue(AppViewModel.resourceAllowsCreation(grants, actorID: actor, ownerID: owner, companyID: company, resourceType: "document"))
+            XCTAssertFalse(AppViewModel.resourceAllowsCreation(grants, actorID: actor, ownerID: owner, companyID: company, resourceType: "loan"))
+        }
+    }
+
+    func testDocumentFileFailuresDoNotExposeServerBodiesOrPaths() {
+        let sensitiveDetail = "signed-token-and-private-object-path"
+        let errors: [Error] = [
+            FunctionsError.httpError(code: 403, data: Data(sensitiveDetail.utf8)),
+            FunctionsError.httpError(code: 500, data: Data(sensitiveDetail.utf8)),
+            StorageError(statusCode: "409", message: sensitiveDetail),
+            PostgrestError(code: "42501", message: sensitiveDetail),
+            NSError(domain: "Unknown", code: 0, userInfo: [NSLocalizedDescriptionKey: sensitiveDetail])
+        ]
+        for error in errors {
+            let message = DocumentFileFailure.message(for: error)
+            XCTAssertFalse(message.contains(sensitiveDetail))
+            XCTAssertFalse(message.contains("Edge Function"))
+            XCTAssertTrue(message.contains("Reopen"))
+        }
+    }
+
+    func testDocumentFileFailuresGiveRecoveryActionsWithoutClaimingRollback() {
+        XCTAssertTrue(DocumentFileFailure.message(for: URLError(.notConnectedToInternet)).contains("connection"))
+        XCTAssertTrue(DocumentFileFailure.message(for: URLError(.timedOut)).contains("before trying again"))
+        XCTAssertTrue(DocumentFileFailure.message(for: URLError(.userAuthenticationRequired)).contains("Sign in again"))
+        XCTAssertTrue(DocumentFileFailure.message(for: FunctionsError.httpError(code: 429, data: Data())).contains("Wait"))
+        XCTAssertTrue(DocumentFileFailure.message(for: NSError(domain: "App", code: -3)).contains("25 MB"))
+        XCTAssertEqual(DocumentFileFailure.message(for: DocumentFileOwnershipError.saveDocumentFirst), "Save this document first, then add its file.")
+    }
+
     func testEntitySharingChoicesKeepDistinctServerScopes() {
         XCTAssertEqual(EntitySharingScope.allCases.map(\.rawValue), [
             "company", "all_institutions", "all_financials", "all_subscriptions", "all_documents"

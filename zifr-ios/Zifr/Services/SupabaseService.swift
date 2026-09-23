@@ -68,6 +68,15 @@ class SupabaseService {
         sessionConfiguration.timeoutIntervalForRequest = 15
         sessionConfiguration.timeoutIntervalForResource = 60
         sessionConfiguration.waitsForConnectivity = false
+        #if DEBUG && targetEnvironment(simulator)
+        if StagingSaveFailureProtocol.isEnabled(
+            url: supabaseURL, bundleID: Bundle.main.bundleIdentifier,
+            arguments: ProcessInfo.processInfo.arguments
+        ) {
+            sessionConfiguration.protocolClasses = [StagingSaveFailureProtocol.self]
+                + (sessionConfiguration.protocolClasses ?? [])
+        }
+        #endif
         let networkSession = URLSession(configuration: sessionConfiguration)
         
         self.client = SupabaseClient(
@@ -125,3 +134,57 @@ class SupabaseService {
         }
     }
 }
+
+#if DEBUG && targetEnvironment(simulator)
+/// Explicitly opted-in, staging-only native acceptance aid. It fails selected
+/// save requests at URLSession, before transmission. Auth, reads and all other
+/// hosts pass through untouched. This is absent from device and Release builds.
+final class StagingSaveFailureProtocol: URLProtocol {
+    static func isEnabled(url: URL, bundleID: String?, arguments: [String]) -> Bool {
+        url.absoluteString == "https://bvtuyzhyospqxvpzcrmv.supabase.co"
+            && bundleID == "com.vibing.miloom.staging"
+            && arguments.contains("--miloom-staging-save-faults")
+    }
+
+    static func errorCode(for request: URLRequest, instruction: String) -> URLError.Code? {
+        guard request.url?.scheme == "https",
+              request.url?.host == "bvtuyzhyospqxvpzcrmv.supabase.co",
+              ["POST", "PATCH"].contains(request.httpMethod ?? "") else { return nil }
+        let parts = instruction.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+        guard parts.count == 2,
+              ["institutions", "financial_cards", "subscriptions", "company_documents", "rpc/miloom_save_loan"].contains(String(parts[1])),
+              request.url?.path == "/rest/v1/\(parts[1])" else { return nil }
+        switch parts[0] {
+        case "offline": return .notConnectedToInternet
+        case "interrupted": return .networkConnectionLost
+        case "timeout": return .timedOut
+        default: return nil
+        }
+    }
+
+    static func isAllowedInstructionPath(_ path: String) -> Bool {
+        // Foundation canonicalizes /private/tmp to /tmp on macOS/simulator.
+        let file = URL(fileURLWithPath: path).standardizedFileURL
+        let directory = URL(fileURLWithPath: "/private/tmp", isDirectory: true).resolvingSymlinksInPath()
+        return file.deletingLastPathComponent().resolvingSymlinksInPath() == directory
+            && file.lastPathComponent.hasPrefix("miloom-staging-save-fault-")
+    }
+
+    private static func currentError(for request: URLRequest) -> URLError.Code? {
+        guard let path = ProcessInfo.processInfo.environment["MILOOM_STAGING_SAVE_FAULT_FILE"],
+              isAllowedInstructionPath(path),
+              let instruction = try? String(contentsOfFile: path, encoding: .utf8),
+              instruction.utf8.count < 128 else { return nil }
+        return errorCode(for: request, instruction: instruction)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        currentError(for: request) != nil
+    }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(Self.currentError(for: request) ?? .cancelled))
+    }
+    override func stopLoading() {}
+}
+#endif

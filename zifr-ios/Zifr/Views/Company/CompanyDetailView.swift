@@ -36,6 +36,21 @@ struct CompanyDetailView: View {
         )
     }
 
+    private func canCreate(_ type: String) -> Bool {
+        AppViewModel.resourceAllowsCreation(
+            appState.resourceShares, actorID: appState.portfolioUserID,
+            ownerID: company.userId, companyID: company.id, resourceType: type
+        )
+    }
+
+    private var canAddInActiveTab: Bool {
+        switch vm.activeTab {
+        case .financial: return ["institution", "card", "loan"].contains { canCreate($0) }
+        case .subscriptions: return canCreate("subscription")
+        case .documents: return canCreate("document")
+        }
+    }
+
     /// Company collaboration grants access to business records, never to the
     /// owner's vault. Secret access remains owner-only until a separate,
     /// resource-specific secret grant exists.
@@ -85,6 +100,7 @@ struct CompanyDetailView: View {
     @State private var newCard: FinancialCard? = nil
     @State private var newDoc: CompanyDocument? = nil
     @State private var newLoan: Loan? = nil
+    @State private var newManualInstitution: Institution?
     @State private var wizardInstitution: Institution? = nil
     @State private var showAssistant = false
     @State private var assistantStrokeRotation: Double = 0.0
@@ -145,11 +161,20 @@ struct CompanyDetailView: View {
             )
         }
         .sheet(item: $newSub) { sub in
-            AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
-                .presentationDetents([.fraction(0.9), .large])
+            if appState.portfolioUserID == company.userId {
+                AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
+                    .presentationDetents([.fraction(0.9), .large])
+            } else {
+                // Collaborator creation must not prompt for owner-vault credentials.
+                EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: true)
+            }
         }
         .sheet(item: $newCard) { c in
             EditCardSheet(card: c, vm: vm, institutions: institutions, cards: cards, isNew: true)
+        }
+        .sheet(item: $newManualInstitution) { institution in
+            EditInstitutionSheet(institution: institution, institutions: institutions,
+                                 cards: cards, loans: loans, vm: vm, isNew: true)
         }
         .sheet(item: $newDoc) { doc in
             EditDocumentSheet(doc: doc, vm: vm, isNew: true, companyStructure: company.structure)
@@ -423,7 +448,7 @@ struct CompanyDetailView: View {
             entitiesControlMenu
 
             // 4. Quick add for editors; a passive role indicator for viewers.
-            if canEditCompany {
+            if canAddInActiveTab {
                 plusControlMenu
             } else {
                 readOnlyControl
@@ -746,45 +771,64 @@ struct CompanyDetailView: View {
         switch vm.activeTab {
         case .financial:
             Menu {
-                if !institutions.isEmpty {
+                if canCreate("loan") {
                     Button {
+                        guard canCreate("loan") else { return }
                         newLoan = vm.addLoan(appState: appState, userId: company.userId, companyId: company.id)
                     } label: {
                         Label("Add Loan", systemImage: "dollarsign.circle")
                     }
                 }
-                Button {
-                    newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
-                } label: {
-                    Label("Add Card", systemImage: "creditcard")
+                if canCreate("card") {
+                    Button {
+                        guard canCreate("card") else { return }
+                        newCard = vm.addCard(appState: appState, userId: company.userId, companyId: company.id)
+                    } label: {
+                        Label("Add Card", systemImage: "creditcard")
+                    }
                 }
-                Button {
-                    wizardInstitution = Institution(userId: company.userId, companyId: company.id)
-                } label: {
-                    Label("Add Account", systemImage: "building.columns")
+                if canCreate("institution") {
+                    Button {
+                        guard canCreate("institution") else { return }
+                        let draft = Institution(userId: company.userId, companyId: company.id)
+                        if appState.portfolioUserID == company.userId {
+                            wizardInstitution = draft
+                        } else {
+                            // Bank linking and its multi-resource wizard remain owner-only.
+                            newManualInstitution = draft
+                        }
+                    } label: {
+                        Label(appState.portfolioUserID == company.userId ? "Add Account" : "Add Institution Manually",
+                              systemImage: "building.columns")
+                    }
                 }
             } label: {
                 plusButtonLabel
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Add financial item")
 
         case .subscriptions:
             Button {
+                guard canCreate("subscription") else { return }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 newSub = Subscription(userId: company.userId, companyId: company.id)
             } label: {
                 plusButtonLabel
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Add service")
 
         case .documents:
             Button {
+                guard canCreate("document") else { return }
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 newDoc = CompanyDocument(userId: company.userId, companyId: company.id)
             } label: {
                 plusButtonLabel
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Add document")
         }
     }
 

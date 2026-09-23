@@ -13,6 +13,10 @@ struct EditCardSheet: View {
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
     @State private var resourceCredentialStatus = "checking"
+    @State private var isSaving = false
+    @State private var saveError: String?
+    @State private var newInstitutionDraftID = UUID()
+    @State private var institutionChangeSaved = false
     @State private var showDeleteConfirm = false
     @State private var showShareSheet = false
     @State private var showDeleteInstitutionConfirm = false
@@ -193,7 +197,7 @@ struct EditCardSheet: View {
     }
 
     @ViewBuilder private var institutionDetailsSection: some View {
-        if isNewInstitution {
+        if isNewInstitution && card.userId == appState.portfolioUserID {
             VStack(alignment: .leading, spacing: 8) {
                 ZifrField(
                     label: "INSTITUTION NAME",
@@ -250,7 +254,7 @@ struct EditCardSheet: View {
                 .foregroundStyle(Color.white.opacity(0.5))
             
             VStack(spacing: 0) {
-                if !institutions.isEmpty {
+                if !institutions.isEmpty && card.userId == appState.portfolioUserID {
                     CustomSegmentedControl(
                         options: ["Select Existing", "Create New"],
                         selection: Binding(
@@ -294,6 +298,13 @@ struct EditCardSheet: View {
                 
                 if isNewInstitution || !(card.institutionName ?? "").isEmpty {
                     institutionDetailsSection
+                }
+
+                if card.userId != appState.portfolioUserID {
+                    Text("Choose an existing institution to save this card. Manage institutions separately from the Financial tab if you have access.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
             }
@@ -806,6 +817,7 @@ struct EditCardSheet: View {
             }
             .scrollDismissesKeyboard(.interactively)
             .background(Color(hex: "#1C1C1E"))
+            .disabled(isSaving)
             .sheet(isPresented: $showCardScanner) {
                 CardScannerView { result in
                     if let number = result.cardNumber {
@@ -845,7 +857,9 @@ struct EditCardSheet: View {
                                 )
             }
             .onAppear {
-                if isNew {
+                if card.userId != appState.portfolioUserID {
+                    isNewInstitution = false
+                } else if isNew {
                     isNewInstitution = institutions.isEmpty
                 } else {
                     isNewInstitution = (card.institutionName ?? "").isEmpty || !institutions.contains(where: { $0.name.lowercased() == (card.institutionName ?? "").lowercased() })
@@ -862,45 +876,46 @@ struct EditCardSheet: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        if isNew { 
-                            vm.deleteCard(card, appState: appState) 
-                        } else if let snap = snapshot {
-                            card.name = snap.name
-                            card.login = snap.login
-                            card.password = snap.password
-                            card.last4 = snap.last4
-                            card.network = snap.network
-                            card.type = snap.type
-                            card.autopay = snap.autopay
-                            card.cardHolder = snap.cardHolder
-                            card.cardHolderType = snap.cardHolderType
-                            card.expiry = snap.expiry
-                            card.notes = snap.notes
-                            card.balance = snap.balance
-                            card.limit = snap.limit
-                            card.moPayment = snap.moPayment
-                            card.apr = snap.apr
-                            card.promoApr = snap.promoApr
-                            card.promoEnds = snap.promoEnds
-                        }
+                        // Never DELETE a draft, including after an uncertain save.
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if !isViewer {
-                        Button("Save") {
+                        Button(isSaving ? "Saving…" : "Save") {
+                            guard !isSaving else { return }
+                            isSaving = true
                             card.institutionName = institutionName
-                            saveInstitutionData()
-                            vm.saveCard(card, appState: appState)
-                            dismiss()
+                            Task { @MainActor in
+                                defer { isSaving = false }
+                                do {
+                                    if try await saveInstitutionData() { institutionChangeSaved = true }
+                                    try await vm.saveCardConfirmed(card, appState: appState)
+                                    dismiss()
+                                } catch {
+                                    var message = ResourceSaveFailure.message(for: error, resource: "card")
+                                    if institutionChangeSaved {
+                                        message += " Institution changes that were already confirmed remain saved."
+                                    }
+                                    saveError = message
+                                }
+                            }
                         }
                         .fontWeight(.semibold)
                         .tint(canSave && isDirty ? .green : nil)
-                        .disabled(!canSave)
+                        .disabled(!canSave || isSaving)
                     }
                 }
             }
-            .interactiveDismissDisabled(isNew)
+            .interactiveDismissDisabled(isNew || isSaving)
+            .alert("Card Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
+            }
             .sheet(isPresented: $showShareSheet) {
                 ShareEntitySheet(resourceId: card.id, resourceType: "card", resourceTitle: card.name.isEmpty ? "Card" : card.name)
             }
@@ -983,34 +998,48 @@ struct EditCardSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func saveInstitutionData() {
-        guard !institutionName.isEmpty else { return }
+    @MainActor
+    private func saveInstitutionData() async throws -> Bool {
+        guard !institutionName.isEmpty else { return false }
         // Saving a shared card must not also write its bank or bank credentials.
         // Collaborators manage an independently granted bank in its own editor.
-        guard card.userId == appState.portfolioUserID else { return }
+        guard card.userId == appState.portfolioUserID else { return false }
 
         if isNewInstitution {
-            var newInst = vm.addInstitution(appState: appState, userId: card.userId, companyId: card.companyId)
+            // Stable identity across retries: a confirmed bank followed by a
+            // failed card save must not create a second institution.
+            var newInst = appState.institutions.first { $0.id == newInstitutionDraftID }
+                ?? Institution(id: newInstitutionDraftID, userId: card.userId, companyId: card.companyId)
             newInst.name = institutionName
             newInst.loginUrl = instWebsite
             newInst.username = instLogin
             newInst.password = instPass
             newInst.email = instEmail
             newInst.twoFactor = instTwoFactor
-            vm.saveInstitution(newInst, appState: appState)
+            if appState.institutions.first(where: { $0.id == newInst.id }) != newInst {
+                try await vm.saveInstitutionConfirmed(newInst, appState: appState)
+                return true
+            }
         } else {
             let instName = institutionName.lowercased()
             if !instName.isEmpty {
-                if var existing = institutions.first(where: { $0.name.lowercased() == instName }) {
+                if var existing = appState.institutions.first(where: {
+                    $0.companyId == card.companyId && $0.userId == card.userId && $0.name.lowercased() == instName
+                }) {
+                    let original = existing
                     if !instWebsite.isEmpty { existing.loginUrl = instWebsite }
                     if !instLogin.isEmpty { existing.username = instLogin }
                     if !instPass.isEmpty { existing.password = instPass }
                     if !instEmail.isEmpty { existing.email = instEmail }
                     if !instTwoFactor.isEmpty { existing.twoFactor = instTwoFactor }
-                    vm.saveInstitution(existing, appState: appState)
+                    if existing != original {
+                        try await vm.saveInstitutionConfirmed(existing, appState: appState)
+                        return true
+                    }
                 }
             }
         }
+        return false
     }
 
     private func moneyField(label: String, value: Binding<Double>) -> some View {
