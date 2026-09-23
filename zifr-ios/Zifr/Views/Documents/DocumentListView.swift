@@ -1231,7 +1231,7 @@ struct EditDocumentSheet: View {
                                     }
                                     Button("Cancel", role: .cancel) {}
                                 } message: {
-                                    Text("This will permanently delete this document and all associated files from the server. This action cannot be undone.")
+                                    Text("This removes the document from Miloom. Its stored file may take a short time to finish deleting. This action cannot be undone.")
                                 }
                             }
                         }

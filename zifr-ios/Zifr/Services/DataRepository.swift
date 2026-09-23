@@ -1431,8 +1431,11 @@ class DataRepository {
         guard userId == ownerUserID else {
             throw DocumentFileOwnershipError.ownerRequired
         }
-        let fileExtension = URL(fileURLWithPath: fileName).pathExtension
-        let uniqueName = "\(UUID().uuidString).\(fileExtension.isEmpty ? "bin" : fileExtension)"
+        let rawExtension = URL(fileURLWithPath: fileName).pathExtension.lowercased()
+        let fileExtension = rawExtension.range(
+            of: "^[a-z0-9]{1,12}$", options: .regularExpression
+        ) == nil ? "bin" : rawExtension
+        let uniqueName = "\(UUID().uuidString).\(fileExtension)"
         let filePath = "\(userId.uuidString)/\(uniqueName)"
         
         do {
@@ -1441,7 +1444,7 @@ class DataRepository {
                 .upload(
                     path: filePath,
                     file: fileData,
-                    options: FileOptions(cacheControl: "3600", contentType: contentType, upsert: true)
+                    options: FileOptions(cacheControl: "3600", contentType: contentType, upsert: false)
                 )
             
             return filePath
