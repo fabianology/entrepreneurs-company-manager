@@ -20,9 +20,15 @@ enum ShareInviteResult {
 
 enum DocumentFileOwnershipError: LocalizedError {
     case ownerRequired
+    case saveDocumentFirst
 
     var errorDescription: String? {
-        "Only the document owner can currently upload or remove a shared file. Document metadata can still be edited."
+        switch self {
+        case .ownerRequired:
+            "Only the document owner can remove this shared file directly."
+        case .saveDocumentFirst:
+            "Save this document first, then add its file."
+        }
     }
 }
 
@@ -1422,20 +1428,81 @@ class DataRepository {
     // MARK: - File Storage Upload
     func uploadDocumentFile(
         fileData: Data, fileName: String, contentType: String,
-        ownerUserID: UUID
+        ownerUserID: UUID, documentID: UUID? = nil, expectedURL: String? = nil
     ) async throws -> String {
         guard let session = try? await client.auth.session else {
             throw URLError(.userAuthenticationRequired)
         }
         let userId = session.user.id
-        guard userId == ownerUserID else {
-            throw DocumentFileOwnershipError.ownerRequired
-        }
         let rawExtension = URL(fileURLWithPath: fileName).pathExtension.lowercased()
         let fileExtension = rawExtension.range(
             of: "^[a-z0-9]{1,12}$", options: .regularExpression
         ) == nil ? "bin" : rawExtension
         let uniqueName = "\(UUID().uuidString).\(fileExtension)"
+        if userId != ownerUserID {
+            guard let documentID else {
+                throw DocumentFileOwnershipError.saveDocumentFirst
+            }
+            struct PreparePayload: Encodable {
+                let document_id: UUID
+                let expected_url: String?
+                let `extension`: String
+                let byte_count: Int
+
+                enum CodingKeys: String, CodingKey {
+                    case document_id, expected_url, `extension`, byte_count
+                }
+
+                func encode(to encoder: Encoder) throws {
+                    var box = encoder.container(keyedBy: CodingKeys.self)
+                    try box.encode(document_id, forKey: .document_id)
+                    if let expected_url {
+                        try box.encode(expected_url, forKey: .expected_url)
+                    } else {
+                        try box.encodeNil(forKey: .expected_url)
+                    }
+                    try box.encode(`extension`, forKey: .extension)
+                    try box.encode(byte_count, forKey: .byte_count)
+                }
+            }
+            struct PreparedUpload: Decodable {
+                let reservationID: UUID
+                let path: String
+                let token: String
+                enum CodingKeys: String, CodingKey {
+                    case reservationID = "reservation_id", path, token
+                }
+            }
+            struct FinalizeParams: Encodable { let p_reservation_id: UUID }
+            struct FinalizedUpload: Decodable { let status: String; let path: String }
+
+            let payload = PreparePayload(
+                document_id: documentID, expected_url: expectedURL,
+                extension: fileExtension, byte_count: fileData.count
+            )
+            let options = FunctionInvokeOptions(
+                method: .post,
+                headers: ["Content-Type": "application/json"],
+                body: try JSONEncoder().encode(payload)
+            )
+            let prepared: PreparedUpload = try await client.functions.invoke(
+                "prepare-document-upload", options: options
+            )
+            _ = try await client.storage.from("CompanyDocuments").uploadToSignedURL(
+                prepared.path, token: prepared.token, data: fileData,
+                options: FileOptions(contentType: contentType, upsert: false)
+            )
+            let finalized: FinalizedUpload = try await client.rpc(
+                "miloom_finalize_document_upload",
+                params: FinalizeParams(p_reservation_id: prepared.reservationID)
+            ).execute().value
+            guard finalized.status == "attached", finalized.path == prepared.path else {
+                throw NSError(domain: "Documents", code: 409, userInfo: [
+                    NSLocalizedDescriptionKey: "The file uploaded, but Miloom could not confirm its document link. Refresh and try again."
+                ])
+            }
+            return finalized.path
+        }
         let filePath = "\(userId.uuidString)/\(uniqueName)"
         
         do {
@@ -1460,6 +1527,18 @@ class DataRepository {
             try fileManager.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: localURL.path)
             return localURL.absoluteString
         }
+    }
+
+    func canUploadSharedDocumentFile(_ documentID: UUID) async -> Bool {
+        struct Params: Encodable { let p_document_id: UUID }
+        struct Status: Decodable { let canUpload: Bool
+            enum CodingKeys: String, CodingKey { case canUpload = "can_upload" }
+        }
+        guard let status: Status = try? await client.rpc(
+            "miloom_document_upload_status",
+            params: Params(p_document_id: documentID)
+        ).execute().value else { return false }
+        return status.canUpload
     }
 
     func getSignedUrl(for docUrl: String) async throws -> URL {

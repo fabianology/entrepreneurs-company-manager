@@ -924,10 +924,15 @@ struct EditDocumentSheet: View {
     @State private var showFileImporter = false
     @State private var isUploading = false
     @State private var uploadError: String? = nil
+    @State private var canUploadSharedFile = false
     @State private var showPremiumUpgrade = false
 
     private var canManageSharedFile: Bool {
         authVM.currentUser?.id == doc.userId
+    }
+
+    private var canUploadFile: Bool {
+        canManageSharedFile || (!isNew && canUploadSharedFile)
     }
 
     private var cannotReplaceStoredFile: Bool {
@@ -953,8 +958,15 @@ struct EditDocumentSheet: View {
     }
     
     private var isViewer: Bool {
-        let share = appState.resourceShares.first(where: { $0.resourceId == doc.id || $0.resourceId == doc.companyId })
-        return share?.role == "Viewer"
+        if canManageSharedFile { return false }
+        let shares = appState.resourceShares.filter { share in
+            share.userId == authVM.currentUser?.id && (
+                (share.resourceType == "document" && share.resourceId == doc.id)
+                || (["company", "all_documents"].contains(share.resourceType)
+                    && share.resourceId == doc.companyId)
+            )
+        }
+        return !shares.isEmpty && !shares.contains { ["Editor", "Admin"].contains($0.role) }
     }
     
     struct Snapshot: Equatable {
@@ -1056,7 +1068,12 @@ struct EditDocumentSheet: View {
                                     if inputMode == 0 {
                                         VStack(spacing: 12) {
                                             if !canManageSharedFile {
-                                                Label("The owner manages this document's file. You can still edit its details.", systemImage: "lock.shield")
+                                                Label(
+                                                    canUploadSharedFile
+                                                        ? "You can replace this file. The replacement is saved immediately."
+                                                        : "The owner manages this document's file. You can still edit its details.",
+                                                    systemImage: canUploadSharedFile ? "doc.badge.arrow.up" : "lock.shield"
+                                                )
                                                     .font(.footnote)
                                                     .foregroundStyle(.secondary)
                                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1095,7 +1112,7 @@ struct EditDocumentSheet: View {
                                             HStack(spacing: 12) {
                                                 Button {
                                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                                    if accessController.request(
+                                                    if canUploadSharedFile || accessController.request(
                                                         .documentUpload,
                                                         source: "document_file_upload",
                                                         appState: appState,
@@ -1119,7 +1136,7 @@ struct EditDocumentSheet: View {
                                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                                 }
                                                 .buttonStyle(.plain)
-                                                .disabled(!canManageSharedFile)
+                                                .disabled(!canUploadFile)
                                                 
                                                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                                                     HStack {
@@ -1134,7 +1151,7 @@ struct EditDocumentSheet: View {
                                                     .background(Color.white.opacity(0.08))
                                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                                 }
-                                                .disabled(!canManageSharedFile)
+                                                .disabled(!canUploadFile)
                                             }
                                             
                                             if isUploading {
@@ -1246,6 +1263,12 @@ struct EditDocumentSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 snapshot = currentSnapshot
+                if !isNew && !canManageSharedFile {
+                    Task {
+                        canUploadSharedFile = await DataRepository.shared
+                            .canUploadSharedDocumentFile(doc.id)
+                    }
+                }
                 
                 if (doc.uploadDate ?? "").isEmpty {
                     let df = DateFormatter()
@@ -1258,7 +1281,7 @@ struct EditDocumentSheet: View {
             }
             .onChange(of: selectedPhotoItem) { _, item in
                 guard let item = item else { return }
-                guard accessController.request(
+                guard canUploadSharedFile || accessController.request(
                     .documentUpload,
                     source: "document_photo_upload",
                     appState: appState,
@@ -1279,10 +1302,16 @@ struct EditDocumentSheet: View {
                                 throw NSError(domain: "App", code: -3, userInfo: [NSLocalizedDescriptionKey: "File is too large (\(data.count / 1_048_576) MB). Maximum size is 25 MB."])
                             }
                             let fileName = "Photo_\(Int(Date().timeIntervalSince1970)).jpg"
-                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: "image/jpeg", ownerUserID: doc.userId)
+                            let oldURL = snapshot?.url ?? ""
+                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(
+                                fileData: data, fileName: fileName, contentType: "image/jpeg",
+                                ownerUserID: doc.userId, documentID: isNew ? nil : doc.id,
+                                expectedURL: oldURL.isEmpty ? nil : oldURL
+                            )
                             
                             await MainActor.run {
                                 doc.url = uploadUrl
+                                if !canManageSharedFile { snapshot?.url = uploadUrl }
                                 if doc.name.isEmpty || doc.name == "New Document" {
                                     doc.name = "Photo - \(doc.type)"
                                 }
@@ -1341,10 +1370,16 @@ struct EditDocumentSheet: View {
                             default: contentType = "application/octet-stream"
                             }
                             
-                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: contentType, ownerUserID: doc.userId)
+                            let oldURL = snapshot?.url ?? ""
+                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(
+                                fileData: data, fileName: fileName, contentType: contentType,
+                                ownerUserID: doc.userId, documentID: isNew ? nil : doc.id,
+                                expectedURL: oldURL.isEmpty ? nil : oldURL
+                            )
                             
                             await MainActor.run {
                                 doc.url = uploadUrl
+                                if !canManageSharedFile { snapshot?.url = uploadUrl }
                                 if doc.name.isEmpty || doc.name == "New Document" {
                                     doc.name = url.deletingPathExtension().lastPathComponent
                                 }
@@ -1392,6 +1427,7 @@ struct EditDocumentSheet: View {
                         Button("Save") { vm.saveDoc(doc, appState: appState); dismiss() }
                             .font(.system(size: 15, weight: .black))
                             .foregroundStyle(isDirty ? Color.green : .white)
+                            .disabled(isUploading)
                     }
                 }
             }

@@ -4,6 +4,38 @@ import CryptoKit
 @testable import Zifr
 
 final class ActiveSessionsTests: XCTestCase {
+    func testSharedEditorScopesMatchTheExactResourceAndCollections() {
+        let actor = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let otherActor = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+        let company = UUID(uuidString: "10000000-0000-0000-0000-000000000001")!
+        let bank = UUID(uuidString: "30000000-0000-0000-0000-000000000001")!
+        let card = UUID(uuidString: "40000000-0000-0000-0000-000000000001")!
+        let document = UUID(uuidString: "60000000-0000-0000-0000-000000000001")!
+        func share(_ type: String, _ id: UUID, _ role: String = "Editor", _ user: UUID? = nil) -> ResourceShare {
+            ResourceShare(resourceId: id, resourceType: type, userId: user ?? actor, role: role)
+        }
+        func allows(_ shares: [ResourceShare], _ type: String, _ id: UUID) -> Bool {
+            AppViewModel.shareAllowsEdit(
+                shares, actorID: actor, companyID: company,
+                resourceType: type, resourceID: id
+            )
+        }
+
+        XCTAssertTrue(allows([share("document", document)], "document", document))
+        XCTAssertFalse(allows([share("document", document)], "institution", bank))
+        XCTAssertTrue(allows([share("institution", bank)], "institution", bank))
+        XCTAssertFalse(allows([share("all_institutions", company)], "card", card))
+        XCTAssertTrue(allows([share("all_institutions", company)], "institution", bank))
+        XCTAssertTrue(allows([share("all_financials", company)], "card", card))
+        XCTAssertFalse(allows([share("all_financials", company)], "document", document))
+        XCTAssertFalse(allows([share("company", company, "Viewer")], "document", document))
+        XCTAssertTrue(allows([
+            share("company", company, "Viewer"), share("document", document)
+        ], "document", document))
+        XCTAssertFalse(allows([share("document", document, "Editor", otherActor)], "document", document))
+        XCTAssertTrue(allows([share("company", company, "Admin")], "document", document))
+    }
+
     func testDocumentDeletionAcceptsOnlyAppGeneratedRelativeStoragePath() {
         let path = "00000000-0000-0000-0000-000000000001/document.pdf"
         XCTAssertEqual(DataRepository.companyDocumentStoragePath(path), path)

@@ -39,7 +39,7 @@ final class AppViewModel {
     }
 
     func updateCompany(_ company: Company, appState: AppState) {
-        guard canEdit(companyId: company.id, appState: appState) else { return }
+        guard canEdit(companyId: company.id, resourceType: "company", resourceId: company.id, appState: appState) else { return }
         guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
         let original = appState.companies[idx]
         var mutableCompany = company
@@ -74,7 +74,7 @@ final class AppViewModel {
     func touchCompany(_ company: Company, appState: AppState) {
         // Viewing a shared company must not attempt to update the owner's row.
         guard company.userId == appState.portfolioUserID else { return }
-        guard canEdit(companyId: company.id, appState: appState) else { return }
+        guard canEdit(companyId: company.id, resourceType: "company", resourceId: company.id, appState: appState) else { return }
         guard let idx = appState.companies.firstIndex(where: { $0.id == company.id }) else { return }
         let original = appState.companies[idx]
         var mutableCompany = company
@@ -92,7 +92,7 @@ final class AppViewModel {
     }
 
     func saveSub(_ sub: Subscription, appState: AppState) {
-        guard canEdit(companyId: sub.companyId, appState: appState) else { return }
+        guard canEdit(companyId: sub.companyId, resourceType: "subscription", resourceId: sub.id, appState: appState) else { return }
         var mutableSub = SubscriptionRenewalScheduler.normalized(sub)
         mutableSub.lastUpdated = Date()
         if let idx = appState.subscriptions.firstIndex(where: { $0.id == sub.id }) {
@@ -112,7 +112,7 @@ final class AppViewModel {
     }
 
     func deleteSub(_ sub: Subscription, appState: AppState) {
-        guard canEdit(companyId: sub.companyId, appState: appState) else { return }
+        guard canEdit(companyId: sub.companyId, resourceType: "subscription", resourceId: sub.id, appState: appState) else { return }
         let original = appState.subscriptions
         appState.subscriptions.removeAll { $0.id == sub.id }
         Task {
@@ -127,7 +127,7 @@ final class AppViewModel {
     }
 
     func saveCard(_ card: FinancialCard, appState: AppState) {
-        guard canEdit(companyId: card.companyId, appState: appState) else { return }
+        guard canEdit(companyId: card.companyId, resourceType: "card", resourceId: card.id, appState: appState) else { return }
         if let idx = appState.cards.firstIndex(where: { $0.id == card.id }) {
             let original = appState.cards[idx]
             appState.cards[idx] = card
@@ -145,7 +145,7 @@ final class AppViewModel {
     }
 
     func deleteCard(_ card: FinancialCard, appState: AppState) {
-        guard canEdit(companyId: card.companyId, appState: appState) else { return }
+        guard canEdit(companyId: card.companyId, resourceType: "card", resourceId: card.id, appState: appState) else { return }
         cleanUpCustomPaymentMethod(name: card.name)
         let original = appState.cards
         appState.cards.removeAll { $0.id == card.id }
@@ -161,7 +161,7 @@ final class AppViewModel {
     }
 
     func saveInstitution(_ inst: Institution, appState: AppState) {
-        guard canEdit(companyId: inst.companyId, appState: appState) else { return }
+        guard canEdit(companyId: inst.companyId, resourceType: "institution", resourceId: inst.id, appState: appState) else { return }
         if let idx = appState.institutions.firstIndex(where: { $0.id == inst.id }) {
             let original = appState.institutions[idx]
             appState.institutions[idx] = inst
@@ -180,7 +180,7 @@ final class AppViewModel {
 
     @MainActor
     func saveFinancialInstitutionCascade(institution: Institution, cards: [FinancialCard], loans: [Loan], appState: AppState) async throws {
-        guard canEdit(companyId: institution.companyId, appState: appState) else {
+        guard canEdit(companyId: institution.companyId, resourceType: "company", resourceId: institution.companyId, appState: appState) else {
             throw NSError(
                 domain: "AppViewModel",
                 code: 403,
@@ -243,7 +243,7 @@ final class AppViewModel {
     /// changing local state, so a disappearing row is a confirmed deletion.
     @MainActor
     func deleteInstitutionConfirmed(_ inst: Institution, appState: AppState) async throws {
-        guard canEdit(companyId: inst.companyId, appState: appState) else {
+        guard inst.userId == appState.portfolioUserID else {
             throw NSError(
                 domain: "AppViewModel",
                 code: 403,
@@ -285,7 +285,7 @@ final class AppViewModel {
     }
 
     func saveLoan(_ loan: Loan, appState: AppState) {
-        guard canEdit(companyId: loan.companyId, appState: appState) else { return }
+        guard canEdit(companyId: loan.companyId, resourceType: "loan", resourceId: loan.id, appState: appState) else { return }
         if let idx = appState.loans.firstIndex(where: { $0.id == loan.id }) {
             let original = appState.loans[idx]
             appState.loans[idx] = loan
@@ -303,7 +303,7 @@ final class AppViewModel {
     }
 
     func deleteLoan(_ loan: Loan, appState: AppState) {
-        guard canEdit(companyId: loan.companyId, appState: appState) else { return }
+        guard canEdit(companyId: loan.companyId, resourceType: "loan", resourceId: loan.id, appState: appState) else { return }
         let original = appState.loans
         appState.loans.removeAll { $0.id == loan.id }
         Task {
@@ -318,7 +318,7 @@ final class AppViewModel {
     }
 
     func saveDoc(_ doc: CompanyDocument, appState: AppState) {
-        guard canEdit(companyId: doc.companyId, appState: appState) else { return }
+        guard canEdit(companyId: doc.companyId, resourceType: "document", resourceId: doc.id, appState: appState) else { return }
         if let idx = appState.documents.firstIndex(where: { $0.id == doc.id }) {
             let original = appState.documents[idx]
             appState.documents[idx] = doc
@@ -335,7 +335,33 @@ final class AppViewModel {
         }
     }
 
-    private func canEdit(companyId: UUID, appState: AppState) -> Bool {
+    static func shareAllowsEdit(
+        _ shares: [ResourceShare], actorID: UUID, companyID: UUID,
+        resourceType: String, resourceID: UUID
+    ) -> Bool {
+        shares.contains { share in
+            guard share.userId == actorID,
+                  ["Editor", "Admin"].contains(share.role) else { return false }
+            if share.resourceType == "company" && share.resourceId == companyID {
+                return true
+            }
+            if share.resourceType == resourceType && share.resourceId == resourceID {
+                return true
+            }
+            guard share.resourceId == companyID else { return false }
+            switch share.resourceType {
+            case "all_subscriptions": return resourceType == "subscription"
+            case "all_documents": return resourceType == "document"
+            case "all_institutions": return resourceType == "institution"
+            case "all_financials": return ["institution", "card", "loan"].contains(resourceType)
+            default: return false
+            }
+        }
+    }
+
+    private func canEdit(
+        companyId: UUID, resourceType: String, resourceId: UUID, appState: AppState
+    ) -> Bool {
         guard let currentUserId = appState.portfolioUserID,
               let company = appState.companies.first(where: { $0.id == companyId }) else {
             appState.error = "Your account access could not be verified. Refresh and try again."
@@ -345,14 +371,11 @@ final class AppViewModel {
         // A collaboration role is an authorization boundary. Premium access
         // unlocks product features, but it must never elevate a Viewer share.
         if company.userId != currentUserId {
-            guard let share = appState.resourceShares.first(where: {
-                $0.resourceId == companyId && $0.userId == currentUserId
-            }) else {
-                appState.error = "You no longer have access to this company."
-                return false
-            }
-            guard ["Editor", "Admin"].contains(share.role) else {
-                appState.error = "Viewer access is read-only."
+            guard Self.shareAllowsEdit(
+                appState.resourceShares, actorID: currentUserId, companyID: companyId,
+                resourceType: resourceType, resourceID: resourceId
+            ) else {
+                appState.error = "You do not have edit access to this shared item. Refresh your access and try again."
                 return false
             }
             return true
@@ -372,7 +395,7 @@ final class AppViewModel {
     }
 
     func deleteDoc(_ doc: CompanyDocument, appState: AppState) {
-        guard canEdit(companyId: doc.companyId, appState: appState) else { return }
+        guard canEdit(companyId: doc.companyId, resourceType: "document", resourceId: doc.id, appState: appState) else { return }
         let original = appState.documents
         appState.documents.removeAll { $0.id == doc.id }
         Task {
