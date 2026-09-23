@@ -4,6 +4,19 @@ import CryptoKit
 @testable import Zifr
 
 final class ActiveSessionsTests: XCTestCase {
+    func testDocumentDeletionAcceptsOnlyAppGeneratedRelativeStoragePath() {
+        let path = "00000000-0000-0000-0000-000000000001/document.pdf"
+        XCTAssertEqual(DataRepository.companyDocumentStoragePath(path), path)
+        XCTAssertNil(DataRepository.companyDocumentStoragePath(
+            "https://example.com/CompanyDocuments/\(path)"
+        ))
+        XCTAssertNil(DataRepository.companyDocumentStoragePath("file:///private/tmp/document.pdf"))
+        XCTAssertNil(DataRepository.companyDocumentStoragePath(
+            "00000000-0000-0000-0000-000000000001/"
+        ))
+        XCTAssertNil(DataRepository.companyDocumentStoragePath("other/document.pdf"))
+    }
+
     func testSessionDecodesServerCurrentFlag() throws {
         let data = Data(
             #"{"id":"25000000-0000-0000-0000-000000000001","created_at":0,"updated_at":0,"user_agent":"Miloom iOS App (iPhone; iOS 26.0)","ip_address":"203.0.113.10","is_current":true}"#.utf8

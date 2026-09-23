@@ -18,6 +18,14 @@ enum ShareInviteResult {
     case invitationCreatedEmailFailed
 }
 
+enum DocumentFileOwnershipError: LocalizedError {
+    case ownerRequired
+
+    var errorDescription: String? {
+        "Only the document owner can currently upload or remove a shared file. Document metadata can still be edited."
+    }
+}
+
 class DataRepository {
     static let shared = DataRepository()
     private var client: SupabaseClient { SupabaseService.shared.client }
@@ -1193,23 +1201,36 @@ class DataRepository {
             try? await insertActivityLog(log)
         }
     }
-    func deleteDocument(_ id: UUID, fileURL: String? = nil) async throws {
+    func deleteDocument(_ id: UUID, fileURL: String? = nil, ownerUserID: UUID) async throws {
         // Clean up the associated file before deleting the database record
         if let fileURL = fileURL, !fileURL.isEmpty {
             if fileURL.hasPrefix("file://") || fileURL.hasPrefix("/") {
-                // Local file — delete from filesystem
-                let path = fileURL.hasPrefix("file://")
-                    ? URL(string: fileURL)?.path ?? fileURL
-                    : fileURL
-                try? FileManager.default.removeItem(atPath: path)
-            } else if fileURL.contains("/CompanyDocuments/") {
-                // Supabase storage — extract the storage path after "CompanyDocuments/"
-                if let range = fileURL.range(of: "/CompanyDocuments/") {
-                    let storagePath = String(fileURL[range.upperBound...])
-                    try? await client.storage
-                        .from("CompanyDocuments")
-                        .remove(paths: [storagePath])
+                // Remove only a file within this app's Documents directory,
+                // and only when the signed-in user owns this document.
+                let session = try await client.auth.session
+                if session.user.id == ownerUserID,
+                   let documents = FileManager.default.urls(
+                       for: .documentDirectory, in: .userDomainMask
+                   ).first {
+                    let path = fileURL.hasPrefix("file://")
+                        ? URL(string: fileURL)?.path ?? ""
+                        : fileURL
+                    let candidate = URL(fileURLWithPath: path).standardizedFileURL.path
+                    let root = documents.standardizedFileURL.path + "/"
+                    if candidate.hasPrefix(root) {
+                        try? FileManager.default.removeItem(atPath: candidate)
+                    }
                 }
+            } else if let storagePath = Self.companyDocumentStoragePath(fileURL) {
+                let session = try await client.auth.session
+                guard session.user.id == ownerUserID else {
+                    throw DocumentFileOwnershipError.ownerRequired
+                }
+                // An exact path (not a whole folder) is removed before its
+                // document row. A failure leaves the row available to retry.
+                _ = try await client.storage
+                    .from("CompanyDocuments")
+                    .remove(paths: [storagePath])
             }
         }
         try await client.from("company_documents").delete().eq("id", value: id).execute()
@@ -1392,11 +1413,17 @@ class DataRepository {
     }
     
     // MARK: - File Storage Upload
-    func uploadDocumentFile(fileData: Data, fileName: String, contentType: String) async throws -> String {
+    func uploadDocumentFile(
+        fileData: Data, fileName: String, contentType: String,
+        ownerUserID: UUID
+    ) async throws -> String {
         guard let session = try? await client.auth.session else {
             throw URLError(.userAuthenticationRequired)
         }
         let userId = session.user.id
+        guard userId == ownerUserID else {
+            throw DocumentFileOwnershipError.ownerRequired
+        }
         let fileExtension = URL(fileURLWithPath: fileName).pathExtension
         let uniqueName = "\(UUID().uuidString).\(fileExtension.isEmpty ? "bin" : fileExtension)"
         let filePath = "\(userId.uuidString)/\(uniqueName)"
@@ -1440,6 +1467,18 @@ class DataRepository {
         return try await client.storage
             .from("CompanyDocuments")
             .createSignedURL(path: storagePath, expiresIn: 60)
+    }
+
+    static func companyDocumentStoragePath(_ url: String) -> String? {
+        // Only an app-generated relative path can authorize removal. An
+        // external URL containing "/CompanyDocuments/" is not proof that it
+        // points at this document's object.
+        guard !url.contains("://"), !url.hasPrefix("/"),
+              url.split(separator: "/", omittingEmptySubsequences: false).count == 2,
+              let first = url.split(separator: "/").first,
+              UUID(uuidString: String(first)) != nil,
+              !url.hasSuffix("/") else { return nil }
+        return url
     }
     
     // MARK: - Managed Shared Access

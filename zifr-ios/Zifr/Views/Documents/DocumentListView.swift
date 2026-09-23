@@ -925,6 +925,17 @@ struct EditDocumentSheet: View {
     @State private var isUploading = false
     @State private var uploadError: String? = nil
     @State private var showPremiumUpgrade = false
+
+    private var canManageSharedFile: Bool {
+        authVM.currentUser?.id == doc.userId
+    }
+
+    private var cannotReplaceStoredFile: Bool {
+        guard !canManageSharedFile, let url = doc.url else { return false }
+        if url.contains("/CompanyDocuments/") { return true }
+        guard let first = url.split(separator: "/").first else { return false }
+        return UUID(uuidString: String(first)) != nil
+    }
     
     @State private var inputMode: Int = 0 // 0 = File, 1 = Link
     
@@ -1040,9 +1051,16 @@ struct EditDocumentSheet: View {
                                         Text("External Link").tag(1)
                                     }
                                     .pickerStyle(.segmented)
+                                    .disabled(cannotReplaceStoredFile)
                                     
                                     if inputMode == 0 {
                                         VStack(spacing: 12) {
+                                            if !canManageSharedFile {
+                                                Label("The owner manages this document's file. You can still edit its details.", systemImage: "lock.shield")
+                                                    .font(.footnote)
+                                                    .foregroundStyle(.secondary)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                            }
                                             if let url = doc.url, !url.isEmpty, !url.hasPrefix("http") {
                                                 HStack {
                                                     Image(systemName: "doc.circle.fill")
@@ -1067,6 +1085,7 @@ struct EditDocumentSheet: View {
                                                             .foregroundStyle(.red)
                                                             .font(.system(size: 16))
                                                     }
+                                                    .disabled(!canManageSharedFile)
                                                 }
                                                 .padding(12)
                                                 .background(Color.white.opacity(0.05))
@@ -1100,6 +1119,7 @@ struct EditDocumentSheet: View {
                                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                                 }
                                                 .buttonStyle(.plain)
+                                                .disabled(!canManageSharedFile)
                                                 
                                                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                                                     HStack {
@@ -1114,6 +1134,7 @@ struct EditDocumentSheet: View {
                                                     .background(Color.white.opacity(0.08))
                                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                                 }
+                                                .disabled(!canManageSharedFile)
                                             }
                                             
                                             if isUploading {
@@ -1136,6 +1157,7 @@ struct EditDocumentSheet: View {
                                         }
                                     } else {
                                         ZifrField(label: "URL / Link", placeholder: "https://drive.google.com/...", text: Binding(get: { doc.url ?? "" }, set: { doc.url = $0 }), keyboardType: .URL)
+                                            .disabled(cannotReplaceStoredFile)
                                     }
                                 }
                             }
@@ -1257,7 +1279,7 @@ struct EditDocumentSheet: View {
                                 throw NSError(domain: "App", code: -3, userInfo: [NSLocalizedDescriptionKey: "File is too large (\(data.count / 1_048_576) MB). Maximum size is 25 MB."])
                             }
                             let fileName = "Photo_\(Int(Date().timeIntervalSince1970)).jpg"
-                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: "image/jpeg")
+                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: "image/jpeg", ownerUserID: doc.userId)
                             
                             await MainActor.run {
                                 doc.url = uploadUrl
@@ -1319,7 +1341,7 @@ struct EditDocumentSheet: View {
                             default: contentType = "application/octet-stream"
                             }
                             
-                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: contentType)
+                            let uploadUrl = try await DataRepository.shared.uploadDocumentFile(fileData: data, fileName: fileName, contentType: contentType, ownerUserID: doc.userId)
                             
                             await MainActor.run {
                                 doc.url = uploadUrl
