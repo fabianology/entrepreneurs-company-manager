@@ -2,13 +2,14 @@
 
 ## Current status (2026-09-23)
 
-Candidate source is committed as `2fd148a4` on
+Latest committed candidate is `7bf657db` on
 `codex/collab-staging-candidate-20260923`; its isolated checkout is clean.
-Selected tests: 42 passed. The bounded native checks recorded below passed
-only to their stated extent. The complete vault gate and release acceptance
-remain open. Earlier build-blocked and not-yet-committed sections are historical
-steps, superseded by the later candidate result. This report does not authorize
-or establish production release.
+It includes the staging-tested invitation handoff fix in `ZifrApp.swift`.
+This is **not yet the final accepted build**. Earlier selected tests: 42 passed
+on the stated earlier source. The bounded native checks recorded below passed
+only to their stated extent. The complete vault, lifecycle and release gates
+remain open. Historical build-blocked sections below are superseded by later
+results. This report does not authorize or establish production release.
 
 ## Identity
 
@@ -490,3 +491,102 @@ configuration guard, staging Associated Domains entitlement, invitation-host
 routing, and deferred sheet presentation. The branch is clean, but the commit
 is not merged, pushed, or production-deployed. Recipient acceptance, the
 already-open-sheet overlap retest, and disposable fixture cleanup remain open.
+
+### Disposable recipient signup and native acceptance (22:02 PDT)
+
+Owner created the invited alias account in the disposable simulator, personally
+entered its temporary password, and submitted Create Account. The recipient's
+Supabase Auth verification email arrived and its confirmation link was opened
+with action-time approval. Initial sign-in failed safely because the first
+simulator build lacked simulated application-identifier signing and could not
+persist its Supabase session. Rebuilding the **same committed source** with
+Xcode-managed simulator signing, staging URL/public key, and the staging
+application identifier (but no Associated Domains on this simulator) passed.
+The owner personally re-entered the password; native sign-in then succeeded.
+
+Native Inbox > Invites showed exactly one pending Viewer invitation for
+Miloom Collaboration Fixture. With separate action-time approval, Accept
+succeeded and the list became `0 PENDING`. The fixture appeared on the
+recipient dashboard labeled `VIEWER`. Its Financial view said the recipient
+cannot add items; its service card showed `Credentials are owner-only` and
+did not display login/password controls. This is new-user native acceptance
+and a visible Viewer boundary, not a recipient universal-link acceptance:
+the recipient simulator omits Associated Domains. The already-open owner
+sharing-sheet link-overlap retest, owner-side revoke/recipient denial, and
+disposable fixture/account cleanup remain. No source change, new commit, push,
+production deployment, or FX owner-session change.
+
+### Disposable alias entity removal and recipient denial (22:21 PDT)
+
+On FX in the staging owner session (`fabianology@icloud.com`), Collaborators
+& Sharing showed three company-access rows for Miloom Collaboration Fixture:
+an active Viewer share for the disposable invited alias, its accepted Viewer
+invitation, and the pre-existing active Viewer share for
+`avidyaclothing@gmail.com`. The owner chose **Remove from This Entity** for
+`avidyaclothing+miloominvite@gmail.com`. After the operation, the native list
+showed **one** share: the pre-existing `avidyaclothing@gmail.com` Viewer. No
+block was selected. This verifies that this removal cleared both the alias's
+direct share and accepted invitation while preserving the independent share.
+
+The recipient simulator initially retained a nonsecret, in-memory dashboard
+and service card while the app remained open. The service card still hid its
+credentials. After terminating and relaunching only the disposable staging
+app, its signed-in dashboard no longer showed Miloom Collaboration Fixture
+and instead showed the add-company empty state. Thus fresh recipient loading
+denied the revoked entity, but immediate foreground/cache invalidation was
+**not** demonstrated and remains a Gate 2 observation to reconcile. The
+disposable Auth account still exists pending explicit deletion approval; the
+synthetic fixture and pre-existing Viewer share were deliberately preserved.
+No source change, new commit, push, production deployment, or production app
+change was made.
+
+### Disposable Auth cleanup (22:28 PDT)
+
+With specific action-time approval, the disposable
+`avidyaclothing+miloominvite@gmail.com` Auth user was permanently deleted
+from **Miloom Staging** (`bvtuyzhyospqxvpzcrmv`) in Supabase Authentication.
+The confirmation dialog named that exact alias. A fresh exact-email search
+returned `No users found` / `Total: 0 users`; the unfiltered list retained
+the owner and the pre-existing `avidyaclothing@gmail.com` account. This
+cannot be restored through the product's normal recovery flow. The Gmail
+alias, original Viewer share, and long-lived synthetic fixture were not
+deleted. The already-open sharing-sheet email-link retest is still pending
+the owner's physical tap because iPhone Mirroring does not activate the
+button. No source change, new commit, push, or production action.
+
+### Covering-sheet link overlap and narrow retest build (22:50 PDT)
+
+With Collaborators & Sharing open on FX, the owner tapped the original staging
+email's Review Invitation link. The first tap closed the open windows without
+leaving the Invitation review visible; the second tap opened a stable
+`Invitation Unavailable` sheet. That is the expected denial for the old,
+revoked/accepted link, but **not** a one-tap handoff pass. No sign-in or access
+change occurred.
+
+In the isolated candidate worktree at base `8524b50f`, only
+`zifr-ios/Zifr/ZifrApp.swift` was changed. The invitation token is now saved
+*before* requesting dismissal of the covering Collaborators sheet, avoiding a
+lost token if its dismissal callback arrives synchronously. Presentation is
+then queued for the next main-actor update after dismissal. `git diff --check`,
+generic iOS Simulator build, and signed Debug iOS build passed. The iOS binary
+SHA-256 is `92d1d0c368f7000aaef95b313e30f7f52144d6c54129423844beb839a88c43d2`.
+Verified built bundle ID `com.vibing.miloom.staging`, Staging Supabase URL,
+and `applinks:staging-invite.miloom.co` entitlement. Installed it over only
+the staging app on FX; production was untouched. Local `codesign -v` reports
+the same untrusted-chain result as the prior installed staging build, so a
+strict local signature pass is not claimed. iPhone Mirroring disconnected
+during navigation, so the owner opened the staging Collaborators sheet and
+tapped the old Gmail link physically. On this exact installed build,
+`Invitation Unavailable` **remained open after the first tap**. The covering-
+sheet one-tap handoff and expected old-link denial therefore passed. This
+does not establish the remaining Gate 2 revoked-access/cache behavior or
+complete release acceptance. No commit, push, merge, backend deployment, or
+production action.
+
+### Checkpoint commit (22:59 PDT)
+
+Committed the one-file invitation handoff fix in the isolated candidate as
+`7bf657db` (`Fix one-tap invitation handoff over sharing sheet`). The
+candidate checkout is clean. This commit identifies the source of the exact
+staging build tested on FX above; it is not pushed, merged, or deployed to
+production. Remaining bounded gates are unchanged.
