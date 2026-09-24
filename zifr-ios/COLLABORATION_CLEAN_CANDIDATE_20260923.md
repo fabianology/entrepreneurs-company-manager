@@ -141,6 +141,125 @@ status boundary only, not a resource-decryption denial or approved-device transf
 Existing fixture remains retained for remaining checks and cleanup. No source,
 production, phone, or permission changes.
 
+## Native unapproved credential surface and approval request
+
+On the same second simulator and candidate build, Financial showed the mixed
+migration bank password as **Locked on this device**. The card detail display
+showed only its masked card number; the resource credential edit sheet was not
+opened by this check. Face ID-authenticated Request Device Access then changed
+the second device to **Approval requested**, still **This Device Needs Access**.
+The trusted first simulator showed the specifically named second device as
+**Pending** with an Approve control. Approval remains pending; neither cross
+device decryption nor broader scoped isolation is claimed. The request and
+fixture must be resolved and cleaned up at checkpoint completion.
+
+Source inspection of `SharedItemOverrideBanner.swift` found an operation token
+check before publishing a delayed reveal result; dismissal and backgrounding
+invalidate that token. This supports the intended guard but is not a native
+delayed post-auth response test. Candidate source remains unchanged.
+
+## Native second-device approval and account-field decryption — passed
+
+After user confirmation, first disposable simulator approved only the pending
+`Miloom Vault Second Device 20260923` request with simulated Face ID. First
+simulator displayed that device as Approved and logged Device approved. The
+second simulator refreshed Password Vault to **Vault Unlocked** and listed
+itself as Approved.
+
+Financial data loaded before approval stayed visually locked after returning
+from vault settings. A fresh process launch (PID 48210) reloaded the data. Its
+Synthetic Checking sheet then displayed the migrated synthetic account number
+and wire routing number in plaintext, while the deliberately unreadable legacy
+routing field remained Locked on this device. This passes account-key delivery,
+decryption of those two migrated fields and preservation of the locked field
+after a fresh load. Immediate in-session financial refresh after device approval
+is a noncritical follow-up; no data loss or access leak was observed.
+
+The separately keyed `Interrupted Reveal Test` card credential has not yet been
+revealed on the second device. Approval of the account vault alone is not proof
+of collaborator resource-key isolation or the card reveal flow. Fixture and
+approved test device remain until the remaining check and cleanup. No source
+change, commit, push, production or phone action occurred.
+
+## Native owner resource credential on approved second device — passed
+
+User opened the exact `Interrupted Reveal Test` card edit sheet on the second
+simulator. Native Reveal Credentials plus simulated Face ID displayed the exact
+synthetic password stored for that card. Hide removed the plaintext and restored
+the Reveal Credentials control. This confirms an approved owner second device can
+unwrap and decrypt this resource-specific credential on the clean candidate.
+It does not prove a collaborator can decrypt only an explicitly granted resource,
+or that another scope is denied. Those checks remain bounded gate 4 work.
+
+## Collaborator exact-card grant and sibling isolation — passed, fixture cleaned
+
+On unchanged candidate `2fd148a4`, the guarded staging fixture now includes a
+second disposable account (`miloom-vault-boundary-editor-20260923@example.com`),
+an exact Editor share for `Interrupted Reveal Test`, a company Viewer share, and
+a Viewer-only `Scope Isolation Sibling` card. The sibling has an active v1
+resource secret with a different synthetic password; no credential grant was
+made to either card. Authenticated backend status using the helper reported the
+Editor card as device-needed (the helper's separate login session passes no
+device ID) and the sibling as unavailable. This supports the eligibility
+boundary, but does not establish native grant/decrypt.
+
+The second disposable simulator signed into that Editor account, dismissed the
+optional OS password-save prompt, and natively set up its own account vault
+with simulated Face ID. Reopening Password Vault showed Vault Unlocked and this
+device Approved. Its one-time recovery code was deliberately not saved for this
+disposable account and must not be used as recovery evidence. The exact Editor
+card's native edit sheet showed Request Access. After request, the owner vault
+showed one pending row naming that Editor and card. With the user's action-time
+approval, the owner confirmed the exact grant and simulated Face ID. The Editor
+then used Check Again and native Reveal Credentials with Face ID; the correct
+synthetic test-card password appeared, and Hide cleared it.
+
+The Viewer-only sibling, also carrying a distinct active resource secret,
+remained visible as a card but did not open an edit sheet when the user pressed
+and held it. Independent staging row inspection found exactly one active Editor
+device grant for the intended card, zero sibling grants and an approved recipient
+device. The authenticated status check returned sibling `unavailable`. This is
+the bounded native/DB cross-scope pass; it does not claim all rotation or
+revocation scenarios were rerun on this fixture.
+
+Guarded fixture cleanup initially deleted the disposable Editor account but
+failed to delete the owner: HTTP 500 / SQL 23503, because the resource-secret
+purge trigger inserted a key-retirement audit row after Auth had removed the
+owner user during cascading account deletion. Added migration
+`202609230002_skip_vault_audit_for_deleted_owner.sql`: it retains the audit for
+ordinary resource deletion but skips insertion when that owner no longer exists;
+key-version purge still runs. Applied **only to staging** with an exact SQL query,
+not to production. Rollback-only staging regression probes passed both ordinary
+card audit and owner-deletion cascade. Added a repeatable isolated PostgreSQL
+`owner_delete` contract; all eight bounded scoped-vault scenarios passed at
+`/private/tmp/miloom-scoped-vault.3iD4z7`. Guarded cleanup then removed the owner.
+Read-only orphan inventory returned zero for both Auth users, company, bank,
+cards, shares, secret versions/wraps/requests/audit, account vaults and devices.
+The cleanup is irreversible for these intentionally disposable staging accounts.
+
+The candidate iOS build/source remained unchanged; the staging backend now has
+the narrow deletion-trigger fix. The exact direct SQL deployment was then marked
+applied as `202609230002` in the staging migration ledger, and a read-only ledger
+check verified its name/version alongside `202609230001`.
+No app rebuild, commit, push, production or phone action occurred. Gate 4 still
+needs the previously frozen recovery/rotation/revocation acceptance evidence
+reconciled on the exact candidate; invitation and release-safety gates remain.
+
+## Invitation delivery/link prerequisite inventory — blocked
+
+Fresh staging secret-name inventory still has neither `RESEND_API_KEY` nor
+`SHARE_EMAIL_FROM`; no secret value was read and no invitation email was sent.
+Read-only HTTPS checks of the live `miloom.co` website returned HTTP 200 for the
+script-free `/invite` fallback and HTTP 200 / `application/json` for the Apple
+association file. That file lists `WYYJ6FGYRP.com.vibing.miloom` for `/invite`,
+but not this candidate's `com.vibing.miloom.staging` app ID. Therefore an actual
+delivered email and email-to-staging-app universal-link pass remain blocked.
+Adding the staging app to the production host's association file without a
+separate link namespace could route production invitations to staging; this
+must not be done as an incidental website edit. A staging-only sender/test inbox
+and a safe staging link/association arrangement need explicit configuration
+before Gate 2 native delivery acceptance. No web deployment was performed.
+
 ## Candidate committed
 
 User-authorized commit `2fd148a4` contains exactly the two verified files on
@@ -149,3 +268,225 @@ the source hashes match the 42-pass test run above. Tests were not rerun merely
 for committing unchanged source. The canonical working branch remains untouched;
 the repair is not merged there, pushed or deployed. Remaining native acceptance
 and external gates still prevent an overall completion/release claim.
+
+## Staging invitation isolation prepared — not yet deployed
+
+After owner approval for a staging-only sender/domain, local backend code now
+requires `SHARE_INVITE_URL=https://staging-invite.miloom.co/invite` on the exact
+staging project and refuses production-domain links there. Staging email also
+requires an exact `SHARE_STAGING_RECIPIENTS` allowlist; production keeps its
+existing `miloom.co/invite` default. A separate static site directory,
+`miloom-staging-invite/`, contains only the staging app ID and `/invite` path in
+its Apple association file. Three Deno email tests and Edge Function type-check
+passed; static JSON and whitespace checks passed.
+
+Both Resend and Vercel browser dashboards currently show sign-in screens.
+The new staging domain does not resolve yet. No domain, DNS, API key, Supabase
+secret, function deployment, live email, native entitlement/build, production
+site, phone, commit, or push was changed by this preparation. Gate 2 delivery
+and universal-link acceptance remain blocked until account access, a verified
+staging sender and test recipient, a separately deployed staging host, and a
+retested native staging build are in place. Existing exact candidate
+`2fd148a4` remains unchanged and clean.
+
+### Staging sender/site deployment progress (later check)
+
+Owner signed into Resend and Vercel in Chrome. Resend had no domains; created
+`mail-staging.miloom.co` with sending enabled, but its DKIM/SPF records are not
+yet published or verified and no API key was created. Created a **separate**
+Vercel project `miloom-staging-invite` (distinct from the `project-mkcuj`
+production website) and deployed the static fallback/AASA as deployment
+`dpl_GboeUPR5wvy4Z8pK6uKMwSfiGzBh`. The staging `vercel.app` alias returned
+HTTP 200 for `/invite` and an unredirected JSON AASA with only
+`WYYJ6FGYRP.com.vibing.miloom.staging`; `.env.local` returned 404. Attached
+`staging-invite.miloom.co` to that staging project, but it does not yet resolve.
+The domain's public nameservers are Squarespace; Vercel requested an A record
+for `staging-invite` to `76.76.21.21`.
+
+Staging Supabase secret name `SHARE_INVITE_URL` was set to the custom staging
+URL. Deployed only `send-share-email` to project
+`bvtuyzhyospqxvpzcrmv`: function version 4, ACTIVE, JWT verification still
+enabled. A secret-name check showed only `SHARE_INVITE_URL`; the sending key,
+sender and test-recipient allowlist remain absent, so mail cannot be sent.
+Squarespace login currently shows only `yageraviation.com`, not `miloom.co`;
+no DNS records were changed. Awaiting access to the account that holds
+`miloom.co` and separate native staging-entitlement authorization. No
+production project/site, native app/build, phone, commit, or push changed.
+
+### Staging DNS published (later check)
+
+The owner opened the correct `miloom.co` Squarespace account and completed its
+reauthentication. Saved only four new staging subdomain records:
+`staging-invite` A `76.76.21.21`, `resend._domainkey.mail-staging` TXT
+(Resend-provided DKIM), `rsend.mail-staging` CNAME `rsend.forge.rmta.net`, and
+`send.mail-staging` CNAME `send.forge.rmta.net`. Squarespace confirmed each save;
+public DNS resolves all four. Existing apex, `www`, MX, and DMARC records were
+not changed. Resend still reports the sending domain Pending/Checking DNS; the
+custom HTTPS staging invite host has not yet completed TLS (curl SSL failure),
+so its AASA and `/invite` must be rechecked on the custom host. No API key,
+sender, recipient allowlist, or real mail has been configured; the deployed
+staging function remains fail-closed. Native staging entitlement/build remains
+unmodified, and Gate 2 has not passed.
+
+### Staging host and sender domain verified (later check)
+
+Resend now marks `mail-staging.miloom.co` and all three required DNS records
+Verified. The custom `https://staging-invite.miloom.co` host serves `/invite`
+with HTTP 200 and its Apple association JSON with HTTP 200, `application/json`,
+no redirect, only app ID `WYYJ6FGYRP.com.vibing.miloom.staging` and `/invite`.
+Vercel recommends a newer per-project CNAME but states the configured legacy A
+record continues to work; no DNS replacement was made. No API key or mail has
+been created/sent, and no native staging entitlement/build was changed. Gate 2
+still requires the restricted staging sender, exact test-recipient allowlist,
+native link handler/entitlement, and end-to-end invitation acceptance.
+
+### Restricted staging sender configured (later check)
+
+After action-time owner approval, created Resend key
+`miloom-staging-invitations-20260923` with **Sending access** limited to
+`mail-staging.miloom.co`. Copied its one-time value directly into Miloom Staging
+project `bvtuyzhyospqxvpzcrmv` as `RESEND_API_KEY`, then cleared the temporary
+browser clipboard copy. Set `SHARE_EMAIL_FROM` to
+`Miloom Staging <invites@mail-staging.miloom.co>`. Staging dashboard lists both
+secret names; no value was written to this repo or chat. `SHARE_STAGING_RECIPIENTS`
+is still absent pending an explicit test inbox, so the function remains
+fail-closed for email delivery. No email has been sent. Native entitlement and
+candidate build still await separate approval.
+
+### Staging inbox configured; native universal link signing blocked (later check)
+
+Owner approved `avidyaclothing@gmail.com` as the sole disposable invitation
+test inbox and a staging-simulator-only associated-domain build. Added that
+exact address to Miloom Staging `SHARE_STAGING_RECIPIENTS`; dashboard confirmed
+the secret name. No email has been sent.
+
+In isolated candidate worktree `/private/tmp/miloom-clean-candidate.dKfPen/source`
+at base commit `2fd148a4`, changed `ZifrApp.swift` so bundle ID
+`com.vibing.miloom.staging` accepts only `staging-invite.miloom.co/invite`,
+while the production bundle retains `miloom.co/invite`. Added a staging-only
+entitlements plist with `applinks:staging-invite.miloom.co`. Source diff and plist
+lint pass. A Debug iPhone 17 Pro simulator build compiled with normal Swift
+settings. The original candidate app bundle was copied to
+`/private/tmp/miloom-clean-candidate.dKfPen/prior-candidate-Zifr.app` before
+building. Temporary Xcode project Debug-setting edits used to test signing were
+reverted; project file has no diff.
+
+On disposable simulator `EFAF2008-6AD5-4D66-BD6A-452EADFB0AB3`, the new
+app launches when ad-hoc signed without Associated Domains. The same binary
+with the staging entitlement (minimal, Xcode-generated simulator entitlement,
+or development-identity manual signature) installs but SpringBoard denies
+launch (`FBProcessExit launch-failed`, POSIX 163). The working no-entitlement
+copy is installed. A synthetic invalid `miloom://staging-invite.miloom.co/invite`
+URL reached the system “Open in Miloom?” prompt; the simulator is signed out,
+so this does not prove authenticated invitation acceptance. Apple’s association
+CDN returns HTTP 200 with only the staging app ID and `/invite`. Universal-link
+opening, delivery, and acceptance are **not verified**. Asked for explicit
+approval before any Apple Developer staging App ID/provisioning change. No
+production app/phone, real email, commit or push was changed.
+
+### Staging provisioning verified; simulator entitlement remains blocked
+
+Owner approved modifying only the disposable staging App ID/provisioning if
+needed, with production and the phone untouched. Existing development profile
+`1ae9d33c-6125-44c0-b8ce-68aa52d175d6` already identifies
+`WYYJ6FGYRP.com.vibing.miloom.staging`, permits Associated Domains and is valid
+through 2027-09-22. No Apple Developer portal change was necessary. A Debug
+`generic/platform=iOS` build succeeded with the development identity, embedded
+profile, and exact `applinks:staging-invite.miloom.co` entitlement; it was not
+installed on a phone.
+
+The simulator build also succeeded, but its Xcode signature contains empty
+entitlements. On the original disposable iOS 26.4 simulator, re-signing the
+same binary without entitlements launched, while adding just the staging
+Associated Domains entitlement caused launchd security-policy error 163.
+Adding DER entitlements, or signing with the development identity and embedded
+staging profile, did not change that result. A new disposable iOS 17.5 simulator
+reproduced the same contrast; it was then deleted. The launchable no-entitlement
+build was restored to the original disposable simulator. Temporary Xcode
+project Debug edits were reverted; only `ZifrApp.swift` and the staging plist
+remain uncommitted in the isolated candidate worktree.
+
+This is a simulator launch-policy blocker, not evidence of a missing staging
+Apple App ID or incorrect AASA. No real invitation email was sent, and native
+universal-link acceptance remains unverified. Gate 2 stays open; an explicitly
+authorized staging-signed physical-device test or a verified alternative
+simulator signing solution is needed before this checkpoint can pass. No
+production, phone, commit, push, or deployment change occurred.
+
+### FX physical staging build installed; backend isolation corrected
+
+With explicit owner approval, the existing staging development profile was
+confirmed to include FX (iPhone 15 Pro Max). A signed staging app initially
+installed and launched, but immediate metadata inspection found its Supabase
+URL/key substitutions empty: the pre-existing client fallback would point at
+the production project. The staging process was terminated before any invite
+test or app UI action. No production write was observed, but production
+requests during that brief launch were not independently ruled out.
+
+The isolated candidate now fails closed when the staging bundle lacks the
+explicit `https://bvtuyzhyospqxvpzcrmv.supabase.co` URL or public key. A new
+Debug iOS build injected the staging URL and public anon key at build time.
+Verification of its Info.plist, decoded key claims, signed entitlement,
+provisioning profile and strict code signature passed. The corrected build was
+installed and launched on FX; the production `com.vibing.miloom` app remains
+separately installed. Temporary project Debug settings were reverted after
+building. Candidate source status is `SupabaseService.swift`, `ZifrApp.swift`,
+and `Zifr.staging.entitlements` only, uncommitted; `git diff --check` passed.
+
+The current staging `send-share-email` is ACTIVE v7; downloaded deployed source
+matches local sender code with exact staging recipient and URL guards, and all
+four expected secret names are configured. No real invitation email has been
+sent, so native universal-link acceptance is still open. iPhone Mirroring
+would forward FX notifications to this Mac; owner preference/approval was
+requested before enabling it. No Mirroring setup, production app update,
+backend deployment, commit or push occurred.
+
+### Gate 2 physical email/deep-link check (latest)
+
+On FX, native staging Share sent a Viewer entity invitation for synthetic
+Miloom Collaboration Fixture to disposable Gmail alias
+`avidyaclothing+miloominvite@gmail.com`; Resend reported Delivered. The
+message arrived in Spam, was moved to Inbox, and its Review Invitation link
+opened Miloom staging. On the first build, an already-open Collaborators &
+Sharing sheet stayed over the invitation until Done; then the signed-in owner
+received expected recipient-bound `Invitation Unavailable`. The app had not
+yet demonstrated automatic sheet dismissal or invited-user acceptance.
+
+A subsequent candidate attempted to dismiss the covering sheet immediately
+when the link arrived. Physical retest showed the Invitation screen briefly,
+then Dashboard. Exact staging-app crash reports at 19:53 and 20:07 show a
+SwiftUI missing-`AuthViewModel` environment assertion. The precise view is
+not identified; simultaneous sheet transition is a plausible trigger.
+
+The isolated candidate now queues the link until Collaborators & Sharing has
+completed `onDismiss`, explicitly passes the auth environment to the
+invitation sheet, and preserves the token across biometric reauthentication.
+Signed Debug iOS build and `git diff --check` passed. The bundle ID, staging
+Supabase URL, nonempty public key, and exact staging Associated Domains
+entitlement were checked before installing this revised staging build on FX
+at 20:19. The live email-link retest is still pending, so Gate 2 remains open.
+The disposable invitation/fixture must be removed after acceptance testing.
+`SHARE_STAGING_RECIPIENTS` was restored to the prior sole inbox
+`avidyaclothing@gmail.com`; therefore the pending alias cannot be resent,
+but the original delivered link remains available. No commit, push or
+production app/backend/site change.
+
+The next physical retest on FX at 21:12 visibly kept the Invitation sheet open
+after Gmail's Review Invitation link. It showed `Invitation Unavailable` for
+the owner account, which is expected recipient-bound denial rather than proof
+of expiry. A read-only staging query confirmed the exact disposable Viewer
+company invite remains Pending until 2026-10-01 02:13:51 UTC; no token was
+read or logged. This passes basic stable email-to-app routing, but not
+automatic dismissal when Collaborators & Sharing is already open, nor
+recipient acceptance. Disposable simulator `3C813101-B8C2-4566-9AB1-1AA041BCE2D9`
+now runs the same candidate source against staging with Associated Domains
+omitted solely because the simulator denies that entitlement at launch. It is
+at the Create Account screen awaiting owner go-ahead and hands-on credential
+entry/Terms acceptance for the invited alias. FX owner session stays intact.
+
+The user-requested iOS checkpoint commit is `8524b50f` on isolated branch
+`codex/collab-staging-candidate-20260923`. It includes only the staging
+configuration guard, staging Associated Domains entitlement, invitation-host
+routing, and deferred sheet presentation. The branch is clean, but the commit
+is not merged, pushed, or production-deployed. Recipient acceptance, the
+already-open-sheet overlap retest, and disposable fixture cleanup remain open.
