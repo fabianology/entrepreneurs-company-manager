@@ -1,5 +1,25 @@
 # Bounded second-agent security review result
 
+## Reconciled checkpoint — 2026-09-27
+
+Supersedes earlier uncommitted/candidate-pending statements: guard and evidence
+committed canonical `d80669ab`, reconciled into clean candidate source
+`0fb1bfdc4370cc4bc5763981808ec1d48a57bb52`. Evidence-only merge differences
+resolved using canonical records; native source/binary unchanged. Candidate's
+ordinary verified-email contract reran successfully at
+`/private/tmp/miloom-invite-verification.aSrZJF/contracts.log`; temporary server
+stopped. Initial sandbox startup failure was environmental, not a test failure.
+Guard SHA-256 matches canonical `f16187c841b3ff4459b25149f5783c4f022d5249b94026f856629036ff19af2f`;
+installed native SHA-256 remains `664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc`.
+Earlier native acceptance is attributed, not rerun for this backend-only change.
+
+Bounded implementation/evidence reconciliation is finished. **Phase 7 remains
+at the recorded final external security-disposition gate, not production-ready.**
+Separate release authorization is required for a production-configured compatible
+build, supported-client upgrades/retirement, legacy entity-Editor disposition,
+operational prerequisites and ordered backend rollout. Global secret activation
+remains closed. No new phase, whole-app QA, push or production action was added.
+
 ## Latest checkpoint — verified-email guard, 2026-09-27
 
 Supersedes the earlier acceptance-confirmation uncertainty for the new source

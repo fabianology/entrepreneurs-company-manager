@@ -1,5 +1,13 @@
 # Collaboration and vault cutover decision
 
+Latest source reconciliation (2026-09-27): candidate `0fb1bfdc` contains the
+tested native implementation plus document guard 002 and verified-email guard
+003; canonical verified-email commit `d80669ab`. Both guards are deployed and
+verified only on Staging. The existing native binary is unchanged. References
+to `7294842e` below identify the native baseline, not the latest backend source.
+No compatible production-configured build number or release authority is assigned.
+Final external review disposition and cutover HOLD remain unchanged.
+
 Date: 2026-09-27. User approved minimum-compatible-release policy; rollout and
 deployment remain separately unauthorized.
 Part of original Phase 0/7 and frozen release-safety Gate 5; no new phase.
