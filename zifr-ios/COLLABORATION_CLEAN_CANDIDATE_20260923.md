@@ -11,6 +11,17 @@ only to their stated extent. The complete vault, lifecycle and release gates
 remain open. Historical build-blocked sections below are superseded by later
 results. This report does not authorize or establish production release.
 
+2026-09-26 continuation: candidate now `09a366ef`, clean, containing the
+previously staging-tested owner-delete fix and regression. Native source is
+unchanged from `7bf657db`; 42 current-source native tests and eight local SQL
+scenarios passed. See `COLLABORATION_BOUNDED_CLOSEOUT_20260926.md` for current
+identity, remaining gates and the newly prepared guided final-vault fixture.
+
+2026-09-27 checkpoint: that disposable final-vault fixture is now deleted with
+absence verified. Recovery, migration/preservation, recovered-device decrypt,
+native scoped-key replacement and owner v2 reveal passed; controlled delayed-
+response verification remains open. See the closeout record's latest sections.
+
 ## Identity
 
 - Source commit: `0d3099bee2d0b70bd70187cbe56bca314aa335bf`.
@@ -590,3 +601,68 @@ Committed the one-file invitation handoff fix in the isolated candidate as
 candidate checkout is clean. This commit identifies the source of the exact
 staging build tested on FX above; it is not pushed, merged, or deployed to
 production. Remaining bounded gates are unchanged.
+
+### Guided Gate 2 revocation fixture — 2026-09-26
+
+Resumed without computer-use automation. Candidate `7bf657db` remains clean.
+Created only staging synthetic company `Gate 2 Revocation Test 20260926`
+(`cc260926-0000-4000-8000-000000000001`) under the existing staging owner and
+marked disposable Viewer `miloom-gate2-viewer-20260926@example.com`. Privileged
+fixture setup inserted one Viewer company edge; it is not native sharing
+acceptance. Authenticated backend check confirmed exactly one visible company,
+one active Viewer edge and no block. No secret/document/financial data added.
+Private credential manifest and guarded helper are in `/private/tmp/` only.
+
+Rebuilt `7bf657db` for disposable recipient simulator
+`3C813101-B8C2-4566-9AB1-1AA041BCE2D9` using the existing approved simulator
+signing overrides and no Associated Domains. Build passed; staging bundle/project
+identity verified; install and launch returned PID 90836. Native sign-in,
+foreground/offline revocation and owner-only blocking checks are pending guided
+user actions. The synthetic company/account/edge require exact cleanup at this
+checkpoint's end. No source change, commit, push, phone update or production action.
+
+User-requested sign-in exception: entered the existing disposable password with
+simulator UI control, tapped Sign In, and dismissed Save Password with Not Now.
+The native dashboard visibly showed the intended Gate 2 company with VIEWER
+badge and zero financial/service/document counts. Sign-in passed; revocation,
+blocking and cleanup remain pending. FX and production were untouched.
+
+After the user reported completing native entity removal on FX, the guarded
+staging `check-denial` assertion passed: zero Viewer share edges, zero fixture
+companies visible through authenticated Viewer RLS, and zero blocks. Backend
+revocation passed; recipient foreground refresh still awaits guided observation.
+
+The user's recipient dashboard screenshot at 19:30:51 shows the add-company
+empty state, with the revoked fixture absent, after the requested return-to-app
+check. Native recipient removal passed in this guided sequence; this is not
+evidence of live invalidation while continuously foregrounded or offline denial.
+Restored only the synthetic Viewer edge for the next owner-blocking test through
+guarded privileged fixture setup, not native invitation acceptance.
+
+After the user completed owner Block All Access on FX, guarded staging inspection
+confirmed one owner-to-disposable-Viewer block and no remaining fixture shares.
+Authenticated Viewer denial passed (zero visible fixture companies). Native
+re-invitation rejection and exact cleanup remain pending; no full Gate 2 pass
+is inferred from this subcheck.
+
+The user reported native re-invitation returned **Collaborator blocked**. This
+completes this checkpoint's owner-block/re-invitation subcheck. Guarded cleanup
+removed the exact synthetic company, disposable Viewer Auth account and test
+block; fresh inspection confirmed companyPresent false, viewerPresent false,
+shares empty and blockCount 0. These deletions are not normally recoverable;
+the owner and independent collaborators were preserved. No production action.
+Gate 2 overall remains subject to final bounded checklist reconciliation; no
+offline or continuous-foreground revocation pass is claimed here.
+
+### 2026-09-26 bounded evidence reconciliation
+
+Fresh tests on native source `7bf657db`: 42 passed, zero failed/skipped; result
+`/private/tmp/miloom-candidate-bounded-20260926.xcresult`. Found that the already
+staging-tested owner-deletion fix was absent from the candidate source. Copied
+only migration 230002, its account-delete regression and the rehearsal's
+owner_delete scenario into the isolated candidate; byte comparisons passed.
+All eight isolated SQL scenarios passed at
+`/private/tmp/miloom-scoped-vault.GX3kvd`; server stopped. Candidate diff check
+passed. These three backend files remain uncommitted; no hosted deployment.
+Current bounded phase/checklist reconciliation is in
+`COLLABORATION_BOUNDED_CLOSEOUT_20260926.md`. No overall completion/release claim.
