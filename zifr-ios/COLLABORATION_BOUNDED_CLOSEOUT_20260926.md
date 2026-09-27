@@ -3,6 +3,45 @@
 Date: 2026-09-26. This reconciles existing evidence; it adds no phases or product
 scope. Production deployment and collaborator-secret activation remain closed.
 
+## Current checkpoint summary — 2026-09-27
+
+Supersedes historical pending-fixture statements below. Clean candidate
+`7294842e`, canonical implementation `4cfe9d69`. Installed native binary SHA-256
+`664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc`
+rechecked; candidate Git status clean. Existing 47 selected native tests and
+eight local scoped-vault scenarios passed; not rerun during cleanup.
+
+Current bounded native role/document/scoped-secret batches passed, as detailed
+in dated entries: Owner/Admin choices, exact Editor edit/save versus Viewer
+sibling denial; document lifecycle/retry/revocation/storage cleanup; approved
+Editor request/grant/decrypt, resource-only revoke preserving independent
+Viewer, stale-sheet denial, native rotation without grant carryover, and fresh
+Owner v2 decrypt. Prior personal recovery/mixed migration and email/lifecycle
+evidence remains attributed to its recorded candidate/source, not repeated.
+Sibling isolation relies on separate native edit denial and hosted unavailable/
+no-request/no-wrap receipts, not merely absence from assigned-card plaintext.
+
+Explicit final user approval permitted permanent deletion of four marker-checked
+`miloom-final-native-{owner,admin,editor,viewer}-20260927@example.com` Staging
+accounts. Verified Auth, entity/cards/documents, vault metadata/devices/wraps/
+challenges/transitions/audit, resource secrets/requests/wraps/audit, shares and
+invitations absent. Document files were already cleaned. Local private manifest
+and recovery backup were not deleted or committed. Production untouched.
+
+**Goal not yet complete.** Remaining Gate 5: supported/installed-client inventory
+and explicit minimum-client/cutover disposition (known build 13 is incompatible
+with canonical revoke/protected-column reads); independent security review is
+recorded as final external gate, not completed. Local containment rollback passed;
+retain encrypted data and use forward repair, not destructive schema rollback.
+Gate 6 still requires an authorized focused evidence commit/final handoff.
+Cleanup approval does not authorize commit/push/deployment.
+
+Original Phases 0–7 unchanged: Phases 1–6 current bounded staging batches passed;
+Phase 0 containment and Phase 7 acceptance/rollout remain In progress for release
+safety and handoff. Production rollout Not started, separately authorized.
+No new UI batch, whole-app QA or adjacent phase is proposed. The historical
+phase table below predates this checkpoint; it is not the current batch status.
+
 Latest checkpoint, 2026-09-27: clean candidate `09a366ef` (native source unchanged
 from `7bf657db`). Personal recovery, three-field safe migration/second-device
 decryption, resource-key preparation/replacement and owner post-rotation reveal
@@ -553,3 +592,326 @@ the controls cannot perform and use private synthetic credentials. Afterward,
 clean only marked disposable data and complete compatibility/cutover/rollback
 disposition plus independent-review external-gate handoff. Commit requires
 explicit instruction under the native agreement. No new phase introduced.
+
+### Scope checkpoint committed; native owner/Admin controls passed (2026-09-27)
+
+User requested commit and continuation. Canonical `4cfe9d69` contains only the
+seven focused native/backend/test files plus closeout evidence. Matching seven
+files committed in isolated candidate as `7294842e`; candidate status clean.
+No push/merge/new deployment. Existing built binary matches the recorded
+47-test SHA-256 `664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc`.
+
+Prepared four marker-validated disposable Staging accounts (owner/Admin/Editor/
+Viewer), one synthetic Final Bounded Acceptance entity, two cards and one
+document. Five canonical owner-RPC direct grants: entity Admin; entity Viewer
+plus exact card/document Editor; separate entity Viewer. Independent metadata
+receipts passed. No vault grant/activation or invitation email. Initial fixture
+payload used nonexistent company type column and failed before creating entity;
+inspected column names, resumed same marked accounts with structure=LLC and
+ID-only card receipts. No duplicate account or permission workaround. Private
+helper/state are `/private/tmp/miloom-final-native-20260927.mjs` and its restricted
+state JSON; no passwords/tokens emitted.
+
+On disposable second simulator, native owner sign-in reached fixture dashboard;
+Save Password dismissed using Not Now. Entire-entity Share showed only Viewer
+and Admin, no Editor. Selecting Admin showed owner-only higher-role/block/secret
+management explanation; cancelled without sending. Signed out natively and
+signed in as disposable Admin. Entity actions retained sharing-scope/report menu;
+Entire Entity Share offered only Viewer with explicit owner-management copy.
+Cancelled without sending. No ownership-transfer UI was found in the inspected
+sources; backend preservation/delegation checks already passed. These are actual
+current-build native controls, not new native grant/revoke or secret-flow proof.
+
+Marked fixture retained for remaining exact Editor/Viewer controls, document
+workflow and scoped-secret boundaries; clean it only after completing those
+defined batches. Production/FX and global password sharing untouched. Further
+native recipient evidence remains pending; all-phase/goal completion not claimed.
+
+Native scoped Editor sign-in also passed on the same candidate. Entity dashboard
+shows Viewer from its independent entity grant, with no entity edit/share buttons.
+Entity detail explicitly says shared items may have separate edit access; entity
+actions contains Reports only, no sharing scopes. Both synthetic cards are visible
+through the entity Viewer grant. Exact card edit and sibling denial still require
+the bounded native gesture/check; no save or password reveal claimed.
+
+User long-press opened Exact Editor Card on the same candidate: editable nickname,
+holder, financial and notes controls, with resource/device-specific credential
+guidance and no plaintext credential field. Save is disabled because the seeded
+card lacks institution_name (`canSave` requires a nonempty name); this fixture
+precondition must be supplied before native save acceptance, not counted as a
+passed save. Dismissed without modifying data; sibling edit denial still pending.
+
+User reported long-press on Viewer Isolation Sibling did not open an edit sheet;
+subsequent native AX shows card detail only, no edit form. Exact-scope edit versus
+sibling read-only control boundary observed; save acceptance still pending.
+Opened Final Document Acceptance natively as exact Editor: editable name/type,
+Choose File/Choose Photo and immediate-replacement explanation present. Files
+picker has No Recents and exposes no content AX; coordinate/Escape navigation
+did not produce a verified transition. Imported only bundled app icon into this
+disposable simulator Photos via simctl (successful corrected relative-path call;
+initial malformed path failed). No document uploaded yet; user picker dismissal
+and Choose Photo needed. No product/backend modifications or secret grants.
+
+Native exact Editor selected only bundled app-icon photo. Upload UI changed to
+Local File / Scan; authenticated independent receipt confirms document owner and
+company unchanged, persisted object path under owner ID, Editor object read 200,
+156937 bytes with PNG signature. Private receipt helper initially assumed JPEG
+signature from .jpg path and rejected; corrected image-format assertion accepts
+actual PNG/JPEG without relaxing owner/path/authentication checks. PNG bytes under
+.jpg naming recorded as noncritical follow-up. Native paperclip action rendered
+the exact Miloom image in in-app browser on explicit Staging domain; opening passes.
+Replacement/remove/retry/revoked-denial acceptance remains pending. No new product
+change, production action or secrets; fixture/storage retained for bounded tests.
+
+Replacement checkpoint: reopened document initially presents owner-only file copy
+while its async authorization status loads, then enables exact Editor replacement
+and removal after response. Choose Photo opened picker. Simulator coordinate
+selection did not produce a verified replacement; independent authenticated
+receipt still shows original path unchanged and readable, owner/company intact.
+No replacement/old-file-cleanup pass claimed; awaiting user selection of bundled
+logo only. No product change or deletion performed.
+
+Following computer-use continuation, reconnect showed the replacement path in
+native Edit Document. Independent exact Editor receipt confirms new path changed,
+156937 readable PNG bytes and unchanged owner/company. Exact old-path checks:
+Editor denied, service storage response specifically not-found, queue row absent;
+replacement cleanup passed without invoking any broad worker. Native Remove
+document file opens explicit Remove File confirmation explaining detach and
+eventual stored-file deletion. Final removal not clicked; awaiting at-action
+confirmation for this synthetic file only, document record retained.
+
+User approved Remove File at action time; native confirmation submitted and file
+UI detached, document retained. Independent receipt confirms URL cleared,
+owner/company intact and both prior uploads denied to Editor. New detached object
+initially queued/stored as expected. Existing hosted v1 cleanup worker rejected
+service-key request (401); no authentication weakening or deployment performed.
+Used configured database Vault/pg_net x-cron-secret path after exact fixture
+owner/marker/path checks and zero unrelated queue/older-orphan aggregate guards.
+Secrets stayed in database. Subsequent exact storage checks specifically not-found
+for both test uploads and queue rows absent; removal/physical cleanup passed.
+Native retry/failure and post-revocation rejection still open; entire Gate 3 not
+declared complete. No unrelated files removed; deleted synthetic image bytes have
+no app undo but can be recreated from bundled icon, document record remains.
+
+### Native document failure/retry and exact Editor revocation (2026-09-27)
+
+Same clean candidate `7294842e`, unchanged binary. Existing DEBUG simulator-only
+StagingSaveFailureProtocol launched with exact staging bundle/host opt-in and
+private instruction `offline:document-prepare`. Initial sandbox launch denied
+CoreSimulator access; scoped escalation launched successfully, no product edit.
+Selected bundled icon natively; sheet showed connection/reopen guidance, retained
+document draft. Independent receipt confirms URL still null, owner/company intact.
+Cleared instruction to `none`, reopened document and retried same image: persisted
+new path, 156937 PNG bytes readable, owner/company unchanged. No real network or
+security settings altered, no phone/production hook.
+
+Authenticated disposable Owner called canonical resource-only miloom_revoke_access
+for exact document Editor edge: one share removed, no person block. Verified
+independent entity Viewer preserved (exact card Editor also untouched). Former
+Editor's upload status false and prepare-document-upload rejects HTTP403; document
+read remains valid via independent Viewer intentionally. Already-open native
+Editor sheet attempted photo upload after revocation and displayed permission-
+specific reopen/owner guidance. Independent receipt shows accepted path unchanged;
+no unauthorized replacement. Restored normal staging app launch without fault
+arguments/environment. Candidate remains clean; no build/product/commit/deploy.
+
+File upload/open/replace/remove+cleanup, controlled prepare failure/retry and
+post-revocation upload rejection now observed. Do not equate this with every Gate3
+scenario: final native document-record removal/fixture cleanup remains, alongside
+existing SQL retry/cleanup failure evidence. Current retry image is attached to
+retained marked document; delete only through bounded cleanup at final checkpoint.
+Remaining frozen work: valid exact-card native save precondition; final scoped
+collaborator secrets gate; release-safety/external-review and final handoff.
+
+Owner native sign-in on same candidate succeeded, Not Now selected. Opened only
+marked Final Document Acceptance and its Delete confirmation; UI explicitly says
+record removal cannot be undone and stored-file deletion can be delayed. Final
+Delete Document not submitted, awaiting at-action user approval for exact test
+record and its attached retry image. Entity/cards/accounts remain out of this
+deletion scope; no new grants/product change.
+
+### Native document record deletion and exact fixture-file cleanup passed (2026-09-27)
+
+User approved final Delete Document. Native Owner submitted explicit confirmation;
+subsequent native list shows 0 Documents. Independent service receipt verifies
+exact document ID absent and entity/owner/two cards preserved. Remaining retry
+image was queued; invoked existing staging database-authenticated cleanup after
+exact tracked-path/marker/owner and no unrelated-target guards. Queue cleared.
+One immediate old URL read still returned image; later cache-bypassed requests
+specifically returned not-found for all three tracked image objects. Do not claim
+this establishes instantaneous invalidation of cached/signed responses; existing
+short-lived signed URL boundary still applies. All three queues absent, document
+record gone. Irreversible synthetic record/files removed, no app undo; entity,
+cards and accounts intentionally retained for remaining role/scoped-vault batch.
+No product changes/new build/commit/push/deployment/production action. Current
+bounded native document batch now includes upload/open/replace/remove, prepare
+failure+retry, revoked-upload denial, independent Viewer preservation and final
+record/file cleanup. SQL/helper cleanup-failure coverage remains separately
+attributed to existing receipts, not a new native fault after bytes transmission.
+
+### Scoped-vault prerequisites positioned (2026-09-27)
+
+Same candidate `7294842e`, disposable second simulator, signed-in test Owner:
+native Password Vault correctly shows Not set up. Setup not submitted; requested
+at-action approval to create this fixture's vault/device keys. Global secret
+sharing remains disabled. Exact Editor Card's missing institution name filled
+with synthetic Bounded Test Institution after marker/owner/entity checks; hosted
+receipt verifies name and ownership. Initial helper update included a user_id
+filter not supported by restricted authenticated SELECT grants (403/42501).
+Corrected helper to native app's ID-only update/select-id pattern; succeeded
+without changing backend permissions. This was not evidence that all direct
+updates are forbidden; native updateCard uses that same table operation.
+No credentials or grants changed, no product edit/build/commit/push/deploy or
+production action. Exact-card native save still pending; fixture preparation is
+not counted as a native save or scoped-secret acceptance pass.
+
+### Disposable Owner vault setup passed (2026-09-27)
+
+User explicitly approved setup for miloom-final-native-owner-20260927@example.com.
+Selected exact second-device simulator through Window menu (initial foreground
+was a different older recipient simulator; no action taken there). Native setup
+completed following simulator Matching Face test; native Vault Unlocked and This
+device Approved observed. Independent marker-checked hosted receipt confirms one
+approved device labelled Miloom Vault Second Device 20260923, zero resource-secret
+versions and zero wraps on the two test cards. Recovery code excluded from result
+observations for this setup; Copy Recovery Code tapped, no visible confirmation
+or clipboard-content assertion, I Saved This Code not submitted. User must save
+the one-time code locally before acknowledging. No global activation/grants or
+production change; setup is a prerequisite, not completion of scoped vault gate.
+Private read-only helper first used nonexistent owner_user_id filter on wraps
+(400/42703), corrected to the two exact card IDs; successful receipt above.
+No source/build/commit/push/deploy; evidence remains uncommitted.
+
+### Disposable recovery save and acknowledgment completed (2026-09-27)
+
+User requested agent finish this step using computer use. Native TextEdit saved
+test-only code to `/private/tmp/miloom-disposable-owner-recovery-20260927.txt`;
+complete length/content fingerprint verified privately, file mode restricted to
+0600, document closed. Initial launch timeout/empty paste recovered by focused
+typing and verification before acknowledging. Native I Saved This Code removed
+one-time recovery panel; unlocked/approved vault remains. No product/global
+activation or collaborator grant. Temporary plaintext backup is exclusively for
+disposable fixture cleanup, not recommended storage for production recovery.
+Same candidate/source commits; evidence uncommitted, scoped acceptance remains.
+
+### Exact resource preparation passed on current candidate (2026-09-27)
+
+Seeded only login/password synthetic inputs on exact two marked cards after
+owner/auth marker/entity guards and absence of existing credentials/versions;
+authenticated Owner writes, no grants changed. Reopened native vault after setup
+to load scoped-service controls, prepared encrypted copies with native confirmation
+and simulated Matching Face. Native report: 2 resources prepared and verified.
+Independent receipt: exactly two card versions in staging state, version 1,
+four resource-encrypted fields and owner wraps present, originals unchanged,
+zero collaborator wraps. Helper initial assertion used wrong state name staged;
+corrected to schema/native staging, no backend change. Candidate worktree clean
+and binary hash remains 664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc.
+Global activation still closed. Before exact Editor request/grant native acceptance,
+need explicit authorization for test-only privileged activation of these two
+marked resources, preserving activation checks and authenticated EXECUTE closure.
+No source/build/commit/push/deploy/production action. Preparation alone is not
+active-secret or collaborator-decryption proof; remaining gates unchanged.
+
+### Approved exact activation and pre-grant boundary passed (2026-09-27)
+
+User approved activation of the two current marked cards only. Transaction used
+existing guarded activation function under exact fixture Owner/session/device,
+source revision/ciphertext/wrap checks; no function grants/schema changes. Both
+v1 versions active and legacy login/password/card-number/expiry null, ownership
+preserved. Authenticated and anon activation EXECUTE remain closed. Privileged
+fixture activation is not proof of reviewed client/global rollout readiness.
+Independent authenticated pre-grant receipts: exact Editor card device_needed,
+Editor sibling unavailable; entity Viewer unavailable for both. Zero collaborator
+wraps. Signed in natively as disposable Editor, Not Now password-saving dismissed;
+its vault correctly Not set up. Setup not submitted; at-action approval needed
+for Editor fixture vault/device keys before native credential request. No source
+build/commit/push/deploy/production changes; frozen remaining gates unchanged.
+
+### Disposable Editor vault setup passed; backup not verified (2026-09-27)
+
+User-approved Editor native setup and Matching Face completed; native unlocked /
+this device approved, marker-checked hosted one approved Editor device, zero owned
+versions and no test-card wraps. No Owner password grant. Blank TextEdit document
+converted to plain text, but subsequent app-specific AX/reconnect/screenshot calls
+timed out; Simulator still responsive. Editor recovery code not entered into
+TextEdit or acknowledged as saved; code still shown in vault, privately retained
+in CUA variable, Copy tapped without clipboard-content assertion. Need local save
+and acknowledgment before proceeding; not a vault product failure and no general
+TextEdit troubleshooting added. Source/build and frozen remaining gates unchanged.
+
+### Editor recovery acknowledged; exact card entry positioned (2026-09-27)
+
+User reports local save/acknowledgment done; native recovery panel gone with
+unlocked/approved Editor vault. Private working code variables cleared. No
+independent saved-file inspection claimed. Exact Editor Card selected in Financial;
+normal tap expands details, not Edit Card/request controls. User long-press needed
+for unsupported gesture. No native request/grant/reveal/save yet; same candidate
+and frozen remaining gates, no source/build/commit/deploy/production action.
+
+### Native exact credential request passed; grant confirmation positioned (2026-09-27)
+
+User long-press opened assigned card Edit sheet. Native Request Access changed to
+Waiting for owner approval. Hosted exact marker/device receipt confirms one
+pending v1 Editor request for assigned card, zero sibling requests/wraps.
+Notes-only native save attempted with AX setValue: displayed test note, actual
+Save dismissed sheet, but persisted note did not match. Ownership/entity,
+institution, sibling and absent legacy secrets preserved. Not counted passed;
+actual typed-input retry needed to distinguish AX binding/input from persistence
+failure before inferring product defect. Signed in Owner; exact request queue and
+Grant Credential Access confirmation observed. Final Grant Access not submitted,
+awaiting user approval for synthetic exact-card credentials only. Same candidate,
+no source/build/commit/push/deploy/production action; frozen remaining gates open.
+
+### Native exact Owner grant passed (2026-09-27)
+
+User clicked Grant Access; simulator Matching Face completed required presence.
+Native Owner queue cleared. Hosted marker/device receipt verifies exactly one
+approved v1 request and active key wrap for assigned Exact Editor Card to the
+disposable Editor device; sibling requests and wraps remain zero. Editor signed
+in with password-save declined; existing vault unlocked/approved. Assigned card
+positioned for user long-press into Edit Card; actual decrypt still untested.
+Metadata typed-input retry, revoke/rotation and frozen safety/cleanup/handoff
+remain open. Same candidate `7294842e`, no source/build/commit/deploy/production
+change, global activation closed; documentation uncommitted.
+
+### Native scoped Editor decrypt and metadata save passed (2026-09-27)
+
+Exact Editor Card native Reveal + simulator Matching Face produced both expected
+synthetic login/password, compared privately without logging plaintext. Sibling
+password absent from that reveal. Hide and subsequent Save dismissal cleared
+displayed values (full AX checked). Native metadata-only note entry via actual
+click/typeText and Save persisted the exact note; independent hosted receipt
+confirms owner/entity, institution, sibling name/empty notes and both active v1
+secrets unchanged. Supersedes failed AX setValue input attempt; no product fix.
+Same candidate `7294842e`, no source/build/commit/deploy/production change.
+Next: exact revoke/native denial, remaining rotation/safety/cleanup/handoff;
+global activation closed and independent review still external gate.
+
+### Exact scoped revoke, stale-sheet denial and native rotation passed (2026-09-27)
+
+Authenticated Owner canonical resource-only revoke removed the exact disposable
+Editor/card share, preserving independent company Viewer access and not blocking
+the person. Assigned wrap revoked, assigned v1 rotation_required, sibling v1
+active. Stale open native Editor sheet Reveal + Matching Face exposed no login
+or password; Secure Credentials removed and fields became read-only. This is
+backend revocation plus native denial, not a repeated Owner removal-UI test.
+Native Owner Replace Key + confirmation + Face ID completed; hosted receipt
+confirms assigned v1 retired/v2 active, sibling v1 unchanged, old v1 wrap revoked,
+zero v2 grants. No privileged rotation setup or permission changes. Owner exact
+card positioned for fresh v2 decrypt; user long-press needed. Same `7294842e`
+candidate, no source/build/commit/deploy/production change. Remaining fresh
+decrypt/isolation reconciliation/cleanup and frozen release-safety/handoff gates.
+
+### Fresh Owner v2 decrypt passed; exact cleanup awaits approval (2026-09-27)
+
+Native Owner Reveal + simulator Matching Face decrypted original expected
+synthetic login/password after rotation to v2; private equality checks passed.
+Hide removed both values from full AX and transient capture cleared. Completes
+the current exact collaborator grant/decrypt/save/revoke/denial/rotation/
+Owner-preservation batch on unchanged `7294842e` binary.
+Permanent cleanup helper addition was rejected by safety reviewer for missing
+concrete final deletion confirmation; no helper/deletion executed. Four marked
+Staging accounts and synthetic entity/two cards retained pending approval.
+Frozen remaining work is cleanup, consolidated acceptance/release-safety
+disposition and independent-review external-gate handoff, not broader UI QA.
+No source/build/commit/deploy/production action; documentation uncommitted.

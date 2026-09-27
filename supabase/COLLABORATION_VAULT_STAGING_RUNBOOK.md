@@ -1,5 +1,23 @@
 # Collaboration and Vault Staging Rollout
 
+## Latest bounded checkpoint — 2026-09-27
+
+Clean candidate `7294842e`, unchanged installed native SHA-256
+`664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc`.
+Current native role/document/scoped-secret acceptance batches and approved
+marker-checked final hosted fixture cleanup passed. Four disposable test accounts,
+synthetic entity/cards and vault/share records verified absent; document files
+already cleaned. Full attributed evidence and limitations are in
+`zifr-ios/COLLABORATION_BOUNDED_CLOSEOUT_20260926.md`.
+
+Remaining release-safety gate: actual supported-client inventory and explicit
+minimum-client/cutover decision; known TestFlight build 13 cannot use canonical
+revoke/protected-column reads. Preserve encrypted data on containment rollback,
+do not restore legacy broad-secret reads, use forward repair. Independent security
+review is the final external gate, not completed. Final evidence commit needs
+user authorization. Production deployment/global scoped-secret activation remain
+closed; this checkpoint neither authorizes rollout nor claims release readiness.
+
 Track: Collaboration and Vault, staging acceptance gate
 
 Baseline: `0cdaf4cbf43e54f9808d397dc4552ae4a2d1907d`
@@ -131,14 +149,22 @@ cron job table. Migration history contains all 37 repository migrations through
 2. Configure staging function secrets using a secure secret source, never shell
    history or a tracked file:
    `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-   `RESEND_API_KEY`, and `SHARE_EMAIL_FROM`.
-3. Use a staging-only Resend credential and sender. Restrict test recipients so
-   acceptance testing cannot email real customers.
+   `RESEND_API_KEY`, `SHARE_EMAIL_FROM`,
+   `SHARE_INVITE_URL=https://staging-invite.miloom.co/invite`, and
+   `SHARE_STAGING_RECIPIENTS` (a comma-separated exact test-inbox allowlist).
+3. Use a staging-only Resend credential with sending-only permission and a
+   verified staging sender domain. The function fails closed for staging if
+   the invite URL or recipient allowlist is missing; never include real
+   customers in that allowlist.
 4. Deploy `send-share-email`, then `approve-vault-device`, to the explicit
    staging project ref. Do not rely only on the current CLI link.
-5. Publish the reviewed Apple association file and script-free `/invite`
-   fallback. Confirm `https://miloom.co/.well-known/apple-app-site-association`
-   returns HTTP 200, `application/json`, and no redirect before testing links.
+5. Deploy `miloom-staging-invite/` as a **separate** site at
+   `staging-invite.miloom.co` and publish its script-free `/invite` fallback.
+   Confirm that its Apple association file returns HTTP 200,
+   `application/json`, no redirect, and **only** the staging app ID for
+   `/invite`. Confirm the staging build has the matching associated-domain
+   entitlement and URL handler. Do not add the staging app to the production
+   `miloom.co` association file or route production invite links to staging.
 6. Record migration versions, function deployment identifiers, website commit,
    UTC time, operator, and staging project ref.
 
