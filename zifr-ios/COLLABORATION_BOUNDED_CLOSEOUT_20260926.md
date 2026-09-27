@@ -382,3 +382,34 @@ the review packet scope, not evidence that an independent review occurred.
 
 No production deployment or global collaborator-password sharing is authorized.
 No new fixture, implementation, tests, or external mutation in this reconciliation.
+
+### Focused commits and current-candidate role contracts (2026-09-27)
+
+User authorized commit and continuation. Canonical commit `4de34175` contains
+only the reveal gate, four tests and the bounded closeout evidence. Matching
+tested native additions are committed in the isolated staging candidate as
+`69567e17`; candidate Git status is clean. The prior 46-test result covers those
+same source bytes; no native rerun or new build is implied by committing them.
+Neither branch was pushed, merged or deployed.
+
+Continued Gate 1 using current-candidate migrations 009–033 in two disposable
+local PostgreSQL databases, with Unix-socket-only access. Existing
+`delegated_scope_assertions.sql` and `admin_viewer_management_assertions.sql`
+both passed. This verifies exact-bank/all-institutions/all-financials isolation,
+entity-only Admin grants, Admin entity boundaries and Viewer grant/removal,
+owner-only blocking, denial of Admin management of higher-role collaborators,
+owner-block enforcement and suspended-Admin denial. It does not establish native
+flows, ownership-transfer coverage, or a completed whole Gate 1.
+
+First rehearsal failed because a later document fixture inserted an independent
+Editor document share, invalidating the role test's otherwise-isolated setup.
+Read the fixture and removed only synthetic authorization rows in the private
+harness before each role assertion; unchanged candidate contracts then passed.
+This was a test-composition issue, not demonstrated cross-scope unauthorized
+access. No implementation or hosted-data change. Evidence directory:
+`/private/tmp/miloom-final-roles.ky9RBA`; failed composition retained separately in
+`/private/tmp/miloom-final-roles.vwQCgs`. Both local servers stopped on exit.
+
+Next bounded row: ownership-transfer restriction coverage and native role-matrix
+reconciliation, then the predefined document final-candidate acceptance batch.
+All other frozen gates retain their stated limitations. No production action.
