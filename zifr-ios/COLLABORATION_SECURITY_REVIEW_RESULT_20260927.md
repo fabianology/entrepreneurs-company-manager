@@ -114,3 +114,30 @@ repair, apply only this migration to Staging under deployment authority, verify
 deployed authenticated denials/authorized paths, and reconcile the final candidate
 and remaining explicitly incomplete security-review boundaries. Production stays
 on hold; global collaborator-secret activation stays closed.
+
+## Defensive staging deployment — September 27
+
+Repair committed as canonical `dca3c625`, reconciled into clean candidate
+`d3b6a457` (parent `7294842e`). Only backend/test/review files changed; installed
+native binary is unchanged. User authorized normal defensive staging work after
+a Codex cybersecurity notice; no blocked advanced security testing was repeated.
+
+Applied only `202609270002_document_identity_scope_guard.sql` with explicit
+Staging reference `bvtuyzhyospqxvpzcrmv`; recorded version/name in migration history.
+Catalog receipt: exactly one enabled BEFORE INSERT OR UPDATE document trigger;
+security-definer function with empty search path; anonymous/authenticated direct
+function execution denied. Function-definition MD5 `da780e4683ee850a611bfeb8479c4c32`
+is an identity receipt, not a security proof. No document rows rewritten.
+
+`supabase/ops/staging_document_guard_happy_path.sql` passed on deployed Staging:
+authorized Owner document creation, exact Editor metadata save, and Owner movement
+between owned entities. Synthetic Auth/entities/document were in one rolled-back
+transaction; subsequent counts found zero retained fixture rows. No file bytes
+or email delivered, no production access, no general migration push.
+
+This verifies deployed presence and normal authorized paths, not a hosted
+adversarial regression or complete independent security audit. Local negative
+regression and focused static repair review remain the denial-boundary evidence.
+Other review omissions stay explicit; global activation and production cutover
+remain closed. Final external review must accept this evidence or perform
+separately approved remaining security checks before release.

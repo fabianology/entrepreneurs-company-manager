@@ -5,6 +5,19 @@ scope. Production deployment and collaborator-secret activation remain closed.
 
 ## Current checkpoint summary — 2026-09-27
 
+Latest defensive checkpoint (supersedes release-status wording below): canonical
+repair `dca3c625`, clean candidate `d3b6a457`, installed native binary unchanged.
+The document identity/scope defect is repaired and deployed only to Staging as
+migration `202609270002`. Local negatives/four existing document contracts and
+focused static re-review passed; deployed positive Owner/Editor workflows passed
+with synthetic transaction rolled back and absence verified. See
+`COLLABORATION_SECURITY_REVIEW_RESULT_20260927.md` for evidence and omissions.
+Minimum-client policy and live inventory are recorded in the cutover decision;
+latest TestFlight build 13 remains incompatible. Remaining release gate: final
+external security disposition for partial review boundaries, plus separately
+authorized compatible release/upgrade cutover. No complete-audit/goal-complete
+claim or extra UI batch.
+
 Supersedes historical pending-fixture statements below. Clean candidate
 `7294842e`, canonical implementation `4cfe9d69`. Installed native binary SHA-256
 `664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc`

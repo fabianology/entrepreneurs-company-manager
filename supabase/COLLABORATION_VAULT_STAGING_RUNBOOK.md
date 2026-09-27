@@ -1,5 +1,18 @@
 # Collaboration and Vault Staging Rollout
 
+## Defensive document guard checkpoint — 2026-09-27
+
+Canonical repair `dca3c625`, clean candidate `d3b6a457` (native binary unchanged).
+Applied only migration `202609270002` to explicit Staging `bvtuyzhyospqxvpzcrmv`;
+enabled BEFORE INSERT/UPDATE guard, empty search path and no direct client EXECUTE
+verified; migration history recorded. Authorized Owner create/move and exact
+Editor metadata save passed via `ops/staging_document_guard_happy_path.sql`.
+Transaction rolled back; no synthetic accounts/entities/documents remain.
+Local denial regressions/focused static repair review are recorded separately;
+no blocked security test repeated or hosted adversarial acceptance claimed.
+Final external review remains a release gate. Production/global activation
+untouched; no whole migration push or new native/UI acceptance batch.
+
 ## Latest bounded checkpoint — 2026-09-27
 
 Clean candidate `7294842e`, unchanged installed native SHA-256
