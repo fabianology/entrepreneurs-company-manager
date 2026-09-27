@@ -17,9 +17,9 @@ pg_ctl -w -D "$scratch_dir/pg" -o "-k $scratch_dir/socket -p 5432 -c listen_addr
 started=true
 psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d postgres -c 'CREATE ROLE service_role NOLOGIN BYPASSRLS'
 run_sql() { psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d "$case_db" -f "$1" >>"$scratch_dir/$case_db.log" 2>&1; }
-if [ "$#" = 0 ]; then set -- foundation owner_stage device_grant owner_rewrap rotation status scoped_update; fi
+if [ "$#" = 0 ]; then set -- foundation owner_stage device_grant owner_rewrap rotation status scoped_update owner_delete; fi
 for scenario in "$@"; do
-  case "$scenario" in foundation|owner_stage|device_grant|owner_rewrap|rotation|status|scoped_update) ;; *) echo 'Unknown scenario' >&2; exit 1 ;; esac
+  case "$scenario" in foundation|owner_stage|device_grant|owner_rewrap|rotation|status|scoped_update|owner_delete) ;; *) echo 'Unknown scenario' >&2; exit 1 ;; esac
   case_db="vault_$scenario"
   createdb -h "$scratch_dir/socket" "$case_db"
   run_sql supabase/tests/delegated_scope_fixture.sql
@@ -43,6 +43,9 @@ for scenario in "$@"; do
       run_sql supabase/tests/resource_secret_containment_rollback_assertions.sql ;;
     status) run_sql supabase/tests/resource_secret_access_status_assertions.sql ;;
     scoped_update) run_sql supabase/tests/resource_secret_scoped_update_assertions.sql ;;
+    owner_delete)
+      run_sql supabase/migrations/202609230002_skip_vault_audit_for_deleted_owner.sql
+      run_sql supabase/tests/resource_secret_account_delete_assertions.sql ;;
   esac
   printf 'PASS scoped-vault scenario: %s\n' "$scenario"
 done
