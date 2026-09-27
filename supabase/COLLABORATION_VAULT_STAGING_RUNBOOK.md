@@ -1,5 +1,20 @@
 # Collaboration and Vault Staging Rollout
 
+## Verified-email acceptance checkpoint — 2026-09-27
+
+Applied only migration `202609270003` to explicit Staging `bvtuyzhyospqxvpzcrmv`;
+history recorded. Invitation acceptance now requires the current Auth account's
+confirmed email and non-anonymous identity, locked through grant creation.
+Existing grants and decline behavior are unchanged; private worker stays private.
+`tests/invitation_verified_email_assertions.sql` passed locally and on Staging:
+unverified acceptance denied without grants; verified ID/token acceptance and
+decline passed. All synthetic rows rolled back; zero test users/entities remain.
+Catalog confirmed guard, identity row lock and worker privileges. Focused separate
+static review passed, not a professional audit. No production/native changes.
+Source is uncommitted; candidate `d3b6a457` does not yet contain this migration.
+Next checkpoint is scoped commit/candidate reconciliation, then final external
+disposition and separately authorized compatible-client production rollout.
+
 ## Defensive document guard checkpoint — 2026-09-27
 
 Canonical repair `dca3c625`, clean candidate `d3b6a457` (native binary unchanged).

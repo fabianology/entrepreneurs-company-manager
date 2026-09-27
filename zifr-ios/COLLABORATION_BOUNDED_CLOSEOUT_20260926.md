@@ -5,6 +5,31 @@ scope. Production deployment and collaborator-secret activation remain closed.
 
 ## Current checkpoint summary — 2026-09-27
 
+Verified-email acceptance guard `202609270003` now implemented/deployed on Staging;
+ordinary local/hosted contracts and focused static review passed. Synthetic rows
+rolled back; no production/native changes. Guard is uncommitted and not yet in
+clean candidate `d3b6a457`; next bounded checkpoint is commit/reconciliation before
+final external disposition. Phase map below otherwise unchanged.
+
+### Final bounded phase map after the document guard
+
+| Original phase | Current status | Remaining within frozen scope |
+| --- | --- | --- |
+| 0 Containment | Complete for staging/policy | Production execution separately authorized |
+| 1 Contracts | Complete on staging | Final reviewer disposition of evidence |
+| 2 Personal vault | Complete on staging | Final reviewer disposition of evidence |
+| 3 Nonsecret collaboration | Complete on staging | Final reviewer disposition of evidence |
+| 4 Scoped secrets | Complete for bounded staging acceptance | Global activation remains closed |
+| 5 Revocation/rotation | Complete for bounded staging acceptance | Final reviewer disposition of evidence |
+| 6 Management | Complete for bounded staging acceptance | Final reviewer disposition of evidence |
+| 7 Acceptance/rollout | In progress: external Gate 5 | Final security sign-off; production rollout separate |
+
+Implementation/deployment evidence is committed and the staging candidate is
+clean. **Exact remaining gate: final external security disposition for incomplete
+review boundaries.** Under the user's definition, this may remain a recorded
+external gate; it must not be represented as passed or production-ready. No new
+implementation phase or whole-app QA is needed to hand off this checkpoint.
+
 Latest defensive checkpoint (supersedes release-status wording below): canonical
 repair `dca3c625`, clean candidate `d3b6a457`, installed native binary unchanged.
 The document identity/scope defect is repaired and deployed only to Staging as

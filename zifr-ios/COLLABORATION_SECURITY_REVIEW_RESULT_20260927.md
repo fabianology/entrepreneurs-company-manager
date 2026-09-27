@@ -1,5 +1,27 @@
 # Bounded second-agent security review result
 
+## Latest checkpoint — verified-email guard, 2026-09-27
+
+Supersedes the earlier acceptance-confirmation uncertainty for the new source
+overlay and deployed Staging worker, not production or already-existing grants.
+Migration `202609270003` explicitly requires current `auth.users.email_confirmed_at`
+and a non-anonymous account before granting invitation access; `FOR SHARE` keeps
+the current identity stable in the transaction. Matching, expiry, blocking,
+decline and public wrappers remain unchanged. Focused separate-agent static
+review passed with no blocking regression identified; this is not a full audit.
+
+Parent executed ordinary synthetic permission contracts locally
+(`/private/tmp/miloom-invite-verification.qlgFN8/contracts.log`) and on explicit
+Staging `bvtuyzhyospqxvpzcrmv`: unverified ID/token acceptance denied without
+grants; anonymous identity denied; verified ID/token acceptance and decline
+passed. Transactions rolled back; hosted test user/entity counts are zero.
+Catalog confirmed guard/identity lock/private worker and migration history.
+No previous blocked security exercise repeated; no production/native changes.
+New source remains uncommitted and outside clean candidate `d3b6a457` pending
+reconciliation. Final external sign-off, legacy entity-Editor disposition and
+compatible-client cutover remain release conditions. Existing native generic
+verification-error copy is a noncritical follow-up, not a new polish checkpoint.
+
 Date: 2026-09-27. Reviewer: separate agent `bounded_security_review`.
 Read-only static review, not a professional audit or executed exploit test.
 Target: clean candidate `7294842e42c7cee9ecad7596461e66b121f96c45` at
@@ -141,3 +163,51 @@ regression and focused static repair review remain the denial-boundary evidence.
 Other review omissions stay explicit; global activation and production cutover
 remain closed. Final external review must accept this evidence or perform
 separately approved remaining security checks before release.
+
+## Remaining-boundary defensive static review — September 27
+
+Separate reviewer completed read-only source/evidence continuation for clean
+`d3b6a45722699dfd542b18fe19a300e4916d6c7c`. No additional confirmed source defect
+identified; no tests, defect exercises, live access, UI or deployments by reviewer.
+This is not a professional audit or production sign-off.
+
+| Boundary | Disposition |
+| --- | --- |
+| Current roles/scopes and canonical scoped removal/block | Pass based on static review |
+| Document identity/scope repair | Pass based on static review |
+| Personal vault approval/recovery/re-enrollment/account rotation | Pass based on static review |
+| Readable migration and locked-value preservation | Pass based on static review |
+| Resource grant/isolation/revoke/rotation and native publication guards | Pass based on static review |
+| Compatibility/containment design | Pass based on static review |
+| Verified-email assurance across all identity paths | Unverified |
+| Actual production cutover and global activation | Unverified; HOLD |
+
+Continuation inspected invitation/legacy-access migrations 210003/220002/220004;
+vault approval/recovery 210005, rotation/revocation 210006, re-enrollment 220005;
+owner rewrap/source revision 220015/016, grant/lifecycle/status 220014/019/020;
+document guard 270002; native AppViewModel migration, DataRepository account
+rotation/recovery/key transitions and publication, AuthViewModel sign-out;
+local containment SQL and dated acceptance/cutover evidence. Previous source list
+and evidence attribution still apply. No test counts are newly claimed.
+
+Parent separately read only public Staging `/auth/v1/settings`: email/password
+signup enabled and `mailer_autoconfirm=false`; phone autoconfirm also false.
+This narrows current signup uncertainty, but acceptance itself matches
+`auth.users.email` without explicit confirmation. Production/OAuth/email changes/
+admin-created identity assurance was not established. Next targeted release
+decision: verify every supported identity path or add an explicit server invariant
+with separate implementation authority; do not mark this row passed from signup
+settings alone.
+
+Existing company Editor edges are deliberately retained by 270001. Applicable
+live legacy-edge inventory/disposition remains a cutover prerequisite. Current
+containment rehearsal covers local recipient-delivery RPC privileges and preserves
+encrypted data; it is not proof every hosted vault path can be disabled. Historical
+provider-credential rotation/monitoring prerequisites also need operational
+reconciliation, not another whole-app QA phase.
+
+Final external disposition must accept these static/runtime limits. Compatible
+production-configured distribution, upgrades or retirement of incompatible support,
+and separately authorized backend rollout remain required. Global collaborator
+secret activation remains closed. No assurance can recall previously delivered
+bytes or keys.

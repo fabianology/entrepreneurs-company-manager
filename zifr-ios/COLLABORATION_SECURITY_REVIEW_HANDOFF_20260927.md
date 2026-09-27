@@ -1,7 +1,54 @@
 # Bounded collaboration and vault independent-review handoff
 
-Date: 2026-09-27. Prepared for an independent reviewer; no review has occurred.
+Latest approved overlay: verified-email migration `202609270003` is implemented
+and deployed only to Staging. Ordinary rolled-back permission contracts passed
+locally/hosted and focused separate static review passed; see the result's latest
+checkpoint. Acceptance now enforces current confirmed, non-anonymous identity
+independently of signup settings. Source remains uncommitted and not yet in
+candidate `d3b6a457`; earlier verified-email uncertainty below is historical for
+that candidate. Production, existing grants and final external sign-off are not
+certified by this checkpoint.
+
+Date: 2026-09-27. Prepared for final external review. A separate-agent partial
+static review and focused document-repair review occurred; see the result record.
+No complete independent audit or final external sign-off has occurred.
 Final external Gate 5 of the frozen goal. No general app QA is requested.
+
+Latest read-only continuation completed for `d3b6a457`: current roles/removal,
+document repair, personal/scoped vault and containment design passed source review
+with existing tests attributed, not rerun. Verified-email assurance remains
+Unverified; parent confirmed Staging signup requires confirmation, not every
+identity path or production settings. Read the result's latest disposition table.
+Legacy entity-Editor inventory and historical operational prerequisites remain
+release conditions. No additional confirmed source defect was reported.
+
+## Current target and remaining external disposition
+
+Supersedes the original target below: clean candidate `d3b6a457` includes the
+document guard repair over `7294842e`; canonical repair `dca3c625`, defensive
+deployment evidence `84913063`. Installed native binary/hash below is unchanged.
+Staging has migration `202609270002`; deployed authorized document paths passed
+with transaction rollback and fixture absence verified. Production untouched.
+
+Read `COLLABORATION_SECURITY_REVIEW_RESULT_20260927.md` before reviewing. The
+original P1 document defect was reproduced locally, repaired, locally regressed,
+statically re-reviewed and defensively deployed. Do not treat partial coverage
+of invitation, vault and compatibility boundaries as full security approval.
+
+Final reviewer must explicitly accept or request bounded additional evidence for:
+
+- Remaining role/delegation and invitation identity/removal/block guarantees,
+  including the verified-email Auth precondition not resolved by source alone.
+- Document fix and deployment receipts, authorization/cache lifetime limitations.
+- Account/device recovery, resource grant isolation, migration/rotation/revocation
+  and late-publication guarantees not fully independently reviewed.
+- Supported-client cutover and non-destructive delivery containment.
+
+No live access, exploit reproduction, security-tool setup or production authority
+is granted by this packet. If additional testing requires broader security access,
+use an approved review route; do not bypass product safeguards. Record acceptance,
+remaining omissions or exact failed gate. Keep noncritical unrelated findings out
+of the frozen task.
 
 ## Exact review target
 
