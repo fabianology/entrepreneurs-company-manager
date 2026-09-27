@@ -17,6 +17,12 @@ late-response tests passed; selected native total **46 passed, 0 failed/skipped*
 These two native file changes are currently uncommitted on top of candidate
 `09a366ef`; it is no longer a clean committed candidate until reconciliation.
 
+Latest approved correction, 2026-09-27: the company-wide Editor gap below is now
+fixed in native source and guarded on Staging. Selected native tests **47 passed,
+0 failed/skipped**; local scope regression and hosted negative probes passed.
+Candidate is now `69567e17` plus three native files and three new backend/test
+files, uncommitted. This closes the specific company/Editor gap, not every gate.
+
 ## Candidate and fresh verification
 
 Native source: `7bf657db`, branch `codex/collab-staging-candidate-20260923`,
@@ -413,3 +419,137 @@ access. No implementation or hosted-data change. Evidence directory:
 Next bounded row: ownership-transfer restriction coverage and native role-matrix
 reconciliation, then the predefined document final-candidate acceptance batch.
 All other frozen gates retain their stated limitations. No production action.
+
+### Ownership/document contracts passed; exact Gate 1 failure found (2026-09-27)
+
+Clean candidate `69567e17` remains unchanged. Local Admin tests using real
+migration 006 owner-preservation trigger plus current 009–033 contract functions
+passed: safe company name edit succeeds while user_id remains the owner, and
+Admin's attempted Admin/Editor delegations are denied without elevated shares.
+Evidence `/private/tmp/miloom-final-roles.8RZAUR`. This checks the trigger and
+RPCs under synthetic auth context, not full hosted RLS or native transfer UI.
+There is no native ownership-transfer feature found in the inspected sources.
+
+Five current-candidate local document cases passed: exact Storage reads,
+upload reservations/finalization/revocation, file removal, Storage write boundary
+and orphan UUID cleanup regression. Evidence
+`/private/tmp/miloom-final-roles.dG2Oj2`. Separate original fixtures were used;
+earlier combined-fixture failures were caused by orphan records and unrelated
+Editor shares changing exact expected counts. Assertions and product SQL were
+not weakened. The UUID regression ran in its required empty disposable database.
+All local servers stopped. These are backend contracts, not a final native
+upload/open/replace/remove acceptance pass or hosted Storage deployment proof.
+
+**Gate 1 currently fails the agreed Editor scope model.** Native ShareEntitySheet
+still offers [Viewer, Editor, Admin] for resource_type=company, and the real
+miloom_share_resource function permits company/Editor. A new local negative
+acceptance check reproduced `FROZEN_GATE_1_FAILED: company-level Editor grant
+accepted`, evidence `/private/tmp/miloom-final-roles.c4yVn1`. Company-level Editor
+inherits entity-wide resource access, rather than the approved exact resource or
+explicit collection. Earlier passing role assertions did not test this forbidden
+combination; they do not override this failed acceptance row. No hosted grant was
+created and no critical data-loss claim is made.
+
+Required bounded correction: remove company Editor from native choices and
+reject new company/Editor grants and invitation acceptance server-side. Inspect
+existing staging grants/invitations and agree an explicit compatibility disposition
+before changing any existing person's authority; never silently promote to Admin
+or downgrade/delete existing shares. Add regression coverage for company rejection
+while exact/collection Editor remains usable. Coordinated backend-contract work
+requires user approval; no implementation/deployment performed in this continuation.
+Production/global secret sharing remain closed. Current evidence edits uncommitted.
+
+### Approved Editor scope correction verified on staging (2026-09-27)
+
+User approved coordinated native/backend correction on Staging only. Before
+deployment, aggregate inventory returned zero company Editor direct shares and
+zero company Editor invitations, so no existing access was converted or removed.
+Production inventory was not inspected and no production action was performed.
+
+Native EntitySharingScope.allowedRoles now yields Viewer/Admin for an entire
+entity, Viewer/Editor for supported resources/collections, Viewer-only for
+delegated Admins, and no roles for unknown scopes. ShareEntitySheet consumes that
+policy and validates selected role before enabling Send. Existing segmented
+control, native presentation/materials and premium style retained; no redesign.
+Added native regression for entity exclusion, all nine exact/collection Editor
+types, Admin Viewer-only and unknown-scope fail-closed behavior.
+
+Migration `202609270001_editor_resource_scope_guard.sql` adds internal BEFORE
+triggers to shares/invitations. These reject new company/Editor edges, conversion
+of other scopes/roles into them, legacy suspended-share reactivation, and legacy
+company Editor invitation transition to Pending/Accepted. The table-level guard
+covers direct grant and acceptance writers, including legacy paths. Installation
+does not silently rewrite/delete existing grants; unrelated legacy metadata,
+suspension, revocation and removal remain possible. Production legacy grants
+still need an explicit disposition before any separately authorized rollout.
+
+Local regression passed against current candidate migrations, covering direct
+and pending grant rejection/no residual rows, all nine scoped Editor grants,
+Viewer-to-company-Editor denial, legacy preservation, suspension/reactivation,
+invitation acceptance denial and internal-function privileges. Evidence:
+`/private/tmp/miloom-final-roles.w4KyAe`. First attempt incorrectly seeded legacy
+rows before the harness reset; corrected fixture order, not product behavior.
+Committed-file-ready legacy fixture and assertion SQL retained in supabase/tests.
+
+Zifr staging simulator build and selected suites passed **47/47**, no failed or
+skipped tests; xcresulttool summary independently verified:
+`/private/tmp/miloom-editor-scope-native-20260927.xcresult`. Restricted build log:
+`/private/tmp/miloom-editor-scope-native-20260927.log`. Debug binary SHA-256:
+`664cc5592c0b007b5cf96ce5a42714b78a3bc7292168362d0401530fd560e8bc`.
+This is source/policy testing, not new native invite/send acceptance evidence.
+
+Applied only this migration to explicit Staging ref `bvtuyzhyospqxvpzcrmv`, with
+atomic migration-history recording. Initial private deployment wrapper had a
+dollar-quote syntax error; transaction failed before any migration applied.
+Corrected wrapper and deployment succeeded. Hosted rolled-back negative probes
+then rejected both company Editor row types with the intended error; confirmed
+two triggers, recorded version, internal helper closed, and zero company Editor
+shares/invitations. No persistent test account/grant/email created. No full db
+push, other migration, production deployment, client-secret activation or FX
+phone update. Candidate/canonical focused changes and evidence are uncommitted;
+unrelated dirty work preserved. Next: authorized checkpoint commit, remaining
+exact-build native document/collaborator-vault acceptance and release-safety gates.
+
+### Post-correction bounded contracts passed (2026-09-27)
+
+With the Editor scope guard installed in every applicable isolated database,
+**nine role/document scenarios passed**: delegated scopes, Admin Viewer management,
+owner preservation/elevated-delegation rejection, company Editor denial, legacy
+scope guard regression, exact document reads, upload reservations/finalization,
+document removal and Storage write boundaries. Evidence:
+`/private/tmp/miloom-final-roles.QWr7xV`. Older delegated-scope test seeded a now
+forbidden company Editor pending invitation; changed only that fixture role to
+supported Viewer in canonical/candidate. Its pending-invitation-no-access
+assertion and all exact/collection Editor assertions remain unchanged. Earlier
+attempt is retained in `/private/tmp/miloom-final-roles.gbfouC`; product guard
+rejection was expected, not a regression in valid scope access.
+
+**All eight existing scoped-vault SQL scenarios passed** with the new scope guard:
+foundation, owner staging, device grant, owner rewrap, rotation/containment,
+status, scoped update and owner deletion. Evidence:
+`/private/tmp/miloom-scoped-vault.pp6tuX`. Uses the existing rehearsal with only
+the new migration added in a private harness; no new product features or broader
+QA cases. Local servers stopped, no hosted calls/mutations in this continuation.
+No native rerun: the prior 47-test result still covers unchanged native bytes.
+Candidate whitespace check passed. Focused changes/evidence remain uncommitted.
+
+#### Remaining exact-build native batches (same six frozen gates)
+
+1. Role controls: owner entire-entity sheet offers Viewer/Admin; entity Admin
+   offers Viewer only; exact/collection Editor edits its scope and Viewer cannot
+   edit or request/reveal credentials. Retain previous invite/link/block evidence;
+   do not resend email or repeat full lifecycle without a changed relevant path.
+2. Documents: on synthetic staging data, authorized upload/open/replace/remove,
+   retry/cleanup and denial after revocation. Combine happy path into one guided
+   pass; use backend receipts for rows/objects and independent-scope preservation.
+   The passing SQL scenarios do not substitute for file-picker/open presentation.
+3. Scoped secrets: approved second device exact Editor request/grant/decrypt,
+   Viewer sibling denial, revoke/fresh-reveal denial and rotation without stale
+   grant carryover. Preserve passed owner recovery/migration/rotation evidence;
+   do not recreate it merely to repeat it. Global client activation stays closed.
+
+These batches must identify the committed candidate/build; ask only for gestures
+the controls cannot perform and use private synthetic credentials. Afterward,
+clean only marked disposable data and complete compatibility/cutover/rollback
+disposition plus independent-review external-gate handoff. Commit requires
+explicit instruction under the native agreement. No new phase introduced.

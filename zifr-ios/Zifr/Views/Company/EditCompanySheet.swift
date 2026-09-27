@@ -1580,9 +1580,7 @@ struct ShareEntitySheet: View {
     }
     
     private var roles: [String] {
-        isDelegatedAdmin ? ["Viewer"] : resourceType.lowercased() == "company"
-            ? ["Viewer", "Editor", "Admin"]
-            : ["Viewer", "Editor"]
+        EntitySharingScope.allowedRoles(resourceType: resourceType, isEntityAdmin: isDelegatedAdmin)
     }
     
     var body: some View {
@@ -1735,7 +1733,8 @@ struct ShareEntitySheet: View {
     }
 
     private var canSend: Bool {
-        canManageSharing && !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        canManageSharing && roles.contains(role)
+            && !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var roleDescription: String {

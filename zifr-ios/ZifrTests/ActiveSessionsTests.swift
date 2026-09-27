@@ -563,6 +563,17 @@ final class ActiveSessionsTests: XCTestCase {
         XCTAssertNil(EntitySharingScope(rawValue: "unknown"))
     }
 
+    func testSharingRolesRejectEntityEditorAndRetainScopedEditors() {
+        XCTAssertEqual(EntitySharingScope.allowedRoles(resourceType: "company", isEntityAdmin: false), ["Viewer", "Admin"])
+        for type in ["all_institutions", "all_financials", "all_subscriptions", "all_documents", "institution", "card", "loan", "subscription", "document"] {
+            XCTAssertEqual(EntitySharingScope.allowedRoles(resourceType: type, isEntityAdmin: false), ["Viewer", "Editor"])
+            XCTAssertEqual(EntitySharingScope.allowedRoles(resourceType: type, isEntityAdmin: true), ["Viewer"])
+        }
+        XCTAssertEqual(EntitySharingScope.allowedRoles(resourceType: "company", isEntityAdmin: true), ["Viewer"])
+        XCTAssertTrue(EntitySharingScope.allowedRoles(resourceType: "unknown", isEntityAdmin: false).isEmpty)
+        XCTAssertTrue(EntitySharingScope.allowedRoles(resourceType: "unknown", isEntityAdmin: true).isEmpty)
+    }
+
     @MainActor
     func testDocumentSaveWaitsForReceiptAndRetainsDraftOnFailure() async throws {
         let state = AppState()

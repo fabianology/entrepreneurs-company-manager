@@ -33,7 +33,7 @@ begin
         resource_id, resource_type, email, role, invited_by, status
     ) values (
         '10000000-0000-0000-0000-000000000002', 'company',
-        'editor@example.com', 'Editor', v_owner, 'Pending'
+        'editor@example.com', 'Viewer', v_owner, 'Pending'
     );
     if public.miloom_can_read_company('10000000-0000-0000-0000-000000000002', v_owner) then
         raise exception 'pending invitation incorrectly exposed company';

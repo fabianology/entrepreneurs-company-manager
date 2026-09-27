@@ -176,6 +176,13 @@ enum EntitySharingScope: String, CaseIterable, Identifiable {
     case documents = "all_documents"
 
     var id: String { rawValue }
+    static func allowedRoles(resourceType: String, isEntityAdmin: Bool) -> [String] {
+        let type = resourceType.lowercased()
+        guard EntitySharingScope(rawValue: type) != nil
+            || ["institution", "card", "loan", "subscription", "document"].contains(type) else { return [] }
+        if isEntityAdmin { return ["Viewer"] }
+        return type == "company" ? ["Viewer", "Admin"] : ["Viewer", "Editor"]
+    }
     var title: String {
         switch self {
         case .company: return "Entire Entity"
