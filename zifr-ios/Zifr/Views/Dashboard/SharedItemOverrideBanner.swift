@@ -1,5 +1,18 @@
 import SwiftUI
 
+/// A reveal response is usable only by the still-current, active presentation.
+/// Kept independent of networking so delayed completions can be tested exactly.
+struct ResourceCredentialRevealGate {
+    private(set) var operationID = UUID()
+
+    mutating func invalidate() { operationID = UUID() }
+
+    func accept(_ fields: [String: String], for token: UUID, isActive: Bool) -> [String: String]? {
+        guard token == operationID, isActive else { return nil }
+        return fields
+    }
+}
+
 struct SharedItemOverrideBanner: View {
     let resourceId: UUID
     let defaultCompanyId: UUID
@@ -83,7 +96,8 @@ struct ResourceCredentialAccessCard: View {
     @State private var isEditing = false
     @State private var isWorking = false
     @State private var errorMessage: String?
-    @State private var operationID = UUID()
+    @State private var revealGate = ResourceCredentialRevealGate()
+    private var operationID: UUID { revealGate.operationID }
     @State private var isRevealing = false
 
     private struct AccountCredentials: Codable, Identifiable {
@@ -284,7 +298,7 @@ struct ResourceCredentialAccessCard: View {
     }
 
     private func clearPlaintext(invalidateOperation: Bool = true) {
-        if invalidateOperation { operationID = UUID() }
+        if invalidateOperation { revealGate.invalidate() }
         plaintextFields.removeAll()
         draftFields.removeAll()
         draftAccounts.removeAll()
@@ -406,11 +420,11 @@ struct ResourceCredentialAccessCard: View {
                     type: resourceType, id: resourceID,
                     expectedOwnerUserID: ownerUserID
                 )
-                guard token == operationID, scenePhase == .active else {
+                guard let acceptedFields = revealGate.accept(fields, for: token, isActive: scenePhase == .active) else {
                     isWorking = false
                     return
                 }
-                plaintextFields = fields
+                plaintextFields = acceptedFields
             } catch {
                 guard token == operationID else {
                     isWorking = false

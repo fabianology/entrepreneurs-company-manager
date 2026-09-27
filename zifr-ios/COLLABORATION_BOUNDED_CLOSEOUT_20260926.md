@@ -7,9 +7,15 @@ Latest checkpoint, 2026-09-27: clean candidate `09a366ef` (native source unchang
 from `7bf657db`). Personal recovery, three-field safe migration/second-device
 decryption, resource-key preparation/replacement and owner post-rotation reveal
 passed. Disposable hosted fixture cleanup passed. Live reveal dismissal passed
-only for observed timing; deterministic delayed-response verification remains
-open. The sections below preserve dated history, including superseded pending/
+for observed timing; subsequent deterministic publication-gate tests also passed.
+The sections below preserve dated history, including superseded pending/
 uncommitted statements. No overall completion or production release is claimed.
+
+2026-09-27 automated continuation: the production reveal predicate is now exposed
+as a small testable gate with equivalent token/active-phase behavior. Controlled
+late-response tests passed; selected native total **46 passed, 0 failed/skipped**.
+These two native file changes are currently uncommitted on top of candidate
+`09a366ef`; it is no longer a clean committed candidate until reconciliation.
 
 ## Candidate and fresh verification
 
@@ -56,9 +62,9 @@ Statuses reflect full acceptance, not absence of implementation. No new phases.
 | --- | --- | --- |
 | 0 Containment | In progress | Minimum-client/cutover evidence and release safety |
 | 1 Contracts | In progress | Consolidated backend/native role matrix on candidate |
-| 2 Personal vault | In progress | Candidate recovery acceptance reconciled with migration evidence |
+| 2 Personal vault | In progress | Recovery/migration/decrypt passed; final exact-build reconciliation |
 | 3 Nonsecret collaboration | In progress | Final lifecycle matrix; foreground/offline limitation disposition |
-| 4 Scoped secrets | In progress | Final candidate matrix, including delayed reveal dismissal boundary |
+| 4 Scoped secrets | In progress | Delayed publication gate passed; consolidate granted-scope/isolation evidence on final candidate |
 | 5 Revocation/rotation | In progress | Candidate-native recovery/revoke/rotate acceptance reconciliation |
 | 6 Management | In progress | Required native management checks within the same final matrix |
 | 7 Acceptance/rollout | In progress | Clean committed candidate, bounded checklist and external-review handoff |
@@ -312,3 +318,67 @@ Checkpoint closed with this evidence limitation. Candidate `09a366ef` unchanged;
 no commit/push/deployment. Next bounded Gate 4 action: deterministic delayed-response
 verification, followed by reconciliation of uncovered roles/document acceptance
 and release-safety/external-review gates. No adjacent phases or whole-app QA.
+
+### Deterministic delayed-response gate tests passed (2026-09-27)
+
+Extracted the existing token/current-active-phase predicate into
+ResourceCredentialRevealGate in the existing SharedItemOverrideBanner.swift file;
+the native reveal handler consumes its accepted fields, and clearPlaintext uses
+its invalidation. No UI/material, permission, crypto or backend contract change.
+Added four tests in the existing test-target file: active-current acceptance,
+inactive rejection, an authenticated request held on a continuation until after
+dismissal invalidation, and an old response released after a new presentation's
+reveal. The latter two deterministically control response ordering without sleep,
+network credentials or staging fixtures. Late plaintext was not published or
+allowed to overwrite the newer reveal.
+
+Built the Zifr scheme and ran reveal-gate, ActiveSessions, resource-cryptography
+and preparation suites on disposable second simulator: **46 passed, 0 failed,
+0 skipped**, independently verified through xcresulttool summary. Result:
+`/private/tmp/miloom-delayed-reveal-20260927.xcresult`; restricted local log:
+`/private/tmp/miloom-delayed-reveal-20260927.log`. Native binary SHA-256:
+`36f6963dccfbd2ef0872e5078939509d4e87c65efdebe769f18ae702c999b039`.
+
+This closes deterministic publication-gate verification together with prior native
+dismissal evidence; it is not a timed HTTP-response integration test of SwiftUI.
+Copied only the same scoped additions into canonical source; preserved its
+pre-existing test-baseline differences. Candidate banner byte comparison and
+both whitespace checks passed. Candidate `09a366ef` plus these two files is now
+dirty/uncommitted. No commit/push/deployment, production action or new fixture.
+Next: reconcile these files into an identifiable candidate commit, then address
+only uncovered rows of the frozen role/document/release-safety acceptance matrix.
+
+### Frozen finish-line reconciliation (2026-09-27)
+
+Still following Phase 0 plus original Phases 1–7; no adjacent phase or general
+app QA is introduced. Implementation evidence is substantial, but none of the
+full-phase statuses above is promoted solely because a build or selected tests
+passed. The current candidate is `09a366ef` plus two uncommitted native files.
+
+| Frozen gate | Covered evidence | Bounded remaining work |
+| --- | --- | --- |
+| 1 Roles/scopes | Backend contracts, native scope policies and incremental Owner/Admin/Editor/Viewer checks | Consolidate exact permission rows; execute only uncovered backend/native boundaries on final candidate |
+| 2 Lifecycle | Delivered staging email, disposable new-user acceptance, existing-user direct share, one-tap native link handoff, entity removal, owner block and blocked re-invite rejection | Reconcile resource removal and role restrictions with final matrix; explicitly disposition foreground/offline cache limitation |
+| 3 Documents | Incremental upload/open/replace/remove, retry, orphan cleanup and revoked-operation rejection | Defined document acceptance batch on final candidate; no new document features |
+| 4 Scoped vault | Personal recovery, readable migration/locked-value preservation, second-device decrypt, owner rotation/decrypt, controlled late-response gate; earlier exact Editor grant/revoke and Viewer-sibling isolation | Final-candidate reconciliation of collaborator grant/revoke/cross-scope rows; owner-only fixture is not collaborator proof |
+| 5 Release safety | Containment and local rollback/rotation assertions; known older-client incompatibility documented | Supported-client inventory and cutover decision; independent security review recorded as final external gate, not completed |
+| 6 Deliverable | Identifiable checkpoint commits, result bundles, dated runbook evidence and disposable cleanup | Authorized focused commit, one clean staging candidate, exact-build bounded checklist and final handoff |
+
+Next execution gate is **Gate 1 role/scope coverage reconciliation**, followed
+by only its uncovered acceptance rows. Gate 3 and the remaining Gate 4 rows follow
+on the same committed candidate. Keep already-passed evidence; repeat a row only
+when needed to establish the final exact-build acceptance, not to restart QA.
+Committing requires explicit user instruction under the native working agreement;
+current continuation authorizes reconciliation, not a new commit/push/deployment.
+
+Release-safety review handoff is bounded to the exact candidate: verify Admin
+cannot grant Admin/Editor, block or transfer ownership; Editor cannot cross scopes;
+Viewer cannot mutate or obtain secrets; grants/wraps cannot bypass revocation;
+migration preserves locked values and recovery/rotation cannot lose readable
+credentials; document storage access respects scope; and containment rollback
+does not restore broad legacy secret reads. Use the recorded acceptance results
+and source diffs, and record any critical finding as a failed gate. This record is
+the review packet scope, not evidence that an independent review occurred.
+
+No production deployment or global collaborator-password sharing is authorized.
+No new fixture, implementation, tests, or external mutation in this reconciliation.

@@ -4,6 +4,62 @@ import CryptoKit
 import Supabase
 @testable import Zifr
 
+final class ResourceCredentialRevealGateTests: XCTestCase {
+    func testCurrentActiveRevealAccepted() {
+        let gate = ResourceCredentialRevealGate()
+        XCTAssertEqual(gate.accept(["password": "synthetic"], for: gate.operationID, isActive: true), ["password": "synthetic"])
+    }
+
+    func testInactivePresentationRejectsReveal() {
+        let gate = ResourceCredentialRevealGate()
+        XCTAssertNil(gate.accept(["password": "synthetic"], for: gate.operationID, isActive: false))
+    }
+
+    @MainActor
+    func testDelayedResponseAfterDismissalCannotPublishPlaintext() async {
+        let started = expectation(description: "Authenticated request suspended before response")
+        var completion: CheckedContinuation<[String: String], Never>?
+        var gate = ResourceCredentialRevealGate()
+        let token = gate.operationID
+        var displayed: [String: String] = [:]
+        let request = Task { @MainActor in
+            let response = await withCheckedContinuation { continuation in
+                completion = continuation
+                started.fulfill()
+            }
+            if let accepted = gate.accept(response, for: token, isActive: true) { displayed = accepted }
+        }
+        await fulfillment(of: [started], timeout: 2)
+        // Same invalidation used by the native sheet's onDisappear/background.
+        gate.invalidate()
+        completion?.resume(returning: ["password": "synthetic-delayed"])
+        await request.value
+        XCTAssertTrue(displayed.isEmpty)
+    }
+
+    @MainActor
+    func testDelayedOldResponseCannotReplaceNewPresentationReveal() async {
+        let started = expectation(description: "Old request suspended")
+        var completion: CheckedContinuation<[String: String], Never>?
+        var gate = ResourceCredentialRevealGate()
+        let oldToken = gate.operationID
+        var displayed: [String: String] = [:]
+        let request = Task { @MainActor in
+            let response = await withCheckedContinuation { continuation in
+                completion = continuation
+                started.fulfill()
+            }
+            if let accepted = gate.accept(response, for: oldToken, isActive: true) { displayed = accepted }
+        }
+        await fulfillment(of: [started], timeout: 2)
+        gate.invalidate()
+        displayed = gate.accept(["password": "synthetic-new"], for: gate.operationID, isActive: true) ?? [:]
+        completion?.resume(returning: ["password": "synthetic-old"])
+        await request.value
+        XCTAssertEqual(displayed, ["password": "synthetic-new"])
+    }
+}
+
 final class ActiveSessionsTests: XCTestCase {
     @MainActor
     func testOverviewPaymentFailureRetryKeepsDraftIdentityAndOriginalOwner() async throws {
