@@ -33,11 +33,17 @@ for number in $(seq 9 33); do
 done
 run_sql supabase/migrations/202609270001_editor_resource_scope_guard.sql
 if [ "$mode" = fixed ]; then run_sql supabase/migrations/202609270002_document_identity_scope_guard.sql; fi
+if [ "$mode" = fixed ]; then run_sql supabase/migrations/202609290001_restore_document_path_execute.sql; fi
+if [ "$mode" = fixed ]; then run_sql supabase/migrations/202609290002_case_insensitive_document_owner_paths.sql; fi
+if [ "$mode" = fixed ]; then run_sql supabase/migrations/202609290003_grant_document_owner_storage_writes.sql; fi
 psql -X -q -v ON_ERROR_STOP=1 -v review_mode="$mode" -h "$scratch_dir/socket" -d postgres -f supabase/tests/document_identity_scope_assertions.sql >>"$scratch_dir/contracts.log" 2>&1
 if [ "$mode" = fixed ]; then
   for contract in document_upload_reservation document_file_removal document_storage_write_boundary document_legacy_url_cleanup; do
     # Each existing contract mutates fixtures; use its own transaction rollback.
     psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d postgres -c 'BEGIN' -f "supabase/tests/${contract}_assertions.sql" -c 'ROLLBACK' >>"$scratch_dir/contracts.log" 2>&1
   done
+  psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d postgres -f supabase/tests/document_storage_path_acl_assertions.sql >>"$scratch_dir/contracts.log" 2>&1
+  psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d postgres -f supabase/tests/document_uppercase_owner_paths_assertions.sql >>"$scratch_dir/contracts.log" 2>&1
+  psql -X -q -v ON_ERROR_STOP=1 -h "$scratch_dir/socket" -d postgres -f supabase/tests/document_owner_storage_write_grant_assertions.sql >>"$scratch_dir/contracts.log" 2>&1
 fi
 printf 'PASS document scope %s and selected compatible document contracts\n' "$mode"

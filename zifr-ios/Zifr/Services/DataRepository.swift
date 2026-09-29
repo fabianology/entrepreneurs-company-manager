@@ -1649,15 +1649,10 @@ class DataRepository {
             return filePath
         } catch {
             AppDiagnostics.failure("documents", "upload_company_document", error: error)
-            // Fallback: save to app's local documents directory (just like how the scanner does it!)
-            let fileManager = FileManager.default
-            guard let documentDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else {
-                throw error
-            }
-            let localURL = documentDirectory.appendingPathComponent(uniqueName)
-            try fileData.write(to: localURL)
-            try fileManager.setAttributes([.protectionKey: FileProtectionType.complete], ofItemAtPath: localURL.path)
-            return localURL.absoluteString
+            // A local-only URL would be persisted as if the document had
+            // synced, but could never open on another device or for a
+            // collaborator. Keep the draft and surface the upload failure.
+            throw error
         }
     }
 
