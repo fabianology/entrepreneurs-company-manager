@@ -38,6 +38,15 @@ class SupabaseService {
     private init() {
         var urlString = Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String ?? ""
         var supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String ?? ""
+
+        // A disposable staging app must never silently connect to production.
+        if Bundle.main.bundleIdentifier == "com.vibing.miloom.staging" {
+            guard urlString == "https://bvtuyzhyospqxvpzcrmv.supabase.co",
+                  !supabaseKey.isEmpty,
+                  !supabaseKey.contains("$(") else {
+                preconditionFailure("The staging app requires explicit staging Supabase configuration")
+            }
+        }
         
         // Fallback if Secrets.local.xcconfig is missing from Xcode build configuration
         if urlString.isEmpty || urlString.contains("$(") {

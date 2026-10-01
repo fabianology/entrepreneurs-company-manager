@@ -31,6 +31,7 @@ struct AdminSettingsView: View {
     @State private var showingNotificationPreferences: Bool = false
     @State private var showingLinkedAccounts: Bool = false
     @State private var showingCollaborators: Bool = false
+    @State private var collaboratorsSheetNeedsDismissal = false
     @State private var showingActiveSessions: Bool = false
     @State private var showingVaultSecurity: Bool = false
     
@@ -446,6 +447,7 @@ struct AdminSettingsView: View {
                     // Collaborators & Sharing
                     Button {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        collaboratorsSheetNeedsDismissal = true
                         showingCollaborators = true
                     } label: {
                         HStack {
@@ -578,6 +580,11 @@ struct AdminSettingsView: View {
             }
         }
         .navigationBarHidden(true)
+        .onReceive(NotificationCenter.default.publisher(for: .miloomInvitationLinkOpened)) { notification in
+            guard collaboratorsSheetNeedsDismissal else { return }
+            (notification.object as? InvitationPresentationRequest)?.waitsForCollaboratorsDismissal = true
+            showingCollaborators = false
+        }
         .gesture(
             DragGesture()
                 .onEnded { value in
@@ -633,7 +640,10 @@ struct AdminSettingsView: View {
         .sheet(isPresented: $showingLinkedAccounts) {
             LinkedAccountsSheet(vm: vm, appState: appState)
         }
-        .sheet(isPresented: $showingCollaborators) {
+        .sheet(isPresented: $showingCollaborators, onDismiss: {
+            collaboratorsSheetNeedsDismissal = false
+            NotificationCenter.default.post(name: .miloomInvitationCoverDismissed, object: nil)
+        }) {
             CollaboratorsSheet(vm: vm, appState: appState)
         }
         .sheet(isPresented: $showingActiveSessions) {

@@ -1,5 +1,14 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let miloomInvitationLinkOpened = Notification.Name("miloomInvitationLinkOpened")
+    static let miloomInvitationCoverDismissed = Notification.Name("miloomInvitationCoverDismissed")
+}
+
+final class InvitationPresentationRequest {
+    var waitsForCollaboratorsDismissal = false
+}
+
 extension UIColor {
     convenience init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -37,6 +46,7 @@ struct ZifrApp: App {
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
     @State private var backgroundDate: Date? = nil
     @State private var pendingInvitationToken: String?
+    @State private var deferredInvitationToken: String?
 
     init() {
         // MARK: - Global UI Styling
@@ -122,14 +132,25 @@ struct ZifrApp: App {
                 }
             }
             .onOpenURL { url in
-                if url.host?.lowercased() == "miloom.co",
+                let invitationHost = Bundle.main.bundleIdentifier == "com.vibing.miloom.staging"
+                    ? "staging-invite.miloom.co"
+                    : "miloom.co"
+                if url.host?.lowercased() == invitationHost,
                    url.path == "/invite",
                    let token = URLComponents(url: url, resolvingAgainstBaseURL: false)?
                     .queryItems?
                     .first(where: { $0.name == "token" })?
                     .value,
                    token.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil {
-                    pendingInvitationToken = token
+                    // The sharing sheet may finish dismissing while its notification
+                    // is being delivered. Keep the token before requesting dismissal.
+                    deferredInvitationToken = token
+                    let request = InvitationPresentationRequest()
+                    NotificationCenter.default.post(name: .miloomInvitationLinkOpened, object: request)
+                    if !request.waitsForCollaboratorsDismissal {
+                        deferredInvitationToken = nil
+                        pendingInvitationToken = token
+                    }
                     return
                 }
 
@@ -148,16 +169,28 @@ struct ZifrApp: App {
                     }
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .miloomInvitationCoverDismissed)) { _ in
+                if let token = deferredInvitationToken {
+                    deferredInvitationToken = nil
+                    // Present in the next update, after SwiftUI has removed the
+                    // previous sheet from the presentation hierarchy.
+                    Task { @MainActor in
+                        await Task.yield()
+                        pendingInvitationToken = token
+                    }
+                }
+            }
             .sheet(isPresented: $authViewModel.isRecoveringPassword) {
                 ResetPasswordSheet(authViewModel: authViewModel)
             }
             .sheet(isPresented: Binding(
                 get: { authViewModel.isAuthenticated && pendingInvitationToken != nil },
-                set: { if !$0 { pendingInvitationToken = nil } }
+                set: { if !$0 && authViewModel.isAuthenticated { pendingInvitationToken = nil } }
             )) {
                 if let token = pendingInvitationToken {
                     InvitationAcceptanceSheet(token: token)
                         .environment(appState)
+                        .environment(authViewModel)
                 }
             }
             .alert("Error", isPresented: Binding(
