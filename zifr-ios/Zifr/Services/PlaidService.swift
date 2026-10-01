@@ -4,14 +4,33 @@ import Supabase
 class PlaidService {
     static let shared = PlaidService()
     private var client: SupabaseClient { SupabaseService.shared.client }
+
+    struct LinkToken: Decodable {
+        let value: String
+        let isUpdateMode: Bool
+
+        private enum CodingKeys: String, CodingKey { case link_token, mode }
+
+        init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            value = try values.decode(String.self, forKey: .link_token)
+            let mode = try values.decodeIfPresent(String.self, forKey: .mode)
+            guard mode == nil || mode == "create" || mode == "update" else {
+                throw DecodingError.dataCorruptedError(forKey: .mode, in: values,
+                    debugDescription: "Unsupported link session mode")
+            }
+            // Legacy responses cannot prove reconnect mode. The caller's mode
+            // check must reject them for reconnect instead of skipping exchange.
+            isUpdateMode = mode == "update"
+        }
+    }
     
-    func createLinkToken(companyId: UUID, institutionId: UUID? = nil, redirectUri: String? = nil) async throws -> String {
+    func createLinkToken(companyId: UUID, institutionId: UUID? = nil, redirectUri: String? = nil) async throws -> LinkToken {
         struct Request: Encodable { 
             let company_id: UUID 
             let institution_id: UUID?
             let redirect_uri: String?
         }
-        struct Response: Decodable { let link_token: String }
         
         let payload = try JSONEncoder().encode(Request(company_id: companyId, institution_id: institutionId, redirect_uri: redirectUri))
         let session = try await client.auth.session
@@ -24,10 +43,10 @@ class PlaidService {
             body: payload
         )
         do {
-            let response: Response = try await client.functions
+            let response: LinkToken = try await client.functions
                 .invoke("create-link-token", options: options)
             AppDiagnostics.event("plaid", "create_link_token", status: "success")
-            return response.link_token
+            return response
         } catch let FunctionsError.httpError(code, data) {
             AppDiagnostics.failure("plaid", "create_link_token", error: NSError(domain: "PlaidHTTP", code: code))
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
