@@ -2,6 +2,39 @@
 
 Date: 2026-10-20. Branch: `codex/admin-entity-credentials`, based on `49449473`.
 
+## Current checkpoint — final Staging acceptance complete
+
+Implementation commit: `77ab1d42`. The dated sections below preserve the work's
+history; their earlier pending/uncommitted statements are superseded by the final
+acceptance and cleanup entries. Final-contract SQL coverage, invited-user consent,
+hosted entity isolation, canonical Editor wording reconciliation and the rebuilt
+Staging app are now evidenced. The independent review found no confirmed blocking
+implementation defect; its earlier HOLD has not been reissued as a reviewer PASS.
+This is not external human security certification.
+
+### Proposed Production sequence — not yet authorized
+
+1. Read-only preflight: confirm the Production project, required migration
+   baseline, absence/presence of exactly `202610200001` and `202610200002`, and
+   current backup/rollback readiness. Stop on an unexpected baseline; do not
+   apply unrelated pending migrations.
+2. With explicit approval, apply only the two reviewed Admin migrations in order.
+   Verify ledger, function privileges and existing shares remaining opted out.
+   Neither migration delivers keys or opts existing Admins into credentials.
+3. Archive and verify a Production-configured app from the identified feature
+   source, using the next available build number and existing signing. Obtain
+   upload approval before App Store Connect/TestFlight distribution. Do not ship
+   a Staging-configured binary or import unrelated dirty checkout changes.
+4. Confirm the installed build opens and exposes the owner-controlled setting.
+   Any actual Admin credential grant remains a separate owner action. Do not
+   repeat the entire seven-phase suite or create new fixtures by default.
+
+Containment: stop distributing the enhancement if needed; clear affected consent
+through the supported owner flow and replace affected resource keys. Do not drop
+vault tables or assume a UI downgrade recalls previously delivered secrets.
+
+## Initial local checkpoint (historical)
+
 This is a separately approved enhancement after Phase 7 closure, not a reopening
 of the original seven phases. Authorization for this checkpoint: implement and
 test locally only. No hosted migration, phone install, real credential grant,
@@ -255,3 +288,72 @@ No password was entered or account created in the prepared simulator.
 Implementation checkpoint is ready to commit; release remains HOLD pending
 hosted/native invitation-consent and other-entity exclusion, fixture cleanup,
 and explicit Production rollout approval. No Production change or Apple upload.
+
+## Final invitation and entity-isolation acceptance — 2026-10-20
+
+Implementation was committed as `77ab1d42`; not pushed or merged. User completed
+the owner-presence/send step on FX. Staging readback confirmed invitation
+`f6e69eec-51e2-4e73-aee8-4a1619e45918`, Admin/Pending/credential consent true.
+The user created and verified the disposable alias privately.
+
+The unsigned simulator initially failed closed at session persistence. With
+explicit approval, rebuilt the same source using Xcode-managed simulator
+signing and temporary Staging-only entitlements (no Associated Domains).
+Build/signature checks passed and simulated entitlement sections are present.
+Log: `/private/tmp/miloom-admin-final-simulator-signed-build.log`; executable
+SHA-256 `53a774d076a75af76669af59e942e5918128d7268d9a146be762ee20811333f6`.
+Installed without clearing data on `3C813101-B8C2-4566-9AB1-1AA041BCE2D9`.
+User retried sign-in successfully; agent observed the authenticated dashboard.
+No project signing changes, phone updates, password reset or security bypass.
+
+With action-time user approval, accepted the exact pending invitation in native
+Inbox → Invites. It changed to zero pending and the dashboard displayed Miloom
+Collaboration Fixture with ADMIN controls. Backend readback confirmed:
+
+- Invitation Accepted, credential consent true.
+- Verified recipient `a202a497-1637-4a11-9bb7-9fbfd26946e5`.
+- Share `b2340d94-3acd-49ce-9b8b-4a36f68b307b`, Admin, consent true.
+- Zero approved Admin credential devices and zero active recipient wraps:
+  accepting consent did not automatically deliver any keys.
+
+Created only an unshared synthetic company, `Admin Exclusion TEST 20261020`
+(`4a8767c3-ffc1-4fb4-91d0-b9b86c7242d2`). An attempted dummy-service draft was
+cancelled after Mirroring text-input errors; no service was saved there.
+Recipient native dashboard excludes that company. A read-only rolled-back
+transaction with authenticated recipient claims confirmed companies RLS returns
+the shared fixture (count 1) and not the excluded company (count 0). Recipient
+has zero shares for the excluded company. This verifies hosted entity isolation;
+cross-entity credential-key denial is covered by the existing local SQL tests,
+not a new hosted decryption attempt against that empty company.
+
+Evidence: `/private/tmp/miloom-admin-invite-accepted-20261020.png` and
+`/private/tmp/miloom-admin-recipient-isolation-20261020.jpg`.
+Remaining: remove this disposable account, accepted invite/share and empty
+exclusion company; final evidence reconciliation. Production enhancement rollout
+and compatible app distribution still require separate authorization. No new
+independent rereview, push, merge, Apple upload or Production change is claimed.
+
+## Final disposable cleanup — 2026-10-20
+
+User explicitly approved permanent removal of the disposable alias and its
+invitation/share, plus the empty exclusion company. Fresh preflight resolved all
+four exact IDs above, verified the company had no services, institutions, cards,
+loans or documents, and verified the recipient owned no companies or vault devices.
+Removed only the exact share, invitation and empty owner-matched company in one
+guarded Staging transaction, then deleted the exact Auth user through Supabase's
+Delete User confirmation. These test records are not recoverable through the app.
+No Gmail account or alias was deleted.
+
+Independent final readback: zero test user/company/share/invitation/Admin
+approvals/key wraps. Preserved: original fixture count 1, Editor Test Service
+count 1, original owner/recipient accounts count 2 and original consent-OFF
+Viewer share count 1. Simulator was signed out and native Sign In observed.
+Evidence: `/private/tmp/miloom-admin-final-cleanup-20261020.jpg`.
+
+The remaining invitation-consent, hosted entity-isolation and cleanup checkpoint
+is complete within the evidence boundaries above. This does not replace the
+independent review's disposition with a new PASS or claim an external human
+sign-off. Implementation remains at `77ab1d42`; the final evidence additions are
+not yet committed. Next release actions are evidence reconciliation/commit and a
+separately authorized Production migration plus compatible app distribution.
+No additional phone tests or fixtures are being introduced.
