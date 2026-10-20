@@ -4,6 +4,49 @@ import CryptoKit
 import Supabase
 @testable import Zifr
 
+final class AdminCredentialConsentTests: XCTestCase {
+    func testDefaultOnRequiresOwnerEntityAdminScope() {
+        XCTAssertTrue(AdminCredentialConsent.defaultEnabled)
+        for role in ["Admin", "Editor", "Viewer"] {
+            for resource in ["company", "subscription", "card", "institution", "document", "services"] {
+                for delegated in [true, false] {
+                    XCTAssertEqual(AdminCredentialConsent.includesCredentials(role: role,
+                        resourceType: resource, isDelegatedAdmin: delegated, enabled: true),
+                        role == "Admin" && resource == "company" && !delegated)
+                }
+            }
+        }
+    }
+
+    func testExplicitOptOutOverridesDefault() {
+        XCTAssertFalse(AdminCredentialConsent.includesCredentials(role: "Admin",
+            resourceType: "company", isDelegatedAdmin: false, enabled: false))
+    }
+
+    func testDeviceApprovalSnapshotIncludesIdentityAndScope() throws {
+        let id = UUID(), company = UUID()
+        let json = """
+        {"id":"\(id)","company_id":"\(company)","company_name":"Synthetic",
+        "recipient_email":"admin@example.invalid","recipient_device_label":"Test phone","status":"pending"}
+        """
+        let pending = try JSONDecoder().decode(AdminCredentialDevice.self, from: Data(json.utf8))
+        let approved = try JSONDecoder().decode(AdminCredentialDevice.self,
+            from: Data(json.replacingOccurrences(of: "pending", with: "approved").utf8))
+        XCTAssertEqual(pending.id, id)
+        XCTAssertEqual(pending.companyID, company)
+        XCTAssertNotEqual(pending, approved, "Changed approval must invalidate the displayed snapshot")
+    }
+
+    func testPartialSyncDoesNotReportUnqualifiedSuccess() {
+        var report = AdminCredentialSyncReport()
+        report.delivered = 2
+        report.failed = 1
+        XCTAssertTrue(report.summary.contains("1 operations need attention"))
+        report.failed = 0
+        XCTAssertFalse(report.summary.contains("need attention"))
+    }
+}
+
 final class ResourceCredentialRevealGateTests: XCTestCase {
     func testCurrentActiveRevealAccepted() {
         let gate = ResourceCredentialRevealGate()

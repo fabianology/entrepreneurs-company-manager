@@ -1413,7 +1413,8 @@ class DataRepository {
     }
     
     // MARK: - Sharing
-    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String) async throws -> ShareInviteResult {
+    func inviteUser(email: String, role: String, resourceId: UUID, resourceType: String,
+                    includeEntityCredentials: Bool = false) async throws -> ShareInviteResult {
         AppDiagnostics.event("sharing", "invite_user", status: "started")
         
         guard (try? await client.auth.session.user) != nil else {
@@ -1448,7 +1449,28 @@ class DataRepository {
                 p_resource_type: resourceType
             )
             
-            let response: ShareRPCResponse = try await client.rpc("miloom_share_resource", params: params).execute().value
+            let response: ShareRPCResponse
+            if role == "Admin" && resourceType == "company" {
+                // No legacy fallback: an unavailable migration must not silently
+                // discard the owner's credential choice or downgrade the warning.
+                struct AdminParams: Encodable {
+                    let p_email: String
+                    let p_company_id: UUID
+                    let p_include_credentials: Bool
+                    let p_actor_device_id: UUID?
+                    let p_key_confirmation: String?
+                }
+                let proof = includeEntityCredentials
+                    ? try await VaultService.shared.authorizeAdminCredentialSharing() : nil
+                response = try await client.rpc("miloom_share_admin_entity", params: AdminParams(
+                    p_email: email, p_company_id: resourceId,
+                    p_include_credentials: includeEntityCredentials,
+                    p_actor_device_id: proof?.deviceID, p_key_confirmation: proof?.confirmation
+                )).execute().value
+            } else {
+                guard !includeEntityCredentials else { throw ResourceSecretGrantError.staleRequest }
+                response = try await client.rpc("miloom_share_resource", params: params).execute().value
+            }
             
             if response.status == "shared_directly" {
                 AppDiagnostics.event("sharing", "share_resource", status: "shared_directly")
@@ -2294,6 +2316,39 @@ private struct ResourceSecretOwnerWrapRecord: Decodable {
         case keyVersion = "key_version"
         case ownerAccountKeyVersion = "owner_account_key_version"
         case ownerWrappedResourceKey = "owner_wrapped_resource_key"
+    }
+}
+
+enum AdminCredentialConsent {
+    static let defaultEnabled = true
+
+    static func includesCredentials(role: String, resourceType: String, isDelegatedAdmin: Bool, enabled: Bool) -> Bool {
+        enabled && role == "Admin" && resourceType == "company" && !isDelegatedAdmin
+    }
+}
+
+struct AdminCredentialDevice: Decodable, Identifiable, Equatable {
+    let id: UUID
+    let companyID: UUID
+    let companyName: String
+    let recipientEmail: String
+    let recipientDeviceLabel: String
+    let status: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case companyID = "company_id", companyName = "company_name"
+        case recipientEmail = "recipient_email", recipientDeviceLabel = "recipient_device_label"
+    }
+}
+
+struct AdminCredentialSyncReport {
+    var delivered = 0
+    var skipped = 0
+    var failed = 0
+    var summary: String {
+        let result = "Delivered \(delivered) credential keys. \(skipped) empty resources skipped. Existing deliveries were left unchanged."
+        return failed == 0 ? result : result + " \(failed) operations need attention; retry Sync after resolving locked or unreadable credentials."
     }
 }
 
@@ -3192,6 +3247,74 @@ final class VaultService: @unchecked Sendable {
         )).execute().value
     }
 
+    func authorizeAdminCredentialSharing() async throws -> (deviceID: UUID, confirmation: String) {
+        try await confirmResourceSecretPresence(reason: "Include existing and future entity credentials for this Admin. Each recipient device still needs your approval.")
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        return (snapshot.deviceID, VaultCryptography.keyConfirmation(for: snapshot.key))
+    }
+
+    private struct AdminCredentialParams: Encodable {
+        let p_grant_id: UUID?
+        let p_actor_device_id: UUID
+        let p_key_confirmation: String
+    }
+
+    func listAdminCredentialDevices() async throws -> [AdminCredentialDevice] {
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        struct Params: Encodable { let p_actor_device_id: UUID; let p_key_confirmation: String }
+        return try await client.rpc("miloom_list_admin_credential_devices", params: Params(
+            p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key)
+        )).execute().value
+    }
+
+    /// One owner-presence confirmation covers this entity/device only. No account
+    /// key is shared; each readable resource gets its own existing key protocol.
+    func syncAdminCredentials(_ displayed: AdminCredentialDevice) async throws -> AdminCredentialSyncReport {
+        try await confirmResourceSecretPresence(reason: "Approve and sync existing and future credentials in \(displayed.companyName) to \(displayed.recipientDeviceLabel).")
+        let session = try await client.auth.refreshSession()
+        let snapshot = try requireSnapshot(for: session.user.id)
+        guard let current = try await listAdminCredentialDevices().first(where: { $0.id == displayed.id }),
+              current == displayed else { throw ResourceSecretGrantError.staleRequest }
+        let params = AdminCredentialParams(p_grant_id: displayed.id, p_actor_device_id: snapshot.deviceID,
+            p_key_confirmation: VaultCryptography.keyConfirmation(for: snapshot.key))
+        try await client.rpc("miloom_approve_admin_credential_device", params: params).execute()
+        struct Resource: Decodable { let resource_type: String; let resource_id: UUID }
+        let resources: [Resource] = try await client.rpc("miloom_list_admin_credential_resources", params: params).execute().value
+        var report = AdminCredentialSyncReport()
+        for resource in resources {
+            do {
+                let status = try await resourceSecretAccessStatus(type: resource.resource_type, id: resource.resource_id)
+                if status == "not_ready" {
+                    guard try await DataRepository.shared.ownedResourceSecretCandidate(
+                        type: resource.resource_type, id: resource.resource_id, snapshot: snapshot
+                    ) != nil else { report.skipped += 1; continue }
+                    try await activateOwnedResourceSecret(type: resource.resource_type, id: resource.resource_id, snapshot: snapshot)
+                } else if status == "locked" {
+                    report.failed += 1
+                }
+            } catch {
+                report.failed += 1
+                AppDiagnostics.failure("vault", "admin_credential_preparation", error: error)
+            }
+        }
+        let deliveries: [ResourceSecretAccessRequest] = try await client.rpc(
+            "miloom_list_admin_credential_deliveries", params: params
+        ).execute().value
+        for delivery in deliveries {
+            do {
+                try await deliverResourceSecret(delivery, snapshot: snapshot, adminGrantID: displayed.id)
+                report.delivered += 1
+            } catch {
+                report.failed += 1
+                AppDiagnostics.failure("vault", "admin_credential_delivery", error: error)
+            }
+        }
+        return report
+    }
+
     func listLockedResourceSecrets() async throws -> [LockedResourceSecret] {
         let session = try await client.auth.refreshSession()
         let snapshot = try requireSnapshot(for: session.user.id)
@@ -3369,10 +3492,18 @@ final class VaultService: @unchecked Sendable {
             let p_resource_id: UUID
             let p_recipient_device_id: UUID
         }
-        try await client.rpc("miloom_request_resource_secret_access", params: Params(
+        let params = Params(
             p_resource_type: type, p_resource_id: id,
             p_recipient_device_id: device.deviceID
-        )).execute()
+        )
+        // On an opted-in entity Admin share, enroll this device for one owner
+        // approval covering the entity. Ordinary per-resource requests stay valid.
+        do {
+            let _: Bool = try await client.rpc("miloom_request_admin_credentials", params: params).execute().value
+        } catch let error as PostgrestError where error.code == "PGRST202" {
+            // Older backend has no entity policy; preserve explicit one-item flow.
+        }
+        try await client.rpc("miloom_request_resource_secret_access", params: params).execute()
     }
 
     /// Reveal only one exact resource after device presence. Callers must keep
@@ -3578,6 +3709,11 @@ final class VaultService: @unchecked Sendable {
               request == displayedRequest else {
             throw ResourceSecretGrantError.staleRequest
         }
+        try await deliverResourceSecret(request, snapshot: snapshot, adminGrantID: nil)
+    }
+
+    private func deliverResourceSecret(_ request: ResourceSecretAccessRequest,
+        snapshot: VaultKeySession.Snapshot, adminGrantID: UUID?) async throws {
         struct SecretParams: Encodable {
             let p_resource_type: String
             let p_resource_id: UUID
@@ -3642,6 +3778,25 @@ final class VaultService: @unchecked Sendable {
             let p_ephemeral_public_key: String
             let p_wrapped_resource_key: String
         }
+        if let adminGrantID {
+            struct AdminDelivery: Encodable {
+                let p_grant_id: UUID
+                let p_resource_type: String
+                let p_resource_id: UUID
+                let p_key_version: Int
+                let p_actor_device_id: UUID
+                let p_key_confirmation: String
+                let p_ephemeral_public_key: String
+                let p_wrapped_resource_key: String
+            }
+            try await client.rpc("miloom_deliver_admin_credential", params: AdminDelivery(
+                p_grant_id: adminGrantID, p_resource_type: request.resourceType,
+                p_resource_id: request.resourceID, p_key_version: request.keyVersion,
+                p_actor_device_id: snapshot.deviceID, p_key_confirmation: confirmation,
+                p_ephemeral_public_key: wrap.ephemeralPublicKey, p_wrapped_resource_key: wrap.wrappedKey
+            )).execute()
+            return
+        }
         try await client.rpc("miloom_approve_resource_secret_access", params: ApprovalParams(
             p_request_id: request.id,
             p_actor_device_id: snapshot.deviceID,
@@ -3694,6 +3849,10 @@ final class VaultService: @unchecked Sendable {
             reason: "Activate encrypted credentials for this resource only. Existing credential fields will be replaced."
         )
         let snapshot = try requireSnapshot(for: session.user.id)
+        try await activateOwnedResourceSecret(type: type, id: id, snapshot: snapshot)
+    }
+
+    private func activateOwnedResourceSecret(type: String, id: UUID, snapshot: VaultKeySession.Snapshot) async throws {
         guard try await resourceSecretAccessStatus(type: type, id: id) == "not_ready" else {
             throw ResourceSecretActivationError.noLongerAvailable
         }
