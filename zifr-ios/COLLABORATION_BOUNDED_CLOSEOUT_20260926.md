@@ -1,5 +1,10 @@
 # Collaboration, sharing and vault: bounded closeout
 
+> Current disposition (2026-10-20): the frozen scope is closed. See
+> [Phase 7 final closeout](COLLABORATION_PHASE7_FINAL_CLOSEOUT_20261020.md).
+> The dated pending/hold statements below are historical, not the current status.
+> Public App Store launch and a professional security audit are separate claims.
+
 ## Reconciled checkpoint — 2026-09-27
 
 Supersedes earlier uncommitted/candidate-pending statements: guard and evidence
