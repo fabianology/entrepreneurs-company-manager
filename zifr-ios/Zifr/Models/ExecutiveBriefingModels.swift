@@ -1,4 +1,38 @@
 import Foundation
+import Observation
+
+/// Read-only inputs; the live AppState never crosses into the report actor.
+protocol ExecutiveBriefingData {
+    var companies: [Company] { get }
+    var subscriptions: [Subscription] { get }
+    var institutions: [Institution] { get }
+    var cards: [FinancialCard] { get }
+    var loans: [Loan] { get }
+    var documents: [CompanyDocument] { get }
+    var transactions: [Transaction] { get }
+    var transactionOverrides: [TransactionOverride] { get }
+    var transactionCategoryRules: [TransactionCategoryRule] { get }
+    var localCompanyOverrides: [String: UUID] { get }
+    var plaidItems: [PlaidItemSummary] { get }
+    var resourceShares: [ResourceShare] { get }
+    var openObligations: [PortfolioObligation] { get }
+    var transactionsForAnalysis: [Transaction] { get }
+    var hasLoadedPortfolio: Bool { get }
+    var portfolioLoadIssue: String? { get }
+}
+
+extension AppState: ExecutiveBriefingData {}
+
+extension SearchIndexSnapshot: ExecutiveBriefingData {
+    var openObligations: [PortfolioObligation] {
+        OwnerBriefingPresentation.activeObligations(in: obligations)
+    }
+
+    var transactionsForAnalysis: [Transaction] {
+        let ignored = Set(transactionOverrides.filter { $0.flowOverride == .ignored }.map(\.transactionId))
+        return transactions.filter { !ignored.contains($0.id) }
+    }
+}
 
 enum ExecutiveBriefingSection: String, Hashable {
     case financial = "Financial"
@@ -104,7 +138,7 @@ struct ExecutiveBriefingSnapshot {
     let upcomingCoverage: UpcomingCoverageProjection
     let plaidItems: [PlaidItemSummary]
 
-    init(appState: AppState, scope: OwnerBriefingScope, companyID: UUID? = nil, now: Date = Date()) {
+    init(appState: some ExecutiveBriefingData, scope: OwnerBriefingScope, companyID: UUID? = nil, now: Date = Date()) {
         self.scope = scope
         companies = appState.companies.filter { scope.includes($0) && (companyID == nil || $0.id == companyID) }
         let ids = Set(companies.map(\.id))
@@ -180,7 +214,7 @@ struct ExecutiveBriefingSnapshot {
         loadIssue = appState.portfolioLoadIssue != nil
     }
 
-    static func companyID(for obligation: PortfolioObligation, in state: AppState) -> UUID? {
+    static func companyID(for obligation: PortfolioObligation, in state: some ExecutiveBriefingData) -> UUID? {
         if let override = state.localCompanyOverrides[obligation.sourceId.uuidString] { return override }
         switch obligation.sourceType {
         case .company: return obligation.sourceId
@@ -591,9 +625,9 @@ struct ExecutiveUrgentNotice: Identifiable {
     let dueAt: Date?
 
     /// Position-plus-attention ordering is confined to the two summary cards.
-    static func cardNotices(in state: AppState, scope: OwnerBriefingScope, now: Date,
-        calendar: Calendar = .current) -> [Self] {
-        let snapshot = ExecutiveBriefingSnapshot(appState: state, scope: scope, now: now)
+    static func cardNotices(in state: some ExecutiveBriefingData, scope: OwnerBriefingScope, now: Date,
+        calendar: Calendar = .current, preparedSnapshot: ExecutiveBriefingSnapshot? = nil) -> [Self] {
+        let snapshot = preparedSnapshot ?? ExecutiveBriefingSnapshot(appState: state, scope: scope, now: now)
         let metrics = ExecutiveCardMetrics(snapshot: snapshot, now: now, calendar: calendar)
         let today = calendar.startOfDay(for: now)
         var ranked: [(rank: Int, notice: Self)] = notices(in: state).filter {
@@ -650,7 +684,7 @@ struct ExecutiveUrgentNotice: Identifiable {
         }.map(\.notice)
     }
 
-    static func notices(in state: AppState) -> [Self] {
+    static func notices(in state: some ExecutiveBriefingData) -> [Self] {
         func entity(_ companyID: UUID?, resourceID: UUID) -> String {
             let effective = state.localCompanyOverrides[resourceID.uuidString] ?? companyID
             guard let company = state.companies.first(where: { $0.id == effective }) else { return "Unassigned" }
@@ -689,7 +723,7 @@ struct ExecutiveUrgentNotice: Identifiable {
         return notices
     }
 
-    func belongs(to scope: OwnerBriefingScope, in state: AppState) -> Bool {
+    func belongs(to scope: OwnerBriefingScope, in state: some ExecutiveBriefingData) -> Bool {
         guard let companyID,
               let company = state.companies.first(where: { $0.id == companyID })
         else {
@@ -697,5 +731,181 @@ struct ExecutiveUrgentNotice: Identifiable {
             return scope == (hasBusiness ? .business : .personal)
         }
         return scope.includes(company)
+    }
+}
+
+
+// MARK: - Duo report preparation
+
+struct DuoBriefingKey: Hashable, Sendable {
+    let userID: UUID?
+    let revision: UInt64
+    let privacyRevision: Int
+    let scope: OwnerBriefingScope
+    let month: CashFlowMonth
+    let minute: Int
+    let ignoredDataIssueIDs: Set<String>
+
+    func canKeepVisible(_ previous: Self) -> Bool {
+        userID == previous.userID && privacyRevision == previous.privacyRevision
+            && scope == previous.scope && month == previous.month
+    }
+}
+
+struct DuoBriefingReport: Sendable {
+    let key: DuoBriefingKey
+    let snapshot: ExecutiveBriefingSnapshot
+    let health: OwnerHealthSnapshot
+    let notices: [ExecutiveUrgentNotice]
+    let financials: [ExecutiveCurrencySummary]
+    let generatedAt: Date
+    let builtOnMainThread: Bool
+}
+
+/// Actor-isolated synchronous calculation runs on its executor, not the UI actor.
+/// Only a Sendable, copy-on-write value snapshot enters this actor.
+actor DuoBriefingBuilder {
+    private(set) var buildCount = 0
+
+    func build(input: SearchIndexSnapshot, key: DuoBriefingKey, now: Date) throws -> DuoBriefingReport {
+        try Task.checkCancellation()
+        buildCount += 1
+        let snapshot = ExecutiveBriefingSnapshot(appState: input, scope: key.scope, now: now)
+        try Task.checkCancellation()
+        let health = OwnerHealthEngine.snapshot(
+            appState: input, scope: key.scope, now: now,
+            ignoredDataIssueIDs: key.ignoredDataIssueIDs
+        )
+        try Task.checkCancellation()
+        let notices = ExecutiveUrgentNotice.cardNotices(
+            in: input, scope: key.scope, now: now, preparedSnapshot: snapshot
+        )
+        let financials = key.month == CashFlowMonth(containing: now)
+            ? snapshot.financials
+            : ExecutiveBriefingSnapshot.financials(records: snapshot.records, now: now, month: key.month)
+        try Task.checkCancellation()
+        return DuoBriefingReport(
+            key: key, snapshot: snapshot, health: health, notices: notices,
+            financials: financials, generatedAt: now, builtOnMainThread: Thread.isMainThread
+        )
+    }
+}
+
+@MainActor
+@Observable
+final class DuoBriefingStore {
+    var scope: OwnerBriefingScope = .personal
+    var month: CashFlowMonth = .current
+    var hasRevealedReceipt = false
+    private(set) var report: DuoBriefingReport?
+    private(set) var isRefreshing = false
+    private(set) var preparationError: String?
+    private(set) var completedBuildCount = 0
+    var retryRevision = 0
+
+    @ObservationIgnored private let builder = DuoBriefingBuilder()
+    @ObservationIgnored private var cache: [DuoBriefingKey: DuoBriefingReport] = [:]
+    @ObservationIgnored private var requestedKey: DuoBriefingKey?
+    @ObservationIgnored private var generation = UUID()
+    @ObservationIgnored private var pending: Task<DuoBriefingReport, Error>?
+
+    func prepare(input: SearchIndexSnapshot, key: DuoBriefingKey, now: Date) async {
+        guard !Task.isCancelled else { return }
+        if report?.key == key { return }
+        pending?.cancel()
+        generation = UUID()
+        let token = generation
+        requestedKey = key
+        if let previous = report?.key, !key.canKeepVisible(previous) {
+            // Never retain another user's, scope's or permission context's figures.
+            report = nil
+            if key.userID != previous.userID || key.privacyRevision != previous.privacyRevision {
+                cache.removeAll()
+            }
+        }
+        preparationError = nil
+        if let cached = cache[key] {
+            report = cached
+            isRefreshing = false
+            return
+        }
+        isRefreshing = true
+        let worker = builder
+        let work = Task.detached(priority: .utility) {
+            try await worker.build(input: input, key: key, now: now)
+        }
+        pending = work
+        do {
+            let result = try await withTaskCancellationHandler {
+                try await work.value
+            } onCancel: {
+                work.cancel()
+            }
+            try Task.checkCancellation()
+            guard generation == token, requestedKey == key else { return }
+            if cache.count >= 4 { cache.removeAll() }
+            cache[key] = result
+            report = result
+            completedBuildCount += 1
+            isRefreshing = false
+            pending = nil
+        } catch {
+            guard generation == token else { return }
+            isRefreshing = false
+            pending = nil
+            if !(error is CancellationError) {
+                preparationError = "Your brief couldn’t be prepared. Please try again."
+            }
+        }
+    }
+
+    func suspend() {
+        generation = UUID()
+        pending?.cancel()
+        pending = nil
+        requestedKey = nil
+        isRefreshing = false
+    }
+
+    func invalidate() {
+        suspend()
+        report = nil
+        cache.removeAll()
+        preparationError = nil
+        hasRevealedReceipt = false
+    }
+}
+
+// MARK: - Duo panel placement (no device-name or screen-size guesses)
+
+struct DuoDashboardPanelFrames: Equatable {
+    let cards: CGRect
+    let receipt: CGRect
+
+    static func resolve(size: CGSize, expanded: Bool, division: CGRect? = nil) -> Self {
+        let width = max(0, size.width)
+        let height = max(0, size.height)
+        guard expanded else {
+            return Self(cards: CGRect(x: 0, y: 0, width: width, height: height), receipt: .zero)
+        }
+        let gap: CGFloat = 12
+        if height > width {
+            let center = division?.midY ?? height / 2
+            let halfGap = max(gap / 2, (division?.height ?? 0) / 2)
+            let topEnd = min(height, max(0, center - halfGap))
+            let bottomStart = min(height, max(topEnd, center + halfGap))
+            return Self(
+                cards: CGRect(x: 0, y: 0, width: width, height: topEnd),
+                receipt: CGRect(x: 0, y: bottomStart, width: width, height: height - bottomStart)
+            )
+        }
+        let center = division?.midX ?? width / 2
+        let halfGap = max(gap / 2, (division?.width ?? 0) / 2)
+        let leftEnd = min(width, max(0, center - halfGap))
+        let rightStart = min(width, max(leftEnd, center + halfGap))
+        return Self(
+            cards: CGRect(x: rightStart, y: 0, width: width - rightStart, height: height),
+            receipt: CGRect(x: 0, y: 0, width: leftEnd, height: height)
+        )
     }
 }

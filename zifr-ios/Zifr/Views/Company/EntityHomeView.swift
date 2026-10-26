@@ -140,7 +140,6 @@ struct EntityHomeView: View {
         }
         .frame(maxWidth: .infinity)
         .background(Color.clear)
-        .ignoresSafeArea(edges: .bottom)
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
                 .presentationDetents([.fraction(0.9), .large])

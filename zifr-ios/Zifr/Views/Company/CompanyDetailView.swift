@@ -122,6 +122,7 @@ struct CompanyDetailView: View {
     }
 
     var body: some View {
+        GeometryReader { geometry in
         ZStack(alignment: .top) {
             Color.zifrBG.ignoresSafeArea()
             
@@ -264,11 +265,12 @@ struct CompanyDetailView: View {
         .overlay {
             tutorialOverlaySection
         }
-        .gesture(edgeSwipeGesture)
+        .gesture(edgeSwipeGesture(width: geometry.size.width))
         .navigationBarBackButtonHidden(true)
         }
         .safeAreaInset(edge: .bottom) {
             bottomBarInset
+        }
         }
     }
 
@@ -330,15 +332,14 @@ struct CompanyDetailView: View {
         }
     }
 
-    private var edgeSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 20, coordinateSpace: .global)
+    private func edgeSwipeGesture(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 20, coordinateSpace: .local)
             .onChanged { value in
                 if swipeHandled { return }
                 
-                let screenWidth = UIScreen.main.bounds.width
                 let startX = value.startLocation.x
                 
-                let isEdgeSwipe = startX < 50 || startX > screenWidth - 50
+                let isEdgeSwipe = startX < 50 || startX > width - 50
                 if !isEdgeSwipe { return }
                 
                 let transX = value.translation.width
@@ -503,6 +504,7 @@ struct CompanyDetailView: View {
     }
 
     private func handleOnAppear() {
+        vm.selectedCompany = company
         onboardingState.evaluateState(appState: appState)
     }
 
@@ -665,8 +667,9 @@ struct CompanyDetailView: View {
                     ForEach(allCompanies) { c in
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            company = c
+                            vm.selectedCompany = c
                             vm.touchCompany(c, appState: appState)
+                            vm.path = NavigationPath([c])
                         } label: {
                             if c.id == company.id {
                                 Label(c.name, systemImage: "checkmark")

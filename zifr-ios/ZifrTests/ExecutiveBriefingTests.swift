@@ -6,6 +6,119 @@ final class ExecutiveBriefingTests: XCTestCase {
     private let owner = UUID()
     private var now: Date { ISO8601DateFormatter().date(from: "2027-08-30T12:00:00Z")! }
 
+
+    func testDuoLandscapePlacesReceiptLeftAndCardsRight() {
+        let frames = DuoDashboardPanelFrames.resolve(size: CGSize(width: 1000, height: 700), expanded: true)
+        XCTAssertEqual(frames.receipt.minX, 0)
+        XCTAssertEqual(frames.cards.maxX, 1000)
+        XCTAssertLessThan(frames.receipt.maxX, frames.cards.minX)
+        XCTAssertEqual(frames.cards.height, 700)
+        XCTAssertEqual(frames.receipt.height, 700)
+    }
+
+    func testDuoPortraitPlacesCardsAboveReceiptAndAvoidsDivision() {
+        let frames = DuoDashboardPanelFrames.resolve(
+            size: CGSize(width: 700, height: 1000), expanded: true,
+            division: CGRect(x: 0, y: 480, width: 700, height: 40)
+        )
+        XCTAssertEqual(frames.cards.minY, 0)
+        XCTAssertEqual(frames.cards.maxY, 480)
+        XCTAssertEqual(frames.receipt.minY, 520)
+        XCTAssertEqual(frames.receipt.maxY, 1000)
+    }
+
+    func testClosedDashboardKeepsCardsFullSizeWithoutReceipt() {
+        let size = CGSize(width: 390, height: 844)
+        let frames = DuoDashboardPanelFrames.resolve(size: size, expanded: false)
+        XCTAssertEqual(frames.cards, CGRect(origin: .zero, size: size))
+        XCTAssertEqual(frames.receipt, .zero)
+    }
+
+    @MainActor
+    func testDuoWorkerUsesImmutableInputsAndRunsOffUIThread() async throws {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Business", structure: "LLC")
+        state.companies = [company]
+        state.hasLoadedPortfolio = true
+        state.portfolioUserID = owner
+        state.transactions = (0..<1000).map { _ in transaction(company: company.id, amount: 20) }
+        let input = SearchIndexSnapshot(state)
+        let legacy = ExecutiveBriefingSnapshot(appState: state, scope: .business, now: now)
+        let key = duoKey(state: state, scope: .business)
+        state.transactions.removeAll()
+        let report = try await DuoBriefingBuilder().build(input: input, key: key, now: now)
+        XCTAssertFalse(report.builtOnMainThread)
+        XCTAssertEqual(report.snapshot.records.count, 1000)
+        XCTAssertEqual(report.financials.first?.insight.current.moneyOut, legacy.financials.first?.insight.current.moneyOut)
+        XCTAssertTrue(state.transactions.isEmpty)
+        XCTAssertEqual(state.companies, [company])
+    }
+
+    @MainActor
+    func testDuoReportCacheReusesScopeAndMonthWithoutRebuilding() async {
+        let state = AppState()
+        state.companies = [Company(userId: owner, name: "Business", structure: "LLC")]
+        state.hasLoadedPortfolio = true
+        state.portfolioUserID = owner
+        let input = SearchIndexSnapshot(state)
+        let store = DuoBriefingStore()
+        let business = duoKey(state: state, scope: .business)
+        let personal = duoKey(state: state, scope: .personal)
+        await store.prepare(input: input, key: business, now: now)
+        await store.prepare(input: input, key: business, now: now)
+        XCTAssertEqual(store.completedBuildCount, 1)
+        await store.prepare(input: input, key: personal, now: now)
+        XCTAssertEqual(store.completedBuildCount, 2)
+        await store.prepare(input: input, key: business, now: now)
+        XCTAssertEqual(store.completedBuildCount, 2)
+        XCTAssertEqual(store.report?.key, business)
+    }
+
+    @MainActor
+    func testDuoCancelledPreparationDoesNotPublishAndInvalidationClearsReceipt() async {
+        let state = AppState()
+        state.hasLoadedPortfolio = true
+        state.portfolioUserID = owner
+        let input = SearchIndexSnapshot(state)
+        let key = duoKey(state: state, scope: .personal)
+        let store = DuoBriefingStore()
+        let cancelled = Task { await store.prepare(input: input, key: key, now: now) }
+        cancelled.cancel()
+        await cancelled.value
+        XCTAssertNil(store.report)
+        XCTAssertEqual(store.completedBuildCount, 0)
+        await store.prepare(input: input, key: key, now: now)
+        XCTAssertNotNil(store.report)
+        store.invalidate()
+        XCTAssertNil(store.report)
+        XCTAssertFalse(store.isRefreshing)
+    }
+
+    @MainActor
+    func testDuoPrivacyAndAccountKeysCannotKeepPreviousFiguresVisible() {
+        let state = AppState()
+        state.portfolioUserID = owner
+        let key = duoKey(state: state, scope: .business)
+        let otherUser = DuoBriefingKey(userID: UUID(), revision: key.revision,
+            privacyRevision: key.privacyRevision, scope: key.scope, month: key.month,
+            minute: key.minute, ignoredDataIssueIDs: [])
+        let changedPermission = DuoBriefingKey(userID: owner, revision: key.revision,
+            privacyRevision: key.privacyRevision + 1, scope: key.scope, month: key.month,
+            minute: key.minute, ignoredDataIssueIDs: [])
+        XCTAssertFalse(otherUser.canKeepVisible(key))
+        XCTAssertFalse(changedPermission.canKeepVisible(key))
+    }
+
+    @MainActor
+    private func duoKey(state: AppState, scope: OwnerBriefingScope) -> DuoBriefingKey {
+        DuoBriefingKey(
+            userID: state.portfolioUserID, revision: state.searchRevision,
+            privacyRevision: state.resourceShares.hashValue, scope: scope,
+            month: CashFlowMonth(containing: now), minute: Int(now.timeIntervalSince1970 / 60),
+            ignoredDataIssueIDs: []
+        )
+    }
+
     func testScopeAndCompanyFilterPreserveInventoryAndConnections() {
         let state = AppState()
         let business = Company(userId: owner, name: "Business", structure: "LLC")

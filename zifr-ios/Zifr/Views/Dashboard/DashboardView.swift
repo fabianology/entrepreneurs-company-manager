@@ -29,6 +29,7 @@ struct DashboardView: View {
     @State private var showPremiumUpgrade = false
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
+    @State private var duoBriefing = DuoBriefingStore()
     @State private var showBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
@@ -76,365 +77,7 @@ struct DashboardView: View {
                         .padding(.top, 3)
                         .padding(.bottom, 7)
 
-                    List {
-                        if let loadIssue = appState.portfolioLoadIssue {
-                            Button {
-                                Task { await DataRepository.shared.fetchAllData(appState: appState) }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
-                                        .foregroundStyle(Color.zifrGold)
-                                    Text(loadIssue)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.78))
-                                        .multilineTextAlignment(.leading)
-                                    Spacer(minLength: 4)
-                                    Text("RETRY")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(Color.zifrGold)
-                                }
-                                .padding(12)
-                                .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            }
-                            .buttonStyle(.plain)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
-                        }
-
-                        ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
-                            let row = companyCardRow(for: company)
-                            let isLast = index == filteredCompanies.count - 1
-                            let hasPlaceholder = companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
-                            row
-                                .background(tutorialFrameCapture(index: index))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? 120 : 16, trailing: 20))
-                        }
-
-                        // Add company button / empty state placeholder under the dummy company
-                        Group {
-                            if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
-                                // Un-blurred only while the tutorial is actively running.
-                                if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
-                                    // Tutorial in progress: show demo card fully visible
-                                    CompanyCardView(
-                                        company: dummyCompany,
-                                        institutionsCount: 2,
-                                        subscriptionsCount: 4,
-                                        docsCount: 3,
-                                        onEdit: {}
-                                    )
-                                    .allowsHitTesting(false)
-                                    .padding(.top, 4)
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear.onAppear {
-                                                tutorialEntityFrame = geo.frame(in: .named("dashboard"))
-                                            }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
-                                                tutorialEntityFrame = f
-                                            }
-                                        }
-                                    )
-                                } else {
-                                    // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        requestAddCompany()
-                                    } label: {
-                                        ZStack {
-                                            CompanyCardView(
-                                                company: dummyCompany,
-                                                institutionsCount: 0,
-                                                subscriptionsCount: 0,
-                                                docsCount: 0,
-                                                onEdit: {}
-                                            )
-                                            .allowsHitTesting(false)
-                                            .blur(radius: 3)
-                                            .opacity(0.8)
-
-                                            VStack(spacing: 16) {
-                                                Image(systemName: "plus.app.fill")
-                                                    .font(.system(size: 28))
-                                                    .foregroundStyle(.white)
-                                                Text("ADD YOUR COMPANY OR ENTITY")
-                                                    .font(.system(size: 11, weight: .black))
-                                                    .textCase(.uppercase)
-                                                    .tracking(2)
-                                                    .foregroundStyle(.white)
-                                            }
-                                        }
-                                    }
-                                    .padding(.top, 4)
-                                    .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
-                                }
-                            }
-                        }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
-                    }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .scrollIndicators(.hidden)
-            .task {
-                // Fallback for OAuth/root-view timing: the dashboard should never
-                // remain on its placeholder simply because the first auth callback
-                // arrived before the app-level loader attached.
-                if appState.companies.isEmpty {
-                    await DataRepository.shared.fetchAllData(appState: appState)
-                }
-            }
-            .onAppear {
-                onboardingState.evaluateState(appState: appState)
-            }
-            .onChange(of: appState.companies.count) { _, _ in
-                let previousStep = onboardingState.currentStep
-                onboardingState.evaluateState(appState: appState)
-                
-                if (previousStep == .needsEntity || previousStep == .notStarted)
-                    && onboardingState.currentStep == .needsBank
-                    && !showAddCompany {
-                    // Automatically jump to the new entity's financial tab
-                    if let newCompany = appState.companies.sorted(by: { $0.lastModified > $1.lastModified }).first {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            vm.selectedCompany = newCompany
-                            vm.activeTab = .financial
-                            vm.touchCompany(newCompany, appState: appState)
-                            vm.path.append(newCompany)
-                        }
-                    }
-                }
-            }
-            .onChange(of: appState.institutions.count) { _, _ in
-                let previousStep = onboardingState.currentStep
-                onboardingState.evaluateState(appState: appState)
-                guard previousStep == .needsBank else { return }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    handlePostBankNavigation()
-                }
-            }
-            .refreshable {
-                await DataRepository.shared.fetchAllData(appState: appState)
-            }
-            .confirmationDialog(
-                companyToDelete?.userId != currentUserId ? "Leave Company" : "Delete Company",
-                isPresented: Binding(
-                    get: { companyToDelete != nil },
-                    set: { if !$0 { companyToDelete = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button(companyToDelete?.userId != currentUserId ? "Leave" : "Delete", role: .destructive) {
-                    if let company = companyToDelete {
-                        vm.deleteCompany(company, appState: appState, currentUserId: currentUserId)
-                    }
-                    companyToDelete = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    companyToDelete = nil
-                }
-            } message: {
-                if companyToDelete?.userId != currentUserId {
-                    Text("Are you sure you want to leave this company? It will be removed from your dashboard.")
-                } else {
-                    Text("Are you sure you want to delete this company? All associated data will be removed for everyone.")
-                }
-            }
-            .navigationDestination(for: Company.self) { company in
-                CompanyDetailView(
-                    company: company,
-                    vm: vm,
-                    onShowAllEntities: { showBriefing = false }
-                )
-            }
-            .navigationDestination(for: AppViewModel.AppRoute.self) { route in
-                if route == .adminSettings {
-                    AdminSettingsView(vm: vm)
-                }
-            }
-            .navigationDestination(isPresented: $showSharedWithMe) {
-                if let uid = currentUserId {
-                    SharedWithMeView(vm: vm, currentUserId: uid)
-                }
-            }
-            .sheet(item: $companyToShare) { company in
-                ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
-            }
-            .sheet(isPresented: $showAddCompany) {
-                NewEntitySheet(vm: vm) { company in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        vm.selectedCompany = company
-                        vm.activeTab = .financial
-                        vm.touchCompany(company, appState: appState)
-                        vm.path.append(company)
-                    }
-                }
-            }
-            .sheet(isPresented: $showPremiumUpgrade) {
-                PremiumUpgradeView(gate: accessController.pendingGate)
-            }
-            .sheet(isPresented: $showDowngradeSelection) {
-                DowngradeSelectionView()
-            }
-            .sheet(item: $editingCompany) { company in
-                NewEntitySheet(vm: vm, company: company) { _ in }
-            }
-            .sheet(isPresented: $vm.showSearch) {
-                GlobalSearchView(vm: vm)
-            }
-            .sheet(isPresented: $showBriefing) {
-                GeometryReader { geometry in
-                    ZStack {
-                        receiptSheetBackground
-                        ScrollView(.vertical) {
-                            OwnerHealthBriefingDashboard(
-                                vm: vm,
-                                onOpenResource: { obligation in
-                                    dismissBriefing {
-                                        openBriefingResource(obligation)
-                                    }
-                                },
-                                onOpenHealthResource: { kind, resourceID in
-                                    dismissBriefing {
-                                        openHealthResource(kind, resourceID)
-                                    }
-                                },
-                                onExploreConnections: {
-                                    dismissBriefing {
-                                        showConnectionGraph = true
-                                    }
-                                }
-                            )
-                            .frame(width: max(geometry.size.width - 40, 0))
-                            .padding(.vertical, 16)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
-                        .scrollIndicators(.hidden)
-                        .clipped()
-                    }
-                }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color(hex: "#1C1C1E"))
-                .preferredColorScheme(.light)
-            }
-            .fullScreenCover(isPresented: $showAssistant) {
-                AssistantOnboardingView(vm: vm)
-                    .environment(appState)
-            }
-            .fullScreenCover(isPresented: $showConnectionGraph) {
-                ConnectionGraphView { reference in
-                    openHealthResource(reference.kind, reference.resourceId)
-                }
-                .environment(appState)
-            }
-            .sheet(item: $selectedSubscription) { sub in
-                EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false, onSave: {})
-            }
-            .sheet(item: $selectedCard) { card in
-                EditCardSheet(card: card, vm: vm, institutions: institutions, cards: cards, isNew: false)
-            }
-            .sheet(item: $selectedInstitution) { inst in
-                EditInstitutionSheet(institution: inst, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false)
-            }
-            .sheet(item: $selectedLoan) { loan in
-                EditLoanSheet(loan: loan, vm: vm, isNew: false, institutions: institutions, cards: cards)
-            }
-            .sheet(item: $taxReviewCompany) { company in TaxOpportunitiesView(initialCompanyId: company.id) }
-            .sheet(item: $selectedDocument) { doc in
-                EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
-            }
-            .sheet(isPresented: $showNotificationInbox) {
-                NotificationInboxView(vm: vm) { route in
-                    showNotificationInbox = false
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(250))
-                        notificationRouter.enqueue(route)
-                    }
-                }
-            }
-            .sheet(isPresented: $showTransactionCenter) {
-                PortfolioTransactionCenterView(
-                    vm: vm,
-                    initialTransactionID: initialTransactionID,
-                    initiallyShowsReviewQueue: initiallyShowsTransactionReview
-                )
-                .environment(appState)
-            }
-            // Tutorial navigation coordinator
-            .onChange(of: onboardingState.currentStep) { _, step in
-                switch step {
-                // ── Command Center steps: push into entity, home tab ──
-                case .tutorialCommandCenter, .tutorialCommandQuickAdd,
-                     .tutorialCommandFinancials, .tutorialCommandSubscriptions,
-                     .tutorialCommandDocuments:
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        let entity = appState.companies.first ?? dummyCompany
-                        vm.selectedCompany = entity
-                        if vm.path.isEmpty {
-                            vm.path.append(entity)
-                        }
-                        // CompanyDetailView will render the Control Center
-                    }
-
-                // ── Financial steps (incl. tabBar step): push into entity, financial tab ──
-                case .tutorialCommandTabBar,
-                     .tutorialFinancialPage, .tutorialFinancialWallet,
-                     .tutorialFinancialCardTap, .tutorialFinancialSwipe:
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        let entity = appState.companies.first ?? dummyCompany
-                        vm.selectedCompany = entity
-                        if vm.path.isEmpty {
-                            vm.path.append(entity)
-                        }
-                        // CompanyDetailView's own onChange will set vm.activeTab = .financial
-                    }
-
-                // ── Back from step 5 → Dashboard steps resume (pop path so DashboardView shows overlay) ──
-                case .tutorialEntityCard, .tutorialQuickActions,
-                     .tutorialSearch, .tutorialAssistant, .tutorialSwipeHint:
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        vm.path = NavigationPath()
-                        vm.activeTab = .financial
-                    }
-
-                // ── Done ──
-                case .tutorialDone:
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                        vm.path = NavigationPath()
-                        vm.activeTab = .financial
-                    }
-
-                default:
-                    break
-                }
-            }
-            .task(id: appState.searchDocumentRevision) {
-                if let userID = authViewModel.currentUser?.id { await SearchDocumentIndexer.shared.index(appState: appState, userID: userID) }
-            }
-            .onChange(of: SearchRouteCoordinator.shared.pending) { _, _ in openPendingSearch() }
-            .onChange(of: notificationRouter.pendingRoute) { _, _ in
-                openPendingNotificationRouteIfReady()
-            }
-            .onChange(of: appState.hasLoadedPortfolio) { _, _ in
-                openPendingNotificationRouteIfReady()
-                openPendingSearch()
-            }
-            .onChange(of: showNotificationInbox) { _, isPresented in
-                if !isPresented { openPendingNotificationRouteIfReady() }
-            }
-            .onAppear {
-                checkDowngradeSelection()
-                openPendingNotificationRouteIfReady()
-                openPendingSearch()
-            }
-            .onChange(of: appState.companies.count) { _, _ in checkDowngradeSelection() }
-            .onChange(of: accessController.snapshot.status) { _, _ in checkDowngradeSelection() }
+                    portfolioPresentedPanels
             }
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 10) {
@@ -637,6 +280,420 @@ struct DashboardView: View {
                 }
             }
         }
+    }
+
+
+    private var portfolioLifecyclePanels: some View {
+        portfolioPanels
+            .task {
+                // Fallback for OAuth/root-view timing: the dashboard should never
+                // remain on its placeholder simply because the first auth callback
+                // arrived before the app-level loader attached.
+                if appState.companies.isEmpty {
+                    await DataRepository.shared.fetchAllData(appState: appState)
+                }
+            }
+            .onAppear {
+                onboardingState.evaluateState(appState: appState)
+            }
+            .onChange(of: appState.companies.count) { _, _ in
+                let previousStep = onboardingState.currentStep
+                onboardingState.evaluateState(appState: appState)
+
+                if (previousStep == .needsEntity || previousStep == .notStarted)
+                    && onboardingState.currentStep == .needsBank
+                    && !showAddCompany {
+                    // Automatically jump to the new entity's financial tab
+                    if let newCompany = appState.companies.sorted(by: { $0.lastModified > $1.lastModified }).first {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            vm.selectedCompany = newCompany
+                            vm.activeTab = .financial
+                            vm.touchCompany(newCompany, appState: appState)
+                            vm.path.append(newCompany)
+                        }
+                    }
+                }
+            }
+            .onChange(of: appState.institutions.count) { _, _ in
+                let previousStep = onboardingState.currentStep
+                onboardingState.evaluateState(appState: appState)
+                guard previousStep == .needsBank else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    handlePostBankNavigation()
+                }
+            }
+            .refreshable {
+                await DataRepository.shared.fetchAllData(appState: appState)
+            }
+            .confirmationDialog(
+                companyToDelete?.userId != currentUserId ? "Leave Company" : "Delete Company",
+                isPresented: Binding(
+                    get: { companyToDelete != nil },
+                    set: { if !$0 { companyToDelete = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(companyToDelete?.userId != currentUserId ? "Leave" : "Delete", role: .destructive) {
+                    if let company = companyToDelete {
+                        vm.deleteCompany(company, appState: appState, currentUserId: currentUserId)
+                    }
+                    companyToDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    companyToDelete = nil
+                }
+            } message: {
+                if companyToDelete?.userId != currentUserId {
+                    Text("Are you sure you want to leave this company? It will be removed from your dashboard.")
+                } else {
+                    Text("Are you sure you want to delete this company? All associated data will be removed for everyone.")
+                }
+            }
+            // All Entities is already the entity picker. Its root must not offer
+            // another sidebar entry point when the split view is collapsed.
+            .navigationBarBackButtonHidden(true)
+            .toolbar(removing: vm.path.isEmpty ? .sidebarToggle : nil)
+            .navigationDestination(for: Company.self) { company in
+                CompanyDetailView(
+                    company: company,
+                    vm: vm,
+                    onShowAllEntities: { showBriefing = false }
+                )
+                .id(company.id)
+            }
+            .navigationDestination(for: AppViewModel.AppRoute.self) { route in
+                if route == .adminSettings {
+                    AdminSettingsView(vm: vm)
+                }
+            }
+            .navigationDestination(isPresented: $showSharedWithMe) {
+                if let uid = currentUserId {
+                    SharedWithMeView(vm: vm, currentUserId: uid)
+                }
+            }
+            .sheet(item: $companyToShare) { company in
+                ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
+            }
+            .sheet(isPresented: $showAddCompany) {
+                NewEntitySheet(vm: vm) { company in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        vm.selectedCompany = company
+                        vm.activeTab = .financial
+                        vm.touchCompany(company, appState: appState)
+                        vm.path.append(company)
+                    }
+                }
+            }
+            .sheet(isPresented: $showPremiumUpgrade) {
+                PremiumUpgradeView(gate: accessController.pendingGate)
+            }
+            .sheet(isPresented: $showDowngradeSelection) {
+                DowngradeSelectionView()
+            }
+            .sheet(item: $editingCompany) { company in
+                NewEntitySheet(vm: vm, company: company) { _ in }
+            }
+            .sheet(isPresented: $vm.showSearch) {
+                GlobalSearchView(vm: vm)
+            }
+            .sheet(isPresented: $showBriefing) {
+                GeometryReader { geometry in
+                    ZStack {
+                        receiptSheetBackground
+                        ScrollView(.vertical) {
+                            OwnerHealthBriefingDashboard(
+                                vm: vm,
+                                onOpenResource: { obligation in
+                                    dismissBriefing {
+                                        openBriefingResource(obligation)
+                                    }
+                                },
+                                onOpenHealthResource: { kind, resourceID in
+                                    dismissBriefing {
+                                        openHealthResource(kind, resourceID)
+                                    }
+                                },
+                                onExploreConnections: {
+                                    dismissBriefing {
+                                        showConnectionGraph = true
+                                    }
+                                }
+                            )
+                            .frame(width: max(geometry.size.width - 40, 0))
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .scrollBounceBehavior(.basedOnSize, axes: .vertical)
+                        .scrollIndicators(.hidden)
+                        .clipped()
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .preferredColorScheme(.light)
+            }
+            .fullScreenCover(isPresented: $showAssistant) {
+                AssistantOnboardingView(vm: vm)
+                    .environment(appState)
+            }
+            .fullScreenCover(isPresented: $showConnectionGraph) {
+                ConnectionGraphView { reference in
+                    openHealthResource(reference.kind, reference.resourceId)
+                }
+                .environment(appState)
+            }
+    }
+
+    private var portfolioPresentedPanels: some View {
+        portfolioLifecyclePanels
+            .sheet(item: $selectedSubscription) { sub in
+                EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false, onSave: {})
+            }
+            .sheet(item: $selectedCard) { card in
+                EditCardSheet(card: card, vm: vm, institutions: institutions, cards: cards, isNew: false)
+            }
+            .sheet(item: $selectedInstitution) { inst in
+                EditInstitutionSheet(institution: inst, institutions: institutions, cards: cards, loans: loans, vm: vm, isNew: false)
+            }
+            .sheet(item: $selectedLoan) { loan in
+                EditLoanSheet(loan: loan, vm: vm, isNew: false, institutions: institutions, cards: cards)
+            }
+            .sheet(item: $taxReviewCompany) { company in TaxOpportunitiesView(initialCompanyId: company.id) }
+            .sheet(item: $selectedDocument) { doc in
+                EditDocumentSheet(doc: doc, vm: vm, isNew: false, companyStructure: companies.first(where: { $0.id == doc.companyId })?.structure ?? "LLC")
+            }
+            .sheet(isPresented: $showNotificationInbox) {
+                NotificationInboxView(vm: vm) { route in
+                    showNotificationInbox = false
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(250))
+                        notificationRouter.enqueue(route)
+                    }
+                }
+            }
+            .sheet(isPresented: $showTransactionCenter) {
+                PortfolioTransactionCenterView(
+                    vm: vm,
+                    initialTransactionID: initialTransactionID,
+                    initiallyShowsReviewQueue: initiallyShowsTransactionReview
+                )
+                .environment(appState)
+            }
+            // Tutorial navigation coordinator
+            .onChange(of: onboardingState.currentStep) { _, step in
+                switch step {
+                // ── Command Center steps: push into entity, home tab ──
+                case .tutorialCommandCenter, .tutorialCommandQuickAdd,
+                     .tutorialCommandFinancials, .tutorialCommandSubscriptions,
+                     .tutorialCommandDocuments:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        let entity = appState.companies.first ?? dummyCompany
+                        vm.selectedCompany = entity
+                        if vm.path.isEmpty {
+                            vm.path.append(entity)
+                        }
+                        // CompanyDetailView will render the Control Center
+                    }
+
+                // ── Financial steps (incl. tabBar step): push into entity, financial tab ──
+                case .tutorialCommandTabBar,
+                     .tutorialFinancialPage, .tutorialFinancialWallet,
+                     .tutorialFinancialCardTap, .tutorialFinancialSwipe:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        let entity = appState.companies.first ?? dummyCompany
+                        vm.selectedCompany = entity
+                        if vm.path.isEmpty {
+                            vm.path.append(entity)
+                        }
+                        // CompanyDetailView's own onChange will set vm.activeTab = .financial
+                    }
+
+                // ── Back from step 5 → Dashboard steps resume (pop path so DashboardView shows overlay) ──
+                case .tutorialEntityCard, .tutorialQuickActions,
+                     .tutorialSearch, .tutorialAssistant, .tutorialSwipeHint:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        vm.path = NavigationPath()
+                        vm.activeTab = .financial
+                    }
+
+                // ── Done ──
+                case .tutorialDone:
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                        vm.path = NavigationPath()
+                        vm.activeTab = .financial
+                    }
+
+                default:
+                    break
+                }
+            }
+            .task(id: appState.searchDocumentRevision) {
+                if let userID = authViewModel.currentUser?.id { await SearchDocumentIndexer.shared.index(appState: appState, userID: userID) }
+            }
+            .onChange(of: SearchRouteCoordinator.shared.pending) { _, _ in openPendingSearch() }
+            .onChange(of: notificationRouter.pendingRoute) { _, _ in
+                openPendingNotificationRouteIfReady()
+            }
+            .onChange(of: appState.hasLoadedPortfolio) { _, _ in
+                openPendingNotificationRouteIfReady()
+                openPendingSearch()
+            }
+            .onChange(of: showNotificationInbox) { _, isPresented in
+                if !isPresented { openPendingNotificationRouteIfReady() }
+            }
+            .onAppear {
+                checkDowngradeSelection()
+                openPendingNotificationRouteIfReady()
+                openPendingSearch()
+            }
+            .onChange(of: appState.companies.count) { _, _ in checkDowngradeSelection() }
+            .onChange(of: appState.portfolioUserID) { _, _ in duoBriefing.invalidate() }
+            .onChange(of: accessController.effectiveSnapshot) { _, _ in duoBriefing.invalidate() }
+            .onChange(of: accessController.snapshot.status) { _, _ in checkDowngradeSelection() }
+    }
+
+    @ViewBuilder
+    private var portfolioPanels: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            DuoDashboardPanels(
+                cards: { expanded in entityList(isDuoExpanded: expanded) },
+                receipt: { inlineBriefingPanel }
+            )
+        } else {
+            entityList()
+        }
+        #else
+        entityList()
+        #endif
+    }
+
+    @ViewBuilder
+    private var inlineBriefingPanel: some View {
+        if accessController.permits(.ownerBriefing, appState: appState, userId: currentUserId) {
+            DuoInlineBriefingView(
+                vm: vm, store: duoBriefing, isActive: vm.path.isEmpty,
+                onOpenResource: openBriefingResource,
+                onOpenHealthResource: openHealthResource,
+                onExploreConnections: { showConnectionGraph = true }
+            )
+        } else {
+            ScrollView {
+                DuoBriefingPlaceholder(
+                    message: "Your executive briefing is available with Miloom Pro.",
+                    action: { presentBriefing(source: "duo_dashboard_inline") }
+                )
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func entityList(isDuoExpanded: Bool = false) -> some View {
+                    List {
+                        if let loadIssue = appState.portfolioLoadIssue {
+                            Button {
+                                Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                                        .foregroundStyle(Color.zifrGold)
+                                    Text(loadIssue)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.78))
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 4)
+                                    Text("RETRY")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.zifrGold)
+                                }
+                                .padding(12)
+                                .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
+                        }
+
+                        ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
+                            let row = companyCardRow(for: company)
+                            let isLast = index == filteredCompanies.count - 1
+                            let hasPlaceholder = companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
+                            row
+                                .background(tutorialFrameCapture(index: index))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? (isDuoExpanded ? 16 : 120) : 16, trailing: 20))
+                        }
+
+                        // Add company button / empty state placeholder under the dummy company
+                        Group {
+                            if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
+                                // Un-blurred only while the tutorial is actively running.
+                                if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
+                                    // Tutorial in progress: show demo card fully visible
+                                    CompanyCardView(
+                                        company: dummyCompany,
+                                        institutionsCount: 2,
+                                        subscriptionsCount: 4,
+                                        docsCount: 3,
+                                        onEdit: {}
+                                    )
+                                    .allowsHitTesting(false)
+                                    .padding(.top, 4)
+                                    .background(
+                                        GeometryReader { geo in
+                                            Color.clear.onAppear {
+                                                tutorialEntityFrame = geo.frame(in: .global)
+                                            }.onChange(of: geo.frame(in: .global)) { _, f in
+                                                tutorialEntityFrame = f
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        requestAddCompany()
+                                    } label: {
+                                        ZStack {
+                                            CompanyCardView(
+                                                company: dummyCompany,
+                                                institutionsCount: 0,
+                                                subscriptionsCount: 0,
+                                                docsCount: 0,
+                                                onEdit: {}
+                                            )
+                                            .allowsHitTesting(false)
+                                            .blur(radius: 3)
+                                            .opacity(0.8)
+
+                                            VStack(spacing: 16) {
+                                                Image(systemName: "plus.app.fill")
+                                                    .font(.system(size: 28))
+                                                    .foregroundStyle(.white)
+                                                Text("ADD YOUR COMPANY OR ENTITY")
+                                                    .font(.system(size: 11, weight: .black))
+                                                    .textCase(.uppercase)
+                                                    .tracking(2)
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
+                                    }
+                                    .padding(.top, 4)
+                                    .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: isDuoExpanded ? 16 : 120, trailing: 20))
+                    }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .scrollIndicators(.hidden)
     }
 
     private var filteredCompanies: [Company] {

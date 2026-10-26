@@ -34,7 +34,9 @@ extension UIColor {
     }
 }
 
+#if !(DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW)
 @main
+#endif
 struct ZifrApp: App {
     @UIApplicationDelegateAdaptor(MiloomAppDelegate.self) private var appDelegate
     @State private var authViewModel = AuthViewModel()

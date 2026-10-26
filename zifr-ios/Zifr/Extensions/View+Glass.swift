@@ -178,7 +178,7 @@ struct ShimmerModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .overlay(
+            .overlay {
                 LinearGradient(
                     gradient: Gradient(colors: [
                         .clear, Color.white.opacity(0.15), .clear
@@ -187,7 +187,7 @@ struct ShimmerModifier: ViewModifier {
                     endPoint: .init(x: phase + 0.3, y: 0)
                 )
                 .blendMode(.plusLighter)
-            )
+            }
             .onAppear {
                 withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
                     phase = 1.3

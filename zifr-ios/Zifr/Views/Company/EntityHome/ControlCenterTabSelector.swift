@@ -104,11 +104,37 @@ struct ControlCenterTabSelector: View {
     }
     
     var body: some View {
-        // Calculate static widths
-        let totalW = UIScreen.main.bounds.width - 40 // Based on .padding(.horizontal, 20)
+        GeometryReader { geometry in
+            selector(width: geometry.size.width)
+        }
+        .frame(height: 56)
+        .padding(.horizontal, 20)
+        .background(
+            tabBarGlassBackground(
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 0,
+                    bottomLeadingRadius: 16,
+                    bottomTrailingRadius: 16,
+                    topTrailingRadius: 0
+                )
+            )
+            .padding(.top, -30)
+            .padding(.horizontal, 20)
+        )
+        .onAppear {
+            lastHapticIndex = currentIndex
+        }
+        .onChange(of: activeTab) { _, _ in
+            dragOffset = 0
+            isDragging = false
+            activeHover = nil
+        }
+    }
+
+    private func selector(width totalW: CGFloat) -> some View {
         let innerPadding: CGFloat = 4
         let availableW = max(0, totalW - (innerPadding * 2))
-        let tabW = availableW / CGFloat(tabs.count)
+        let tabW = max(1, availableW / CGFloat(tabs.count))
         let tabH: CGFloat = 48
         
         let baseOffset = innerPadding + (CGFloat(currentIndex) * tabW)
@@ -136,7 +162,7 @@ struct ControlCenterTabSelector: View {
             ? Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86)
             : Animation.spring(response: 0.3, dampingFraction: 0.75)
         
-        ZStack(alignment: .leading) {
+        return ZStack(alignment: .leading) {
             // 1. Sliding Pill (Active Indicator) - Liquid Glass Pill
             tabBarGlassBackground(
                 RoundedRectangle(cornerRadius: 14),
@@ -282,22 +308,5 @@ struct ControlCenterTabSelector: View {
                     }
                 }
         )
-        .frame(height: 56)
-        .padding(.horizontal, 20)
-        .background(
-            tabBarGlassBackground(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
-                    bottomLeadingRadius: 16,
-                    bottomTrailingRadius: 16,
-                    topTrailingRadius: 0
-                )
-            )
-            .padding(.top, -30)
-            .padding(.horizontal, 20)
-        )
-        .onAppear {
-            lastHapticIndex = currentIndex
-        }
     }
 }
