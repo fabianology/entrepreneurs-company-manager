@@ -137,6 +137,7 @@ struct SubscriptionReceiptView: View {
     let subscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
+    var isEmbedded = false
     @State private var showsServices = false
 
     private var activeSubscriptions: [Subscription] {
@@ -154,7 +155,21 @@ struct SubscriptionReceiptView: View {
     private let ink = BriefingReceiptTheme.ink
     private let muted = BriefingReceiptTheme.fadedInk
 
+    @ViewBuilder
     var body: some View {
+        if isEmbedded {
+            receiptScroll.environment(\.colorScheme, .light)
+        } else {
+            receiptScroll
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .preferredColorScheme(.light)
+        }
+    }
+
+    private var receiptScroll: some View {
         ScrollView(.vertical) {
             reportContent
                 .padding(.horizontal, 20)
@@ -162,12 +177,11 @@ struct SubscriptionReceiptView: View {
         }
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         .scrollIndicators(.hidden)
-        .background(Color(hex: "#1C1C1E").ignoresSafeArea())
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
-        .presentationBackground(Color(hex: "#1C1C1E"))
-        .preferredColorScheme(.light)
+        .background {
+            if !isEmbedded {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+            }
+        }
     }
 
     // Also used by rendering tests, without a navigation or scrolling container.

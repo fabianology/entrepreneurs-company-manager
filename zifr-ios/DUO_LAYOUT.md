@@ -693,3 +693,41 @@ in this three-line follow-up. Previous scrolling gap retained. Only
 PortfolioTransactionCenterView.swift and notes edited this pass. Canonical source
 fingerprint/global Xcode unchanged; local/uncommitted/unpushed, no phone install,
 backend/data mutation or deployment.
+
+## 2026-10-27: expanded landscape report workspace
+
+Fully open landscape now uses the same selected-entity cash-flow pane/geometry as
+partially open landscape (Duo + expanded + landscape). Entity report menu routes
+Financial Report and Subscription Report into this left area, replacing cash
+flow while leaving right-side entity tabs/content/Search usable. Back to Cash
+Flow restores the existing mounted transaction view and its analysis/filter state.
+Report selection is local view state; no new requests, generators, sync logic or
+data changes. Other poses/non-Duo devices retain the existing modal route.
+
+FinancialReceiptView and SubscriptionReceiptView gain isEmbedded default false.
+Embedded variants reuse the original receipt/scroll content with clear backing;
+Financial omits nested navigation/Close toolbar, Subscription omits sheet-only
+presentation and limits light appearance to its own subtree. Default modal
+navigation, dark backing and sheet settings are retained. CompanyDetailView's
+private pane names/identifier now reflect general report content. No dashboard,
+permissions, report calculations, project/signing/package or backend changes.
+
+Verification: normal Debug simulator builds on Xcode 26.4/27.1 and explicit 27.1
+sample preview passed. Three existing tests passed (subscription receipt compact/
+accessible rendering, selected-entity inferred cash-flow scope, default portfolio/
+other-entity duplicate isolation). Whitespace passed. Synthetic UI checked fully
+open cash flow, both reports inline with right tabs/Search present, changing the
+right tab while a report stayed visible, subscription disclosure, report retention
+through partial opening, Back to Cash Flow, closed Financial Report retaining
+its original overlay/Close, and expanded portrait without an inline pane. Preview
+returned to fully open landscape cash flow. Evidence/logs:
+/private/tmp/miloom-duo-report-workspace-20261027.fH2uyb/.
+
+Manual scrolling/performance acceptance remains: drag and wheel input did not
+move the embedded subscription report in the fully open simulator. No independent
+scrolling, physical-device frame rate or authenticated-flow acceptance claimed;
+previous partial-open input limitation also remains. No data writes/sync activation.
+Three Swift files plus these notes changed after 6d78816c on codex/duo-evaluation;
+local/uncommitted/unpushed. Original iPhone source/installed build, project/package
+hashes, global Xcode 26.4 and canonical non-coordination fingerprint unchanged.
+No merge, deployment, archive, upload, backend mutation or real-phone install.

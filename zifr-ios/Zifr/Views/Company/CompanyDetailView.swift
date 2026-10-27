@@ -1,5 +1,9 @@
 import SwiftUI
 
+private enum DuoEntityReport: Equatable {
+    case financial, subscriptions
+}
+
 /// The existing entity menu, shared by entity pages and the Duo Admin toolbar.
 struct MiloomEntitySwitcher: View {
     @Bindable var vm: AppViewModel
@@ -81,11 +85,11 @@ struct MiloomCircularToolbarLabel<Icon: View>: View {
 
 #if compiler(>=6.4)
 @available(iOS 27.1, *)
-private struct DuoEntityTransactionPanels<Page: View, Transactions: View>: View {
+private struct DuoEntityPanels<Page: View, Panel: View>: View {
     let isSplit: Bool
     @ViewBuilder let page: () -> Page
-    @ViewBuilder let transactions: () -> Transactions
-    @State private var hasShownTransactions = false
+    @ViewBuilder let panel: () -> Panel
+    @State private var hasShownPanel = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -98,14 +102,14 @@ private struct DuoEntityTransactionPanels<Page: View, Transactions: View>: View 
                        width: $0.frame.width + $0.margins.leading + $0.margins.trailing,
                        height: $0.frame.height + $0.margins.top + $0.margins.bottom)
             }
-            DuoEntityTransactionLayout(isSplit: isSplit, division: division) {
+            DuoEntityPanelLayout(isSplit: isSplit, division: division) {
                 // Keep the original footer's safe-area overflow so Search can
                 // stay aligned with the native toolbar's bottom control.
                 page().contentShape(Rectangle())
                 ZStack {
                     // Mount on first use, then retain analysis, filters and scroll
                     // state when the phone folds or the entity's tab changes.
-                    if hasShownTransactions || isSplit { transactions() }
+                    if hasShownPanel || isSplit { panel() }
                 }
                 .clipped()
                 .contentShape(Rectangle())
@@ -113,18 +117,18 @@ private struct DuoEntityTransactionPanels<Page: View, Transactions: View>: View 
                 .opacity(isSplit ? 1 : 0)
                 .allowsHitTesting(isSplit)
                 .accessibilityHidden(!isSplit)
-                .accessibilityIdentifier("duo.entityTransactions")
+                .accessibilityIdentifier("duo.entityPanel")
             }
         }
         .background(Color.zifrBG.ignoresSafeArea())
         .onChange(of: isSplit, initial: true) { _, visible in
-            if visible { hasShownTransactions = true }
+            if visible { hasShownPanel = true }
         }
     }
 }
 
 @available(iOS 27.1, *)
-private struct DuoEntityTransactionLayout: Layout {
+private struct DuoEntityPanelLayout: Layout {
     let isSplit: Bool
     let division: CGRect?
 
@@ -255,6 +259,7 @@ struct CompanyDetailView: View {
     @State private var showFinancialReport = false
     @State private var showSubscriptionReport = false
     @State private var showTransactionCenter = false
+    @State private var duoReport: DuoEntityReport?
 
     // Tutorial frame targets — populated by TutorialFrameKey preferences
     @State private var tutFrameHeader: CGRect = .zero
@@ -273,7 +278,7 @@ struct CompanyDetailView: View {
     var body: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
-            companyWithTransactionPane.modifier(DuoSideToolbar(
+            companyWithLeftPanel.modifier(DuoSideToolbar(
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: .constant(nil),
                 bottomControlWindowCenterY: $duoAdminWindowCenterY,
@@ -293,19 +298,18 @@ struct CompanyDetailView: View {
         #endif
     }
 
-    private var usesInlineTransactions: Bool {
-        duoLayout.isDuoDevice && duoLayout.isPartiallyOpen && duoLayout.isLandscape
+    private var usesInlineEntityPanel: Bool {
+        duoLayout.isDuoDevice && duoLayout.isExpanded && duoLayout.isLandscape
     }
 
     @ViewBuilder
-    private var companyWithTransactionPane: some View {
+    private var companyWithLeftPanel: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *), duoLayout.isDuoDevice {
-            DuoEntityTransactionPanels(isSplit: usesInlineTransactions) {
+            DuoEntityPanels(isSplit: usesInlineEntityPanel) {
                 companySurface
-            } transactions: {
-                PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id)
-                    .environment(appState)
+            } panel: {
+                duoLeftPanel
             }
         } else {
             companySurface
@@ -313,6 +317,66 @@ struct CompanyDetailView: View {
         #else
         companySurface
         #endif
+    }
+
+    private var duoLeftPanel: some View {
+        ZStack {
+            // Keep cash-flow analysis and filters mounted while a report is visible.
+            PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id)
+                .environment(appState)
+                .opacity(duoReport == nil ? 1 : 0)
+                .allowsHitTesting(duoReport == nil)
+                .accessibilityHidden(duoReport != nil)
+
+            if let duoReport {
+                VStack(spacing: 0) {
+                    HStack {
+                        Button {
+                            self.duoReport = nil
+                        } label: {
+                            Label("Cash Flow", systemImage: "arrow.left")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color.zifrGold)
+                                .padding(.horizontal, 16)
+                                .frame(height: 44)
+                                .background(bottomControlGlass(Capsule()))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Back to cash flow")
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+
+                    switch duoReport {
+                    case .financial:
+                        FinancialReceiptView(
+                            company: company, institutions: institutions, cards: cards,
+                            loans: loans, subscriptions: subscriptions, isEmbedded: true
+                        )
+                        .accessibilityIdentifier("duo.entityFinancialReport")
+                    case .subscriptions:
+                        SubscriptionReceiptView(
+                            company: company, subscriptions: subscriptions,
+                            institutions: institutions, cards: cards, isEmbedded: true
+                        )
+                        .accessibilityIdentifier("duo.entitySubscriptionReport")
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
+    private func presentReport(_ report: DuoEntityReport) {
+        if usesInlineEntityPanel {
+            duoReport = report
+        } else {
+            switch report {
+            case .financial: showFinancialReport = true
+            case .subscriptions: showSubscriptionReport = true
+            }
+        }
     }
 
     private var companySurface: some View {
@@ -758,7 +822,7 @@ struct CompanyDetailView: View {
 
                     Spacer(minLength: 8)
 
-                    if vm.activeTab == .financial && !usesInlineTransactions {
+                    if vm.activeTab == .financial && !usesInlineEntityPanel {
                         transactionHeaderButton
                     }
 
@@ -822,12 +886,12 @@ struct CompanyDetailView: View {
             if !isDuoDevice { sharingMenuItems }
             Section("Reports") {
                 Button {
-                    showFinancialReport = true
+                    presentReport(.financial)
                 } label: {
                     Label("Financial Report", systemImage: "dollarsign.circle")
                 }
                 Button {
-                    showSubscriptionReport = true
+                    presentReport(.subscriptions)
                 } label: {
                     Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
                 }

@@ -6,6 +6,7 @@ struct FinancialReceiptView: View {
     let cards: [FinancialCard]
     let loans: [Loan]
     let subscriptions: [Subscription]
+    var isEmbedded = false
     
     @Environment(\.dismiss) private var dismiss
     
@@ -47,51 +48,64 @@ struct FinancialReceiptView: View {
             connections: appState.resourceConnections, companyOverrides: appState.localCompanyOverrides)
     }
 
+    @ViewBuilder
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // Receipt Content
-                    VStack(alignment: .leading, spacing: 16) {
-                        receiptHeader
-                        
-                        dashedDivider
-                        
-                        ForEach(institutions) { inst in
-                            institutionItem(inst: inst)
-                            dashedDivider
+        if isEmbedded {
+            receiptScroll
+        } else {
+            NavigationStack {
+                receiptScroll
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            Button("Close") { dismiss() }
+                                .font(.system(.body, design: .monospaced).bold())
+                                .foregroundStyle(.white)
                         }
-                        
-                        let relationships = institutionRelationships
-                        let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
-                        let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
-                        
-                        if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
-                            otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
-                            dashedDivider
-                        }
-                        
-                        receiptFooter
                     }
-                    .padding(24)
-                    .background(paperColor)
-                }
-                .padding(.vertical, 32)
-                .padding(.horizontal, 16)
-                .shadow(color: .white.opacity(0.1), radius: 20, x: 0, y: 10)
-            }
-            .background(Color(hex: "#121212").ignoresSafeArea())
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") { dismiss() }
-                        .font(.system(.body, design: .monospaced).bold())
-                        .foregroundStyle(.white)
-                }
             }
         }
     }
-    
+
+    private var receiptScroll: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                // Receipt Content
+                VStack(alignment: .leading, spacing: 16) {
+                    receiptHeader
+
+                    dashedDivider
+
+                    ForEach(institutions) { inst in
+                        institutionItem(inst: inst)
+                        dashedDivider
+                    }
+
+                    let relationships = institutionRelationships
+                    let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
+                    let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
+
+                    if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
+                        otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
+                        dashedDivider
+                    }
+
+                    receiptFooter
+                }
+                .padding(24)
+                .background(paperColor)
+            }
+            .padding(.vertical, 32)
+            .padding(.horizontal, 16)
+            .shadow(color: .white.opacity(0.1), radius: 20, x: 0, y: 10)
+        }
+        .background {
+            if !isEmbedded {
+                Color(hex: "#121212").ignoresSafeArea()
+            }
+        }
+    }
+
     // MARK: - Components
     
     private var dashedDivider: some View {
