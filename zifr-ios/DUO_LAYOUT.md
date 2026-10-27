@@ -607,3 +607,89 @@ RootView.swift, PremiumEngineTests.swift and these notes after 46158b3d. Project
 and package hashes, global Xcode 26.4 and canonical non-coordination source
 fingerprint remained unchanged. Separate Duo branch codex/duo-evaluation only;
 local/uncommitted/unpushed; no merge, deployment, archive or upload.
+
+## 2026-10-27: clear glass cash-flow pane
+
+Duo inline pane removes its Transactions/entity heading and opaque gray outer
+background. Cash-Flow Insights uses native glassEffect(.clear) instead of the
+black sheet-card backing. Its net cash-flow summary retains its data/spacing but
+removes the gray fill and gold box outline. Positive amounts use mint in this
+pane so they stay readable over green. Month picker, metrics and action rows
+retain existing behavior. ZifrSheetCard gains usesClearGlass, default false;
+only the embedded entity cash-flow card opts in. Original modal/default card
+styling, data-loading/sync logic and other poses remain unchanged.
+
+Final normal Debug simulator builds passed on Xcode 26.4/27.1, and explicit 27.1
+sample preview passed. Whitespace check passed. Synthetic UI verified clear glass,
+removed headings/gray boxes, Studio +$1,920 and Personal -$25, month picker and
+September no-activity state, month retention through fully open/back to partial,
+and the original modal with its dark card/gray summary intact. Returned preview
+to Personal/October partial landscape. No XCTest rerun for this visual-only
+change, authenticated flow, physical-device or performance acceptance; previous
+partial-open simulator scrolling limitation remains. No data writes or sync
+activation. Evidence/logs: /private/tmp/miloom-duo-cashflow-glass-20261027.hDN1lp/.
+
+Changed ZifrSheetCard.swift, PortfolioTransactionCenterView.swift and these notes
+on codex/duo-evaluation after 580d9a22; local/uncommitted/unpushed. Original iPhone
+source/installed build, project/package hashes and global Xcode 26.4 retained.
+Canonical non-coordination fingerprint unchanged. No merge, deployment, upload,
+archive, backend changes or real-phone install.
+
+## 2026-10-27: match cash-flow glass to Search
+
+Follow-up replaces the pane's untinted clear glass with the entity Search bar's
+exact glass settings: .clear.tint(zifrTabBarFill.opacity(0.28)).interactive(),
+same 1.5-point gold gradient outline and black 0.4-opacity shadow (radius 6,
+x 0/y 3). Pane keeps its rounded rectangular shape. Only usesClearGlass callers
+receive the shadow; only embedded cash flow opts in and enables the outline.
+Existing uncommitted header/gray-box removal is preserved. Default iPhone sheet
+styling and Search itself are unchanged.
+
+Xcode 26.4 normal Debug simulator build and Xcode 27.1 explicit sample preview
+build passed; whitespace check passed. Visually compared pane and Search together
+in partial landscape with Studio's sample data; tint/edge/shadow now match.
+Evidence: /private/tmp/miloom-duo-cashflow-searchglass-20261027.WI9N0w/.
+No new XCTest, normal-27.1 build, authenticated flow, scrolling or physical-device
+performance acceptance in this follow-up. Project/package hashes, global Xcode
+26.4 and canonical non-coordination fingerprint unchanged. Same two Swift files
+and notes remain local/uncommitted/unpushed on codex/duo-evaluation. No deployment,
+backend mutation, data write or real-phone install.
+
+## 2026-10-27: date glass and cash-flow colors
+
+Duo embedded month picker opts into Search's clear glass tint/interaction/shadow
+without adding the gold outline. Its default path remains untinted as before.
+Embedded net cash-flow amounts are white for either sign, Money In uses money
+green #85BB65 and Money Out uses system red. Spending by Category and Tax
+Opportunities use darker green #0D4635, including no-activity/empty tax actions.
+TaxOpportunitiesButton accepts an optional backgroundColor defaulting to the
+original zifrBG; only embedded cash flow overrides it. Loading/data/actions and
+legacy iPhone styling stay unchanged. Earlier pending clear-glass edits retained.
+
+Xcode 26.4 normal Debug simulator build and Xcode 27.1 explicit sample preview
+build passed; whitespace passed. Synthetic UI checked positive Studio and negative
+Personal cash flow, requested amount/button colors, outline-free tinted picker
+and month menu opening/selection. Preview left at Personal/October partial
+landscape. Evidence: /private/tmp/miloom-duo-cashflow-colors-20261027.Wz2VTX/.
+No fresh XCTest, normal-27.1 build, authenticated flow, scrolling or physical-device
+performance acceptance. Previous simulator scrolling gap remains. No sync/data
+writes. Project/package hashes, global Xcode 26.4 and canonical non-coordination
+fingerprint unchanged. New edits in PortfolioTransactionCenterView.swift and
+TaxOpportunitiesView.swift plus notes; earlier ZifrSheetCard.swift pending work
+preserved. Local/uncommitted/unpushed on codex/duo-evaluation; no merge/deployment,
+backend change or real-phone install.
+
+## 2026-10-27: gold net cash flow and white metrics
+
+Duo embedded net cash-flow digits now use zifrGold (#C1AA78), matching the
+Cash-Flow Insights header for every sign. Money In and Money Out digits are both
+white. Supersedes the immediately preceding green/red/white amount choices;
+all other pending visual work retained. Original iPhone amount colors unchanged.
+Xcode 27.1 sample preview build and whitespace check passed; visually verified
+header/net gold and white income/outflow in partial landscape. Evidence:
+/private/tmp/miloom-duo-cashflow-gold-20261027.2tnW1f/.
+No new XCTest, Xcode 26.4/normal-27.1 build, authenticated or performance acceptance
+in this three-line follow-up. Previous scrolling gap retained. Only
+PortfolioTransactionCenterView.swift and notes edited this pass. Canonical source
+fingerprint/global Xcode unchanged; local/uncommitted/unpushed, no phone install,
+backend/data mutation or deployment.

@@ -313,6 +313,7 @@ enum CashFlowInsightEngine {
 struct MiloomMonthPicker: View {
     @Binding var selection: CashFlowMonth
     let anchorDate: Date
+    var usesSearchGlass = false
 
     private var months: [CashFlowMonth] {
         CashFlowMonth.recent(from: anchorDate)
@@ -354,6 +355,8 @@ struct MiloomMonthPicker: View {
         .buttonStyle(.plain)
         .tint(Color.miloomGold)
         .background { pickerGlass(Capsule()) }
+        .shadow(color: usesSearchGlass ? Color.black.opacity(0.4) : .clear,
+                radius: 6, x: 0, y: 3)
         .accessibilityLabel("Choose transaction month")
         .accessibilityValue(selection.title())
         .accessibilityHint("Shows the latest twelve calendar months")
@@ -364,7 +367,9 @@ struct MiloomMonthPicker: View {
         if #available(iOS 26.0, *) {
             Color.clear
                 .glassEffect(
-                    .clear.interactive(),
+                    usesSearchGlass
+                        ? .clear.tint(Color.zifrTabBarFill.opacity(0.28)).interactive()
+                        : .clear.interactive(),
                     in: shape
                 )
         } else {
@@ -970,23 +975,15 @@ struct PortfolioTransactionCenterView: View {
         }.count
     }
 
+    private var cashFlowActionBackground: Color {
+        embeddedCompanyID == nil ? .zifrBG : Color(hex: "#0D4635")
+    }
+
     private func embeddedTransactions(companyID: UUID) -> some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Transactions")
-                    .font(.system(size: 19, weight: .bold))
-                Text(appState.companies.first { $0.id == companyID }?.name ?? "Selected Entity")
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(Color.zifrGold)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
             transactionContent
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(hex: "#1C1C1E"))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .sheet(isPresented: $showTaxOpportunities) { TaxOpportunitiesView(initialCompanyId: companyID) }
         .sheet(isPresented: $showSpendingCategories) {
@@ -1056,7 +1053,9 @@ struct PortfolioTransactionCenterView: View {
     @ViewBuilder
     private var transactionContent: some View {
         ZStack {
-            Color(hex: "#1C1C1E").ignoresSafeArea()
+            if embeddedCompanyID == nil {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+            }
 
             if isPreparing {
                 loadingState("Preparing transactions…")
@@ -1064,7 +1063,7 @@ struct PortfolioTransactionCenterView: View {
                 loadingState("Syncing all accounts…")
             } else if allRecords.isEmpty {
                 VStack {
-                    TaxOpportunitiesButton(count: taxReviewCount) { showTaxOpportunities = true }.padding(20)
+                    TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }.padding(20)
                     emptyState
                 }
             } else {
@@ -1138,7 +1137,8 @@ struct PortfolioTransactionCenterView: View {
             title: "CASH-FLOW INSIGHTS",
             icon: "waveform.path.ecg",
             subtitle: cashFlowMonth.title().uppercased(),
-            showsBorder: false,
+            showsBorder: embeddedCompanyID != nil,
+            usesClearGlass: embeddedCompanyID != nil,
             contentHorizontalPadding: 20,
             contentTopPadding: 18,
             contentBottomPadding: 18,
@@ -1152,12 +1152,12 @@ struct PortfolioTransactionCenterView: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date())
+                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: embeddedCompanyID != nil)
 
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
                         spendingByCategory(insights)
-                        TaxOpportunitiesButton(count: taxReviewCount) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
 
                         VStack(spacing: 0) {
                             if let largestExpense = insights.largestExpense {
@@ -1182,7 +1182,7 @@ struct PortfolioTransactionCenterView: View {
                                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
                         )
                     } else {
-                        TaxOpportunitiesButton(count: taxReviewCount) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
                         HStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 19, weight: .semibold))
@@ -1220,7 +1220,7 @@ struct PortfolioTransactionCenterView: View {
                 cashFlowMetric(
                     title: "MONEY IN",
                     value: formatCurrency(insights.current.moneyIn),
-                    color: Color.zifrBG
+                    color: embeddedCompanyID == nil ? Color.zifrBG : .white
                 )
                 cashFlowMetric(
                     title: "MONEY OUT",
@@ -1239,7 +1239,7 @@ struct PortfolioTransactionCenterView: View {
             .padding(.vertical, 2)
         }
         .padding(18)
-        .background(Color(hex: "#2C2C2E"))
+        .background(embeddedCompanyID == nil ? Color(hex: "#2C2C2E") : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .overlay(
             RoundedRectangle(cornerRadius: 15)
@@ -1252,7 +1252,7 @@ struct PortfolioTransactionCenterView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 1.5
+                    lineWidth: embeddedCompanyID == nil ? 1.5 : 0
                 )
         )
         .accessibilityElement(children: .ignore)
@@ -1344,7 +1344,7 @@ struct PortfolioTransactionCenterView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens a pie chart with transactions by category")
-        .background(Color.zifrBG)
+        .background(cashFlowActionBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
@@ -1370,6 +1370,7 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private func netCashFlowColor(_ value: Double) -> Color {
+        if embeddedCompanyID != nil { return .zifrGold }
         if value > 0.005 { return Color.zifrBG }
         if value < -0.005 { return .orange }
         return .white

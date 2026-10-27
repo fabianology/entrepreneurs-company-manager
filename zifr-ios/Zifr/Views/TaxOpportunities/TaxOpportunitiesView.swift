@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TaxOpportunitiesButton: View {
     var count: Int
+    var backgroundColor: Color = .zifrBG
     var action: () -> Void
     var body: some View {
         Button(action: action) {
@@ -17,7 +18,7 @@ struct TaxOpportunitiesButton: View {
                 Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
             }
             .padding(.horizontal, 16).padding(.vertical, 14).frame(minHeight: 64)
-            .background(Color.zifrBG, in: RoundedRectangle(cornerRadius: 14))
+            .background(backgroundColor, in: RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain).accessibilityIdentifier("taxOpportunitiesButton")
         .accessibilityHint("Opens business expense review across your accounts")
