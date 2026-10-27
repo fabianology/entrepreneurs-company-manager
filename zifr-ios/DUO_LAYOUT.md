@@ -507,3 +507,60 @@ and whether it predates this change were not isolated; no navigation fix is
 claimed. Screenshot: dashboard-return-portrait-sidebar-issue.png. This pass is
 local/uncommitted/unpushed after checkpoint 3b4d069f; no deployment or phone
 install. Project/package hashes and the global Xcode 26.4 selection are retained.
+
+## 2026-10-27: remove the left navigation sidebar throughout Duo
+
+RootView now mounts DashboardView's single navigation stack directly when the
+existing window observer identifies a Duo. The split sidebar and its reveal
+button/gesture are absent on Duo dashboard, entity sections and Admin. The
+existing 9-dot menu, section tabs and right-side toolbar remain. This choice uses
+device identity rather than pose or width, so folds/rotations keep the same stack
+mounted. The legacy split surface is retained for non-Duo devices and older
+SDKs; the original iPhone checkout and installed app were not changed.
+
+Normal Debug simulator builds passed on Xcode 26.4 and 27.1, along with the
+explicit 27.1 sample preview and whitespace check. Synthetic UI verified all
+three entity sections, switching to Personal through the 9-dot menu, Admin and
+its All Entities action, full-width open/partial landscape pages, open portrait,
+closed dashboard/entity and reopening. The previously observed portrait All
+Entities return now kept full width and Search after rotation. Search opened and
+remained presented through two rotations and closing, then dismissed normally.
+No saved data, settings changes, Gemini activation, XCTest rerun, authenticated
+flow or physical-device/performance acceptance. Evidence and three build logs:
+/private/tmp/miloom-duo-no-sidebar-20261027.rXCavD/.
+
+Only RootView.swift and these notes changed after fec41d2d. Project/package hashes,
+global Xcode 26.4 and canonical non-coordination source fingerprint stayed the
+same. Local/uncommitted/unpushed; no merge, deployment, upload, archive, backend
+mutation or real-phone install.
+
+## 2026-10-27: dashboard Share above Plus; rightmost card Edit
+
+Duo dashboard adds the existing glass Share control above Plus. Its menu first
+chooses an eligible entity, then one of the same five EntitySharingScope options
+as the entity pages, and opens the existing ShareEntitySheet. Eligibility reuses
+resourceAllowsSharing; no grant/role/backend logic changed. Duo Plus directly
+opens New Entity instead of retaining a duplicate long-press Share menu. Expanded
+portrait keeps Share in the header when the side toolbar is absent. Duo entity
+cards omit the Share callback, leaving Edit at the far right automatically;
+CompanyCardView itself and non-Duo callbacks/presentation remain unchanged.
+
+Removed the obsolete sidebar-toggle removal on Duo only: it made the new native
+Share label invisible while leaving its menu tappable. Legacy split navigation
+still removes its redundant dashboard sidebar toggle. Earlier pending sidebar
+removal in RootView is preserved unchanged.
+
+Final Xcode 26.4/27.1 normal Debug simulator builds and the explicit 27.1 sample
+preview passed; whitespace check passed. Synthetic UI verified visible Share
+above Plus, no Share on either card, rightmost Edit, all five sharing choices,
+Entire Entity opening Northstar Studio's existing sheet, scoped documents sheet
+during the pass, Edit opening Northstar Studio, Plus opening New Entity, and
+closed/open/partial landscape plus open/partial portrait placement. Forms were
+canceled; no invitations, grants, saved data or Gemini activation. No XCTest
+rerun, authenticated permission-matrix or physical-device/performance acceptance.
+Evidence/logs: /private/tmp/miloom-duo-dashboard-share-20261027.X9GSek/.
+
+This pass changes DashboardView.swift and these notes only; earlier pending
+RootView work is retained. Canonical non-coordination fingerprint, project/package
+hashes, global Xcode 26.4 and installed iPhone build remain unchanged by this task.
+Local/uncommitted/unpushed; no merge, deployment, archive, upload or phone install.

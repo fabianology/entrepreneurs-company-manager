@@ -18,6 +18,7 @@ struct DashboardView: View {
     @State private var editingCompany: Company?
     @State private var companyToDelete: Company?
     @State private var companyToShare: Company?
+    @State private var duoSharingRequest: DuoDashboardSharingRequest?
     
     // Shared Item states
     @State private var selectedSubscription: Subscription?
@@ -90,7 +91,7 @@ struct DashboardView: View {
                 reportsDuoDevice: $isDuoDevice,
                 isActive: vm.path.isEmpty,
                 admin: dashboardAdminButton,
-                primaryAction: EmptyView(),
+                primaryAction: dashboardShareControl.frame(width: 52, height: 52),
                 add: plusCommandMenu,
                 entities: EmptyView()
             ))
@@ -441,10 +442,10 @@ struct DashboardView: View {
                     Text("Are you sure you want to delete this company? All associated data will be removed for everyone.")
                 }
             }
-            // All Entities is already the entity picker. Its root must not offer
-            // another sidebar entry point when the split view is collapsed.
+            // Only the legacy host has a sidebar toggle to remove. Duo uses a
+            // single stack; removing a native item there can hide its Share label.
             .navigationBarBackButtonHidden(true)
-            .toolbar(removing: vm.path.isEmpty ? .sidebarToggle : nil)
+            .toolbar(removing: !isDuoDevice && vm.path.isEmpty ? .sidebarToggle : nil)
             .navigationDestination(for: Company.self) { company in
                 CompanyDetailView(
                     company: company,
@@ -465,6 +466,12 @@ struct DashboardView: View {
             }
             .sheet(item: $companyToShare) { company in
                 ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
+            }
+            .sheet(item: $duoSharingRequest) { request in
+                ShareEntitySheet(
+                    resourceId: request.company.id, resourceType: request.scope.rawValue,
+                    resourceTitle: request.scope == .company ? request.company.name : request.scope.title
+                )
             }
             .sheet(isPresented: $showAddCompany) {
                 NewEntitySheet(vm: vm) { company in
@@ -861,6 +868,21 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var plusCommandMenu: some View {
+        if isDuoDevice {
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                requestAddCompany()
+            } label: {
+                dashboardPlusLabel
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add entity")
+        } else {
+            legacyPlusCommandMenu
+        }
+    }
+
+    private var legacyPlusCommandMenu: some View {
         Menu {
             if !companies.isEmpty {
                 Section("Share Entity") {
@@ -875,34 +897,76 @@ struct DashboardView: View {
                 }
             }
         } label: {
-            ZStack {
-                bottomControlGlass(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#918457"),
-                                        Color(hex: "#918457").opacity(0.3)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.85))
-            }
-            .frame(width: 44, height: 44)
+            dashboardPlusLabel
         } primaryAction: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             requestAddCompany()
         }
         .buttonStyle(.plain)
+    }
+
+    private var dashboardPlusLabel: some View {
+        ZStack {
+            bottomControlGlass(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    private var shareableDuoCompanies: [Company] {
+        companies.filter { company in
+            AppViewModel.resourceAllowsSharing(
+                appState.resourceShares, actorID: appState.portfolioUserID,
+                ownerID: company.userId, companyID: company.id
+            )
+        }
+    }
+
+    private var dashboardShareControl: some View {
+        Menu {
+            Section("Share Entity") {
+                ForEach(shareableDuoCompanies) { company in
+                    Menu(company.name.isEmpty ? "New Business" : company.name) {
+                        ForEach(EntitySharingScope.allCases) { scope in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                duoSharingRequest = DuoDashboardSharingRequest(company: company, scope: scope)
+                            } label: {
+                                Label(scope.title, systemImage: scope.icon)
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            MiloomCircularToolbarLabel {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(shareableDuoCompanies.isEmpty)
+        .accessibilityLabel("Share access")
+        .accessibilityHint("Choose an entity and which records to share")
     }
 
     private func requestAddCompany() {
@@ -1077,6 +1141,7 @@ struct DashboardView: View {
 
             HStack(spacing: 8) {
                 Spacer()
+                if isDuoDevice && !usesDuoSideToolbar { dashboardShareControl }
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     presentBriefing(source: "dashboard_header_receipt")
@@ -1159,7 +1224,7 @@ struct DashboardView: View {
             docsCount: dCount,
             onEdit: { editingCompany = company },
             canEdit: canEdit,
-            onShare: isSharedWithMe ? nil : { companyToShare = company },
+            onShare: isDuoDevice || isSharedWithMe ? nil : { companyToShare = company },
             shareRole: role,
             isSharedWithMe: isSharedWithMe,
             isSharedByMe: isSharedByMe,
@@ -1225,6 +1290,12 @@ struct DashboardView: View {
             return ""
         }
     }
+}
+
+private struct DuoDashboardSharingRequest: Identifiable {
+    let company: Company
+    let scope: EntitySharingScope
+    var id: String { "\(company.id)-\(scope.rawValue)" }
 }
 
 

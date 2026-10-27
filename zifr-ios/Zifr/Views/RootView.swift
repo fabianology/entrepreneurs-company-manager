@@ -39,9 +39,23 @@ struct RootView: View {
             }
     }
 
+    @ViewBuilder
     private var rootSurface: some View {
-        // Keep the detail stack mounted across a fold; a size-class if/else would
-        // recreate its sheets, scroll positions, and in-progress form state.
+        if duoLayout.isDuoDevice {
+            // Duo uses the entity menu and section tabs instead of a duplicate
+            // navigation column. Device identity stays stable across a fold,
+            // keeping this single stack, its sheets and form state mounted.
+            DashboardView(vm: vm)
+                .tint(.white)
+                .onChange(of: duoLayout.dashboardRequest) { _, _ in
+                    vm.path = NavigationPath()
+                }
+        } else {
+            legacySplitSurface
+        }
+    }
+
+    private var legacySplitSurface: some View {
         NavigationSplitView(
             columnVisibility: splitViewVisibility,
             preferredCompactColumn: $compactColumn
