@@ -1157,3 +1157,368 @@ final class ResourceSecretPreparationTests: XCTestCase {
         XCTAssertFalse(json.contains("Test Bank"))
     }
 }
+
+
+@MainActor
+final class PortfolioLoadingTests: XCTestCase {
+    private func fixture() -> (AppState, PortfolioSectionLoader, UUID) {
+        let state = AppState()
+        let user = UUID()
+        state.portfolioUserID = user
+        let loader = PortfolioSectionLoader(appState: state, userID: user, loadID: state.portfolioLoadID) { user }
+        return (state, loader, user)
+    }
+
+    func testServicesAndDocumentsPublishWhileCompaniesAreStillPending() async {
+        let (state, loader, user) = fixture()
+        let company = Company(userId: user, name: "Example")
+        let service = Subscription(userId: user, companyId: company.id, name: "Ready service")
+        let document = CompanyDocument(userId: user, companyId: company.id, name: "Ready document")
+        let pending = expectation(description: "Company request started")
+        let visible = expectation(description: "Services and documents visible")
+        var companyResponse: CheckedContinuation<[Company], Never>?
+        let load = Task { @MainActor in
+            let companies = Task { @MainActor in
+                await loader.load("companies", operation: {
+                    await withCheckedContinuation { continuation in
+                        companyResponse = continuation
+                        pending.fulfill()
+                    }
+                }, publish: { $0.companies = $1 })
+            }
+            async let services: [Subscription]? = loader.load("services", operation: { [service] }, publish: { $0.subscriptions = $1 })
+            async let documents: [CompanyDocument]? = loader.load("documents", operation: { [document] }, publish: { $0.documents = $1 })
+            _ = await (services, documents)
+            visible.fulfill()
+            _ = await companies.value
+        }
+        await fulfillment(of: [pending, visible], timeout: 2)
+        XCTAssertTrue(state.companies.isEmpty)
+        XCTAssertEqual(state.subscriptions, [service])
+        XCTAssertEqual(state.documents, [document])
+        XCTAssertFalse(state.hasLoadedPortfolio, "Lists must not depend on the full portfolio-ready flag")
+        companyResponse?.resume(returning: [company])
+        await load.value
+        XCTAssertEqual(state.companies, [company])
+    }
+
+    func testFailedRefreshPreservesKnownServicesAndReportsIssue() async {
+        let (state, loader, user) = fixture()
+        let service = Subscription(userId: user, companyId: UUID(), name: "Saved service")
+        state.subscriptions = [service]
+        let result: [Subscription]? = await loader.load("services", operation: {
+            throw URLError(.timedOut)
+        }, publish: { $0.subscriptions = $1 })
+        XCTAssertNil(result)
+        XCTAssertEqual(state.subscriptions, [service])
+        XCTAssertEqual(loader.failures, ["services"])
+        XCTAssertTrue(state.portfolioLoadIssue?.contains("services") == true)
+    }
+
+    func testSuccessfulEmptyResponseRemovesDeletedServices() async {
+        let (state, loader, user) = fixture()
+        state.subscriptions = [Subscription(userId: user, companyId: UUID(), name: "Deleted")]
+        let _: [Subscription]? = await loader.load("services", operation: { [] }, publish: { $0.subscriptions = $1 })
+        XCTAssertTrue(state.subscriptions.isEmpty)
+        XCTAssertTrue(loader.failures.isEmpty)
+    }
+
+    func testSupersededAndSignedOutResponsesCannotPublish() async {
+        for changeAccount in [false, true] {
+            let (state, _, user) = fixture()
+            var currentUser: UUID? = user
+            let loader = PortfolioSectionLoader(appState: state, userID: user, loadID: state.portfolioLoadID) { currentUser }
+            let started = expectation(description: "Request pending")
+            var response: CheckedContinuation<[CompanyDocument], Never>?
+            let request = Task { @MainActor in
+                await loader.load("documents", operation: {
+                    await withCheckedContinuation { continuation in
+                        response = continuation
+                        started.fulfill()
+                    }
+                }, publish: { $0.documents = $1 })
+            }
+            await fulfillment(of: [started], timeout: 2)
+            if changeAccount { currentUser = nil } else { state.portfolioLoadID = UUID() }
+            response?.resume(returning: [CompanyDocument(userId: user, companyId: UUID(), name: "Stale")])
+            let result = await request.value
+            XCTAssertNil(result)
+            XCTAssertTrue(state.documents.isEmpty)
+            XCTAssertNil(state.portfolioLoadIssue)
+        }
+    }
+
+    func testCancelledResponseCannotPublish() async {
+        let (state, loader, user) = fixture()
+        let started = expectation(description: "Request pending")
+        var response: CheckedContinuation<[Company], Never>?
+        let request = Task { @MainActor in
+            await loader.load("companies", operation: {
+                await withCheckedContinuation { continuation in
+                    response = continuation
+                    started.fulfill()
+                }
+            }, publish: { $0.companies = $1 })
+        }
+        await fulfillment(of: [started], timeout: 2)
+        request.cancel()
+        response?.resume(returning: [Company(userId: user, name: "Stale")])
+        let result = await request.value
+        XCTAssertNil(result)
+        XCTAssertTrue(state.companies.isEmpty)
+    }
+
+    func testBiometricLockKeepsSameAccountSnapshotAndInvalidatesPendingWork() {
+        let (state, loader, user) = fixture()
+        let company = Company(userId: user, name: "Current account")
+        state.companies = [company]
+        state.subscriptions = [Subscription(userId: user, companyId: company.id)]
+        state.hasLoadedCompanies = true
+        state.hasLoadedCompanyContent = true
+        state.hasLoadedPortfolio = true
+        state.clearSearchSession(keepingPortfolio: true)
+        XCTAssertFalse(loader.isCurrent)
+        XCTAssertEqual(state.portfolioUserID, user)
+        XCTAssertEqual(state.companies, [company])
+        XCTAssertEqual(state.subscriptions.count, 1)
+        XCTAssertTrue(state.hasLoadedCompanies && state.hasLoadedCompanyContent)
+        XCTAssertFalse(state.hasLoadedPortfolio)
+    }
+
+    func testAccountResetClearsVisibleSectionsAndReadiness() {
+        let (state, loader, user) = fixture()
+        let company = Company(userId: user, name: "Previous account")
+        state.companies = [company]
+        state.subscriptions = [Subscription(userId: user, companyId: company.id)]
+        state.institutions = [Institution(userId: user, companyId: company.id)]
+        state.cards = [FinancialCard(userId: user, companyId: company.id)]
+        state.loans = [Loan(userId: user, companyId: company.id)]
+        state.documents = [CompanyDocument(userId: user, companyId: company.id)]
+        state.hasLoadedCompanies = true
+        state.hasLoadedCompanyContent = true
+        state.hasLoadedPortfolio = true
+        state.clearPortfolio()
+        XCTAssertFalse(loader.isCurrent)
+        XCTAssertNil(state.portfolioUserID)
+        XCTAssertFalse(state.hasLoadedCompanies)
+        XCTAssertFalse(state.hasLoadedCompanyContent)
+        XCTAssertFalse(state.hasLoadedPortfolio)
+        XCTAssertTrue(state.companies.isEmpty && state.subscriptions.isEmpty && state.institutions.isEmpty)
+        XCTAssertTrue(state.cards.isEmpty && state.loans.isEmpty && state.documents.isEmpty)
+    }
+}
+
+@MainActor
+final class PortfolioCacheTests: XCTestCase {
+    private var directory: URL!
+    private let key = SymmetricKey(size: .bits256)
+
+    override func setUp() {
+        super.setUp()
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent("portfolio-cache-test-\(UUID())")
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: directory)
+        super.tearDown()
+    }
+
+    private func cache() -> PortfolioCache {
+        let key = key
+        return PortfolioCache(directory: directory, key: { _, _ in key }, deleteKey: { _ in })
+    }
+
+    private func snapshot(user: UUID = UUID(), savedAt: Date = Date()) -> PortfolioSnapshot {
+        let company = Company(userId: user, name: "Saved company")
+        var service = Subscription(userId: user, companyId: company.id, name: "Saved service")
+        service.password = "miloom:v1:synthetic-opaque-vault-envelope"
+        var bank = Institution(userId: user, companyId: company.id, name: "Saved bank")
+        bank.accounts = [InstitutionAccount(name: "Checking", balance: 120)]
+        let card = FinancialCard(userId: user, companyId: company.id, name: "Saved card")
+        var loan = Loan(userId: user, companyId: company.id, name: "Saved loan")
+        loan.revision = 3
+        loan.payments = [LoanPayment(userId: user, loanId: loan.id, amount: 10)]
+        let doc = CompanyDocument(userId: user, companyId: company.id, name: "Saved document")
+        return PortfolioSnapshot(userID: user, savedAt: savedAt, companies: [company], subscriptions: [service],
+            institutions: [bank], cards: [card], loans: [loan], documents: [doc])
+    }
+
+    func testDeviceKeychainKeyCanSaveRestoreAndRemoveSnapshot() async throws {
+        // A random fixture account exercises the real device Keychain without
+        // reading or modifying an authenticated user's key.
+        let cache = PortfolioCache(directory: directory)
+        let snapshot = snapshot()
+        let generation = await cache.generation(for: snapshot.userID)
+        do {
+            let saved = try await cache.save(snapshot, generation: generation)
+            XCTAssertTrue(saved)
+            let restored = try await cache.load(for: snapshot.userID)
+            XCTAssertEqual(restored?.companies, snapshot.companies)
+            let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
+            XCTAssertEqual(values.isExcludedFromBackup, true)
+        } catch {
+            await cache.remove(for: snapshot.userID)
+            throw error
+        }
+        await cache.remove(for: snapshot.userID)
+        let removed = try await cache.load(for: snapshot.userID)
+        XCTAssertNil(removed)
+    }
+
+    func testNewCacheInstanceRestoresEverySectionAndLoanLedgerFromEncryptedDisk() async throws {
+        let firstProcess = cache()
+        let snapshot = snapshot()
+        let generation = await firstProcess.generation(for: snapshot.userID)
+        let saved = try await firstProcess.save(snapshot, generation: generation)
+        XCTAssertTrue(saved)
+        let file = await firstProcess.fileURL(for: snapshot.userID)
+        let bytes = try Data(contentsOf: file)
+        XCTAssertNil(String(data: bytes, encoding: .utf8)?.range(of: "Saved company"))
+        XCTAssertNil(String(data: bytes, encoding: .utf8)?.range(of: "synthetic-opaque"))
+        let anotherProcess = cache()
+        let loaded = try await anotherProcess.load(for: snapshot.userID)
+        XCTAssertEqual(loaded?.companies, snapshot.companies)
+        XCTAssertEqual(loaded?.subscriptions, snapshot.subscriptions)
+        XCTAssertEqual(loaded?.institutions, snapshot.institutions)
+        XCTAssertEqual(loaded?.cards, snapshot.cards)
+        XCTAssertEqual(loaded?.loans, snapshot.loans)
+        XCTAssertEqual(loaded?.documents, snapshot.documents)
+        XCTAssertEqual(loaded?.loans.first?.payments?.count, 1)
+        XCTAssertEqual(loaded?.loans.first?.revision, 3)
+        XCTAssertEqual(loaded?.subscriptions.first?.password, "miloom:v1:synthetic-opaque-vault-envelope")
+    }
+
+    func testColdStartShowsSavedContentWhileServerIsPending() async throws {
+        let cache = cache()
+        let snapshot = snapshot()
+        let generation = await cache.generation(for: snapshot.userID)
+        try await cache.save(snapshot, generation: generation)
+        let state = AppState()
+        state.portfolioUserID = snapshot.userID
+        let loader = PortfolioSectionLoader(appState: state, userID: snapshot.userID, loadID: state.portfolioLoadID) { snapshot.userID }
+        let started = expectation(description: "Server is pending")
+        var response: CheckedContinuation<[Subscription], Never>?
+        let server = Task { @MainActor in
+            await loader.load("services", operation: {
+                await withCheckedContinuation { continuation in
+                    response = continuation
+                    started.fulfill()
+                }
+            }, publish: { $0.subscriptions = $1 })
+        }
+        await fulfillment(of: [started], timeout: 2)
+        defer {
+            response?.resume(returning: [])
+            server.cancel()
+        }
+        let start = Date()
+        let disk = try await cache.load(for: snapshot.userID)
+        let loaded = try XCTUnwrap(disk)
+        XCTAssertTrue(state.restoreSavedPortfolio(loaded, loadID: state.portfolioLoadID))
+        let elapsed = Date().timeIntervalSince(start) * 1_000
+        let timing = XCTAttachment(string: "Synthetic disk load and state restoration: \(elapsed) ms, with the server response still suspended.")
+        timing.name = "Saved portfolio restoration"
+        timing.lifetime = .keepAlways
+        add(timing)
+        XCTAssertEqual(state.companies, snapshot.companies)
+        XCTAssertEqual(state.subscriptions.count, 1)
+        XCTAssertEqual(state.cards.count, 1)
+        XCTAssertEqual(state.documents.count, 1)
+        XCTAssertTrue(state.isShowingSavedPortfolio)
+        XCTAssertTrue(state.hasLoadedCompanies && state.hasLoadedCompanyContent)
+        XCTAssertFalse(state.hasLoadedPortfolio, "Cached metadata must not claim that search/history is complete")
+        var fresh = snapshot.subscriptions[0]
+        fresh.name = "Updated service from server"
+        response?.resume(returning: [fresh])
+        response = nil
+        _ = await server.value
+        XCTAssertEqual(state.subscriptions.first?.name, fresh.name)
+    }
+
+    func testSharedRecordsAreExcludedEvenInsideAnOwnedCompany() {
+        let owner = UUID(), other = UUID()
+        let owned = Company(userId: owner, name: "Owned")
+        let shared = Company(userId: other, name: "Shared")
+        let snapshot = PortfolioSnapshot(userID: owner, companies: [owned, shared], subscriptions: [
+            Subscription(userId: other, companyId: owned.id), Subscription(userId: owner, companyId: shared.id)
+        ], institutions: [Institution(userId: other, companyId: owned.id)],
+           cards: [FinancialCard(userId: other, companyId: owned.id)], loans: [Loan(userId: other, companyId: owned.id)],
+           documents: [CompanyDocument(userId: other, companyId: owned.id)])
+        XCTAssertEqual(snapshot.companies, [owned])
+        XCTAssertTrue(snapshot.subscriptions.isEmpty && snapshot.institutions.isEmpty && snapshot.cards.isEmpty)
+        XCTAssertTrue(snapshot.loans.isEmpty && snapshot.documents.isEmpty)
+    }
+
+    func testWrongAccountAndSupersededLoadCannotRestore() {
+        let snapshot = snapshot()
+        let state = AppState()
+        state.portfolioUserID = UUID()
+        XCTAssertFalse(state.restoreSavedPortfolio(snapshot, loadID: state.portfolioLoadID))
+        state.portfolioUserID = snapshot.userID
+        XCTAssertFalse(state.restoreSavedPortfolio(snapshot, loadID: UUID()))
+        XCTAssertTrue(state.companies.isEmpty)
+        state.hasLoadedCompanies = true
+        XCTAssertFalse(state.restoreSavedPortfolio(snapshot, loadID: state.portfolioLoadID))
+    }
+
+    func testMissingSnapshotAndUnavailableKeyFallBackToNetwork() async throws {
+        let cache = cache()
+        let snapshot = snapshot()
+        let missing = try await cache.load(for: snapshot.userID)
+        XCTAssertNil(missing)
+        let generation = await cache.generation(for: snapshot.userID)
+        try await cache.save(snapshot, generation: generation)
+        let locked = PortfolioCache(directory: directory, key: { _, _ in nil }, deleteKey: { _ in })
+        let unavailable = try await locked.load(for: snapshot.userID)
+        XCTAssertNil(unavailable)
+    }
+
+    func testEmptySnapshotDoesNotHideSharedCompaniesBehindAnEmptyState() {
+        let user = UUID()
+        let snapshot = PortfolioSnapshot(userID: user, companies: [], subscriptions: [], institutions: [], cards: [], loans: [], documents: [])
+        let state = AppState()
+        state.portfolioUserID = user
+        XCTAssertFalse(state.restoreSavedPortfolio(snapshot, loadID: state.portfolioLoadID))
+        XCTAssertFalse(state.hasLoadedCompanies)
+    }
+
+    func testExpiredSnapshotsAreIgnored() async throws {
+        let cache = cache()
+        let old = snapshot(savedAt: Date().addingTimeInterval(-PortfolioSnapshot.maximumAge - 60))
+        let generation = await cache.generation(for: old.userID)
+        try await cache.save(old, generation: generation)
+        let loaded = try await cache.load(for: old.userID)
+        XCTAssertNil(loaded)
+    }
+
+    func testTamperedFileAndAccountSwapFailAuthentication() async throws {
+        let cache = cache()
+        let snapshot = snapshot()
+        let generation = await cache.generation(for: snapshot.userID)
+        try await cache.save(snapshot, generation: generation)
+        let source = await cache.fileURL(for: snapshot.userID)
+        let anotherUser = UUID()
+        let destination = await cache.fileURL(for: anotherUser)
+        try FileManager.default.copyItem(at: source, to: destination)
+        do { _ = try await cache.load(for: anotherUser); XCTFail("Account-swapped ciphertext accepted") } catch {}
+        var bytes = try Data(contentsOf: source)
+        bytes[bytes.count - 1] ^= 1
+        try bytes.write(to: source)
+        do { _ = try await cache.load(for: snapshot.userID); XCTFail("Tampered ciphertext accepted") } catch {}
+    }
+
+    func testSignOutRemovesSnapshotAndRejectsDelayedSave() async throws {
+        let cache = cache()
+        let snapshot = snapshot()
+        let oldGeneration = await cache.generation(for: snapshot.userID)
+        try await cache.save(snapshot, generation: oldGeneration)
+        await cache.remove(for: snapshot.userID)
+        let loaded = try await cache.load(for: snapshot.userID)
+        XCTAssertNil(loaded)
+        let delayedSave = try await cache.save(snapshot, generation: oldGeneration)
+        XCTAssertFalse(delayedSave)
+        let newGeneration = await cache.generation(for: snapshot.userID)
+        let saved = try await cache.save(snapshot, generation: newGeneration)
+        XCTAssertTrue(saved)
+    }
+}

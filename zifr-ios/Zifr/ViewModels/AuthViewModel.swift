@@ -196,6 +196,7 @@ final class AuthViewModel: NSObject {
 
     @MainActor
     func signOut() async {
+        let cachedUserID = currentUser?.id ?? session?.user.id
         await PushNotificationService.shared.unregisterCurrentDevice()
         do {
             // A plain Supabase signOut defaults to .global. The account-level
@@ -207,6 +208,7 @@ final class AuthViewModel: NSObject {
             AppDiagnostics.failure("auth", "sign_out_local", error: error)
         }
 
+        if let cachedUserID { await PortfolioCache.shared.remove(for: cachedUserID) }
         session = nil
         currentUser = nil
         isBiometricEnabled = false
@@ -222,6 +224,7 @@ final class AuthViewModel: NSObject {
     func deleteAccount() async throws {
         await MainActor.run { self.isLoading = true; self.authError = nil }
         do {
+            let userID = currentUser?.id ?? session?.user.id
             try await SupabaseService.shared.deleteUserAccount()
             await MainActor.run {
                 self.session = nil
@@ -233,6 +236,7 @@ final class AuthViewModel: NSObject {
                 UserDefaults.standard.removeObject(forKey: "onboardingStep")
                 self.isLoading = false
             }
+            if let userID { await PortfolioCache.shared.remove(for: userID) }
         } catch {
             await MainActor.run {
                 self.authError = error.localizedDescription

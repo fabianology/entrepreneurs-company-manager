@@ -482,8 +482,9 @@ struct Subscription: Identifiable, Codable, Hashable {
         self.pricingModel = try container.decodeIfPresent(String.self, forKey: .pricingModel) ?? "Flat"
         self.serviceType = try container.decodeIfPresent(RecurringServiceType.self, forKey: .serviceType) ?? .automatic
         
-        // Handle Date decoding flexibly (string or native Date)
-        if let dateStr = try container.decodeIfPresent(String.self, forKey: .lastUpdated) {
+        // Server responses use ISO strings; local Codable snapshots preserve
+        // the native Date representation (and its full timestamp precision).
+        if let dateStr = try? container.decode(String.self, forKey: .lastUpdated) {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             if let date = formatter.date(from: dateStr) {
@@ -493,7 +494,7 @@ struct Subscription: Identifiable, Codable, Hashable {
                 self.lastUpdated = fallback.date(from: dateStr) ?? Date()
             }
         } else {
-            self.lastUpdated = Date()
+            self.lastUpdated = try container.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? Date()
         }
         
         self.showSubServicesTab = try container.decodeIfPresent(Bool.self, forKey: .showSubServicesTab) ?? false

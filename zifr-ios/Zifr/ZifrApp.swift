@@ -124,10 +124,14 @@ struct ZifrApp: App {
             }
             .onChange(of: authViewModel.isAuthenticated) { wasAuthenticated, isAuthenticated in
                 if wasAuthenticated && !isAuthenticated {
-                    appState.clearSearchSession()
-                    appState.clearBusinessExpenses()
                     if authViewModel.currentUser == nil {
+                        appState.clearPortfolio()
                         notificationRouter.clear()
+                    } else {
+                        // Biometric locking keeps this account's visible snapshot
+                        // ready for unlock while invalidating pending loads/search.
+                        appState.clearSearchSession(keepingPortfolio: true)
+                        appState.clearBusinessExpenses()
                     }
                 }
             }
