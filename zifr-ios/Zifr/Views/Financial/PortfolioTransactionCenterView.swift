@@ -374,10 +374,33 @@ struct MiloomMonthPicker: View {
     }
 }
 
-private struct TransactionCenterAnalysis {
+struct TransactionCenterAnalysis {
     let records: [ResolvedTransaction]
     let detectedSubscriptions: [DetectedSubscription]
     let duplicateAlerts: [DuplicateChargeAlert]
+
+    static func prepare(
+        transactions: [Transaction], companies: [Company], institutions: [Institution],
+        cards: [FinancialCard], subscriptions: [Subscription],
+        overrides: [TransactionOverride] = [], categoryRules: [TransactionCategoryRule] = [],
+        companyID: UUID? = nil
+    ) -> Self {
+        // Resolve inferred Plaid ownership before scoping. Every insight and
+        // review banner must use the same entity as the visible transaction rows.
+        let resolved = TransactionIntelligence.resolveAll(
+            transactions, companies: companies, institutions: institutions,
+            cards: cards, overrides: overrides, categoryRules: categoryRules
+        )
+        let records = companyID.map { id in resolved.filter { $0.companyId == id } } ?? resolved
+        return Self(
+            records: records,
+            detectedSubscriptions: SubscriptionDetector.detect(
+                transactions: TransactionIntelligence.enrichedTransactions(from: records),
+                existingSubscriptions: subscriptions
+            ),
+            duplicateAlerts: DuplicateChargeDetector.detect(records: records)
+        )
+    }
 }
 
 struct DuplicateChargeAlert: Identifiable, Equatable {
@@ -784,6 +807,8 @@ struct PortfolioTransactionCenterView: View {
     @Bindable var vm: AppViewModel
     var initialTransactionID: UUID? = nil
     var initiallyShowsReviewQueue: Bool = false
+    /// Used only by the Duo inline pane. Nil preserves the existing iPhone sheet.
+    var embeddedCompanyID: UUID? = nil
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
@@ -881,6 +906,7 @@ struct PortfolioTransactionCenterView: View {
 
     private var analysisInputSignature: Int {
         var hasher = Hasher()
+        hasher.combine(embeddedCompanyID)
         for transaction in appState.transactions {
             hasher.combine(transaction.id)
             hasher.combine(transaction.companyId)
@@ -919,15 +945,73 @@ struct PortfolioTransactionCenterView: View {
         )
     }
 
+    @ViewBuilder
     var body: some View {
-        transactionNavigation
-            .presentationDetents([.fraction(0.92), .large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(24)
-            .presentationBackground(Color(hex: "#1C1C1E"))
-            .task(id: analysisInputSignature) {
-                await rebuildAnalysis(showLoading: allRecords.isEmpty)
+        if let embeddedCompanyID {
+            embeddedTransactions(companyID: embeddedCompanyID)
+                .task(id: analysisInputSignature) {
+                    await rebuildAnalysis(showLoading: allRecords.isEmpty)
+                }
+        } else {
+            transactionNavigation
+                .presentationDetents([.fraction(0.92), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .task(id: analysisInputSignature) {
+                    await rebuildAnalysis(showLoading: allRecords.isEmpty)
+                }
+        }
+    }
+
+    private var taxReviewCount: Int {
+        appState.businessExpenseReviews.filter {
+            BusinessExpenseFilter.needsReview.includes($0) && $0.belongs(to: embeddedCompanyID)
+        }.count
+    }
+
+    private func embeddedTransactions(companyID: UUID) -> some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Transactions")
+                    .font(.system(size: 19, weight: .bold))
+                Text(appState.companies.first { $0.id == companyID }?.name ?? "Selected Entity")
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
             }
+            .foregroundStyle(Color.zifrGold)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            transactionContent
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(hex: "#1C1C1E"))
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .sheet(isPresented: $showTaxOpportunities) { TaxOpportunitiesView(initialCompanyId: companyID) }
+        .sheet(isPresented: $showSpendingCategories) {
+            SpendingCategorySheet(
+                insights: cashFlowInsights, month: cashFlowMonth,
+                onSave: { draft, record in try await saveOverride(draft, for: record) },
+                onReset: { record in try await resetOverride(for: record) }
+            )
+        }
+        .sheet(isPresented: $showDuplicateReview) {
+            DuplicateChargeReviewSheet(
+                alerts: duplicateAlerts,
+                onDismissAlert: { alert in
+                    DuplicateChargeDismissalStore.dismiss(alert)
+                    dismissedDuplicateIds.insert(alert.id)
+                }
+            )
+        }
+        .sheet(item: $selectedTransaction) { record in
+            TransactionDetailSheet(
+                record: record,
+                onSave: { draft in try await saveOverride(draft, for: record) },
+                onReset: { try await resetOverride(for: record) }
+            )
+        }
     }
 
     private var transactionNavigation: some View {
@@ -980,7 +1064,7 @@ struct PortfolioTransactionCenterView: View {
                 loadingState("Syncing all accounts…")
             } else if allRecords.isEmpty {
                 VStack {
-                    TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }.padding(20)
+                    TaxOpportunitiesButton(count: taxReviewCount) { showTaxOpportunities = true }.padding(20)
                     emptyState
                 }
             } else {
@@ -1073,7 +1157,7 @@ struct PortfolioTransactionCenterView: View {
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
                         spendingByCategory(insights)
-                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount) { showTaxOpportunities = true }
 
                         VStack(spacing: 0) {
                             if let largestExpense = insights.largestExpense {
@@ -1098,7 +1182,7 @@ struct PortfolioTransactionCenterView: View {
                                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
                         )
                     } else {
-                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount) { showTaxOpportunities = true }
                         HStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 19, weight: .semibold))
@@ -1335,13 +1419,15 @@ struct PortfolioTransactionCenterView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    filterMenu(
-                        title: selectedCompanyId.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All Companies",
-                        icon: "building.2"
-                    ) {
-                        Button("All Companies") { selectedCompanyId = nil }
-                        ForEach(appState.companies.sorted { $0.name < $1.name }) { company in
-                            Button(company.name) { selectedCompanyId = company.id }
+                    if embeddedCompanyID == nil {
+                        filterMenu(
+                            title: selectedCompanyId.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All Companies",
+                            icon: "building.2"
+                        ) {
+                            Button("All Companies") { selectedCompanyId = nil }
+                            ForEach(appState.companies.sorted { $0.name < $1.name }) { company in
+                                Button(company.name) { selectedCompanyId = company.id }
+                            }
                         }
                     }
 
@@ -1743,23 +1829,13 @@ struct PortfolioTransactionCenterView: View {
         let subscriptions = appState.subscriptions
         let overrides = appState.transactionOverrides
         let categoryRules = appState.transactionCategoryRules
+        let companyID = embeddedCompanyID
 
         let analysis = await Task.detached(priority: .userInitiated) {
-            let records = TransactionIntelligence.resolveAll(
-                transactions,
-                companies: companies,
-                institutions: institutions,
-                cards: cards,
-                overrides: overrides,
-                categoryRules: categoryRules
-            )
-            return TransactionCenterAnalysis(
-                records: records,
-                detectedSubscriptions: SubscriptionDetector.detect(
-                    transactions: TransactionIntelligence.enrichedTransactions(from: records),
-                    existingSubscriptions: subscriptions
-                ),
-                duplicateAlerts: DuplicateChargeDetector.detect(records: records)
+            TransactionCenterAnalysis.prepare(
+                transactions: transactions, companies: companies, institutions: institutions,
+                cards: cards, subscriptions: subscriptions, overrides: overrides,
+                categoryRules: categoryRules, companyID: companyID
             )
         }.value
 

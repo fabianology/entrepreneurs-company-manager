@@ -79,6 +79,70 @@ struct MiloomCircularToolbarLabel<Icon: View>: View {
     }
 }
 
+#if compiler(>=6.4)
+@available(iOS 27.1, *)
+private struct DuoEntityTransactionPanels<Page: View, Transactions: View>: View {
+    let isSplit: Bool
+    @ViewBuilder let page: () -> Page
+    @ViewBuilder let transactions: () -> Transactions
+    @State private var hasShownTransactions = false
+
+    var body: some View {
+        GeometryReader { geometry in
+            let region = geometry.reservedRegions(kind: .division).first {
+                $0.frame.height > $0.frame.width
+            }
+            let division = region.map {
+                CGRect(x: $0.frame.minX - $0.margins.leading,
+                       y: $0.frame.minY - $0.margins.top,
+                       width: $0.frame.width + $0.margins.leading + $0.margins.trailing,
+                       height: $0.frame.height + $0.margins.top + $0.margins.bottom)
+            }
+            DuoEntityTransactionLayout(isSplit: isSplit, division: division) {
+                // Keep the original footer's safe-area overflow so Search can
+                // stay aligned with the native toolbar's bottom control.
+                page().contentShape(Rectangle())
+                ZStack {
+                    // Mount on first use, then retain analysis, filters and scroll
+                    // state when the phone folds or the entity's tab changes.
+                    if hasShownTransactions || isSplit { transactions() }
+                }
+                .clipped()
+                .contentShape(Rectangle())
+                .zIndex(1)
+                .opacity(isSplit ? 1 : 0)
+                .allowsHitTesting(isSplit)
+                .accessibilityHidden(!isSplit)
+                .accessibilityIdentifier("duo.entityTransactions")
+            }
+        }
+        .background(Color.zifrBG.ignoresSafeArea())
+        .onChange(of: isSplit, initial: true) { _, visible in
+            if visible { hasShownTransactions = true }
+        }
+    }
+}
+
+@available(iOS 27.1, *)
+private struct DuoEntityTransactionLayout: Layout {
+    let isSplit: Bool
+    let division: CGRect?
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        let frames = DuoDashboardPanelFrames.resolve(size: bounds.size, expanded: isSplit, division: division)
+        for (index, frame) in [frames.cards, frames.receipt].enumerated() {
+            subviews[index].place(at: frame.offsetBy(dx: bounds.minX, dy: bounds.minY).origin, anchor: .topLeading,
+                                  proposal: ProposedViewSize(frame.size))
+        }
+    }
+}
+#endif
+
 struct CompanyDetailView: View {
     @State var company: Company
     @Bindable var vm: AppViewModel
@@ -209,7 +273,7 @@ struct CompanyDetailView: View {
     var body: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
-            companySurface.modifier(DuoSideToolbar(
+            companyWithTransactionPane.modifier(DuoSideToolbar(
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: .constant(nil),
                 bottomControlWindowCenterY: $duoAdminWindowCenterY,
@@ -221,6 +285,28 @@ struct CompanyDetailView: View {
                 add: duoAddControl,
                 entities: entitiesControlMenu
             ))
+        } else {
+            companySurface
+        }
+        #else
+        companySurface
+        #endif
+    }
+
+    private var usesInlineTransactions: Bool {
+        duoLayout.isDuoDevice && duoLayout.isPartiallyOpen && duoLayout.isLandscape
+    }
+
+    @ViewBuilder
+    private var companyWithTransactionPane: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *), duoLayout.isDuoDevice {
+            DuoEntityTransactionPanels(isSplit: usesInlineTransactions) {
+                companySurface
+            } transactions: {
+                PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id)
+                    .environment(appState)
+            }
         } else {
             companySurface
         }
@@ -672,7 +758,7 @@ struct CompanyDetailView: View {
 
                     Spacer(minLength: 8)
 
-                    if vm.activeTab == .financial {
+                    if vm.activeTab == .financial && !usesInlineTransactions {
                         transactionHeaderButton
                     }
 

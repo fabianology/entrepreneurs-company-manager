@@ -564,3 +564,46 @@ This pass changes DashboardView.swift and these notes only; earlier pending
 RootView work is retained. Canonical non-coordination fingerprint, project/package
 hashes, global Xcode 26.4 and installed iPhone build remain unchanged by this task.
 Local/uncommitted/unpushed; no merge, deployment, archive, upload or phone install.
+
+## 2026-10-27: selected-entity Transactions in partial landscape
+
+Partially open landscape now embeds the existing Cash-Flow Insights and
+Transactions content full height on the left of the selected entity. Entity
+header, Financial/Services/Vault content, Search and Gemini occupy the right.
+Other poses retain their existing page and modal Transactions entry. The passive
+hinge observer records discrete partial-open status; no continuous angle updates.
+The pane mounts on first use and stays mounted across folds, rotations and tabs
+so its analysis and month/filter state can survive pose changes.
+
+Reuses PortfolioTransactionCenterView and its existing detached analysis,
+stale-result guard, source data and sync/pull-to-refresh behavior. No new
+Generate/Refresh button, fetch, polling, AI request or backend path. Embedded
+analysis resolves account ownership before restricting records to the entity;
+cash flow, duplicate/subscription detection, review counts and account filters
+use that scope. The company selector is omitted only when embedded. The normal
+sheet's nil scope and original presentation remain. Sample-preview-only fixture
+transactions deliberately differ between Personal and Northstar Studio.
+
+Verification: nine focused Xcode 26.4 tests passed, including inferred account
+ownership, selected-entity cash flow, exclusion of other-entity duplicate alerts
+and unchanged default portfolio scope. Final normal Debug simulator builds on
+Xcode 26.4/27.1 and explicit 27.1 sample preview passed. Synthetic UI checked
+partial landscape on all three tabs, Studio +$1,920 vs Personal -$25 after entity
+switching, month selection retained after folding, original fully open modal,
+closed layout and partial portrait without the inline pane. Final whitespace
+check passed. Evidence/logs:
+/private/tmp/miloom-duo-inline-transactions-20261027.IFmm0D/.
+
+Scrolling acceptance remains limited: automated drag/wheel input failed on both
+the new pane and original modal in the partially open simulator, while the
+original modal scrolled when fully open. A temporary preview diagnostic confirmed
+correct viewport/content bounds and was removed. No claim of verified independent
+dragging, scroll-offset retention, physical-device performance, authenticated
+flow or measured frame rate. No data writes, sync button activation or phone
+install during this pass.
+
+Changed CompanyDetailView.swift, PortfolioTransactionCenterView.swift,
+RootView.swift, PremiumEngineTests.swift and these notes after 46158b3d. Project
+and package hashes, global Xcode 26.4 and canonical non-coordination source
+fingerprint remained unchanged. Separate Duo branch codex/duo-evaluation only;
+local/uncommitted/unpushed; no merge, deployment, archive or upload.

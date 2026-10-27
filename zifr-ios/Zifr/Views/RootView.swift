@@ -4,6 +4,7 @@ import SwiftUI
 final class MiloomDuoLayoutState {
     var isDuoDevice = false
     var isExpanded = false
+    var isPartiallyOpen = false
     var isLandscape = false
     var dashboardRequest = 0
 }
@@ -184,8 +185,10 @@ private struct MiloomDuoLayoutObserver: ViewModifier {
                 .onHingeChange { _, context in
                     let isDuo = context.hinge != nil
                     let expanded = context.hinge.map { $0.status != .closed } ?? false
+                    let partial = context.hinge?.status == .partiallyOpen
                     if layout.isDuoDevice != isDuo { layout.isDuoDevice = isDuo }
                     if layout.isExpanded != expanded { layout.isExpanded = expanded }
+                    if layout.isPartiallyOpen != partial { layout.isPartiallyOpen = partial }
                 }
                 .onGeometryChange(for: Bool.self) { $0.size.width >= $0.size.height } action: {
                     if layout.isLandscape != $0 { layout.isLandscape = $0 }
@@ -229,6 +232,24 @@ private struct MiloomDuoLayoutObserver: ViewModifier {
                     userId: owner, companyId: studio.id, name: "Studio Card",
                     last4: "4242", limit: 12000, balance: 2400, moPayment: 120
                 )
+            ]
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let sampleDate = dateFormatter.string(from: Date())
+            func sampleTransaction(companyID: UUID, name: String, amount: Double) -> Transaction {
+                var transaction = Transaction()
+                transaction.userId = owner
+                transaction.companyId = companyID
+                transaction.accountId = "sample-\(companyID)"
+                transaction.name = name
+                transaction.amount = amount
+                transaction.date = sampleDate
+                return transaction
+            }
+            state.transactions = [
+                sampleTransaction(companyID: studio.id, name: "Sample Studio Income", amount: -2000),
+                sampleTransaction(companyID: studio.id, name: "Sample Office Supplies", amount: 80),
+                sampleTransaction(companyID: home.id, name: "Sample Personal Purchase", amount: 25)
             ]
             state.hasLoadedPortfolio = true
             let navigation = AppViewModel()

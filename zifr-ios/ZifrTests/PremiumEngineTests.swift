@@ -2105,6 +2105,64 @@ final class PremiumEngineTests: XCTestCase {
         )
     }
 
+    func testDuoTransactionPaneScopesInferredAccountsAndCashFlowToSelectedEntity() {
+        let owner = UUID()
+        let studio = Company(userId: owner, name: "Studio", structure: "LLC")
+        let personal = Company(userId: owner, name: "Personal", structure: "Individual")
+        let bank = Institution(userId: owner, companyId: studio.id, name: "Sample Bank",
+                               accounts: [InstitutionAccount(id: "studio-account", name: "Checking", type: "Checking")])
+        var income = makeTransaction(owner: owner, company: studio.id, name: "Income", amount: -2000, date: "2026-10-16")
+        income.companyId = nil
+        income.accountId = "studio-account"
+        let expense = makeTransaction(owner: owner, company: studio.id, name: "Supplies", amount: 80, date: "2026-10-16")
+        let other = makeTransaction(owner: owner, company: personal.id, name: "Personal", amount: 999, date: "2026-10-16")
+        var unassigned = makeTransaction(owner: owner, company: personal.id, name: "Unassigned", amount: 500, date: "2026-10-16")
+        unassigned.companyId = nil
+        unassigned.accountId = "unknown-account"
+
+        let analysis = TransactionCenterAnalysis.prepare(
+            transactions: [income, expense, other, unassigned], companies: [studio, personal],
+            institutions: [bank], cards: [], subscriptions: [], companyID: studio.id
+        )
+        XCTAssertEqual(Set(analysis.records.map(\.id)), [income.id, expense.id])
+        XCTAssertTrue(analysis.records.allSatisfy { $0.companyId == studio.id })
+        let insights = CashFlowInsightEngine.analyze(
+            records: analysis.records, month: CashFlowMonth(year: 2026, month: 10),
+            anchorDate: utcDate("2026-10-27")
+        )
+        XCTAssertEqual(insights.current.transactionCount, 2)
+        XCTAssertEqual(insights.current.moneyIn, 2000, accuracy: 0.001)
+        XCTAssertEqual(insights.current.moneyOut, 80, accuracy: 0.001)
+    }
+
+    func testDuoTransactionPaneExcludesOtherEntityReviewsAndKeepsLegacyPortfolioScope() {
+        let owner = UUID()
+        let studio = Company(userId: owner, name: "Studio", structure: "LLC")
+        let personal = Company(userId: owner, name: "Personal", structure: "Individual")
+        let first = makeTransaction(owner: owner, company: personal.id, name: "Amazon", amount: 100, date: "2026-10-15")
+        let second = makeTransaction(owner: owner, company: personal.id, name: "Amazon", amount: 100, date: "2026-10-16")
+        let studioCharge = makeTransaction(owner: owner, company: studio.id, name: "Supplies", amount: 20, date: "2026-10-15")
+        let transactions = [first, second, studioCharge]
+        let scoped = TransactionCenterAnalysis.prepare(
+            transactions: transactions, companies: [studio, personal], institutions: [],
+            cards: [], subscriptions: [], companyID: studio.id
+        )
+        XCTAssertEqual(scoped.records.map(\.id), [studioCharge.id])
+        XCTAssertTrue(scoped.duplicateAlerts.isEmpty)
+        let emptyEntity = TransactionCenterAnalysis.prepare(
+            transactions: transactions, companies: [studio, personal], institutions: [],
+            cards: [], subscriptions: [], companyID: UUID()
+        )
+        XCTAssertTrue(emptyEntity.records.isEmpty)
+        let legacy = TransactionCenterAnalysis.prepare(
+            transactions: transactions, companies: [studio, personal], institutions: [],
+            cards: [], subscriptions: []
+        )
+        XCTAssertEqual(Set(legacy.records.map(\.id)), Set(transactions.map(\.id)))
+        XCTAssertEqual(legacy.duplicateAlerts.count, 1)
+        XCTAssertEqual(legacy.duplicateAlerts.first?.companyId, personal.id)
+    }
+
     private func makeTransaction(
         owner: UUID,
         company: UUID,
