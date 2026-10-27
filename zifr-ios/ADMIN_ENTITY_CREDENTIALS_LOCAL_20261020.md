@@ -2,7 +2,56 @@
 
 Date: 2026-10-20. Branch: `codex/admin-entity-credentials`, based on `49449473`.
 
-## Current checkpoint — final Staging acceptance complete
+## Current checkpoint — Production backend applied; follow-up vault fix awaiting phone check
+
+October 26 update: preparing this isolated branch for a PR to `main`, without
+merging. The follow-up native fix restores/rebinds the approved owner's vault
+session after Face ID/auth refresh before producing Admin-sharing consent proof.
+If no matching owner key is available, it returns actionable vault instructions
+instead of the generic cryptography error. It does not bootstrap a vault, approve
+a device, deliver keys, or silently disable credential consent. This fix was not
+in uploaded build 17.
+
+The October 20 canonical handoff records a successful simulator build, 15 focused
+tests and six temporary mocked authorization checks for this exact small fix.
+On October 26 the temporary log/source were gone and the remaining xcresult
+directory lacked its Info.plist, so those historical results could not be
+re-read. No fresh test pass is claimed by the Git checkpoint. Whitespace review
+passed; physical-device retry is still pending. FX now has separate startup/cache
+work installed in the primary app: do not replace that app without an explicit
+decision. Prefer the separate Staging app for the focused check.
+
+The dated rollout observations below are historical; current Apple processing
+status has not been rechecked on October 26. No merge or new release upload is
+authorized by this checkpoint.
+
+On 2026-10-20, after explicit owner authorization and a fresh encrypted backup,
+applied only `202610200001` and `202610200002` to Production
+`xxqdytdbpiqjilhutvhz`, atomically with migration-ledger entries. Both ledger
+source hashes match the reviewed migration files. Readback: four shares/two
+Admins unchanged, zero consent-enabled shares/invitations, zero Admin device
+approvals, zero scoped versions/active wraps. Both consent columns default false
+and are NOT NULL; device-table RLS is enabled with no anon/authenticated direct
+table privileges. All 14 enhancement functions have the expected fixed search
+path and execution permissions (zero mismatches).
+
+The fresh encrypted database snapshot is
+`/Users/yager/Downloads/Miloom-Backups/20261020-pre-admin/Miloom-Production-PreAdmin-20261020.tar.gz.aesgcm`,
+SHA-256 `dbf424dee9aec2a9a20069256755290c05d826a1f477456d9b47d4db58de454f`.
+Full custom-dump readability and encryption/decryption byte equality passed;
+this does not establish a full Supabase restore. It contains database schemas
+and data, not Storage object bytes. Temporary plaintext/credential files were
+removed and both temporary backup tokens revoked (absence verified).
+
+No existing Admin was opted in and no password/device grant occurred. Production
+app 1.0(17) was uploaded with explicit user authorization on October 20;
+App Store Connect shows Processing. TestFlight availability and installed-build
+acceptance remain unverified. External groups and older builds were unchanged.
+Evidence: `/private/tmp/miloom-admin-production-applied-20261020.jpg`,
+`/private/tmp/miloom-admin-production-permissions-20261020.jpg`, and
+`/private/tmp/miloom-admin-backup-r2-revoked-20261020.jpg`.
+
+### Final Staging acceptance
 
 Implementation commit: `77ab1d42`. The dated sections below preserve the work's
 history; their earlier pending/uncommitted statements are superseded by the final
@@ -12,7 +61,59 @@ Staging app are now evidenced. The independent review found no confirmed blockin
 implementation defect; its earlier HOLD has not been reissued as a reviewer PASS.
 This is not external human security certification.
 
-### Proposed Production sequence — not yet authorized
+### Production app preparation — 2026-10-20
+
+After user sign-in, App Store Connect's build list and upload history both showed
+16 as the highest build, with no newer upload processing. Archived 1.0(17) from
+the reviewed source at `0ec03e73` (only this evidence document dirty), using the
+existing private Production configuration and existing signing assets. Archive
+and strict/deep signature checks passed. Executable SHA-256 before export:
+`02b3586ce6b09b086fc72d3acfb7c7483e5909374139ac9ee2c9946b1543a519`.
+
+Manual export could not use the Xcode-managed store profile. Automatic local
+export then succeeded **without `-allowProvisioningUpdates`**, using existing
+Cloud Managed Apple Distribution certificate `82A373B1A77982DA7EE933F9FE5481541A011CB4`
+and store profile `eba0015c-e4f3-4b9e-a66b-4e9b50f2febd` (expires May 17, 2027).
+No new signing asset requested. Local extracted-IPA strict/deep signature passed.
+Packaged Info/profile checks confirm `com.vibing.miloom`, 1.0(17), Production
+Supabase URL and matching anon-key project claim, Production push/CloudKit,
+`get-task-allow=false`, and `applinks:miloom.co`. No secret value was printed.
+
+IPA: `/private/tmp/miloom-admin-production-17.xy7HCg/export/Miloom.ipa`
+SHA-256: `45c5765bdf3fdc84f3b39a5fe1b8576dab4cbbc5accb2e98da4ed867e0b15634`.
+Archive and logs are under `/private/tmp/miloom-admin-production-17.xy7HCg/`.
+This is a verified local distribution artifact, not Apple processing/acceptance
+or physical-device evidence. No upload, tester/group change, installation,
+commit, push or merge occurred. Next separate approval is upload of this exact
+IPA and symbols; internal Devs availability may follow automatically. Leave
+external groups and older builds unchanged unless separately authorized.
+
+### Authorized upload — 2026-10-20
+
+User approved build 17 and symbol upload, including possible automatic internal
+Devs availability, while leaving external groups and older builds unchanged.
+`xcodebuild -exportArchive` uploaded the same verified archive using destination
+`upload`, automatic existing signing, version management disabled and
+`uploadSymbols=true`, without provisioning updates. Exit 0: “Upload succeeded”,
+“Uploaded Zifr”, “EXPORT SUCCEEDED”. No source rebuild. This re-export/upload is
+not asserted to have byte-identical IPA packaging to the separately hashed local
+export above.
+
+Apple accepted the package and a fresh App Store Connect read showed 1.0(17)
+Processing, created October 20, 2026 at 2:27 PM. Evidence:
+`/private/tmp/miloom-production-build17-processing-20261020.png`.
+Log: `/private/tmp/miloom-admin-production-17.xy7HCg/upload.log`.
+Nonblocking upload warning: missing LinkKit.framework dSYM for UUID
+`8BDC8016-EAD9-38D8-B221-39C5ED6AD8A3`. The archive contains Zifr.app.dSYM;
+complete third-party symbol delivery is not claimed. Track this as a crash
+diagnostics follow-up, not a reason to repeat the acceptance suite.
+
+No tester/group edits, build retirement, phone install, actual Admin consent or
+key grant, commit/push/merge. Next: confirm processing completion and internal
+availability, then have the owner update via TestFlight and confirm dashboard
+plus owner-controlled Admin credential setting on the installed build.
+
+### Production sequence — steps 1–3 complete; Apple processing and step 4 pending
 
 1. Read-only preflight: confirm the Production project, required migration
    baseline, absence/presence of exactly `202610200001` and `202610200002`, and

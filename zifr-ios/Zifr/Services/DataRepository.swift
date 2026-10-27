@@ -2504,6 +2504,7 @@ enum ResourceSecretUpdateError: LocalizedError {
 enum ResourceSecretGrantError: LocalizedError {
     case confirmationUnavailable
     case confirmationCancelled
+    case vaultNotReady
     case staleRequest
     case invalidSecret
 
@@ -2513,6 +2514,8 @@ enum ResourceSecretGrantError: LocalizedError {
             return "Face ID or your device passcode is required to approve credential access."
         case .confirmationCancelled:
             return "Approval was cancelled. No credential key was granted."
+        case .vaultNotReady:
+            return "Your Password Vault isn't ready on this device. Open Settings → Password Vault to set it up, approve this device, or unlock it, then try again. You can also turn off Include entity credentials to share business details only."
         case .staleRequest:
             return "This request changed or is no longer valid. Refresh the vault before approving."
         case .invalidSecret:
@@ -3250,7 +3253,13 @@ final class VaultService: @unchecked Sendable {
     func authorizeAdminCredentialSharing() async throws -> (deviceID: UUID, confirmation: String) {
         try await confirmResourceSecretPresence(reason: "Include existing and future entity credentials for this Admin. Each recipient device still needs your approval.")
         let session = try await client.auth.refreshSession()
-        let snapshot = try requireSnapshot(for: session.user.id)
+        // Startup restoration may have failed or not finished yet. Face ID
+        // confirms presence; it does not load this device's approved vault key.
+        // Rebind cached keys as well, since refreshSession may change Auth state.
+        await restoreSessionIfAvailable(for: session.user.id)
+        guard let snapshot = VaultKeySession.shared.snapshot(for: session.user.id) else {
+            throw ResourceSecretGrantError.vaultNotReady
+        }
         return (snapshot.deviceID, VaultCryptography.keyConfirmation(for: snapshot.key))
     }
 
