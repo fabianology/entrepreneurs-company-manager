@@ -144,6 +144,13 @@ struct CompanyDetailView: View {
                         }
                     )
                 
+                if !appState.hasLoadedCompanyContent && appState.isLoading {
+                    ProgressView("Loading company details…")
+                        .tint(Color.zifrGold)
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.vertical, 8)
+                }
+
             // ── Content ──────────────────────────────────────────────────
             ZStack(alignment: .top) {
                 mainContentSection

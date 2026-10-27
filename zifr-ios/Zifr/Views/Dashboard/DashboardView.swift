@@ -77,9 +77,19 @@ struct DashboardView: View {
                         .padding(.bottom, 7)
 
                     List {
+                        if companies.isEmpty && !appState.hasLoadedCompanies && appState.portfolioLoadIssue == nil && !onboardingState.isTutorialActive {
+                            ProgressView("Loading your companies…")
+                                .tint(Color.zifrGold)
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 48)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+
                         if let loadIssue = appState.portfolioLoadIssue {
                             Button {
-                                Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                                Task { await DataRepository.shared.fetchAllData(appState: appState, force: true) }
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
@@ -115,7 +125,7 @@ struct DashboardView: View {
 
                         // Add company button / empty state placeholder under the dummy company
                         Group {
-                            if companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
+                            if (companies.isEmpty && appState.hasLoadedCompanies) || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
                                 // Un-blurred only while the tutorial is actively running.
                                 if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
                                     // Tutorial in progress: show demo card fully visible
@@ -184,7 +194,7 @@ struct DashboardView: View {
                 // Fallback for OAuth/root-view timing: the dashboard should never
                 // remain on its placeholder simply because the first auth callback
                 // arrived before the app-level loader attached.
-                if appState.companies.isEmpty {
+                if !appState.hasLoadedCompanies {
                     await DataRepository.shared.fetchAllData(appState: appState)
                 }
             }
@@ -218,7 +228,7 @@ struct DashboardView: View {
                 }
             }
             .refreshable {
-                await DataRepository.shared.fetchAllData(appState: appState)
+                await DataRepository.shared.fetchAllData(appState: appState, force: true)
             }
             .confirmationDialog(
                 companyToDelete?.userId != currentUserId ? "Leave Company" : "Delete Company",

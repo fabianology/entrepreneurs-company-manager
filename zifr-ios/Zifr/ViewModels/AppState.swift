@@ -49,6 +49,9 @@ final class AppState {
     var entitlementSnapshot: AccessSnapshot = .free
     var resourceConnections: [ResourceConnection] = [] { didSet { searchRevision &+= 1 } }
     var obligations: [PortfolioObligation] = [] { didSet { searchRevision &+= 1 } }
+    var isShowingSavedPortfolio = false
+    var hasLoadedCompanies = false
+    var hasLoadedCompanyContent = false
     var hasLoadedPortfolio: Bool = false { didSet { searchRevision &+= 1 } }
     
     var isLoading: Bool = false
@@ -121,17 +124,66 @@ final class AppState {
         return index
     }
 
-    func clearSearchSession() {
+    func clearSearchSession(keepingPortfolio: Bool = false) {
         portfolioLoadID = UUID()
         portfolioLoadingUserID = nil
         isLoading = false
-        portfolioUserID = nil
+        if !keepingPortfolio {
+            portfolioUserID = nil
+            isShowingSavedPortfolio = false
+            hasLoadedCompanies = false
+            hasLoadedCompanyContent = false
+        }
         hasLoadedPortfolio = false
         searchDocumentPages = []
         searchDocumentStatus = "Document contents have not been indexed"
         cachedSearch = nil
         pendingSearch?.task.cancel()
         pendingSearch = nil
+    }
+
+    /// Restore only into the matching authenticated load, before server data has
+    /// arrived. This deliberately leaves search/history marked incomplete.
+    @discardableResult
+    func restoreSavedPortfolio(_ snapshot: PortfolioSnapshot, loadID: UUID) -> Bool {
+        guard portfolioLoadID == loadID, portfolioUserID == snapshot.userID,
+              !hasLoadedCompanies, !snapshot.companies.isEmpty,
+              snapshot.isValid(for: snapshot.userID, now: Date()) else { return false }
+        companies = snapshot.companies
+        subscriptions = snapshot.subscriptions.map { SubscriptionRenewalScheduler.normalized($0) }
+        institutions = snapshot.institutions
+        cards = snapshot.cards
+        loans = snapshot.loans
+        documents = snapshot.documents
+        hasLoadedCompanies = true
+        hasLoadedCompanyContent = true
+        isShowingSavedPortfolio = true
+        return true
+    }
+
+    /// Clear all visible data before loading a different account. Progressive
+    /// loading must never mix a new company's cards with the prior user's records.
+    func clearPortfolio() {
+        clearSearchSession()
+        companies = []
+        subscriptions = []
+        institutions = []
+        cards = []
+        loans = []
+        documents = []
+        transactions = []
+        transactionOverrides = []
+        transactionCategoryRules = []
+        resourceShares = []
+        activityLogs = []
+        notifications = []
+        userPreferences = nil
+        alertRules = []
+        plaidItems = []
+        resourceConnections = []
+        obligations = []
+        portfolioLoadIssue = nil
+        clearBusinessExpenses()
     }
 
     // Local Overrides: resourceId -> companyId

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1026CAC0000000000000001 /* PortfolioCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1026CAC0000000000000002 /* PortfolioCache.swift */; };
 		A17917200000000000000004 /* SearchOverviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17917200000000000000003 /* SearchOverviewCard.swift */; };
 		A17917200000000000000002 /* SearchOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17917200000000000000001 /* SearchOverview.swift */; };
 		A17092700000000000000001 /* AppShortcuts.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A17092700000000000000002 /* AppShortcuts.xcstrings */; };
@@ -160,6 +161,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A1026CAC0000000000000002 /* PortfolioCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioCache.swift; sourceTree = "<group>"; };
 		A17917200000000000000003 /* SearchOverviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchOverviewCard.swift; sourceTree = "<group>"; };
 		A17917200000000000000001 /* SearchOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchOverview.swift; sourceTree = "<group>"; };
 		A17092700000000000000002 /* AppShortcuts.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AppShortcuts.xcstrings; sourceTree = "<group>"; };
@@ -489,6 +491,7 @@
 			isa = PBXGroup;
 			children = (
 				C9E5CF10B11366A7F77DE656 /* DataRepository.swift */,
+				A1026CAC0000000000000002 /* PortfolioCache.swift */,
 				ED204010D74AB9325095BD9A /* DocumentScannerService.swift */,
 				D2D29FAAC42DB16C9DB89283 /* GeminiService.swift */,
 				FCF8AFCC4B90998C49582363 /* PlaidService.swift */,
@@ -805,6 +808,7 @@
 				CD0308E14A8A6FD71D3348AC /* CompanyMetaSheet.swift in Sources */,
 				BD36B621F86387C0246A6622 /* DashboardView.swift in Sources */,
 				5921C64C073EA205947D4777 /* DataRepository.swift in Sources */,
+				A1026CAC0000000000000001 /* PortfolioCache.swift in Sources */,
 				67636BB971C2E199B6398175 /* Date+Formatting.swift in Sources */,
 				F583B5C82FBD983E6CA21FB5 /* DocumentListView.swift in Sources */,
 				E47D3D940DF56A8FE62E9AF8 /* DocumentScannerService.swift in Sources */,

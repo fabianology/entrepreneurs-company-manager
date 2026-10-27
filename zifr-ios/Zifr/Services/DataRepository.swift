@@ -12,6 +12,49 @@ private actor PortfolioLoadFailures {
     func record(_ name: String) { names.insert(name) }
 }
 
+/// Publishes each ready section without waiting for unrelated requests. The
+/// generation and identity checks also reject responses from a superseded load.
+@MainActor
+final class PortfolioSectionLoader {
+    let appState: AppState
+    let userID: UUID
+    let loadID: UUID
+    private let currentUserID: () -> UUID?
+    private(set) var failures = Set<String>()
+
+    init(appState: AppState, userID: UUID, loadID: UUID, currentUserID: @escaping () -> UUID?) {
+        self.appState = appState
+        self.userID = userID
+        self.loadID = loadID
+        self.currentUserID = currentUserID
+    }
+
+    var isCurrent: Bool {
+        !Task.isCancelled && appState.portfolioLoadID == loadID
+            && appState.portfolioUserID == userID && currentUserID() == userID
+    }
+
+    @discardableResult
+    func load<Value>(_ name: String, operation: () async throws -> Value,
+                     publish: (AppState, Value) -> Void) async -> Value? {
+        let start = Date()
+        do {
+            let value = try await operation()
+            guard isCurrent else { return nil }
+            publish(appState, value)
+            AppDiagnostics.duration("data", name, seconds: Date().timeIntervalSince(start))
+            return value
+        } catch {
+            guard isCurrent else { return nil }
+            failures.insert(name)
+            AppDiagnostics.failure("data", name, error: error)
+            appState.portfolioLoadIssue = "Could not refresh: " + failures.sorted().joined(separator: ", ") + ". Pull down to try again."
+            // Keep the last successful section during a failed refresh.
+            return nil
+        }
+    }
+}
+
 enum ShareInviteResult {
     case sharedDirectly
     case invitationEmailSent
@@ -315,11 +358,12 @@ class DataRepository {
 
     @MainActor
     func fetchAllData(appState: AppState, force: Bool = false) async {
-        guard let loadingUserID = try? await client.auth.session.user.id else { return }
+        let loadStartedAt = Date()
+        // Restoring a saved portfolio must not wait behind a token refresh.
+        guard let loadingUserID = client.auth.currentSession?.user.id else { return }
         if !force && appState.isLoading && appState.portfolioLoadingUserID == loadingUserID { return }
         if appState.portfolioUserID != loadingUserID {
-            appState.clearSearchSession()
-            appState.companies = []
+            appState.clearPortfolio()
         }
         let loadID = UUID()
         appState.portfolioLoadID = loadID
@@ -327,27 +371,106 @@ class DataRepository {
         appState.isLoading = true
         defer { if appState.portfolioLoadID == loadID { appState.isLoading = false; appState.portfolioLoadingUserID = nil } }
 
+        appState.portfolioUserID = loadingUserID
+        appState.portfolioLoadIssue = nil
+        let primary = PortfolioSectionLoader(appState: appState, userID: loadingUserID, loadID: loadID) {
+            self.client.auth.currentSession?.user.id
+        }
+        let cacheGeneration = await PortfolioCache.shared.generation(for: loadingUserID)
+        guard primary.isCurrent else { return }
+        if !appState.hasLoadedCompanies {
+            let restoreStartedAt = Date()
+            do {
+                if let snapshot = try await PortfolioCache.shared.load(for: loadingUserID), primary.isCurrent,
+                   appState.restoreSavedPortfolio(snapshot, loadID: loadID) {
+                    decryptPortfolioSecrets(appState: appState)
+                    AppDiagnostics.duration("data", "saved_portfolio_visible", seconds: Date().timeIntervalSince(restoreStartedAt))
+                }
+            } catch {
+                AppDiagnostics.failure("data", "restore_saved_portfolio", error: error)
+            }
+        }
+        guard primary.isCurrent else { return }
+        do {
+            guard try await client.auth.session.user.id == loadingUserID, primary.isCurrent else { return }
+        } catch {
+            guard primary.isCurrent else { return }
+            appState.portfolioLoadIssue = "Could not refresh your companies. Check your connection and pull down to try again."
+            AppDiagnostics.failure("data", "refresh_portfolio_session", error: error)
+            return
+        }
         let searchLoadFailures = PortfolioLoadFailures()
-        // Companies drive the first dashboard paint. Publish them immediately rather
-        // than holding them until every secondary portfolio request has completed.
-        let fetchedCompaniesResult = await measure("companies") { await fetchCompanies() }
-        guard !Task.isCancelled, appState.portfolioLoadID == loadID, (try? await client.auth.session.user.id) == loadingUserID else { return }
-        switch fetchedCompaniesResult {
-        case .success(let fetchedCompanies):
-            appState.companies = fetchedCompanies
-            appState.portfolioLoadIssue = nil
-        case .failure:
-            // Preserve any already-rendered companies. A transient refresh failure
-            // must never replace known-good portfolio data with an empty dashboard.
-            appState.portfolioLoadIssue = "Companies could not be refreshed. Pull down to try again."
+
+        // Start all visible content together. Secondary history and intelligence
+        // requests start only after these sections are usable, avoiding launch contention.
+        async let fCompanies: [Company]? = primary.load("companies", operation: {
+            try await self.fetchCompanies().get()
+        }, publish: { state, companies in
+            state.companies = companies
+            state.hasLoadedCompanies = true
+        })
+        async let fSubscriptions: [Subscription]? = primary.load("services", operation: {
+            try await self.fetchVisibleSubscriptions()
+        }, publish: { state, subscriptions in
+            state.subscriptions = subscriptions.map { subscription in
+                var value = SubscriptionRenewalScheduler.normalized(subscription)
+                value.password = SecurityService.shared.decrypt(value.password, context: self.vaultContext(owner: value.userId, type: "subscription", id: value.id, field: "password"))
+                return value
+            }
+        })
+        async let fInstitutions: [Institution]? = primary.load("bank accounts", operation: {
+            try await self.fetchVisibleInstitutions()
+        }, publish: { state, institutions in
+            state.institutions = institutions.map { self.decryptInstitutionSecrets($0) }
+        })
+        async let fCards: [FinancialCard]? = primary.load("cards", operation: {
+            try await self.fetchVisibleCards()
+        }, publish: { state, cards in
+            state.cards = cards.map { card in
+                var value = card
+                value.password = SecurityService.shared.decrypt(value.password, context: self.vaultContext(owner: value.userId, type: "financial_card", id: value.id, field: "password"))
+                return value
+            }
+        })
+        async let fLoans: [Loan]? = primary.load("loans", operation: {
+            try await self.fetchLoanSnapshots()
+        }, publish: { $0.loans = $1 })
+        async let fDocuments: [CompanyDocument]? = primary.load("documents", operation: {
+            try await self.client.from("company_documents").select().execute().value
+        }, publish: { $0.documents = $1 })
+        async let fShares: [ResourceShare]? = primary.load("sharing permissions", operation: {
+            try await self.client.from("resource_shares").select().execute().value
+        }, publish: { $0.resourceShares = $1 })
+
+        let (fetchedCompanies, fetchedSubscriptions, fetchedInstitutions, fetchedCards, fetchedLoans, fetchedDocuments, fetchedShares) = await (fCompanies, fSubscriptions, fInstitutions, fCards, fLoans, fDocuments, fShares)
+        guard primary.isCurrent else { return }
+        appState.hasLoadedCompanyContent = true
+        AppDiagnostics.duration("data", "company_content_ready", seconds: Date().timeIntervalSince(loadStartedAt))
+        let renewalUpdates = (fetchedSubscriptions ?? []).compactMap { original -> Subscription? in
+            var normalized = SubscriptionRenewalScheduler.normalized(original)
+            guard original != normalized else { return nil }
+            normalized.password = SecurityService.shared.decrypt(normalized.password, context: vaultContext(owner: normalized.userId, type: "subscription", id: normalized.id, field: "password"))
+            guard appState.subscriptions.first(where: { $0.id == original.id }) == normalized else { return nil }
+            return normalized
         }
 
-        async let fSubscriptions: [Subscription] = measure("subscriptions") { await searchLoad("services", failures: searchLoadFailures) { try await fetchVisibleSubscriptions() } }
-        async let fInstitutions: [Institution] = measure("institutions") { await searchLoad("bank accounts", failures: searchLoadFailures) { try await fetchVisibleInstitutions() } }
-        async let fCards: [FinancialCard] = measure("cards") { await searchLoad("cards", failures: searchLoadFailures) { try await fetchVisibleCards() } }
-        async let fLoans: [Loan] = measure("loans") { await searchLoad("loans", failures: searchLoadFailures) { try await fetchLoanSnapshots() } }
-        async let fDocuments: [CompanyDocument] = measure("documents") { await searchLoad("documents", failures: searchLoadFailures) { try await client.from("company_documents").select().execute().value } }
-        async let fShares: [ResourceShare] = measure("shares") { await searchLoad("sharing permissions", failures: searchLoadFailures) { try await client.from("resource_shares").select().execute().value } }
+        // Persist a complete raw server snapshot, retaining the original encrypted
+        // credential fields. Never serialize decrypted presentation values or grants.
+        if let fetchedCompanies, let fetchedSubscriptions, let fetchedInstitutions,
+           let fetchedCards, let fetchedLoans, let fetchedDocuments, fetchedShares != nil {
+            appState.isShowingSavedPortfolio = false
+            let snapshot = PortfolioSnapshot(userID: loadingUserID, companies: fetchedCompanies,
+                subscriptions: fetchedSubscriptions, institutions: fetchedInstitutions,
+                cards: fetchedCards, loans: fetchedLoans, documents: fetchedDocuments)
+            do { try await PortfolioCache.shared.save(snapshot, generation: cacheGeneration) }
+            catch { AppDiagnostics.failure("data", "save_portfolio_snapshot", error: error) }
+            guard primary.isCurrent else { return }
+        }
+
+        // Vault restoration may require several network requests. Lists are already
+        // usable with encrypted fields preserved; revealing credentials still requires
+        // the existing vault checks. Restore alongside the secondary requests.
+        async let vaultRestore: Void = VaultService.shared.restoreSessionIfAvailable(for: loadingUserID)
         async let fActivity: [ActivityLog] = measure("activity_logs") { await searchLoad("activity", failures: searchLoadFailures) { try await client.from("activity_logs").select().order("created_at", ascending: false).execute().value } }
         async let fNotifications: [AppNotification] = measure("app_notifications") { await searchLoad("notifications", failures: searchLoadFailures) { try await client.from("app_notifications").select().order("created_at", ascending: false).execute().value } }
         async let fPrefs: [UserPreferences] = measure("user_preferences") { await searchLoad("preferences", failures: searchLoadFailures) { try await client.from("user_preferences").select().execute().value } }
@@ -372,13 +495,7 @@ class DataRepository {
                 .from("plaid_transaction_category_rules").select().execute().value }
         }
         
-        let fetchedSubscriptions = await fSubscriptions
-        let fetchedInstitutions = await fInstitutions
-        let fetchedCards = await fCards
-        let fetchedLoans = await fLoans
-        let fetchedDocuments = await fDocuments
         let fetchedPlaidItems = await fPlaidItems
-        let shares = await fShares
         let fetchedActivityLogs = await fActivity
         let fetchedNotifications = await fNotifications
         let fetchedPreferences = await fPrefs
@@ -396,37 +513,12 @@ class DataRepository {
         let transactionOverrides = await fTransactionOverrides
         let transactionCategoryRules = await fTransactionCategoryRules
         
-        await VaultService.shared.restoreSessionIfAvailable(for: loadingUserID)
+        await vaultRestore
+        guard primary.isCurrent else { return }
 
-        let secureSubs = fetchedSubscriptions.map { s -> Subscription in
-            var m = s
-            m.password = SecurityService.shared.decrypt(s.password, context: vaultContext(owner: s.userId, type: "subscription", id: s.id, field: "password"))
-            return m
-        }
-        let normalizedSubscriptions = secureSubs.map { SubscriptionRenewalScheduler.normalized($0) }
-        let subscriptionsNeedingRenewalUpdate = zip(secureSubs, normalizedSubscriptions).compactMap { pair in
-            let (original, normalized) = pair
-            return original == normalized ? nil : normalized
-        }
-        let secureInst = fetchedInstitutions.map { decryptInstitutionSecrets($0) }
-        let secureCards = fetchedCards.map { c -> FinancialCard in
-            var m = c
-            m.password = SecurityService.shared.decrypt(c.password, context: vaultContext(owner: c.userId, type: "financial_card", id: c.id, field: "password"))
-            return m
-        }
-        
-        let session = try? await client.auth.session
-        let currentUserId = session?.user.id
-        guard !Task.isCancelled, appState.portfolioLoadID == loadID, currentUserId == loadingUserID else { return }
-        appState.portfolioUserID = loadingUserID
-
-        appState.subscriptions = normalizedSubscriptions
-        appState.institutions = secureInst
-        appState.cards = secureCards
-        appState.loans = fetchedLoans
-        appState.documents = fetchedDocuments
+        // Decrypt current values rather than replacing edits made during refresh.
+        decryptPortfolioSecrets(appState: appState)
         appState.plaidItems = fetchedPlaidItems
-        appState.resourceShares = shares
         appState.activityLogs = fetchedActivityLogs
         appState.notifications = fetchedNotifications
         appState.userPreferences = fetchedPreferences.first
@@ -437,15 +529,29 @@ class DataRepository {
         appState.resourceConnections = fetchedConnections
         appState.obligations = fetchedObligations
 
+        let unavailable = await searchLoadFailures.names.sorted()
+        guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
+        if !unavailable.isEmpty {
+            appState.portfolioLoadIssue = ([appState.portfolioLoadIssue].compactMap { $0 } + ["Could not load: " + unavailable.joined(separator: ", ") + ". Search and totals may be incomplete."]).joined(separator: " ")
+        }
+        appState.hasLoadedPortfolio = true
+        AppDiagnostics.duration("data", "portfolio_ready", seconds: Date().timeIntervalSince(loadStartedAt))
+
         // Keep next-due dates current in Supabase. A failed background write does
         // not block the portfolio from showing the correctly calculated date.
-        for subscription in subscriptionsNeedingRenewalUpdate {
-            guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
-            try? await updateSubscription(subscription)
+        for snapshot in renewalUpdates {
+            guard primary.isCurrent else { return }
+            // Only persist the normalization if this record has not been edited
+            // since the primary load. Account for the vault decrypting its password.
+            var expected = snapshot
+            expected.password = SecurityService.shared.decrypt(expected.password, context: vaultContext(owner: expected.userId, type: "subscription", id: expected.id, field: "password"))
+            guard appState.subscriptions.first(where: { $0.id == snapshot.id }) == expected else { continue }
+            try? await updateSubscription(expected)
         }
 
         guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
-        if let currentUserId {
+        if primary.isCurrent {
+            let currentUserId = loadingUserID
             let generatedConnections = PortfolioConnectionEngine.buildConnections(appState: appState, ownerUserId: currentUserId)
             let existingEdges = Set(fetchedConnections.map(Self.connectionIdentity))
             let newConnections = generatedConnections.filter { !existingEdges.contains(Self.connectionIdentity($0)) }
@@ -466,14 +572,21 @@ class DataRepository {
             if appState.portfolioLoadID == loadID { appState.clearSearchSession(); appState.isLoading = false; appState.portfolioLoadingUserID = nil }
             return
         }
-        guard appState.portfolioLoadID == loadID else { return }
-        let unavailable = await searchLoadFailures.names.sorted()
-        guard !Task.isCancelled, appState.portfolioLoadID == loadID else { return }
-        if !unavailable.isEmpty {
-            appState.portfolioLoadIssue = ([appState.portfolioLoadIssue].compactMap { $0 } + ["Could not load: " + unavailable.joined(separator: ", ") + ". Search and totals may be incomplete."]).joined(separator: " ")
-        }
-        appState.hasLoadedPortfolio = true
+    }
 
+    @MainActor
+    private func decryptPortfolioSecrets(appState: AppState) {
+        appState.subscriptions = appState.subscriptions.map { subscription in
+            var value = subscription
+            value.password = SecurityService.shared.decrypt(value.password, context: vaultContext(owner: value.userId, type: "subscription", id: value.id, field: "password"))
+            return value
+        }
+        appState.institutions = appState.institutions.map { decryptInstitutionSecrets($0) }
+        appState.cards = appState.cards.map { card in
+            var value = card
+            value.password = SecurityService.shared.decrypt(value.password, context: vaultContext(owner: value.userId, type: "financial_card", id: value.id, field: "password"))
+            return value
+        }
     }
 
     private static func connectionIdentity(_ connection: ResourceConnection) -> String {
