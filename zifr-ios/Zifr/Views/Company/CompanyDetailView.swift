@@ -217,7 +217,7 @@ struct CompanyDetailView: View {
                 reportsDuoDevice: $isDuoDevice,
                 isActive: true,
                 admin: profileControlButton,
-                assistant: geminiControlButton,
+                primaryAction: duoShareControl.frame(width: 52, height: 52),
                 add: duoAddControl,
                 entities: entitiesControlMenu
             ))
@@ -592,6 +592,8 @@ struct CompanyDetailView: View {
             }
             .buttonStyle(.plain)
 
+            if isDuoDevice { geminiControlButton }
+
             // 3. Entities Button (instead of Apple Intelligence)
             if !usesDuoSideToolbar { entitiesControlMenu }
 
@@ -674,6 +676,9 @@ struct CompanyDetailView: View {
                         transactionHeaderButton
                     }
 
+                    // Expanded portrait has no side toolbar; keep Share reachable
+                    // beside the reports control instead of mixing their menus.
+                    if isDuoDevice && !usesDuoSideToolbar { duoShareControl }
                     headerActionMenu
                 }
 
@@ -728,17 +733,7 @@ struct CompanyDetailView: View {
     @ViewBuilder
     private var headerActionMenu: some View {
         Menu {
-            if canManageSharing {
-                Section("Share Access") {
-                    ForEach(EntitySharingScope.allCases) { scope in
-                        Button {
-                            sharingScope = scope
-                        } label: {
-                            Label(scope.title, systemImage: scope.icon)
-                        }
-                    }
-                }
-            }
+            if !isDuoDevice { sharingMenuItems }
             Section("Reports") {
                 Button {
                     showFinancialReport = true
@@ -752,15 +747,46 @@ struct CompanyDetailView: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis")
+            Image(systemName: isDuoDevice ? "receipt" : "ellipsis")
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(Color(hex: "#C1AA78"))
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial, in: Circle())
                 .contentShape(Circle())
         }
-        .accessibilityLabel("Entity actions")
-        .accessibilityHint(canManageSharing ? "Sharing scopes and reports" : "Entity reports")
+        .accessibilityLabel(isDuoDevice ? "Entity reports" : "Entity actions")
+        .accessibilityHint(!isDuoDevice && canManageSharing ? "Sharing scopes and reports" : "Entity reports")
+    }
+
+    @ViewBuilder
+    private var sharingMenuItems: some View {
+        if canManageSharing {
+            Section("Share Access") {
+                ForEach(EntitySharingScope.allCases) { scope in
+                    Button {
+                        sharingScope = scope
+                    } label: {
+                        Label(scope.title, systemImage: scope.icon)
+                    }
+                }
+            }
+        }
+    }
+
+    private var duoShareControl: some View {
+        Menu {
+            sharingMenuItems
+        } label: {
+            circularControlLabel {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!canManageSharing)
+        .accessibilityLabel("Share access")
+        .accessibilityHint(canManageSharing ? "Choose which entity records to share" : "You do not have permission to manage sharing")
     }
 
     @ViewBuilder
@@ -846,7 +872,7 @@ struct CompanyDetailView: View {
             showAssistant = true
         } label: {
             circularControlLabel { MiloomGeminiSparkle() }
-                .frame(width: 52, height: 52)
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

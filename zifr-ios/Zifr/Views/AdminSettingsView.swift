@@ -79,7 +79,7 @@ struct AdminSettingsView: View {
                 reportsDuoDevice: .constant(false),
                 isActive: true,
                 admin: duoAdminIndicator,
-                assistant: EmptyView(),
+                primaryAction: EmptyView(),
                 add: EmptyView(),
                 entities: MiloomEntitySwitcher(vm: vm, selectedCompanyID: vm.selectedCompany?.id) {
                     dismiss()

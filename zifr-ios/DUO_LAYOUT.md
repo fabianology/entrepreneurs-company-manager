@@ -480,3 +480,30 @@ earlier focused briefing tests and later synthetic UI checks are dated evidence,
 not newly rerun tests. Commit-only pass reviewed the diff and whitespace; no
 source behavior, signing, dependencies or build settings changed in this pass.
 No push, merge, deployment, upload or installed iPhone update is requested.
+
+## 2026-10-27: Gemini beside Search; separate sharing and reports
+
+Duo dashboard and Financial/Services/Vault place Gemini immediately right of
+Search, with matching 44-point controls and the same closed alignment offset.
+Entity side toolbars replace Gemini with Share above Plus; the header receipt
+menu contains only Financial Report and Subscription Report. Share reuses the
+five existing scope options, permission checks and sheet. Expanded portrait has
+no side toolbar, so Share remains reachable beside the header receipt. Admin's
+only change is the shared modifier argument rename to primaryAction. Legacy
+iPhone presentation and original checkout are unchanged by this task.
+
+Normal Debug simulator builds passed with Xcode 26.4 and 27.1; the 27.1 sample
+preview and whitespace check passed. Synthetic UI verified all three closed
+entity sections, expanded landscape/portrait controls, dashboard closed/open/
+partial landscape and portrait placement, Search opening, five Share choices,
+and both existing report sheets opening/dismissing. No invitation, access change,
+Gemini activation, saved data, XCTest rerun or physical performance acceptance.
+Evidence: /private/tmp/miloom-duo-share-reports-20261027.kWsWu5/.
+
+Remaining navigation issue observed during QA: All Entities from an expanded
+portrait entity can retain the sidebar; rotating then showed missing dashboard
+Search until a close/reopen restored the full-width layout and controls. Cause
+and whether it predates this change were not isolated; no navigation fix is
+claimed. Screenshot: dashboard-return-portrait-sidebar-issue.png. This pass is
+local/uncommitted/unpushed after checkpoint 3b4d069f; no deployment or phone
+install. Project/package hashes and the global Xcode 26.4 selection are retained.

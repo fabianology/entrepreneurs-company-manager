@@ -31,6 +31,7 @@ struct DashboardView: View {
     @State private var showConnectionGraph = false
     @State private var duoBriefing = DuoBriefingStore()
     @State private var usesDuoSideToolbar = false
+    @State private var isDuoDevice = false
     @State private var usesDuoLandscapeDashboard = false
     @State private var duoBottomToolbarCenterY: CGFloat?
     @State private var duoBottomControlsWindowCenterY: CGFloat?
@@ -86,10 +87,10 @@ struct DashboardView: View {
                 bottomControlCenterY: $duoBottomToolbarCenterY,
                 bottomControlWindowCenterY: $duoBottomToolbarWindowCenterY,
                 isLandscapeExpanded: $usesDuoLandscapeDashboard,
-                reportsDuoDevice: .constant(false),
+                reportsDuoDevice: $isDuoDevice,
                 isActive: vm.path.isEmpty,
                 admin: dashboardAdminButton,
-                assistant: dashboardAssistantButton,
+                primaryAction: EmptyView(),
                 add: plusCommandMenu,
                 entities: EmptyView()
             ))
@@ -246,8 +247,9 @@ struct DashboardView: View {
             if !usesDuoSideToolbar { dashboardAdminButton }
             dashboardSearchButton
                 .offset(y: closedDuoSearchOffset)
+            dashboardAssistantButton
+                .offset(y: closedDuoSearchOffset)
             if !usesDuoSideToolbar {
-                dashboardAssistantButton
                 plusCommandMenu
             }
         }
@@ -350,7 +352,7 @@ struct DashboardView: View {
             showAssistant = true
         } label: {
             dashboardGeminiIcon
-                .frame(width: 52, height: 52)
+                .frame(width: isDuoDevice ? 44 : 52, height: isDuoDevice ? 44 : 52)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1259,7 +1261,7 @@ struct MiloomGeminiSparkle: View {
 import SwiftUI
 #if compiler(>=6.4)
 @available(iOS 27.1, *)
-struct DuoSideToolbar<Admin: View, Assistant: View, Add: View, Entities: View>: ViewModifier {
+struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: View>: ViewModifier {
     @Environment(MiloomDuoLayoutState.self) private var layout
     @Binding var usesSideToolbar: Bool
     @Binding var bottomControlCenterY: CGFloat?
@@ -1268,7 +1270,7 @@ struct DuoSideToolbar<Admin: View, Assistant: View, Add: View, Entities: View>: 
     @Binding var reportsDuoDevice: Bool
     let isActive: Bool
     let admin: Admin
-    let assistant: Assistant
+    let primaryAction: PrimaryAction
     let add: Add
     let entities: Entities
     var showsPrimaryActions = true
@@ -1285,7 +1287,7 @@ struct DuoSideToolbar<Admin: View, Assistant: View, Add: View, Entities: View>: 
                     if showsPrimaryActions {
                         ToolbarItem(placement: .topBarLeading) {
                             VStack(spacing: 16) {
-                                assistant
+                                primaryAction
                                 add
                             }
                         }
