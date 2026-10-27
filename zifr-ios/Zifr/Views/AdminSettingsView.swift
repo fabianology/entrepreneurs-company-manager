@@ -733,6 +733,9 @@ private enum VaultPresenceError: LocalizedError {
 private final class VaultSecurityController {
     var overview: VaultOverview?
     var pendingSecretRequests: [ResourceSecretAccessRequest] = []
+    var adminCredentialDevices: [AdminCredentialDevice] = []
+    var adminCredentialLoadFailed = false
+    var adminCredentialSyncSummary: String?
     var secretRequestLoadFailed = false
     var scopedSecretServiceAvailable = false
     var lockedResourceSecrets: [LockedResourceSecret] = []
@@ -756,6 +759,8 @@ private final class VaultSecurityController {
     func load() async {
         isLoading = true
         errorMessage = nil
+        adminCredentialDevices = []
+        adminCredentialLoadFailed = false
         defer {
             isLoading = false
             hasLoaded = true
@@ -763,6 +768,14 @@ private final class VaultSecurityController {
         do {
             overview = try await VaultService.shared.overview()
             if overview?.isUnlocked == true {
+                do {
+                    adminCredentialDevices = try await VaultService.shared.listAdminCredentialDevices()
+                } catch let error as PostgrestError where error.code == "PGRST202" {
+                    // Backend has not enabled the new entity-wide consent contract.
+                } catch {
+                    adminCredentialLoadFailed = true
+                    AppDiagnostics.failure("vault", "load_admin_credential_devices", error: error)
+                }
                 do {
                     pendingSecretRequests = try await VaultService.shared.listPendingResourceSecretRequests()
                     secretRequestLoadFailed = false
@@ -896,6 +909,22 @@ private final class VaultSecurityController {
         }
     }
 
+    func syncAdminCredentials(_ device: AdminCredentialDevice) async {
+        adminCredentialSyncSummary = nil
+        await perform("Syncing Entity Credentials…", reason: "Approve this Admin device for entity credentials.", requiresPresence: false) {
+            let report = try await VaultService.shared.syncAdminCredentials(device)
+            self.adminCredentialSyncSummary = report.summary
+            // A refresh error must not undo or misreport already delivered keys.
+            do {
+                self.adminCredentialDevices = try await VaultService.shared.listAdminCredentialDevices()
+                self.pendingSecretRequests = try await VaultService.shared.listPendingResourceSecretRequests()
+                self.adminCredentialLoadFailed = false
+            } catch {
+                self.adminCredentialLoadFailed = true
+            }
+        }
+    }
+
     func prepareResourceSecrets() async {
         await perform(
             "Preparing Encrypted Copies…",
@@ -1022,6 +1051,7 @@ private struct VaultSecuritySheet: View {
     private enum VaultAlert: Identifiable {
         case revoke(VaultDeviceRecord)
         case approve(ResourceSecretAccessRequest)
+        case adminCredentials(AdminCredentialDevice)
         case rotate(LockedResourceSecret)
         case error(String)
 
@@ -1029,6 +1059,7 @@ private struct VaultSecuritySheet: View {
             switch self {
             case .revoke(let device): return "revoke-\(device.id)"
             case .approve(let request): return "approve-\(request.id)"
+            case .adminCredentials(let device): return "admin-\(device.id)"
             case .rotate(let secret): return "rotate-\(secret.id)"
             case .error(let message): return "error-\(message)"
             }
@@ -1053,6 +1084,9 @@ private struct VaultSecuritySheet: View {
 
                     if controller.isUnlocked {
                         trustedDevicesCard
+                        if !controller.adminCredentialDevices.isEmpty || controller.adminCredentialLoadFailed {
+                            adminCredentialDevicesCard
+                        }
                         if !controller.pendingSecretRequests.isEmpty || controller.secretRequestLoadFailed {
                             credentialRequestsCard
                         }
@@ -1163,6 +1197,14 @@ private struct VaultSecuritySheet: View {
                 },
                 secondaryButton: .cancel()
             )
+            case .adminCredentials(let device):
+                return Alert(
+                    title: Text(device.status == "pending" ? "Approve Entity Credentials?" : "Sync Entity Credentials?"),
+                    message: Text("\(device.recipientEmail) on \(device.recipientDeviceLabel) will receive readable credentials in \(device.companyName). This approves the device for existing and future credentials in this entity only. Sync again after adding credentials or replacing keys. Copied passwords cannot be recalled."),
+                    primaryButton: .default(Text("Approve & Sync")) {
+                        Task { await controller.syncAdminCredentials(device) }
+                    }, secondaryButton: .cancel()
+                )
             case .rotate(let secret):
                 return Alert(
                 title: Text("Replace Locked Credential Key?"),
@@ -1430,6 +1472,40 @@ private struct VaultSecuritySheet: View {
                             Divider().background(Color.white.opacity(0.1))
                         }
                     }
+                }
+            }
+        }
+        .privacySensitive()
+    }
+
+    private var adminCredentialDevicesCard: some View {
+        ZifrSheetCard(title: "ADMIN ENTITY CREDENTIALS", icon: "person.badge.key") {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Approve each Admin device once. Sync delivers separate resource keys for existing and future credentials; your personal vault key is never shared. New or rotated credentials stay locked until synced.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+                if controller.adminCredentialLoadFailed {
+                    Text("Admin credential permissions could not be refreshed. Pull to refresh before approving.")
+                        .foregroundStyle(.orange)
+                }
+                ForEach(controller.adminCredentialDevices) { device in
+                    Button {
+                        pendingAlert = .adminCredentials(device)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(device.companyName).font(.headline)
+                            Text("\(device.recipientEmail) · \(device.recipientDeviceLabel)")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Text(device.status == "pending" ? "Approve Device & Sync Credentials" : "Sync Entity Credentials")
+                                .font(.subheadline).foregroundStyle(Color.zifrGold)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(controller.adminCredentialLoadFailed)
+                }
+                if let summary = controller.adminCredentialSyncSummary {
+                    Text(summary).font(.subheadline).foregroundStyle(.secondary)
                 }
             }
         }
