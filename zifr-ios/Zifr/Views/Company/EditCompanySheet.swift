@@ -2,6 +2,38 @@ import SwiftUI
 import PhotosUI
 import Supabase
 
+/// Keep the legacy iPhone sheet unchanged. A hinge identifies Duo, including
+/// its closed display; sizing itself remains owned by the system safe areas.
+private struct DuoEntitySheetPresentation: ViewModifier {
+    @Binding var isDuoDevice: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            formSized(content)
+                .onHingeChange { _, context in
+                    let next = context.hinge != nil
+                    if isDuoDevice != next { isDuoDevice = next }
+                }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+
+    @ViewBuilder
+    private func formSized(_ content: Content) -> some View {
+        if #available(iOS 18.0, *), isDuoDevice {
+            content.presentationSizing(.form)
+        } else {
+            content
+        }
+    }
+}
+
 private enum NewEntityFlowStep: Int, CaseIterable {
     case identity
     case connect
@@ -71,6 +103,7 @@ struct NewEntitySheet: View {
     @State private var showingDeleteConfirmation = false
     @State private var showingPremiumUpgrade = false
     @State private var didPrefillIdentity = false
+    @State private var isDuoDevice = false
     @FocusState private var isNameFocused: Bool
 
     private var trimmedName: String {
@@ -146,6 +179,15 @@ struct NewEntitySheet: View {
                     }
                     .scrollDismissesKeyboard(.interactively)
                 }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    if isDuoDevice && step == .identity {
+                        addAccountsButton
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+                            .padding(.bottom, 12)
+                            .background(Color(hex: "#1C1C1E"))
+                    }
+                }
             }
             .navigationTitle(company == nil ? "New Entity" : "Edit Entity")
             .navigationBarTitleDisplayMode(.inline)
@@ -166,12 +208,18 @@ struct NewEntitySheet: View {
                     }
                 }
 
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(step == .identity ? "Cancel" : "Close") {
+                ToolbarItem(placement: isDuoDevice ? .cancellationAction : .topBarLeading) {
+                    Button {
                         if step == .identity {
                             dismiss()
                         } else {
                             closeTapped()
+                        }
+                    } label: {
+                        if isDuoDevice {
+                            Label(step == .identity ? "Cancel" : "Close", systemImage: "xmark")
+                        } else {
+                            Text(step == .identity ? "Cancel" : "Close")
                         }
                     }
                     .disabled(isBusy)
@@ -179,9 +227,15 @@ struct NewEntitySheet: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     if step == .identity {
-                        Button("Save") {
+                        Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             saveIdentity(destination: .finish)
+                        } label: {
+                            if isDuoDevice {
+                                Label("Save", systemImage: "checkmark")
+                            } else {
+                                Text("Save")
+                            }
                         }
                         .fontWeight(.semibold)
                         .tint(canSaveIdentity ? .green : nil)
@@ -191,10 +245,11 @@ struct NewEntitySheet: View {
             }
         }
         .preferredColorScheme(.dark)
-        .presentationDetents([.fraction(0.84)])
+        .presentationDetents(isDuoDevice ? [.large] : [.fraction(0.84)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color(hex: "#1C1C1E"))
         .presentationContentInteraction(.resizes)
+        .modifier(DuoEntitySheetPresentation(isDuoDevice: $isDuoDevice))
         .onAppear { prefillIdentityIfNeeded() }
         .interactiveDismissDisabled(isBusy || createdCompany != nil || !trimmedName.isEmpty || !trimmedWebsite.isEmpty || logoData != nil)
         .onChange(of: selectedPhoto) { _, item in
@@ -400,24 +455,9 @@ struct NewEntitySheet: View {
                 }
             }
 
-            Button { saveIdentity(destination: .accounts) } label: {
-                HStack(spacing: 8) {
-                    if isSavingEntity {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text("Add Accounts")
-                        Image(systemName: "arrow.right")
-                    }
-                }
-                .font(.body.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
+            if !isDuoDevice {
+                addAccountsButton
             }
-            .disabled(trimmedName.isEmpty || isSavingEntity)
-            .buttonStyle(NewEntityPrimaryButtonStyle(
-                enabledBackground: Color.zifrGreen,
-                enabledForeground: .white
-            ))
 
             if company != nil {
                 Button(role: .destructive) {
@@ -436,6 +476,28 @@ struct NewEntitySheet: View {
                 .accessibilityHint("Requires confirmation")
             }
         }
+    }
+
+    private var addAccountsButton: some View {
+        Button { saveIdentity(destination: .accounts) } label: {
+            HStack(spacing: 8) {
+                if isSavingEntity {
+                    ProgressView().tint(.white)
+                } else {
+                    Text("Add Accounts")
+                    Image(systemName: "arrow.right")
+                }
+            }
+            .font(.body.weight(.semibold))
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+        }
+        .disabled(trimmedName.isEmpty || isSavingEntity)
+        .buttonStyle(NewEntityPrimaryButtonStyle(
+            enabledBackground: Color.zifrGreen,
+            enabledForeground: .white
+        ))
+        .accessibilityIdentifier("entity.addAccounts")
     }
 
     private var entityMark: some View {

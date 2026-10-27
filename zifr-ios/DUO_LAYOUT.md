@@ -216,3 +216,267 @@ project-management UPDATES.md. No push, merge, release or original iPhone
 checkout change is authorized by this checkpoint. The verification and remaining
 manual acceptance limits above still apply; builds/tests are not rerun merely
 for this Git checkpoint.
+
+## 2026-10-26: show owned-card controls in the labeled preview
+
+The edit/share controls were already present in CompanyCardView and correctly
+gated by ownership, but the unauthenticated QA entry point made both synthetic
+entities look like limited-access shared entities. The preview now defines its
+fixture owner ID once and uses it solely for dashboard card presentation under
+DEBUG + simulator + MILOOM_LAYOUT_PREVIEW. No AuthViewModel session is created;
+normal Debug/Release builds still derive permissions from the signed-in user.
+Existing pencil/share buttons and sheet callbacks are unchanged.
+
+Verified normal Debug builds with Xcode 26.4 and 27.1 and the explicit 27.1
+preview build. Visually confirmed both icons at the right of each black header
+in open landscape and partially open portrait. Northstar Studio's edit/share
+buttons open the matching existing sheets; canceled both without saving or
+sending an invitation. No XCTest rerun or authenticated save/sharing acceptance.
+Evidence: /private/tmp/miloom-duo-card-controls-20261026.8ZXt6M/.
+Original iPhone checkout, real-user access rules, project/package settings and
+global toolchain unchanged. This follow-up is uncommitted/unpushed; checkpoint
+228a9cd0 remains intact. No backend mutation or physical-phone installation.
+
+## 2026-10-26: Duo entity sheet and pinned Add Accounts
+
+NewEntitySheet (also used for editing) now detects a non-nil hinge under the
+new SDK guard, including the closed Duo display. On Duo only it uses system
+form sizing and the large detent, and provides symbol-bearing Cancel/Save labels
+so the system places those controls in the outer display's side bar. The legacy
+iPhone still uses the 0.84 detent and its original text toolbar controls.
+
+The existing Add Accounts button is shared by both paths. Only on Duo, it is
+outside the ScrollView in a bottom safe-area inset, above the keyboard when
+present. Fields remain scrollable on shorter layouts; button validation,
+navigation, authentication, bank connection and persistence code are unchanged.
+
+Verified normal Debug builds in Xcode 26.4 and 27.1, plus explicit preview build.
+On the synthetic Duo simulator: closed sheet shows every identity field and the
+complete Add Accounts button without scrolling; Cancel/Save are clear of the
+status area. Keyboard leaves the name and pinned action visible; typing a local
+test name enables the action. Opening, partially folding and rotating to portrait
+preserve that unsaved name and the visible action. Cleared the test name without
+saving or invoking Add Accounts. No XCTest rerun or authenticated creation/bank
+connection acceptance. Evidence: /private/tmp/miloom-duo-entity-sheet-20261026.rDlKXr/.
+
+Only EditCompanySheet.swift and these notes changed in this pass; prior pending
+preview-icon changes are preserved. Original iPhone checkout fingerprint,
+project/package hashes and default Xcode 26.4 remain unchanged. Uncommitted and
+unpushed; no merge, deployment, archive, account mutation or real-phone install.
+
+## 2026-10-26: dashboard actions in the Duo side toolbar
+
+On the dashboard, Duo's active vertical toolbar now contains Admin at its top
+and Gemini above Plus at its bottom. Existing glass styling, callbacks, haptics
+and tutorial targets are reused. The bottom row then contains only Search,
+expanding into the freed width with the same horizontal margins. The system's
+toolbarVerticalEdge and a non-nil device hinge gate this behavior; no global
+screen bounds or status-strip offsets are used. On open/partial portrait without
+a vertical toolbar, the original Admin/Search/Gemini/Plus row returns. Non-Duo
+devices and Xcode 26.4 retain that original layout. The entity-detail controls
+are unchanged; the new toolbar items are dashboard-root-only.
+
+Verified normal Debug builds on Xcode 26.4 and 27.1 plus the explicit preview
+build. Synthetic simulator checks: closed, open/partial landscape, open/partial
+portrait, correct Admin/Gemini/Plus ordering, no duplicate portrait controls,
+Plus opening New Entity, Admin opening Settings and returning, and Search opening
+global search. Dismissed without changing settings or saving an entity. Gemini
+was not activated, so no voice session, permission grant or metered call tested.
+No XCTest rerun or authenticated-flow acceptance. Evidence and build logs:
+/private/tmp/miloom-duo-toolbar-20261026.lQM4Qr/.
+
+This pass changes DashboardView.swift and these notes only; pending preview
+ownership and entity-sheet fixes are retained. Original iPhone checkout's diff
+fingerprint, project/package hashes and global Xcode 26.4 are unchanged.
+Uncommitted/unpushed; checkpoint 228a9cd0 remains. No merge, deployment, archive,
+upload, production mutation or real-phone installation.
+
+## 2026-10-26: full-height landscape briefing and right-pane chrome
+
+Only on the expanded (open/partially open) landscape Duo dashboard, the MILOOM
+wordmark/header and Search now belong to the right entity pane. The left receipt
+uses the full available safe-area height instead of losing space to global
+header/search rows. Its existing margins, independent ScrollView, worker/cache,
+loading behavior and reveal animation are unchanged. Gemini takes Admin's upper
+native toolbar slot; Admin stays available in Gemini's former lower slot above
+Plus. Search's actual center follows the measured native Plus center, including
+the bottom safe-area overlap, without hard-coded screen or status-strip offsets.
+
+The legacy outer header and bottom safe-area row remain in closed/portrait
+layouts. Portrait continues cards above receipt with horizontal controls. Empty
+receipt/header/footer layout slots use concrete containers so closed placement
+does not collapse. Root hinge/geometry state is reconciled on navigation return
+to avoid duplicate header/Search rows after Settings. No NavigationStack swap,
+data-loader changes, permission changes or new dependencies.
+
+Verification: final normal Xcode 26.4 and 27.1 builds/test products succeeded;
+33 ExecutiveBriefingTests passed on each, including four new chrome/alignment
+regressions. Explicit preview build succeeded. Visually checked open/partial
+landscape, open/partial portrait, closed, Search opening global search, Plus
+opening New Entity (dismissed without saving), and Admin/Settings return without
+duplicate rows. Gemini was not activated. Automated receipt scroll gestures did
+not establish movement; real touch scrolling and measured frame-time acceptance
+remain open, as do authenticated workflows. Evidence/build/test logs:
+/private/tmp/miloom-duo-landscape-chrome-20261026.zuh0TV/.
+
+This pass changes DashboardView, ExecutiveBriefingViews, ExecutiveBriefingModels,
+ExecutiveBriefingTests and these notes only. Prior preview ownership/entity-sheet
+changes are retained. No original iPhone source edits by this task. Canonical
+diff changed concurrently with the separately recorded startup-loading task;
+it is not claimed unchanged globally. Duo project/package hashes and global
+Xcode 26.4 default remain unchanged. Local/uncommitted/unpushed; checkpoint
+228a9cd0 remains. No merge, deployment, archive, upload, production mutation or
+real-phone installation.
+
+## 2026-10-26: match closed Duo toolbar order to landscape
+
+The dashboard's native vertical toolbar now always places Gemini at the top
+and Admin above Plus at the bottom, including closed Duo. Only the former
+pose-dependent ordering in DuoDashboardSideToolbar changed. Closed header,
+cards, Search placement, portrait horizontal controls, detail pages and all
+callbacks remain unchanged. Original iPhone source was not edited by this task.
+
+Verified normal Debug builds in Xcode 26.4 and 27.1 and the explicit simulator
+preview build. Visually confirmed the requested closed ordering, unchanged
+landscape ordering, and unchanged open-portrait horizontal controls. No XCTest
+rerun or live Gemini session. Evidence: /private/tmp/miloom-duo-closed-toolbar-20261026.PCEdcA/.
+This pass changes DashboardView.swift and these notes only, preserving all
+pending Duo work. Project/package hashes and global Xcode 26.4 are unchanged.
+Uncommitted/unpushed; no merge, deployment, archive, upload or real-phone install.
+
+## 2026-10-26: align closed dashboard Search with Plus
+
+Closed Duo Search now follows Plus's vertical center without changing the row's
+reserved layout height, header, cards or horizontal margins. Non-interactive
+window-coordinate reporters measure the unshifted row and native Plus: collapsed
+toolbar/content hosts do not consistently share a SwiftUI global origin. Reports
+are coalesced on the main queue and publish only changed centers; adjustments
+larger than one control height are ignored as stale fold/rotation pairs. The
+offset applies only with a Duo side toolbar outside expanded landscape. Existing
+landscape pane positioning and portrait/legacy horizontal controls are retained.
+
+Repeated rotation also exposed the side toolbar gating its own creation on an
+emitted edge that can transiently vanish. Eligibility now follows the existing
+hinge/device and local orientation state (closed or expanded landscape); native
+placement remains system-managed. Navigation return reconciles toolbar eligibility
+along with landscape state, avoiding missing controls after a fold.
+
+Verified final normal Debug builds in Xcode 26.4 and 27.1 plus explicit preview
+build. Synthetic UI: closed centerline, actual coordinate tap on the shifted bar
+opens global search and dismisses normally, retained open-landscape alignment,
+portrait horizontal row, and repeated rotations/folds returning the native
+toolbar and closed alignment. Gemini was not activated; no data was entered or
+saved. No XCTest rerun or physical-device/performance acceptance. Evidence/logs:
+/private/tmp/miloom-duo-closed-search-20261026.vy0e2m/ (closed-aligned.png).
+
+This pass changes DashboardView.swift and these notes only. All earlier pending
+Duo work remains. Canonical non-coordination diff fingerprint stayed
+e450a9d332a542091d21a33831318a9c271988c2dd7d075acc4aa0cb03473b2f;
+no original iPhone source edits by this task. Project/package hashes and global
+Xcode 26.4 unchanged. Uncommitted/unpushed; no merge, deployment, archive, upload,
+production mutation or real-phone install by this task.
+
+## 2026-10-26: Plus below Gemini; Admin in bottom slot
+
+The dashboard's Duo side toolbar now stacks Gemini then Plus at the top, with
+Admin alone in the former bottom Plus slot. Search remains on the bottom row:
+its closed-window and landscape alignment measurements now follow Admin rather
+than the relocated Plus. Renamed only these alignment bindings/parameters to
+describe the bottom control. Portrait horizontal controls, entity detail and
+regular iPhone layout paths remain unchanged.
+
+Two separate top toolbar group items disappeared in the closed simulator host
+after rotation/folding. Keeping Gemini/Plus in one native item with a 16-point
+vertical stack retained both through the repeated fold/rotation check.
+
+Final normal Debug simulator builds succeeded with Xcode 26.4 and 27.1; the
+explicit 27.1 sample preview also built. Visually checked closed, open/partial
+landscape, unchanged open portrait, and closed after repeated rotation/folding.
+No XCTest rerun, Gemini activation, saved data or physical-device/performance
+acceptance. Evidence: /private/tmp/miloom-duo-toolbar-swap-20261026.VSPOsp/.
+
+This pass edits DashboardView.swift, ExecutiveBriefingViews.swift and these notes,
+preserving all earlier pending work. No original iPhone source edits by this
+task. Canonical source changed independently with the recorded quiet-refresh
+task. Project/package hashes and global Xcode 26.4 remain unchanged. Local,
+uncommitted/unpushed; no merge, deployment, archive, upload or real-phone install.
+
+## 2026-10-26: shared Duo toolbar on entity pages
+
+Financial, Services and Vault now reuse the dashboard's native Duo side toolbar:
+Gemini above Plus, Admin at the bottom. Search remains aligned with Admin; the
+entity-switching menu stays beside Search. Expanded portrait retains horizontal
+controls. The Duo read-only presentation uses a disabled Plus instead of an eye;
+all creation checks remain intact. The explicit sample-preview fixture now sets
+its synthetic portfolio owner identity, so owner add controls display correctly
+without authenticating or changing normal app permissions.
+
+Shared full-window hinge/orientation state reaches navigation destinations even
+when their detail column is narrow. Observe it from a non-interactive background,
+not directly on NavigationSplitView: attaching it to the container interfered
+with dashboard column layout. Avoid a navigation-depth gate for entity toolbar
+creation because compact split navigation can empty the bound path while keeping
+the entity destination visible. A Duo All Entities request explicitly reconciles
+the path, preferred detail column and stored sidebar visibility after folding.
+No fold-dependent recreation of the navigation stack was introduced.
+
+Final Xcode 26.4 and 27.1 normal Debug simulator builds and the explicit 27.1
+preview build succeeded; whitespace check passed. Synthetic UI during this pass
+checked Financial/Services/Vault controls, financial Add menu, Services form
+opening/cancellation without saving, Admin/back, partial landscape and portrait.
+Final preview checks confirmed all three entity tabs in closed mode, repeated
+rotations/folds and a full-width landscape dashboard return with receipt left,
+cards/header/Search right and no sidebar. Gemini was not activated. No XCTest
+rerun, authenticated permission-matrix test, real-phone or performance acceptance.
+Evidence/logs: /private/tmp/miloom-duo-entity-toolbar-20261026.vPZhjT/.
+
+This pass changes CompanyDetailView.swift, DashboardView.swift, RootView.swift
+and these notes only, preserving earlier pending work. Original iPhone source
+was not edited by this task. Project/package hashes and global Xcode 26.4 remain
+unchanged. Local/uncommitted/unpushed; checkpoint 228a9cd0 retained. No merge,
+deployment, archive, Apple upload, backend mutation or physical-phone install.
+
+## 2026-10-27: entity switcher above Admin in the Duo side toolbar
+
+On Financial, Services and Vault, the 9-dot entity menu moves from beside Search
+into the lower native toolbar group, directly above Admin. Search fills the freed
+width and keeps its existing Admin-center alignment. When there is no vertical
+toolbar (expanded portrait or legacy iPhone), the existing horizontal entity
+menu remains. Shared MiloomEntitySwitcher preserves entity selection/All Entities
+actions and styling, and now has the accessibility label Switch entity.
+
+Admin has the same lower entity switcher above a selected, non-interactive
+current-page Admin icon. Its existing custom Back/content stay; the navigation
+bar is enabled only while the Duo side toolbar is in use. No unrelated Gemini
+or Add action was added to Admin. The dashboard passes an empty entity slot and
+keeps its previous toolbar arrangement. Existing permission checks are unchanged.
+
+Final normal Debug simulator builds succeeded on Xcode 26.4 and 27.1; explicit
+27.1 sample preview and whitespace check passed. Synthetic UI verified all three
+closed entity tabs, expanded Search, open/partial landscape placement, Admin
+entry from both an entity and dashboard, Admin-to-Personal switching, Admin All
+Entities returning to the full-width dashboard, and restored Admin controls
+after repeated rotations/closing. Expanded portrait Admin retains its old
+hidden-navigation-bar presentation. No settings toggles, saved form data, Gemini
+activation, XCTest rerun or real-device/performance acceptance. Evidence/logs:
+/private/tmp/miloom-duo-entity-switcher-20261027.e60LtT/.
+
+This pass edits CompanyDetailView.swift, DashboardView.swift, AdminSettingsView.swift
+and these notes only, retaining all earlier pending work. Original iPhone source
+and installed build were not edited/updated by this task; canonical source diff
+fingerprint remained a6c853dd45aeeb2b145f25deb930a49307b67a4c402c0c87a487a7fac07c1d02.
+Project/package hashes and global Xcode 26.4 unchanged. Local/uncommitted/unpushed;
+checkpoint 228a9cd0 retained. No merge, deployment, archive, upload or phone install.
+
+## 2026-10-27: owner-requested Duo polish checkpoint
+
+Checkpoint scope is the nine pending native source/test/layout-note files since
+228a9cd0: full-height landscape briefing/right-pane chrome, native side toolbars
+and Search alignment, entity-sheet sizing/pinned Add Accounts, labeled preview
+ownership, shared pose/navigation handling, and entity switching above Admin.
+All remain confined to this separate Duo checkout. Existing verification above
+is retained: latest Xcode 26.4/27.1 normal builds and 27.1 preview succeeded;
+earlier focused briefing tests and later synthetic UI checks are dated evidence,
+not newly rerun tests. Commit-only pass reviewed the diff and whitespace; no
+source behavior, signing, dependencies or build settings changed in this pass.
+No push, merge, deployment, upload or installed iPhone update is requested.

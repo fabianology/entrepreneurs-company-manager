@@ -34,6 +34,55 @@ final class ExecutiveBriefingTests: XCTestCase {
         XCTAssertEqual(frames.receipt, .zero)
     }
 
+    func testDuoLandscapeChromeLeavesReceiptFullHeightAndAlignsSearchWithPlus() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 1000, height: 700), expanded: true,
+            division: CGRect(x: 480, y: 0, width: 40, height: 700),
+            headerHeight: 62, footerHeight: 56, footerControlCenterY: 670
+        )
+        XCTAssertEqual(frames.receipt, CGRect(x: 0, y: 0, width: 480, height: 700))
+        XCTAssertEqual(frames.header.minX, 520)
+        XCTAssertEqual(frames.footer.minX, 520)
+        XCTAssertEqual(frames.footer.maxX, 1000)
+        XCTAssertEqual(frames.footer.minY + 22, 670)
+        XCTAssertEqual(frames.cards.minY, frames.header.maxY)
+        XCTAssertEqual(frames.cards.maxY, frames.footer.minY)
+    }
+
+    func testDuoPortraitChromeRemainsPageWideAndRespectsHinge() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 700, height: 1000), expanded: true,
+            division: CGRect(x: 0, y: 480, width: 700, height: 40),
+            headerHeight: 62, footerHeight: 64, footerControlCenterY: 100
+        )
+        XCTAssertEqual(frames.header.width, 700)
+        XCTAssertEqual(frames.footer.minY, 936)
+        XCTAssertEqual(frames.cards.minY, 62)
+        XCTAssertEqual(frames.cards.maxY, 480)
+        XCTAssertEqual(frames.receipt.minY, 520)
+        XCTAssertEqual(frames.receipt.maxY, 936)
+    }
+
+    func testLandscapeSearchCanFollowPlusIntoBottomSafeArea() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 1000, height: 700), expanded: true,
+            headerHeight: 62, footerHeight: 56, footerControlCenterY: 685
+        )
+        XCTAssertEqual(frames.footer.minY + 22, 685)
+        XCTAssertEqual(frames.receipt.maxY, 700)
+    }
+
+    func testClosedDuoChromeKeepsLegacyFullWidthRegions() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 390, height: 844), expanded: false,
+            headerHeight: 62, footerHeight: 56, footerControlCenterY: 100
+        )
+        XCTAssertEqual(frames.header, CGRect(x: 0, y: 0, width: 390, height: 62))
+        XCTAssertEqual(frames.cards, CGRect(x: 0, y: 62, width: 390, height: 726))
+        XCTAssertEqual(frames.footer, CGRect(x: 0, y: 788, width: 390, height: 56))
+        XCTAssertEqual(frames.receipt, .zero)
+    }
+
     @MainActor
     func testDuoWorkerUsesImmutableInputsAndRunsOffUIThread() async throws {
         let state = AppState()

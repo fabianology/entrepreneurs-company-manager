@@ -1,10 +1,19 @@
 import SwiftUI
 
+@Observable
+final class MiloomDuoLayoutState {
+    var isDuoDevice = false
+    var isExpanded = false
+    var isLandscape = false
+    var dashboardRequest = 0
+}
+
 struct RootView: View {
     @Environment(AppState.self) private var appState
     @State private var vm: AppViewModel
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var compactColumn: NavigationSplitViewColumn = .detail
+    @State private var duoLayout = MiloomDuoLayoutState()
 
     init(vm: AppViewModel = AppViewModel()) {
         _vm = State(initialValue: vm)
@@ -12,7 +21,7 @@ struct RootView: View {
 
     private var splitViewVisibility: Binding<NavigationSplitViewVisibility> {
         Binding(
-            get: { vm.path.isEmpty ? .detailOnly : columnVisibility },
+            get: { columnVisibility },
             set: { visibility in
                 // The portfolio already lists every entity. Do not let a sidebar
                 // toggle or reveal gesture replace it with the same list again.
@@ -23,6 +32,14 @@ struct RootView: View {
     }
 
     var body: some View {
+        rootSurface
+            .environment(duoLayout)
+            .background {
+                Color.clear.modifier(MiloomDuoLayoutObserver(layout: duoLayout))
+            }
+    }
+
+    private var rootSurface: some View {
         // Keep the detail stack mounted across a fold; a size-class if/else would
         // recreate its sheets, scroll positions, and in-progress form state.
         NavigationSplitView(
@@ -38,7 +55,14 @@ struct RootView: View {
         .tint(.white)
         .onChange(of: vm.path.isEmpty, initial: true) { _, isDashboard in
             compactColumn = .detail
-            if !isDashboard { columnVisibility = .all }
+            columnVisibility = isDashboard ? .detailOnly : .all
+        }
+        .onChange(of: duoLayout.dashboardRequest) { _, _ in
+            // Compact split navigation can already have emptied the bound path
+            // while its entity destination remains visible. Reconcile both hosts.
+            vm.path = NavigationPath()
+            columnVisibility = .detailOnly
+            compactColumn = .detail
         }
     }
 
@@ -134,7 +158,38 @@ struct RootView: View {
     }
 }
 
+/// Observe the whole window, not an entity's potentially narrow detail column.
+private struct MiloomDuoLayoutObserver: ViewModifier {
+    let layout: MiloomDuoLayoutState
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            content
+                .onHingeChange { _, context in
+                    let isDuo = context.hinge != nil
+                    let expanded = context.hinge.map { $0.status != .closed } ?? false
+                    if layout.isDuoDevice != isDuo { layout.isDuoDevice = isDuo }
+                    if layout.isExpanded != expanded { layout.isExpanded = expanded }
+                }
+                .onGeometryChange(for: Bool.self) { $0.size.width >= $0.size.height } action: {
+                    if layout.isLandscape != $0 { layout.isLandscape = $0 }
+                }
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
+    }
+}
+
 #if DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW
+    enum MiloomLayoutPreviewData {
+        static let ownerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    }
+
     // Opt-in QA executable, never a runtime authentication bypass. Normal Debug and
     // every Release build keep ZifrApp as the entry point. No app session loader or
     // push delegate is mounted here. Use only on a fresh, unauthenticated simulator:
@@ -148,10 +203,12 @@ struct RootView: View {
         @State private var access = AccessController()
 
         init() {
-            let owner = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+            let owner = MiloomLayoutPreviewData.ownerID
             let studio = Company(userId: owner, name: "Northstar Studio", structure: "LLC", colorHex: "#1A7077")
             let home = Company(userId: owner, name: "Personal", structure: "Individual", colorHex: "#918457")
             let state = AppState()
+            // Fixture identity only: no Auth session or production permission bypass.
+            state.portfolioUserID = owner
             state.companies = [studio, home]
             state.cards = [
                 FinancialCard(

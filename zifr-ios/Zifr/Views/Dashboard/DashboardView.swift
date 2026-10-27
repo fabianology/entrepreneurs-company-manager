@@ -30,6 +30,11 @@ struct DashboardView: View {
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
     @State private var duoBriefing = DuoBriefingStore()
+    @State private var usesDuoSideToolbar = false
+    @State private var usesDuoLandscapeDashboard = false
+    @State private var duoBottomToolbarCenterY: CGFloat?
+    @State private var duoBottomControlsWindowCenterY: CGFloat?
+    @State private var duoBottomToolbarWindowCenterY: CGFloat?
     @State private var showBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
@@ -68,129 +73,44 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack(path: $vm.path) {
+            dashboardWithToolbar
+        }
+    }
+
+    @ViewBuilder
+    private var dashboardWithToolbar: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            dashboardSurface.modifier(DuoSideToolbar(
+                usesSideToolbar: $usesDuoSideToolbar,
+                bottomControlCenterY: $duoBottomToolbarCenterY,
+                bottomControlWindowCenterY: $duoBottomToolbarWindowCenterY,
+                isLandscapeExpanded: $usesDuoLandscapeDashboard,
+                reportsDuoDevice: .constant(false),
+                isActive: vm.path.isEmpty,
+                admin: dashboardAdminButton,
+                assistant: dashboardAssistantButton,
+                add: plusCommandMenu,
+                entities: EmptyView()
+            ))
+        } else {
+            dashboardSurface
+        }
+        #else
+        dashboardSurface
+        #endif
+    }
+
+    private var dashboardSurface: some View {
             ZStack(alignment: .top) {
                 Color.zifrBG.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Sticky Header (Miloom Logo & Quote)
-                    headerSection
-                        .padding(.top, 3)
-                        .padding(.bottom, 7)
-
+                    if !usesDuoLandscapeDashboard { dashboardHeader }
                     portfolioPresentedPanels
             }
             .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 10) {
-                    Button {
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
-                        vm.path.append(AppViewModel.AppRoute.adminSettings)
-                    } label: {
-                        ZStack {
-                            bottomControlGlass(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color(hex: "#918457"),
-                                                    Color(hex: "#918457").opacity(0.3)
-                                                ],
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            ),
-                                            lineWidth: 1.5
-                                        )
-                                )
-                                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.85))
-                        }
-                        .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        vm.showSearch = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.85))
-                            Text("search")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(bottomControlGlass(Capsule()))
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: "#918457"),
-                                            Color(hex: "#918457").opacity(0.3)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .background(
-                        Group {
-                            if onboardingState.isTutorialActive {
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        tutorialSearchFrame = geo.frame(in: .global)
-                                    }.onChange(of: geo.frame(in: .global)) { _, f in
-                                        tutorialSearchFrame = f
-                                    }
-                                }
-                            }
-                        }
-                    )
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        showAssistant = true
-                    } label: {
-                        dashboardGeminiIcon
-                            .frame(width: 52, height: 52)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open Gemini Live")
-                    .accessibilityHint("Starts a voice conversation with Miloom")
-                    .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
-                    .background(
-                        Group {
-                            if onboardingState.isTutorialActive {
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        tutorialAssistantFrame = geo.frame(in: .global)
-                                    }.onChange(of: geo.frame(in: .global)) { _, f in
-                                        tutorialAssistantFrame = f
-                                    }
-                                }
-                            }
-                        }
-                    )
-
-                    plusCommandMenu
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+                if !usesDuoLandscapeDashboard { dashboardBottomControls }
             }
             } // End ZStack
             .coordinateSpace(name: "dashboard")
@@ -279,7 +199,177 @@ struct DashboardView: View {
                     .transition(.opacity)
                 }
             }
+    }
+
+
+
+    private var alignsClosedDuoSearch: Bool {
+        usesDuoSideToolbar && !usesDuoLandscapeDashboard
+    }
+
+    private var closedDuoSearchOffset: CGFloat {
+        guard alignsClosedDuoSearch,
+              let bottomControlY = duoBottomToolbarWindowCenterY,
+              let rowY = duoBottomControlsWindowCenterY else { return 0 }
+        let adjustment = bottomControlY - rowY
+        // Ignore measurements from different fold/rotation passes until both
+        // hosts have settled. The final alignment is less than one hit target.
+        return abs(adjustment) <= 44 ? adjustment : 0
+    }
+
+    @ViewBuilder
+    private var dashboardBottomControls: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            dashboardBottomControlsRow
+                .background {
+                    DuoDashboardWindowCenterReader { value in
+                        duoBottomControlsWindowCenterY = value
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+        } else {
+            dashboardBottomControlsRow
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
         }
+        #else
+        dashboardBottomControlsRow
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+        #endif
+    }
+
+    private var dashboardBottomControlsRow: some View {
+        HStack(spacing: 10) {
+            if !usesDuoSideToolbar { dashboardAdminButton }
+            dashboardSearchButton
+                .offset(y: closedDuoSearchOffset)
+            if !usesDuoSideToolbar {
+                dashboardAssistantButton
+                plusCommandMenu
+            }
+        }
+    }
+
+    private var dashboardHeader: some View {
+        headerSection
+            .padding(.top, 3)
+            .padding(.bottom, 7)
+    }
+
+    private var dashboardAdminButton: some View {
+        Button {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            vm.path.append(AppViewModel.AppRoute.adminSettings)
+        } label: {
+            ZStack {
+                bottomControlGlass(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#918457"),
+                                        Color(hex: "#918457").opacity(0.3)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Admin settings")
+    }
+
+    private var dashboardSearchButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            vm.showSearch = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                Text("search")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(bottomControlGlass(Capsule()))
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background(
+            Group {
+                if onboardingState.isTutorialActive {
+                    GeometryReader { geo in
+                        Color.clear.onAppear {
+                            tutorialSearchFrame = geo.frame(in: .global)
+                        }.onChange(of: geo.frame(in: .global)) { _, f in
+                            tutorialSearchFrame = f
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private var dashboardAssistantButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            showAssistant = true
+        } label: {
+            dashboardGeminiIcon
+                .frame(width: 52, height: 52)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open Gemini Live")
+        .accessibilityHint("Starts a voice conversation with Miloom")
+        .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
+        .background(
+            Group {
+                if onboardingState.isTutorialActive {
+                    GeometryReader { geo in
+                        Color.clear.onAppear {
+                            tutorialAssistantFrame = geo.frame(in: .global)
+                        }.onChange(of: geo.frame(in: .global)) { _, f in
+                            tutorialAssistantFrame = f
+                        }
+                    }
+                }
+            }
+        )
     }
 
 
@@ -558,8 +648,11 @@ struct DashboardView: View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
             DuoDashboardPanels(
+                bottomControlCenterY: duoBottomToolbarCenterY,
                 cards: { expanded in entityList(isDuoExpanded: expanded) },
-                receipt: { inlineBriefingPanel }
+                receipt: { inlineBriefingPanel },
+                header: { dashboardHeader },
+                footer: { dashboardBottomControls }
             )
         } else {
             entityList()
@@ -759,29 +852,7 @@ struct DashboardView: View {
                 .allowsHitTesting(false)
 
             // Gemini's four-point sparkle, rendered sharply at every display scale.
-            Path { path in
-                path.move(to: CGPoint(x: 12, y: 0))
-                path.addCurve(to: CGPoint(x: 24, y: 12),
-                              control1: CGPoint(x: 13.8, y: 7.8),
-                              control2: CGPoint(x: 16.2, y: 10.2))
-                path.addCurve(to: CGPoint(x: 12, y: 24),
-                              control1: CGPoint(x: 16.2, y: 13.8),
-                              control2: CGPoint(x: 13.8, y: 16.2))
-                path.addCurve(to: CGPoint(x: 0, y: 12),
-                              control1: CGPoint(x: 10.2, y: 16.2),
-                              control2: CGPoint(x: 7.8, y: 13.8))
-                path.addCurve(to: CGPoint(x: 12, y: 0),
-                              control1: CGPoint(x: 7.8, y: 10.2),
-                              control2: CGPoint(x: 10.2, y: 7.8))
-                path.closeSubpath()
-            }
-            .fill(LinearGradient(
-                colors: [Color(hex: "#4CA6FF"), Color(hex: "#8D8BFF"), Color(hex: "#D495D9")],
-                startPoint: .bottomLeading,
-                endPoint: .topTrailing
-            ))
-            .frame(width: 24, height: 24)
-            .accessibilityHidden(true)
+            MiloomGeminiSparkle()
         }
         .frame(width: 44, height: 44)
     }
@@ -1057,10 +1128,17 @@ struct DashboardView: View {
         let sCount = subscriptions.filter { $0.companyId == company.id }.count
         let dCount = documents.filter { $0.companyId == company.id }.count
         
-        let isSharedWithMe = (company.userId != currentUserId)
-        let isSharedByMe = (company.userId == currentUserId) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
+        #if DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW
+        // Show fixture ownership only in the labeled simulator preview. Do not
+        // create an authenticated session or alter any persistence authorization.
+        let cardViewerID: UUID? = MiloomLayoutPreviewData.ownerID
+        #else
+        let cardViewerID = currentUserId
+        #endif
+        let isSharedWithMe = (company.userId != cardViewerID)
+        let isSharedByMe = (company.userId == cardViewerID) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
         let role = appState.resourceShares.first(where: {
-            $0.resourceType == "company" && $0.resourceId == company.id && $0.userId == currentUserId
+            $0.resourceType == "company" && $0.resourceId == company.id && $0.userId == cardViewerID
         })?.role ?? "Limited access"
         let canEdit = !isSharedWithMe || ["Editor", "Admin"].contains(role)
 
@@ -1149,8 +1227,156 @@ struct DashboardView: View {
 
 
 
-// MARK: - Shared With Me View
+/// Shared vector glyph; dashboard and Duo entity controls use the same mark.
+struct MiloomGeminiSparkle: View {
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: 12, y: 0))
+            path.addCurve(to: CGPoint(x: 24, y: 12),
+                          control1: CGPoint(x: 13.8, y: 7.8),
+                          control2: CGPoint(x: 16.2, y: 10.2))
+            path.addCurve(to: CGPoint(x: 12, y: 24),
+                          control1: CGPoint(x: 16.2, y: 13.8),
+                          control2: CGPoint(x: 13.8, y: 16.2))
+            path.addCurve(to: CGPoint(x: 0, y: 12),
+                          control1: CGPoint(x: 10.2, y: 16.2),
+                          control2: CGPoint(x: 7.8, y: 13.8))
+            path.addCurve(to: CGPoint(x: 12, y: 0),
+                          control1: CGPoint(x: 7.8, y: 10.2),
+                          control2: CGPoint(x: 10.2, y: 7.8))
+            path.closeSubpath()
+        }
+        .fill(LinearGradient(
+            colors: [Color(hex: "#4CA6FF"), Color(hex: "#8D8BFF"), Color(hex: "#D495D9")],
+            startPoint: .bottomLeading, endPoint: .topTrailing
+        ))
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Shared Duo toolbar
 import SwiftUI
+#if compiler(>=6.4)
+@available(iOS 27.1, *)
+struct DuoSideToolbar<Admin: View, Assistant: View, Add: View, Entities: View>: ViewModifier {
+    @Environment(MiloomDuoLayoutState.self) private var layout
+    @Binding var usesSideToolbar: Bool
+    @Binding var bottomControlCenterY: CGFloat?
+    @Binding var bottomControlWindowCenterY: CGFloat?
+    @Binding var isLandscapeExpanded: Bool
+    @Binding var reportsDuoDevice: Bool
+    let isActive: Bool
+    let admin: Admin
+    let assistant: Assistant
+    let add: Add
+    let entities: Entities
+    var showsPrimaryActions = true
+
+    // Do not gate native toolbar creation on its own emitted edge: the edge
+    // can briefly disappear during a fold and prevent the items returning.
+    private var hasSideToolbar: Bool { layout.isDuoDevice && (!layout.isExpanded || layout.isLandscape) }
+    private var hasLandscapeDashboard: Bool { layout.isDuoDevice && layout.isExpanded && layout.isLandscape }
+
+    func body(content: Content) -> some View {
+        content
+            .toolbar {
+                if hasSideToolbar && isActive {
+                    if showsPrimaryActions {
+                        ToolbarItem(placement: .topBarLeading) {
+                            VStack(spacing: 16) {
+                                assistant
+                                add
+                            }
+                        }
+                        .axisBehavior(.verticalPreferred)
+                        .sharedBackgroundVisibility(.hidden)
+                    }
+
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Spacer()
+                        entities
+                        admin
+                            .onGeometryChange(for: CGFloat.self) { geometry in
+                                geometry.frame(in: .global).midY
+                            } action: { bottomControlCenterY = $0 }
+                            .background {
+                                DuoDashboardWindowCenterReader { bottomControlWindowCenterY = $0 }
+                            }
+                    }
+                    .axisBehavior(.verticalPreferred)
+                    .sharedBackgroundVisibility(.hidden)
+                }
+            }
+            .onChange(of: layout.isDuoDevice, initial: true) { _, next in
+                if reportsDuoDevice != next { reportsDuoDevice = next }
+            }
+            .onChange(of: hasLandscapeDashboard, initial: true) { _, value in
+                if isActive { isLandscapeExpanded = value }
+            }
+            .onChange(of: isActive) { _, value in
+                // Reconcile once on return from a navigation destination, even
+                // if the root pane's orientation did not change while hidden.
+                if value {
+                    isLandscapeExpanded = hasLandscapeDashboard
+                    usesSideToolbar = hasSideToolbar
+                }
+            }
+            .onChange(of: hasSideToolbar, initial: true) { _, value in
+                usesSideToolbar = value
+            }
+    }
+}
+
+/// Native toolbar items and collapsed content can have different SwiftUI global
+/// coordinate roots. Compare window coordinates for the closed alignment only.
+@available(iOS 27.1, *)
+struct DuoDashboardWindowCenterReader: UIViewRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeUIView(context: Context) -> CenterView {
+        let view = CenterView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: CenterView, context: Context) {
+        view.onChange = onChange
+        view.scheduleReport()
+    }
+
+    final class CenterView: UIView {
+        var onChange: (CGFloat) -> Void = { _ in }
+        private var previousCenter: CGFloat?
+        private var reportQueued = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            scheduleReport()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            scheduleReport()
+        }
+
+        func scheduleReport() {
+            guard !reportQueued else { return }
+            reportQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                reportQueued = false
+                guard window != nil else { return }
+                let center = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: nil).y
+                guard previousCenter != center else { return }
+                previousCenter = center
+                onChange(center)
+            }
+        }
+    }
+}
+#endif
+
 struct SharedWithMeView: View {
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState

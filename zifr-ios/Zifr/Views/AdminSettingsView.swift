@@ -19,6 +19,8 @@ struct AdminSettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(AccessController.self) private var accessController
     @Environment(NotificationRouteCoordinator.self) private var notificationRouter
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
+    @State private var usesDuoSideToolbar = false
     
     @State private var userEmail: String = "Loading..."
     @AppStorage("autoLockTimeout") private var autoLockTimeout: Int = 0
@@ -65,7 +67,46 @@ struct AdminSettingsView: View {
         return "\(delivery) · \(rules)"
     }
 
+    @ViewBuilder
     var body: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            adminSurface.modifier(DuoSideToolbar(
+                usesSideToolbar: $usesDuoSideToolbar,
+                bottomControlCenterY: .constant(nil),
+                bottomControlWindowCenterY: .constant(nil),
+                isLandscapeExpanded: .constant(false),
+                reportsDuoDevice: .constant(false),
+                isActive: true,
+                admin: duoAdminIndicator,
+                assistant: EmptyView(),
+                add: EmptyView(),
+                entities: MiloomEntitySwitcher(vm: vm, selectedCompanyID: vm.selectedCompany?.id) {
+                    dismiss()
+                    duoLayout.dashboardRequest &+= 1
+                },
+                showsPrimaryActions: false
+            ))
+        } else {
+            adminSurface
+        }
+        #else
+        adminSurface
+        #endif
+    }
+
+    private var duoAdminIndicator: some View {
+        MiloomCircularToolbarLabel {
+            Image(systemName: "person.crop.circle")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Admin settings, current page")
+        .accessibilityAddTraits(.isSelected)
+    }
+
+    private var adminSurface: some View {
         ZStack(alignment: .top) {
             Color.zifrBG.ignoresSafeArea()
             
@@ -579,7 +620,8 @@ struct AdminSettingsView: View {
                 await authVM.fetchActiveSessions()
             }
         }
-        .navigationBarHidden(true)
+        .navigationBarHidden(!usesDuoSideToolbar)
+        .navigationBarBackButtonHidden(true)
         .onReceive(NotificationCenter.default.publisher(for: .miloomInvitationLinkOpened)) { notification in
             guard collaboratorsSheetNeedsDismissal else { return }
             (notification.object as? InvitationPresentationRequest)?.waitsForCollaboratorsDismissal = true

@@ -1814,14 +1814,24 @@ struct DuoBriefingPlaceholder: View {
 private struct DuoDashboardPanelLayout: Layout {
     let expanded: Bool
     let division: CGRect?
+    let footerControlCenterY: CGFloat?
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions()
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let frames = DuoDashboardPanelFrames.resolve(size: bounds.size, expanded: expanded, division: division)
-        let ordered = [frames.cards, frames.receipt]
+        guard subviews.count == 4 else { return }
+        let panels = DuoDashboardPanelFrames.resolve(size: bounds.size, expanded: expanded, division: division)
+        let chromeWidth = expanded && bounds.width >= bounds.height ? panels.cards.width : bounds.width
+        let measurement = ProposedViewSize(width: chromeWidth, height: nil)
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: bounds.size, expanded: expanded, division: division,
+            headerHeight: subviews[2].sizeThatFits(measurement).height,
+            footerHeight: subviews[3].sizeThatFits(measurement).height,
+            footerControlCenterY: footerControlCenterY
+        )
+        let ordered = [frames.cards, frames.receipt, frames.header, frames.footer]
         for (index, subview) in subviews.enumerated() where index < ordered.count {
             let frame = ordered[index].offsetBy(dx: bounds.minX, dy: bounds.minY)
             subview.place(at: frame.origin, anchor: .topLeading, proposal: ProposedViewSize(frame.size))
@@ -1831,14 +1841,22 @@ private struct DuoDashboardPanelLayout: Layout {
 
 #if compiler(>=6.4)
 @available(iOS 27.1, *)
-struct DuoDashboardPanels<Cards: View, Receipt: View>: View {
+struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View>: View {
     @State private var expanded = false
+    let bottomControlCenterY: CGFloat?
     let cards: (Bool) -> Cards
     let receipt: () -> Receipt
+    let header: () -> Header
+    let footer: () -> Footer
 
-    init(@ViewBuilder cards: @escaping (Bool) -> Cards, @ViewBuilder receipt: @escaping () -> Receipt) {
+    init(bottomControlCenterY: CGFloat?,
+         @ViewBuilder cards: @escaping (Bool) -> Cards, @ViewBuilder receipt: @escaping () -> Receipt,
+         @ViewBuilder header: @escaping () -> Header, @ViewBuilder footer: @escaping () -> Footer) {
+        self.bottomControlCenterY = bottomControlCenterY
         self.cards = cards
         self.receipt = receipt
+        self.header = header
+        self.footer = footer
     }
 
     var body: some View {
@@ -1855,17 +1873,26 @@ struct DuoDashboardPanels<Cards: View, Receipt: View>: View {
                     height: $0.frame.height + $0.margins.top + $0.margins.bottom
                 )
             }
-            let frames = DuoDashboardPanelFrames.resolve(size: geometry.size, expanded: expanded, division: division)
-            DuoDashboardPanelLayout(expanded: expanded, division: division) {
+            let landscape = expanded && !portrait
+            let localBottomControlCenterY = bottomControlCenterY.map { $0 - geometry.frame(in: .global).minY }
+            DuoDashboardPanelLayout(expanded: expanded, division: division,
+                                    footerControlCenterY: landscape ? localBottomControlCenterY : nil) {
                 cards(expanded)
-                    .frame(width: frames.cards.width, height: frames.cards.height)
                     .clipped()
-                if expanded {
-                    receipt()
-                        .frame(width: frames.receipt.width, height: frames.receipt.height)
-                        .clipped()
-                        .accessibilityIdentifier("duo.receiptPanel")
+                ZStack {
+                    if expanded { receipt() }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .accessibilityIdentifier("duo.receiptPanel")
+                ZStack {
+                    if landscape { header() }
+                }
+                .frame(height: landscape ? nil : 0)
+                ZStack {
+                    if landscape { footer() }
+                }
+                .frame(height: landscape ? nil : 0)
             }
             .onHingeChange { _, context in
                 // A nil hinge is a non-Duo device. Ignore continuous angle ticks.

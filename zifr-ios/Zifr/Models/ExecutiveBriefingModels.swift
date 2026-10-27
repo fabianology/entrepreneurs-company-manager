@@ -909,3 +909,46 @@ struct DuoDashboardPanelFrames: Equatable {
         )
     }
 }
+
+/// Header and search belong to the entity pane only in expanded landscape.
+/// Other poses retain the original page-wide header and bottom controls.
+struct DuoDashboardChromeFrames: Equatable {
+    let cards: CGRect
+    let receipt: CGRect
+    let header: CGRect
+    let footer: CGRect
+
+    static func resolve(size: CGSize, expanded: Bool, division: CGRect? = nil,
+                        headerHeight: CGFloat, footerHeight: CGFloat,
+                        footerControlCenterY: CGFloat? = nil) -> Self {
+        let landscape = expanded && size.width >= size.height
+        let headerHeight = min(size.height, max(0, headerHeight))
+        let footerHeight = min(max(0, size.height - headerHeight), max(0, footerHeight))
+        if landscape {
+            let panels = DuoDashboardPanelFrames.resolve(size: size, expanded: true, division: division)
+            // The existing footer has twelve points of bottom padding. Align
+            // the actual 44-point search control, not its padded container.
+            let proposedY = footerControlCenterY.map { $0 - (footerHeight - 12) / 2 }
+                ?? (size.height - footerHeight)
+            // The native side bar may sit slightly into the bottom safe-area
+            // inset. Match its center there instead of lifting Search above it.
+            let footerY = min(size.height - max(0, footerHeight - 12) / 2, max(headerHeight, proposedY))
+            return Self(
+                cards: CGRect(x: panels.cards.minX, y: headerHeight,
+                              width: panels.cards.width, height: max(0, footerY - headerHeight)),
+                receipt: panels.receipt,
+                header: CGRect(x: panels.cards.minX, y: 0, width: panels.cards.width, height: headerHeight),
+                footer: CGRect(x: panels.cards.minX, y: footerY, width: panels.cards.width, height: footerHeight)
+            )
+        }
+        let bodySize = CGSize(width: size.width, height: max(0, size.height - headerHeight - footerHeight))
+        let bodyDivision = division?.offsetBy(dx: 0, dy: -headerHeight)
+        let panels = DuoDashboardPanelFrames.resolve(size: bodySize, expanded: expanded, division: bodyDivision)
+        return Self(
+            cards: panels.cards.offsetBy(dx: 0, dy: headerHeight),
+            receipt: expanded ? panels.receipt.offsetBy(dx: 0, dy: headerHeight) : .zero,
+            header: CGRect(x: 0, y: 0, width: size.width, height: headerHeight),
+            footer: CGRect(x: 0, y: size.height - footerHeight, width: size.width, height: footerHeight)
+        )
+    }
+}
