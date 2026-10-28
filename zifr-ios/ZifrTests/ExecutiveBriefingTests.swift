@@ -3,6 +3,98 @@ import SwiftUI
 @testable import Zifr
 
 final class ExecutiveBriefingTests: XCTestCase {
+    func testDuoEntityPortraitWidensContentAndKeepsItRightOfCenter() {
+        let size = CGSize(width: 700, height: 1000)
+        let landscape = DuoEntityPanelFrames.resolve(size: CGSize(width: 972, height: 700),
+            expanded: true, portrait: false)
+        let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true,
+            landscapePageWidth: landscape.page.width)
+        XCTAssertEqual(frames.page.width, min(size.width - 124, landscape.page.width * 1.2), accuracy: 0.001)
+        XCTAssertEqual(frames.page.minX, min(size.width - frames.page.width, (size.width - frames.page.width) / 2 + 44))
+        XCTAssertEqual(frames.page.height, size.height)
+        XCTAssertLessThan(frames.sections.maxX, frames.page.minX)
+        XCTAssertGreaterThanOrEqual(frames.sections.width, 44)
+        XCTAssertEqual(frames.sections.minX, 0)
+        XCTAssertEqual(frames.panel, .zero)
+        XCTAssertEqual(frames.divider, .zero)
+    }
+
+    func testDuoEntityPortraitFilingFramesStayInBoundsForSmallWindows() {
+        for size in [CGSize.zero, CGSize(width: 80, height: 30), CGSize(width: 320, height: 200), CGSize(width: 700, height: 1000)] {
+            let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true,
+                division: CGRect(x: 0, y: size.height / 2, width: size.width, height: 40), landscapePageWidth: 480)
+            XCTAssertGreaterThanOrEqual(frames.page.minX, 0)
+            XCTAssertGreaterThanOrEqual(frames.page.width, 0)
+            XCTAssertEqual(frames.page.minX, min(size.width - frames.page.width, (size.width - frames.page.width) / 2 + 44))
+            XCTAssertEqual(frames.page.height, size.height)
+            XCTAssertLessThanOrEqual(frames.sections.maxX, frames.page.minX)
+            XCTAssertLessThanOrEqual(frames.sections.maxY, size.height)
+            XCTAssertEqual(frames.panel, .zero)
+        }
+    }
+
+    func testDuoBinderDrawerUsesNinetyPercentWidthAndLeavesDividersAtLeftEdge() {
+        let size = CGSize(width: 700, height: 1000)
+        for progress: CGFloat in [0, 0.25, 0.5, 0.75, 1] {
+            let frames = DuoBinderDrawerFrames.resolve(size: size, progress: progress, tabIndex: 1)
+            XCTAssertEqual(frames.sheet.width, 630)
+            XCTAssertEqual(frames.tab.minX, 0)
+            XCTAssertEqual(frames.sheet.minX, (progress - 1) * 630, accuracy: 0.001)
+        }
+        let open = DuoBinderDrawerFrames.resolve(size: size, progress: 1, tabIndex: 1)
+        XCTAssertEqual(open.sheet.minX, 0)
+        XCTAssertEqual(open.sheet.maxX, 630)
+        let closed = DuoBinderDrawerFrames.resolve(size: size, progress: 0, tabIndex: 1)
+        XCTAssertEqual(closed.sheet.maxX, 0)
+    }
+
+    func testDuoBinderDrawerClampsProgressAndFitsAllDividerTabs() {
+        for size in [CGSize.zero, CGSize(width: 30, height: 20), CGSize(width: 700, height: 1000)] {
+            for progress: CGFloat in [-1, 0, 1, 2, .nan] {
+                for index in 0..<3 {
+                    let frames = DuoBinderDrawerFrames.resolve(size: size, progress: progress, tabIndex: index)
+                    XCTAssertGreaterThanOrEqual(frames.tab.minX, 0)
+                    XCTAssertLessThanOrEqual(frames.tab.maxX, size.width)
+                    XCTAssertGreaterThanOrEqual(frames.tab.minY, 0)
+                    XCTAssertLessThanOrEqual(frames.tab.maxY, size.height)
+                    XCTAssertTrue(frames.sheet.minX.isFinite)
+                }
+            }
+        }
+    }
+
+    func testHolographicSectorSelectionDoesNotTurnCreditsOrInvalidValuesIntoDebt() {
+        let slices: [DuoReportSlice] = [
+            .init(id: "credit", title: "Credit balance", value: -20, color: .white),
+            .init(id: "invalid", title: "Invalid", value: .nan, color: .white),
+            .init(id: "cards", title: "Cards", value: 200, color: .white),
+            .init(id: "loans", title: "Loans", value: 300, color: .white)
+        ]
+        XCTAssertEqual(DuoReportSeries.selectedID(at: 0, in: slices), "cards")
+        XCTAssertEqual(DuoReportSeries.selectedID(at: 199.9, in: slices), "cards")
+        XCTAssertEqual(DuoReportSeries.selectedID(at: 200, in: slices), "loans")
+        XCTAssertNil(DuoReportSeries.selectedID(at: 500, in: slices))
+        XCTAssertNil(DuoReportSeries.selectedID(at: .nan, in: slices))
+        XCTAssertNil(DuoReportSeries.selectedID(at: -1, in: slices))
+        XCTAssertNil(DuoReportSeries.selectedID(at: nil, in: slices))
+    }
+
+    func testDuoEntityClosedAndLandscapePlacementRemainUnchanged() {
+        let size = CGSize(width: 1000, height: 700)
+        for portrait in [true, false] {
+            let closed = DuoEntityPanelFrames.resolve(size: size, expanded: false, portrait: portrait)
+            XCTAssertEqual(closed.page, CGRect(origin: .zero, size: size))
+            XCTAssertEqual(closed.panel, .zero)
+            XCTAssertEqual(closed.divider, .zero)
+        }
+        let division = CGRect(x: 480, y: 0, width: 40, height: 700)
+        let original = DuoDashboardPanelFrames.resolve(size: size, expanded: true, division: division)
+        let current = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: false, division: division)
+        XCTAssertEqual(current.page, original.cards)
+        XCTAssertEqual(current.panel, original.receipt)
+        XCTAssertEqual(current.divider, .zero)
+    }
+
     private let owner = UUID()
     private var now: Date { ISO8601DateFormatter().date(from: "2027-08-30T12:00:00Z")! }
 

@@ -731,3 +731,160 @@ Three Swift files plus these notes changed after 6d78816c on codex/duo-evaluatio
 local/uncommitted/unpushed. Original iPhone source/installed build, project/package
 hashes, global Xcode 26.4 and canonical non-coordination fingerprint unchanged.
 No merge, deployment, archive, upload, backend mutation or real-phone install.
+
+## 2026-10-27: stacked portrait workspace
+
+Open and partially open Duo portrait now stack the entity workspace above a
+separate Cash Flow / Transactions / Reports section. Default placement is about
+60/40 after the fixed bottom toolbar/divider; a provided horizontal reserved fold
+anchors the initial divider. Drag the gold grip to resize, double tap it to reset,
+or use Expand/Compact/Restore. Resizing clamps bounds and preserves at least
+180 points for the entity header/tabs when space allows. The adjustable handle
+announces its percentage. A short 16-point/opacity reveal and button resize
+animation honor Reduce Motion. Search and existing bottom controls remain fixed
+below both panes. Landscape uses its existing left/right geometry; closed/non-Duo
+retain their original page/footer and modal routes.
+
+One PortfolioTransactionCenterView remains mounted. Portrait Cash Flow shows
+only existing insights; Transactions shows the existing list/search/account/flow/
+posting filters plus its month picker. Selected month filters this dedicated
+transaction list only and survives section changes; legacy/landscape lists retain
+original behavior. Reports has two existing receipt choices; selecting from the
+entity header activates Reports below automatically. Report selection survives
+fold/rotation; landscape keeps Back to Cash Flow. No additional data load,
+generator, sync, polling or duplicate analysis instance added. No backend,
+permissions, project/signing/package, dashboard or report calculation changes.
+
+Final normal Debug simulator builds on Xcode 26.4/27.1 and explicit 27.1 sample
+preview passed. Seven focused tests passed: three new portrait/resize/fold/closed/
+landscape geometry checks, new transaction-month check, two existing selected/
+legacy scope checks and subscription rendering. Whitespace passed. Synthetic UI
+verified three section buttons, dedicated transaction rows and September filtering,
+month retention on Cash Flow return, report chooser, both inline receipts,
+header-menu routing, expanded header/tab visibility, drag resize (74% to 59%),
+compact (18%)/restore (40%), both portrait poses, closed controls/original All
+Transactions entry, and landscape report/right toolbar retention. Preview left
+in open portrait, Studio/October Cash Flow/default split. Evidence/logs:
+/private/tmp/miloom-duo-portrait-workspace-20261027.YRRh63/.
+
+Remaining acceptance: automated report-content dragging still did not scroll in
+portrait (divider dragging did work). Independent scrolling, physical-device
+performance/frame rate, runtime Reduce Motion and authenticated flows remain
+unverified; earlier scrolling gap retained. No sync activation or saved data.
+Changed CompanyDetailView.swift, PortfolioTransactionCenterView.swift, two test
+files and these notes after bebcff2c on codex/duo-evaluation; local/uncommitted/
+unpushed. Original iPhone source/installed build, project/package hashes, global
+Xcode 26.4 and canonical non-coordination fingerprint unchanged. No merge,
+deployment, archive, upload, backend mutation or real-phone install.
+
+## 2026-10-28: portrait side toolbar matching landscape
+
+At owner request, the shared DuoSideToolbar adds an app-level trailing rail for
+open/partial portrait. It reuses each page's existing Share/Plus near the top and
+entity switcher/Admin near the bottom (dashboard/Admin retain their existing
+page-specific items). A 52-point lane with padding/spacing reserves content width;
+the rail does not overlay the portrait panes. Existing usesSideToolbar bindings
+remove duplicate header Share and bottom Admin/entity/Plus controls, leaving
+Search/Gemini at the bottom. The measured Admin anchor preserves footer alignment.
+Native toolbar creation/placements are still used only for closed and expanded
+landscape; no forced system portrait-bar placement. Admin preserves its original
+portrait custom Back/header rather than introducing an empty native navigation
+bar. Earlier uncommitted stacked portrait/transaction/report work retained.
+
+Final normal Debug simulator builds on Xcode 26.4/27.1 and explicit 27.1 sample
+preview passed; whitespace passed. Synthetic UI verified open/partial portrait,
+all entity tabs with correct Add actions, one Share menu with all five existing
+scopes, entity switching, Admin rail/header, dashboard rail, New Entity opening
+and dismissal without saving, and native closed dashboard/entity plus landscape
+placement. Search/Gemini remain visible at the bottom. Preview left in partial
+portrait Personal/Cash Flow. Evidence/logs:
+/private/tmp/miloom-duo-portrait-toolbar-20261028.Seyl6B/.
+
+No new XCTest for this layout-only follow-up; previous seven portrait tests are
+historical, not rerun. No invitations, settings changes, saved data, Gemini
+activation, backend mutation or real-phone install. Existing report-scrolling,
+authenticated-flow and physical-device/performance gaps remain unaccepted.
+Today's edits: DashboardView.swift shared modifier, AdminSettingsView.swift
+portrait nav visibility, CompanyDetailView.swift comment and these notes.
+Earlier dirty files preserved. Local/uncommitted/unpushed on codex/duo-evaluation;
+no merge, deployment, upload or archive. Project/package hashes and global Xcode
+26.4 retained. No canonical product files written; its non-coordination diff
+fingerprint changed during this pass from 222b8c8e7d720af61656d78a9498c0e9f9bba2b8d657006c7749cc35027157c0
+to 623f2dae655e1c4db8d66f250cd9d093134d4f5e479f18355c6b8f6a61efecd3;
+that separate work was preserved, not investigated or reverted.
+
+## 2026-10-28 — Duo portrait holographic reports at the fold
+
+- Implemented only in `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, on top of the pending portrait workspace/toolbar work after `bebcff2c`. Open/partially open portrait now has Financial Report, Subscriptions Report and Transactions tabs immediately above the physical division; content starts below it. Reserved division bounds take priority, with the window midpoint converted to local coordinates for fully open fallback. This supersedes the movable 60/40 divider and expand/compact controls in portrait. Existing top entity content, side rail and bottom Search/Gemini remain.
+- Added portrait-only transparent report presentations with gold totals, cyan/coral sector charts and selectable legends. Subscription type selection filters charges; Monthly/Annual equivalents and a currency menu reuse SubscriptionReceiptSummary without mixing currencies or supplemental charge cycles/sources. Account/service disclosures retain existing details. Financial totals retain the original financial receipt policy. Transactions uses the retained entity-scoped analysis and includes cash flow, existing filters, rows and actions. No polling, network generation, timer/particle loop or dependency added; short selection/section animations honor Reduce Motion. Existing closed and landscape presentation paths stay at their default styles.
+- New `DuoHolographicReports.swift` is explicitly in the Zifr target; project changes are four source-membership lines only. Other source edits this pass: CompanyDetailView.swift, FinancialReceiptView.swift, SubscriptionReceiptView.swift, PortfolioTransactionCenterView.swift, RootView.swift (optional synthetic `-duoReportFixtures` argument exclusively inside MILOOM_LAYOUT_PREVIEW), and ExecutiveBriefingTests.swift. All seven previously dirty files were preserved. No canonical product edits; its non-coordination diff fingerprint remained `d4882cf4d06a4125742d5d1fe79697588765339164e84e8353bce666b299e218`. Package pins unchanged; global command-line Xcode remains 26.4.
+- Verification: 44 selected XCTest cases passed (37 ExecutiveBriefingTests and 7 ledger/entity-scope/cash-flow regressions), including new fixed-fold bounds and signed/invalid sector-selection tests. An initial Xcode 26.4 type-check timeout in the new aggregation expression was fixed by simplifying it. Final normal Xcode 26.4 and 27.1 simulator builds and sample-only preview build all succeeded; project plist and whitespace checks passed. Tests preceded final spacing/empty-label polish; final builds include that polish. Synthetic UI inspected open/partial portrait, chart/legend selection, USD/EUR separation, monthly USD124 versus annual USD1488, Bills filtering, account-detail expansion, Transactions cash-flow values/records, unchanged landscape cash flow/paper receipt and closed page. Optional fixture data was removed from the running preview by relaunching without the argument; no real data saved, sharing sent, Gemini activated or real phone installed.
+- Limits: simulator touch scrolling was inconsistent (financial detail content visibly advanced after expansion, but repeated Transactions drag/wheel attempts did not move its viewport). Full manual touch/scrolling, large-data performance, VoiceOver/Dynamic Type, authenticated actions and physical-device animation acceptance remain unverified; build and chart taps do not establish a completed real-data flow. Preview remains running; user interacted with it during final checks, so their final navigation state was left alone. Logs, xcresult and screenshots: `/private/tmp/miloom-duo-holographic-20261028.SLtGI9/`; self-contained comparison `board.html`/`board.png` uses synthetic data. Local/uncommitted/unpushed; no merge, archive, upload, deployment or release.
+
+## 2026-10-28 — Duo portrait report slider below the hinge
+
+- Implemented in `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, retaining all pending Duo work. This follow-up supersedes the previous above-hinge report tab placement: open/partial portrait now reserves the upper pane to the fold, places the 56-point report selector 8 points below the division, then starts report content 8 points below the selector. Reuses ControlCenterTabSelector's existing glass sliding lens, typography, icons, tap/drag behavior and haptics with optional labels/icons and standalone background. Main selector defaults remain unchanged; the portrait report instance respects Reduce Motion and wraps long labels.
+- Upper portrait header top padding reduced from 8 to 0; empty navigation chrome hidden only in this layout, and optional EntityHomeView compact spacing moves the upper content 16 points closer to its main selector while retaining the mask and selector positions. Other layouts use the original spacing. Today's source/test changes: CompanyDetailView.swift, ControlCenterTabSelector.swift, EntityHomeView.swift, ExecutiveBriefingTests.swift. All earlier dirty files preserved. No canonical product files edited; non-coordination diff fingerprint remained `d4882cf4d06a4125742d5d1fe79697588765339164e84e8353bce666b299e218`. Project/package settings and global Xcode 26.4 default unchanged.
+- Verification: three focused geometry/isolation tests passed with zero failures (below-fold placement, reserved-fold/tiny-window bounds, closed/landscape preservation). Final normal Xcode 26.4 and 27.1 simulator builds and Duo sample preview build succeeded; whitespace passed. Tests preceded the final content-spacing-only addition; final builds include it. Sample UI verified open/partial portrait placement, report tab taps, horizontal slider drag from Transactions to Subscriptions, independent main/report selection, empty subscriptions and Transactions cash flow. Final upper Vault layout fits all six category buttons above the hinge. Closed and landscape retained existing layouts/native side controls after rotation/folding. Preview left in partial portrait, Northstar Studio/Vault with Financial Report selected. Evidence: `/private/tmp/miloom-duo-tabs-below-fold-20261028.U2N9Lj/`.
+- Remaining manual scrolling, physical-device motion/performance, large-data, Dynamic Type/VoiceOver and authenticated-flow acceptance gaps from the prior handoff remain open; no new claim of those passes. No saved real data, sharing, Gemini activation, real-phone install, commit, push, merge, archive, upload, deployment or release. Changes remain local and uncommitted.
+
+
+## 2026-10-28 — Duo portrait full-height pages and report sheets
+
+- Implemented at owner request in `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`. Supersedes the portrait lower report pane and selector: open/partial portrait now uses the full page height. Financial, Services and Vault each have transaction and receipt buttons in the header. Transactions opens the selected entity's existing cash flow and transaction content; Reports opens Financial/Subscriptions selection with the initial choice appropriate to the page. Sheets use native clear Liquid Glass with the existing MILOOM tint and a dark green (#0D4635) content card matching Spending by Category. Landscape retains its inline panel; closed/iPhone routes retain existing presentation.
+- Current-task source/test edits are CompanyDetailView.swift, DuoHolographicReports.swift and ExecutiveBriefingTests.swift; prior pending Duo work preserved. Initial report selection on the first Services presentation was corrected using the sheet item's report value and local picker state. No new fetching, polling or dependencies. No canonical product writes: the canonical non-coordination diff fingerprint changed concurrently from `a6c853dd45aeeb2b145f25deb930a49307b67a4c402c0c87a487a7fac07c1d02` to `3d95f9293c46bb041fd9bca094a59b8c32792a71ccd6af93ecda50f23def1689`; those changes were preserved. Global Xcode default remains `/Applications/Xcode.app/Contents/Developer` (26.4); project/package settings untouched by this task.
+- Verification: five focused geometry/entity-scope tests passed, zero failures. Final normal Xcode 26.4 and 27.1 simulator builds and sample preview build succeeded; whitespace check passed. Tests preceded final glass and initial-report-state refinements; final builds include both. Simulator checks covered full-height open/partial portrait, both header icons on all three pages, both report choices, correct first Services report, transaction cash flow, and portrait-sheet dismissal on rotation with the existing landscape pane restored. Closed Services retained its existing layout. Final preview is partial portrait, Northstar Studio/Vault, Transactions sheet open. Evidence: `/private/tmp/miloom-duo-portrait-sheets-20261028.B8hKsW/`; final screenshots include `partial-transactions-final.png`, `services-report-verified.png`, `open-portrait-full-page.png` and `closed-regression.png`.
+- Remaining acceptance: simulator transaction vertical drag still did not visibly advance the viewport; manual touch scrolling, physical-device smoothness, large-data performance, VoiceOver/Dynamic Type and authenticated actions remain unverified. No real-data mutation, sharing/Gemini activation, real-phone installation, commit, push, merge, archive, upload, deployment or release. Changes remain local and uncommitted; only the dedicated Duo sample simulator was installed/launched.
+
+
+## 2026-10-28 — Duo portrait undimmed clear-glass sheets
+
+- In the separate Duo checkout `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, corrected the grey/opaque report and transaction sheet appearance. Apple's full-height system sheets become opaque (WWDC25 session 323); these expanded-portrait presentations now use a floating sheet in the page's rendering hierarchy with native untinted `.glassEffect(.clear)`, no dimming scrim, and the retained #0D4635 content card. Added explicit close/outside-tap/header-drag dismissal, Reduce Motion handling, modal accessibility traits and initial title focus. Background controls are blocked while it is open. Rotation/folding dismisses it. Landscape and closed presentation routes remain intact.
+- Current-task product edits only: CompanyDetailView.swift and DuoHolographicReports.swift. Prior dirty work preserved; no project/package or canonical product edits. Canonical non-coordination fingerprint changed concurrently from `a6186fc2346c97825effae64cf48b266b9bbbe5ab0109f1fd11307a8663fdc8c` to `4b92303f25930654dba16076919a3d3d5b38a2620ee09f79d2136ecc20e0bcd4`; concurrent work was preserved. Global default is still Xcode 26.4; explicit Xcode 27.1 used for Duo.
+- Verification: normal simulator builds passed with Xcode 26.4 and 27.1, and the synthetic Duo preview build passed; whitespace passed. UI verified visible underlying content through glass, undimmed outside area, Transactions and Reports, both report choices, close button, outside tap, header swipe-down, full/partial portrait, rotation dismissal/restored landscape cash-flow pane, and existing closed Financial header. No new tests added or rerun for this presentation-only correction. Evidence: `/private/tmp/miloom-duo-clear-sheet-20261028.33Odc4/`, including build logs, before copies/current-task diffs, `transactions-clear-final.png`, `reports-clear.png`, and `open-portrait-reports.png`. Dedicated sample preview left partial portrait/Financial with Transactions open.
+- Existing simulator transaction vertical-scroll acceptance remains unresolved: drag showed its scroll indicator but no visible viewport advance. Physical-device smoothness, large-data, VoiceOver/Dynamic Type and authenticated-flow acceptance remain open. No real-data mutation, sharing/Gemini activation, real-phone install, commit, push, merge, archive, deployment or release. Local/uncommitted only.
+
+
+## 2026-10-28 — Populated Duo sample preview
+
+- Added owner-requested fictional content in the separate Duo checkout `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`: 3 banks, 4 cards (3 associated with banks and 1 standalone), 4 services with 8 subservices, and 6 documents across Northstar Studio and Personal. Banks include checking/savings balances; services reference sample payment cards. Documents span Legal, Taxes, Receipts, Estate, Identity and Other, with visibly fictional PDF pages generated in the simulator temporary directory for local preview.
+- Changed only the existing `RootView.swift` simulator-only `DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW` block this task. Default sample content now appears without a launch flag; the older optional report-fixture argument appends its QA examples. Normal app entry point/source outside that block unchanged, no fixture persistence/upload/auth loader added. Existing pending Duo work preserved. Canonical non-coordination fingerprint stayed `43dd6b50f3768e5e8d09bbae2c1c657cc7dbcc36195493a936f57b717f37eeac`; no canonical product changes. Global Xcode 26.4 default unchanged.
+- Verification: Xcode 27.1 synthetic preview and normal Xcode 26.4 simulator builds succeeded; whitespace and guarded-source isolation checks passed. Installed/launched only the dedicated Duo evaluation simulator. Visually checked the Financial banks/card counts and standalone card, Services with expanded Office Essentials subservices, Vault's four Studio documents, and opened/closed the local Operating Agreement PDF. Sample preview remains on Northstar Studio/Vault. Evidence: `/private/tmp/miloom-duo-filled-preview-20261028.qUcpRW/` (build logs, before/diff, financial.png, services.png, vault.png, sample-pdf.png).
+- No new tests for reversible preview data; no real-data writes, real banking connection, sharing, purchase, physical-phone install, commit, push, merge or deployment. Earlier manual scrolling/performance/accessibility/authenticated-flow acceptance gaps remain open. Local/uncommitted only.
+
+
+## 2026-10-28 — Duo portrait filing workspace and two-column dashboard
+
+- Implemented owner-approved follow-up in `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, only for expanded Duo portrait (open/partial). Financial, Services and Vault now occupy a narrower full-height right column. The column reuses the observed landscape entity-pane width, clamped to fit beside the tab rail; a cold portrait launch uses a viewport-based fitted estimate until the first landscape measurement. Landscape width is retained in scene state through rotation. Left clear-glass Financial/Subscriptions/Transactions filing tabs select on-demand files that slide from left to right over the main column, with no dimming scrim. Retains clear glass surround, dark green content, header shortcuts, close/outside dismissal, and adds left-swipe header dismissal. Filing tabs remain accessible while a file is open; Reduce Motion is respected.
+- Expanded portrait dashboard uses two equal-width entity cards per row across the available dashboard pane, retaining the existing briefing below. Compact card avatar/title sizing is opt-in only for that grid; long entity names wrap. Empty/tutorial fallback stays on existing UI. Closed/iPhone and landscape rendering use existing paths. Current-task files: CompanyDetailView.swift, DuoHolographicReports.swift, DashboardView.swift, CompanyCardView.swift, RootView.swift (scene sizing state/observer), ExecutiveBriefingTests.swift. All prior dirty work and sample fixtures preserved. Canonical product diff fingerprint stayed `43dd6b50f3768e5e8d09bbae2c1c657cc7dbcc36195493a936f57b717f37eeac`; project/packages and global Xcode 26.4 default unchanged.
+- Verification: final five focused tests passed, zero failures, with Xcode 26.4 (portrait reference-width/right alignment, bounded small-window math, legacy closed/landscape frames, selected-entity transaction/cash-flow scope). Final normal Xcode 27.1 and synthetic preview builds succeeded; whitespace passed. Simulator UI checked full/partial portrait, all three filing choices and direct switching with selected accessibility traits, Financial/Services/Vault main pages, left-swipe close, rotation dismissal/restored landscape panel, retained measured width on return, two-card dashboard row with readable full names, and closed single-column dashboard. Preview left partial portrait on dashboard. Evidence: `/private/tmp/miloom-duo-portrait-files-20261028.zyArFE/`, including before/diff files, tests26-final.log, normal27-build.log, preview-final.log, portrait-files-final.png, transactions-file-final.png, dashboard-grid-final.png and regression screenshots.
+- No new data-fetch engine or timers. Existing vertical-scroll/manual performance, physical-device, large-data, Dynamic Type/VoiceOver and authenticated-flow acceptance gaps remain open; no claim of those passes. No real-data mutation, physical-phone install, sharing/Gemini activation, commit, push, merge or deployment. Local/uncommitted only; dedicated Duo synthetic simulator installation only.
+
+
+## 2026-10-28 — Duo portrait attached binder dividers
+
+- Implemented owner-requested refinement in `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`. Expanded Duo portrait only: narrow vertical clear-glass binder dividers now rest flush against the left screen edge. Tapping or pulling a divider moves it to the right with a full-width report attached behind it. A shared progress value and persistent divider identity drive both positions, keeping their trailing edges aligned throughout the motion; the report covers the other dividers and the side toolbar. No dimming scrim. Tap the attached divider again or drag it left to close; VoiceOver escape remains available. Animation completions are generation-guarded and cancelled on pose changes; Reduce Motion respected.
+- Removed the report's outer title/header, grabber and X button; the title is now inside its dark-green content card, surrounded by native clear Liquid Glass. Main portrait column sizing, dashboard two-card grid, sample fixtures, landscape and closed/iPhone routes retained. Current-task source/tests only: CompanyDetailView.swift, DuoHolographicReports.swift, ExecutiveBriefingTests.swift. Prior dirty work preserved. Canonical non-coordination fingerprint remained `43dd6b50f3768e5e8d09bbae2c1c657cc7dbcc36195493a936f57b717f37eeac`; no project/package/global-toolchain change.
+- Verification: seven focused tests passed, zero failures, with Xcode 26.4: full-width attachment at intermediate slide fractions, clamped progress and divider bounds, portrait page sizing/edge placement, closed/landscape preservation and selected-entity transaction scope. Xcode 27.1 normal simulator and sample preview builds succeeded; whitespace passed. Simulator UI verified flush-left divider styling, Financial tap-open, attached-tab drag-close, Subscriptions drag-open and tap-close, full-width Transactions, no X/outer title, in-card titles, full/partial portrait, rotation dismissing the drawer/restoring the existing landscape cash-flow pane, and closed mode without binder controls. Dedicated synthetic preview left partial portrait with Financial Report open. Evidence: `/private/tmp/miloom-duo-binder-20261028.myw6nV/` (before/diffs, tests26.log, normal27-build.log, preview-build.log, dividers-resting.png, financial-open.png, partial-transactions.png, binder-final.png).
+- Existing report vertical-scrolling, physical-device motion/performance, large-data, Dynamic Type/VoiceOver and authenticated-flow acceptance gaps remain open; no claim of those passes. No real-data mutation, real-phone installation, sharing/Gemini activation, commit, push, merge or deployment. Local/uncommitted, installed only on the dedicated Duo evaluation simulator.
+
+
+## 2026-10-28 — Centered Duo portrait content and 80-percent drawer
+
+- In separate Duo checkout `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, centered the existing landscape-sized entity column within its available content area for open/partial Duo portrait only. Reports now slide from the left to 80% of the display content width. Divider tabs remain stationary at the left edge and are covered by the open drawer; restored a 44-point X close control at the card's top right. Titles remain in the green card. Both glass sheet and card have square leading corners and rounded trailing corners. Retains no-scrim native clear glass, existing data/actions, and Reduce Motion handling. Dashboard grid and closed/landscape/iPhone rendering paths untouched.
+- Current-task edits only CompanyDetailView.swift, DuoHolographicReports.swift and ExecutiveBriefingTests.swift; prior pending work preserved. Verification: five focused Xcode 26.4 tests passed (centering, drawer width/stationary dividers, bounds and legacy layout isolation); Xcode 27.1 sample preview build succeeded; whitespace passed. UI verified centered content, square-left 80% drawer, title/X placement, X closing and dividers returning, and open/partial portrait. Preview left in partial portrait with Transactions open. Evidence `/private/tmp/miloom-duo-drawer80-20261028/` contains before/diffs, build/test logs and centered.png, drawer.png, partial-final.png.
+- Earlier vertical-scroll/performance, physical-device, large-data, accessibility and authenticated-flow acceptance gaps remain open. No canonical product edits, real-data writes, real-phone install, commit, push, merge or deployment. Only dedicated synthetic Duo simulator installed. Changes remain local/uncommitted.
+
+
+## 2026-10-28 — Duo portrait 90-percent drawer and inset card
+
+- In separate Duo checkout `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, shifted the expanded-portrait main column 44 points right of its previous available-area center, clamped to fit. Increased the left-origin drawer to 90% width; dividers remain stationary. Inner dark-green card now has 20-point horizontal/bottom spacing and all rounded corners. Title stays inside card; X moved to a glass-only row above it. Added a transparent outside-tap dismissal target; no dimming backdrop. Scope remains open/partial Duo portrait, retaining square outer leading glass corners and all other layouts/dashboard behavior.
+- Changed only CompanyDetailView.swift, DuoHolographicReports.swift and ExecutiveBriefingTests.swift this task; earlier pending work preserved. Five focused Xcode 26.4 tests passed, zero failures (90% width, stationary tab/bounds, right-of-center placement and legacy layout geometry). Xcode 27.1 sample preview build succeeded; whitespace passed. Native preview checked card spacing/corners, X on glass, outside-tap closing and X closing, main-content placement, partial and fully open portrait. Preview left fully open portrait, Financial Report open. Evidence `/private/tmp/miloom-duo-drawer90-20261028/`: before/diffs, preview.log, tests26.log, drawer.png, main-content.png, full-open.png.
+- Earlier scrolling/performance, physical-device, large-data, accessibility and authenticated-flow acceptance gaps remain open. No real-data mutation, canonical product edits, real-phone install, commit, push, merge or deployment. Installed only on the dedicated synthetic Duo simulator; local/uncommitted.
+
+
+## 2026-10-28 — Duo portrait wider content and glass pull handle
+
+- In isolated Duo checkout `/Users/yager/.codex/worktrees/duo-evaluation/cifr---entrepreneur's-company-manager`, branch `codex/duo-evaluation`, increased expanded-portrait entity-column target width by 20%, bounded by available width, retaining its right-of-center placement. Removed the portrait-only -16-point content offset so picker-to-card spacing uses the same default as landscape. Replaced X with a small vertical handle midway down the right glass margin; it supports a leftward drag with the sheet following the gesture, tap closure, and an accessible close label/escape. Preserved the 48-point top glass margin and applied 48 points to right/bottom; left card inset remains 20 points and all inner corners rounded. Drawer remains 90% width with no dimming backdrop and outside-tap closure. Scope only open/partial Duo portrait; other rendering paths and dashboard retained.
+- Current-task edits only CompanyDetailView.swift, DuoHolographicReports.swift and ExecutiveBriefingTests.swift; existing dirty work preserved. Five focused Xcode 26.4 tests passed, zero failures (widened placement, 90% drawer/stationary tabs, bounds and legacy layout isolation); Xcode 27.1 preview build succeeded; whitespace passed. Simulator verified wider content, landscape-default gap, matching glass margins, no X, visible handle, successful drag-to-close and retained outside-tap closing in partial portrait. Preview left partial portrait on Northstar Studio/Financial main page. Evidence `/private/tmp/miloom-duo-handle-20261028/`: before/diffs, preview.log, tests26.log, main.png and handle.png.
+- Earlier vertical-scroll, physical-device smoothness, large-data, accessibility and authenticated-flow acceptance gaps remain open. No real-data mutation, canonical product edits, real-phone install, commit, push, merge or deployment; dedicated synthetic Duo simulator only. Local/uncommitted.

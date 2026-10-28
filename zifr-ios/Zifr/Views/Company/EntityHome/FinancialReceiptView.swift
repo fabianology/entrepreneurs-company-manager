@@ -7,6 +7,8 @@ struct FinancialReceiptView: View {
     let loans: [Loan]
     let subscriptions: [Subscription]
     var isEmbedded = false
+    var usesHolographicStyle = false
+    @State private var showsAccountDetails = false
     
     @Environment(\.dismiss) private var dismiss
     
@@ -37,9 +39,9 @@ struct FinancialReceiptView: View {
     }
     
     // Aesthetic tokens for the White Paper receipt
-    private let paperColor = Color(hex: "#F8F9FA")
-    private let inkColor = Color(hex: "#1A1A1A")
-    private let fadedInk = Color(hex: "#1A1A1A").opacity(0.6)
+    private var paperColor: Color { usesHolographicStyle ? .clear : Color(hex: "#F8F9FA") }
+    private var inkColor: Color { usesHolographicStyle ? .white : Color(hex: "#1A1A1A") }
+    private var fadedInk: Color { inkColor.opacity(usesHolographicStyle ? 0.75 : 0.6) }
     
     @Environment(AppState.self) private var appState
 
@@ -51,7 +53,7 @@ struct FinancialReceiptView: View {
     @ViewBuilder
     var body: some View {
         if isEmbedded {
-            receiptScroll
+            if usesHolographicStyle { holographicScroll } else { receiptScroll }
         } else {
             NavigationStack {
                 receiptScroll
@@ -65,6 +67,32 @@ struct FinancialReceiptView: View {
                     }
             }
         }
+    }
+
+    private var holographicScroll: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                DuoHolographicFinancialSummary(debt: totalDebt,
+                    cardDebt: creditCards.reduce(0) { $0 + $1.balance },
+                    availableCredit: availableCredit, monthlyServices: totalSubscriptionCost)
+                DisclosureGroup("Account details", isExpanded: $showsAccountDetails) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        ForEach(institutions) { inst in institutionItem(inst: inst) }
+                        let relationships = institutionRelationships
+                        let orphanedCards = cards.filter { relationships.banks(for: .card, id: $0.id).isEmpty }
+                        let orphanedLoans = loans.filter { $0.isLender && relationships.banks(for: .loan, id: $0.id).isEmpty }
+                        if !orphanedCards.isEmpty || !orphanedLoans.isEmpty {
+                            otherAccountsItem(cards: orphanedCards, loans: orphanedLoans)
+                        }
+                        receiptFooter
+                    }.padding(.top, 16)
+                }
+                .font(.subheadline.weight(.semibold)).tint(DuoHologram.cyan)
+                .foregroundStyle(.white).padding(.vertical, 8)
+            }
+            .padding(.horizontal, 24).padding(.top, 20).padding(.bottom, 32)
+        }
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private var receiptScroll: some View {

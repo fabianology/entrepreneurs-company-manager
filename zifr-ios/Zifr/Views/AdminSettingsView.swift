@@ -620,7 +620,7 @@ struct AdminSettingsView: View {
                 await authVM.fetchActiveSessions()
             }
         }
-        .navigationBarHidden(!usesDuoSideToolbar)
+        .navigationBarHidden(!usesDuoSideToolbar || (duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape))
         .navigationBarBackButtonHidden(true)
         .onReceive(NotificationCenter.default.publisher(for: .miloomInvitationLinkOpened)) { notification in
             guard collaboratorsSheetNeedsDismissal else { return }

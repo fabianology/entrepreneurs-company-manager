@@ -1,7 +1,81 @@
 import SwiftUI
 
-private enum DuoEntityReport: Equatable {
+private enum DuoEntityReport: Hashable {
     case financial, subscriptions
+}
+
+private enum DuoEntitySection: String, CaseIterable, Hashable {
+    case cashFlow = "Cash Flow", transactions = "Transactions", reports = "Reports"
+}
+
+private enum DuoPortraitSheet: Identifiable {
+    case transactions
+    case reports(DuoEntityReport)
+    static let files: [Self] = [.reports(.financial), .reports(.subscriptions), .transactions]
+    var title: String {
+        switch self {
+        case .transactions: return "Transactions"
+        case .reports(.financial): return "Financial Report"
+        case .reports(.subscriptions): return "Subscriptions Report"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .transactions: return "list.bullet.rectangle.portrait"
+        case .reports(.financial): return "chart.pie"
+        case .reports(.subscriptions): return "arrow.triangle.2.circlepath"
+        }
+    }
+    var id: String {
+        switch self {
+        case .transactions: return "transactions"
+        case .reports(let report): return report == .financial ? "financial-report" : "subscriptions-report"
+        }
+    }
+}
+
+/// The portrait page retains a landscape pane's measured point width. The
+/// remaining left margin holds filing tabs; no lower pane is reserved.
+struct DuoPortraitFilingFrames: Equatable {
+    let page: CGRect
+    let tabs: CGRect
+
+    static func resolve(size: CGSize, landscapePageWidth: CGFloat? = nil) -> Self {
+        let width = max(0, size.width), height = max(0, size.height)
+        let rail = min(width, 124)
+        let reference = landscapePageWidth ?? max(width, height) / 2 - 6
+        let pageWidth = min(max(0, width - rail), max(0, reference * 1.2))
+        let pageX = min(width - pageWidth, (width - pageWidth) / 2 + 44)
+        let tabWidth = min(56, max(0, pageX))
+        return Self(page: CGRect(x: pageX, y: 0, width: pageWidth, height: height),
+                    tabs: CGRect(x: 0, y: min(16, height),
+                                 width: tabWidth,
+                                 height: max(0, height - 32)))
+    }
+}
+
+/// Pure placement math, shared by the layout and its isolation/bounds tests.
+struct DuoEntityPanelFrames: Equatable {
+    let page: CGRect
+    let panel: CGRect
+    let divider: CGRect
+    let sections: CGRect
+
+    static func resolve(size: CGSize, expanded: Bool, portrait: Bool,
+                        foldY: CGFloat? = nil, division: CGRect? = nil,
+                        landscapePageWidth: CGFloat? = nil) -> Self {
+        let width = max(0, size.width), height = max(0, size.height)
+        if expanded && portrait {
+            let files = DuoPortraitFilingFrames.resolve(size: size, landscapePageWidth: landscapePageWidth)
+            return Self(page: files.page, panel: .zero, divider: .zero, sections: files.tabs)
+        }
+        guard expanded else {
+            return Self(page: CGRect(x: 0, y: 0, width: width, height: height),
+                        panel: .zero, divider: .zero, sections: .zero)
+        }
+        let frames = DuoDashboardPanelFrames.resolve(size: size, expanded: true, division: division)
+        return Self(page: frames.cards, panel: frames.receipt, divider: .zero, sections: .zero)
+    }
 }
 
 /// The existing entity menu, shared by entity pages and the Duo Admin toolbar.
@@ -87,6 +161,8 @@ struct MiloomCircularToolbarLabel<Icon: View>: View {
 @available(iOS 27.1, *)
 private struct DuoEntityPanels<Page: View, Panel: View>: View {
     let isSplit: Bool
+    let isPortrait: Bool
+    @Environment(MiloomDuoLayoutState.self) private var layout
     @ViewBuilder let page: () -> Page
     @ViewBuilder let panel: () -> Panel
     @State private var hasShownPanel = false
@@ -102,13 +178,15 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
                        width: $0.frame.width + $0.margins.leading + $0.margins.trailing,
                        height: $0.frame.height + $0.margins.top + $0.margins.bottom)
             }
-            DuoEntityPanelLayout(isSplit: isSplit, division: division) {
-                // Keep the original footer's safe-area overflow so Search can
-                // stay aligned with the native toolbar's bottom control.
+            let measuredWidth = isSplit && geometry.size.width >= geometry.size.height
+                ? DuoDashboardPanelFrames.resolve(size: geometry.size, expanded: true, division: division).cards.width : nil
+            DuoEntityPanelLayout(isSplit: isSplit, isPortrait: isPortrait, division: division,
+                                 landscapePageWidth: layout.portraitEntityWidth) {
                 page().contentShape(Rectangle())
+                    .mask { Rectangle().padding(-64) }
                 ZStack {
-                    // Mount on first use, then retain analysis, filters and scroll
-                    // state when the phone folds or the entity's tab changes.
+                    // Mount only when landscape first needs it, then retain its
+                    // analysis and filters through subsequent folding/rotation.
                     if hasShownPanel || isSplit { panel() }
                 }
                 .clipped()
@@ -118,6 +196,11 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
                 .allowsHitTesting(isSplit)
                 .accessibilityHidden(!isSplit)
                 .accessibilityIdentifier("duo.entityPanel")
+            }
+            .onChange(of: measuredWidth, initial: true) { _, width in
+                if let width, width > 0, layout.landscapeEntityWidth != width {
+                    layout.landscapeEntityWidth = width
+                }
             }
         }
         .background(Color.zifrBG.ignoresSafeArea())
@@ -130,7 +213,9 @@ private struct DuoEntityPanels<Page: View, Panel: View>: View {
 @available(iOS 27.1, *)
 private struct DuoEntityPanelLayout: Layout {
     let isSplit: Bool
+    let isPortrait: Bool
     let division: CGRect?
+    let landscapePageWidth: CGFloat?
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         proposal.replacingUnspecifiedDimensions()
@@ -138,8 +223,9 @@ private struct DuoEntityPanelLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard subviews.count == 2 else { return }
-        let frames = DuoDashboardPanelFrames.resolve(size: bounds.size, expanded: isSplit, division: division)
-        for (index, frame) in [frames.cards, frames.receipt].enumerated() {
+        let frames = DuoEntityPanelFrames.resolve(size: bounds.size, expanded: isSplit || isPortrait,
+            portrait: isPortrait, division: division, landscapePageWidth: landscapePageWidth)
+        for (index, frame) in [frames.page, frames.panel].enumerated() {
             subviews[index].place(at: frame.offsetBy(dx: bounds.minX, dy: bounds.minY).origin, anchor: .topLeading,
                                   proposal: ProposedViewSize(frame.size))
         }
@@ -260,6 +346,13 @@ struct CompanyDetailView: View {
     @State private var showSubscriptionReport = false
     @State private var showTransactionCenter = false
     @State private var duoReport: DuoEntityReport?
+    @State private var duoSection: DuoEntitySection = .cashFlow
+    @State private var duoPortraitSheet: DuoPortraitSheet?
+    @State private var duoBinderProgress: CGFloat = 0
+    @State private var duoBinderIsDragging = false
+    @State private var duoBinderDragStart: CGFloat = 0
+    @State private var duoBinderAnimationGeneration = 0
+    @Environment(\.accessibilityReduceMotion) private var reducePortraitMotion
 
     // Tutorial frame targets — populated by TutorialFrameKey preferences
     @State private var tutFrameHeader: CGRect = .zero
@@ -278,7 +371,9 @@ struct CompanyDetailView: View {
     var body: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
-            companyWithLeftPanel.modifier(DuoSideToolbar(
+            companyWithLeftPanel
+                .toolbar(usesDuoPortraitLayout ? .hidden : .automatic, for: .navigationBar)
+                .modifier(DuoSideToolbar(
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: .constant(nil),
                 bottomControlWindowCenterY: $duoAdminWindowCenterY,
@@ -290,6 +385,10 @@ struct CompanyDetailView: View {
                 add: duoAddControl,
                 entities: entitiesControlMenu
             ))
+                .allowsHitTesting(duoPortraitSheet == nil || !usesDuoPortraitLayout)
+                .accessibilityHidden(duoPortraitSheet != nil && usesDuoPortraitLayout)
+                .overlay { portraitFilesOverlay }
+
         } else {
             companySurface
         }
@@ -302,11 +401,15 @@ struct CompanyDetailView: View {
         duoLayout.isDuoDevice && duoLayout.isExpanded && duoLayout.isLandscape
     }
 
+    private var usesDuoPortraitLayout: Bool {
+        duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
+    }
+
     @ViewBuilder
     private var companyWithLeftPanel: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *), duoLayout.isDuoDevice {
-            DuoEntityPanels(isSplit: usesInlineEntityPanel) {
+            DuoEntityPanels(isSplit: usesInlineEntityPanel, isPortrait: usesDuoPortraitLayout) {
                 companySurface
             } panel: {
                 duoLeftPanel
@@ -320,57 +423,184 @@ struct CompanyDetailView: View {
     }
 
     private var duoLeftPanel: some View {
-        ZStack {
-            // Keep cash-flow analysis and filters mounted while a report is visible.
-            PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id)
+        VStack(spacing: 8) {
+            ZStack {
+                // One analysis instance survives section/report/pose changes.
+                PortfolioTransactionCenterView(
+                    vm: vm, embeddedCompanyID: company.id,
+                    embeddedSection: .all
+                )
                 .environment(appState)
-                .opacity(duoReport == nil ? 1 : 0)
-                .allowsHitTesting(duoReport == nil)
-                .accessibilityHidden(duoReport != nil)
+                .opacity(duoSection == .reports ? 0 : 1)
+                .allowsHitTesting(duoSection != .reports)
+                .accessibilityHidden(duoSection == .reports)
 
-            if let duoReport {
-                VStack(spacing: 0) {
-                    HStack {
-                        Button {
-                            self.duoReport = nil
-                        } label: {
-                            Label("Cash Flow", systemImage: "arrow.left")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Color.zifrGold)
-                                .padding(.horizontal, 16)
-                                .frame(height: 44)
-                                .background(bottomControlGlass(Capsule()))
+                if duoSection == .reports {
+                    VStack(spacing: 0) {
+                            HStack {
+                                Button {
+                                    duoSection = .cashFlow
+                                } label: {
+                                    Label("Cash Flow", systemImage: "arrow.left")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(Color.zifrGold)
+                                        .padding(.horizontal, 16)
+                                        .frame(height: 44)
+                                        .background(bottomControlGlass(Capsule()))
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Back to cash flow")
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
+
+                        if let duoReport {
+                            switch duoReport {
+                            case .financial:
+                                FinancialReceiptView(
+                                    company: company, institutions: institutions, cards: cards,
+                                    loans: loans, subscriptions: subscriptions, isEmbedded: true
+                                )
+                                .accessibilityIdentifier("duo.entityFinancialReport")
+                            case .subscriptions:
+                                SubscriptionReceiptView(
+                                    company: company, subscriptions: subscriptions,
+                                    institutions: institutions, cards: cards, isEmbedded: true
+                                )
+                                .accessibilityIdentifier("duo.entitySubscriptionReport")
+                            }
+                        } else {
+                            VStack(spacing: 16) {
+                                Text("Choose a report").font(.headline).foregroundStyle(Color.zifrGold)
+                                Button("Financial Report") { duoReport = .financial }
+                                Button("Subscription Report") { duoReport = .subscriptions }
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(Color.zifrGold)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Back to cash flow")
-                        Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+    }
 
-                    switch duoReport {
-                    case .financial:
-                        FinancialReceiptView(
-                            company: company, institutions: institutions, cards: cards,
-                            loans: loans, subscriptions: subscriptions, isEmbedded: true
-                        )
-                        .accessibilityIdentifier("duo.entityFinancialReport")
-                    case .subscriptions:
-                        SubscriptionReceiptView(
-                            company: company, subscriptions: subscriptions,
-                            institutions: institutions, cards: cards, isEmbedded: true
-                        )
-                        .accessibilityIdentifier("duo.entitySubscriptionReport")
+    @ViewBuilder
+    private var portraitFilesOverlay: some View {
+        if usesDuoPortraitLayout {
+            GeometryReader { geometry in
+                let activeIndex = DuoPortraitSheet.files.firstIndex { $0.id == duoPortraitSheet?.id } ?? 0
+                let drawer = DuoBinderDrawerFrames.resolve(size: geometry.size,
+                    progress: duoBinderProgress, tabIndex: activeIndex)
+                ZStack(alignment: .topLeading) {
+                    if let sheet = duoPortraitSheet {
+                        Color.clear.contentShape(Rectangle())
+                            .onTapGesture { settlePortraitFile(open: false) }
+                            .accessibilityHidden(true)
+                            .zIndex(1)
+                        portraitSheet(sheet)
+                            .id(sheet.id)
+                            .frame(width: drawer.sheet.width, height: drawer.sheet.height)
+                            .offset(x: drawer.sheet.minX)
+                            .transition(.identity)
+                            .zIndex(2)
+                    }
+                    ForEach(Array(DuoPortraitSheet.files.enumerated()), id: \.element.id) { index, sheet in
+                        let selected = duoPortraitSheet?.id == sheet.id
+                        let tab = DuoBinderDrawerFrames.resolve(size: geometry.size,
+                            progress: selected ? duoBinderProgress : 0, tabIndex: index).tab
+                        MiloomDuoFilingTab(title: sheet.title, icon: sheet.icon, isSelected: selected,
+                            action: { togglePortraitFile(sheet) },
+                            onDragChanged: { dragPortraitFile(sheet, translation: $0, travel: drawer.travel) },
+                            onDragEnded: { _, predicted in
+                                let target = duoBinderDragStart + predicted / max(1, drawer.travel)
+                                settlePortraitFile(open: target > 0.5)
+                            })
+                            .frame(width: tab.width, height: tab.height)
+                            .offset(x: tab.minX, y: tab.minY)
+                            .zIndex(0)
+                            .allowsHitTesting(duoPortraitSheet == nil)
+                            .accessibilityHidden(duoPortraitSheet != nil)
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
+                .accessibilityElement(children: .contain)
+                .accessibilityAddTraits(duoPortraitSheet != nil ? .isModal : [])
+                .onChange(of: duoPortraitSheet?.id) { _, id in
+                    if id == nil { duoBinderProgress = 0 }
+                    else if !duoBinderIsDragging { settlePortraitFile(open: true) }
+                }
+            }
+        }
+    }
+
+    private func togglePortraitFile(_ sheet: DuoPortraitSheet) {
+        if duoPortraitSheet?.id == sheet.id {
+            settlePortraitFile(open: duoBinderProgress < 0.5)
+        } else {
+            duoBinderProgress = 0
+            duoPortraitSheet = sheet
+        }
+    }
+
+    private func dragPortraitFile(_ sheet: DuoPortraitSheet, translation: CGFloat, travel: CGFloat) {
+        if !duoBinderIsDragging {
+            duoBinderAnimationGeneration += 1
+            duoBinderIsDragging = true
+            duoBinderDragStart = duoPortraitSheet?.id == sheet.id ? duoBinderProgress : 0
+            if duoPortraitSheet == nil { duoPortraitSheet = sheet }
+        }
+        // The divider stays at the edge while the sheet follows the pull.
+        duoBinderProgress = min(1, max(0, duoBinderDragStart + translation / max(1, travel)))
+    }
+
+    private func settlePortraitFile(open: Bool) {
+        duoBinderIsDragging = false
+        duoBinderAnimationGeneration += 1
+        let generation = duoBinderAnimationGeneration
+        let fileID = duoPortraitSheet?.id
+        withAnimation(reducePortraitMotion ? nil : .easeInOut(duration: 0.32), completionCriteria: .logicallyComplete) {
+            duoBinderProgress = open ? 1 : 0
+        } completion: {
+            if !open && generation == duoBinderAnimationGeneration && duoPortraitSheet?.id == fileID {
+                duoPortraitSheet = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func portraitSheet(_ sheet: DuoPortraitSheet) -> some View {
+        switch sheet {
+        case .transactions:
+            MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }) {
+                PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id,
+                    embeddedSection: .all, usesHolographicStyle: true)
+                    .environment(appState)
+            }
+        case .reports(let report):
+            MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }) {
+                if report == .financial {
+                    FinancialReceiptView(company: company, institutions: institutions,
+                        cards: cards, loans: loans, subscriptions: subscriptions,
+                        isEmbedded: true, usesHolographicStyle: true)
+                } else {
+                    SubscriptionReceiptView(company: company, subscriptions: subscriptions,
+                        institutions: institutions, cards: cards,
+                        isEmbedded: true, usesHolographicStyle: true)
+                }
             }
         }
     }
 
     private func presentReport(_ report: DuoEntityReport) {
-        if usesInlineEntityPanel {
+        if usesDuoPortraitLayout {
+            duoPortraitSheet = .reports(report)
+        } else if usesInlineEntityPanel {
             duoReport = report
+            duoSection = .reports
         } else {
             switch report {
             case .financial: showFinancialReport = true
@@ -391,7 +621,7 @@ struct CompanyDetailView: View {
                 // ── Entity Command Plate ─────────────────────────────────────
                 companyHeader
                     .padding(.horizontal, 20)
-                    .padding(.top, 8)
+                    .padding(.top, usesDuoPortraitLayout ? 0 : 8)
                     .padding(.bottom, 4)
                     .zIndex(10)
                     .background(
@@ -460,6 +690,14 @@ struct CompanyDetailView: View {
                 institutions: institutions,
                 cards: cards
             )
+        }
+        .onChange(of: usesDuoPortraitLayout) { _, portrait in
+            if !portrait {
+                duoBinderAnimationGeneration += 1
+                duoBinderIsDragging = false
+                duoBinderProgress = 0
+                duoPortraitSheet = nil
+            }
         }
         .sheet(isPresented: $showTransactionCenter) {
             PortfolioTransactionCenterView(vm: vm)
@@ -549,7 +787,8 @@ struct CompanyDetailView: View {
             canEdit: canEditCompany,
             canAccessCredentials: canAccessCompanyCredentials,
             vm: vm,
-            activeInternalTab: $vm.activeTab
+            activeInternalTab: $vm.activeTab,
+            compactTopSpacing: false
         )
     }
 
@@ -822,12 +1061,11 @@ struct CompanyDetailView: View {
 
                     Spacer(minLength: 8)
 
-                    if vm.activeTab == .financial && !usesInlineEntityPanel {
+                    if usesDuoPortraitLayout || (vm.activeTab == .financial && !usesInlineEntityPanel) {
                         transactionHeaderButton
                     }
 
-                    // Expanded portrait has no side toolbar; keep Share reachable
-                    // beside the reports control instead of mixing their menus.
+                    // Keep Share reachable in any layout without a side toolbar.
                     if isDuoDevice && !usesDuoSideToolbar { duoShareControl }
                     headerActionMenu
                 }
@@ -868,44 +1106,60 @@ struct CompanyDetailView: View {
     private var transactionHeaderButton: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showTransactionCenter = true
+            if usesDuoPortraitLayout { duoPortraitSheet = .transactions }
+            else { showTransactionCenter = true }
         } label: {
             Image(systemName: "list.bullet.rectangle.portrait")
                 .font(.system(size: 19, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.70))
-                .frame(width: 28, height: 28)
+                .frame(width: usesDuoPortraitLayout ? 44 : 28, height: usesDuoPortraitLayout ? 44 : 28)
+                .background {
+                    if usesDuoPortraitLayout {
+                        Circle().fill(.ultraThinMaterial)
+                    }
+                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("All transactions")
+        .accessibilityLabel(usesDuoPortraitLayout ? "Entity transactions" : "All transactions")
     }
 
     @ViewBuilder
     private var headerActionMenu: some View {
-        Menu {
-            if !isDuoDevice { sharingMenuItems }
-            Section("Reports") {
-                Button {
-                    presentReport(.financial)
-                } label: {
-                    Label("Financial Report", systemImage: "dollarsign.circle")
+        if usesDuoPortraitLayout {
+            Button {
+                duoPortraitSheet = .reports(vm.activeTab == .subscriptions ? .subscriptions : .financial)
+            } label: { headerReportIcon }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Entity reports")
+        } else {
+            Menu {
+                if !isDuoDevice { sharingMenuItems }
+                Section("Reports") {
+                    Button {
+                        presentReport(.financial)
+                    } label: {
+                        Label("Financial Report", systemImage: "dollarsign.circle")
+                    }
+                    Button {
+                        presentReport(.subscriptions)
+                    } label: {
+                        Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
+                    }
                 }
-                Button {
-                    presentReport(.subscriptions)
-                } label: {
-                    Label("Subscription Report", systemImage: "arrow.triangle.2.circlepath")
-                }
-            }
-        } label: {
-            Image(systemName: isDuoDevice ? "receipt" : "ellipsis")
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color(hex: "#C1AA78"))
-                .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
-                .contentShape(Circle())
+            } label: { headerReportIcon }
+            .accessibilityLabel(isDuoDevice ? "Entity reports" : "Entity actions")
+            .accessibilityHint(!isDuoDevice && canManageSharing ? "Sharing scopes and reports" : "Entity reports")
         }
-        .accessibilityLabel(isDuoDevice ? "Entity reports" : "Entity actions")
-        .accessibilityHint(!isDuoDevice && canManageSharing ? "Sharing scopes and reports" : "Entity reports")
+    }
+
+    private var headerReportIcon: some View {
+        Image(systemName: isDuoDevice ? "receipt" : "ellipsis")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(Color(hex: "#C1AA78"))
+            .frame(width: 44, height: 44)
+            .background(.ultraThinMaterial, in: Circle())
+            .contentShape(Circle())
     }
 
     @ViewBuilder

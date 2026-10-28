@@ -1,6 +1,7 @@
 import SwiftUI
 struct DashboardView: View {
     @Environment(AppState.self) private var appState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(AccessController.self) private var accessController
@@ -691,7 +692,39 @@ struct DashboardView: View {
         }
     }
 
+    @ViewBuilder
     private func entityList(isDuoExpanded: Bool = false) -> some View {
+        if duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
+            && !companies.isEmpty && !onboardingState.isTutorialActive {
+            ScrollView {
+                VStack(spacing: 16) {
+                    if let issue = appState.portfolioLoadIssue {
+                        Button {
+                            Task { await DataRepository.shared.fetchAllData(appState: appState) }
+                        } label: {
+                            Label(issue, systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                                .font(.footnote).foregroundStyle(Color.zifrGold)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Retry loading entities: \(issue)")
+                    }
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                        ForEach(filteredCompanies) { company in
+                            companyCardRow(for: company, compact: true).frame(maxWidth: .infinity)
+                        }
+                    }
+                    .accessibilityIdentifier("duo.portraitEntityGrid")
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+            }
+            .scrollIndicators(.hidden)
+        } else {
+            legacyEntityList(isDuoExpanded: isDuoExpanded)
+        }
+    }
+
+    private func legacyEntityList(isDuoExpanded: Bool = false) -> some View {
                     List {
                         if let loadIssue = appState.portfolioLoadIssue {
                             Button {
@@ -1190,7 +1223,7 @@ struct DashboardView: View {
     }
     
     @ViewBuilder
-    private func companyCardRow(for company: Company) -> some View {
+    private func companyCardRow(for company: Company, compact: Bool = false) -> some View {
         let iCount = institutions.filter { $0.companyId == company.id }.count
         let sCount = subscriptions.filter { $0.companyId == company.id }.count
         let dCount = documents.filter { $0.companyId == company.id }.count
@@ -1231,7 +1264,8 @@ struct DashboardView: View {
             onTapSubscriptions: { navigateAction(.subscriptions) },
             onTapInstitutions: { navigateAction(.financial) },
             onTapDocuments: { navigateAction(.documents) },
-            onTapMain: { navigateAction(.financial) }
+            onTapMain: { navigateAction(.financial) },
+            usesCompactLayout: compact
         )
     }
 
@@ -1348,13 +1382,35 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
 
     // Do not gate native toolbar creation on its own emitted edge: the edge
     // can briefly disappear during a fold and prevent the items returning.
-    private var hasSideToolbar: Bool { layout.isDuoDevice && (!layout.isExpanded || layout.isLandscape) }
+    private var hasNativeSideToolbar: Bool { layout.isDuoDevice && (!layout.isExpanded || layout.isLandscape) }
+    private var hasPortraitToolbar: Bool { layout.isDuoDevice && layout.isExpanded && !layout.isLandscape }
+    private var hasSideToolbar: Bool { hasNativeSideToolbar || hasPortraitToolbar }
     private var hasLandscapeDashboard: Bool { layout.isDuoDevice && layout.isExpanded && layout.isLandscape }
 
     func body(content: Content) -> some View {
         content
+            .safeAreaInset(edge: .trailing, spacing: 8) {
+                if hasPortraitToolbar && isActive {
+                    VStack(spacing: 16) {
+                        if showsPrimaryActions {
+                            primaryAction
+                            add
+                        }
+                        Spacer(minLength: 24)
+                        entities
+                        measuredAdmin
+                    }
+                    .frame(width: 52)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
+                    .padding(.trailing, 12)
+                    .frame(maxHeight: .infinity)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("duo.portraitToolbar")
+                }
+            }
             .toolbar {
-                if hasSideToolbar && isActive {
+                if hasNativeSideToolbar && isActive {
                     if showsPrimaryActions {
                         ToolbarItem(placement: .topBarLeading) {
                             VStack(spacing: 16) {
@@ -1369,13 +1425,7 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                     ToolbarItemGroup(placement: .bottomBar) {
                         Spacer()
                         entities
-                        admin
-                            .onGeometryChange(for: CGFloat.self) { geometry in
-                                geometry.frame(in: .global).midY
-                            } action: { bottomControlCenterY = $0 }
-                            .background {
-                                DuoDashboardWindowCenterReader { bottomControlWindowCenterY = $0 }
-                            }
+                        measuredAdmin
                     }
                     .axisBehavior(.verticalPreferred)
                     .sharedBackgroundVisibility(.hidden)
@@ -1397,6 +1447,16 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             }
             .onChange(of: hasSideToolbar, initial: true) { _, value in
                 usesSideToolbar = value
+            }
+    }
+
+    private var measuredAdmin: some View {
+        admin
+            .onGeometryChange(for: CGFloat.self) { geometry in
+                geometry.frame(in: .global).midY
+            } action: { bottomControlCenterY = $0 }
+            .background {
+                DuoDashboardWindowCenterReader { bottomControlWindowCenterY = $0 }
             }
     }
 }

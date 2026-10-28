@@ -48,6 +48,15 @@ enum EntityHomeTab: String, CaseIterable {
 
 struct ControlCenterTabSelector: View {
     @Binding var activeTab: EntityHomeTab
+    // Optional standalone configuration for the Duo portrait report selector.
+    // Defaults preserve the existing Financial/Services/Vault control.
+    var labels: [EntityHomeTab: String] = [:]
+    var icons: [EntityHomeTab: String] = [:]
+    var isStandalone = false
+    var usesReducedMotion = false
+
+    private func title(for tab: EntityHomeTab) -> String { labels[tab] ?? tab.rawValue }
+    private func icon(for tab: EntityHomeTab) -> String { icons[tab] ?? tab.icon }
     
     // Smooth interaction state
     @State private var dragOffset: CGFloat = 0
@@ -97,7 +106,7 @@ struct ControlCenterTabSelector: View {
         impactFeedback.impactOccurred()
         guard tab != activeTab else { return }
 
-        withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) {
+        withAnimation(usesReducedMotion ? nil : .spring(response: 0.36, dampingFraction: 0.82)) {
             activeTab = tab
             dragOffset = 0
         }
@@ -109,18 +118,23 @@ struct ControlCenterTabSelector: View {
         }
         .frame(height: 56)
         .padding(.horizontal, 20)
-        .background(
-            tabBarGlassBackground(
-                UnevenRoundedRectangle(
-                    topLeadingRadius: 0,
-                    bottomLeadingRadius: 16,
-                    bottomTrailingRadius: 16,
-                    topTrailingRadius: 0
+        .background {
+            if isStandalone {
+                tabBarGlassBackground(RoundedRectangle(cornerRadius: 16))
+                    .padding(.horizontal, 20)
+            } else {
+                tabBarGlassBackground(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 0,
+                        bottomLeadingRadius: 16,
+                        bottomTrailingRadius: 16,
+                        topTrailingRadius: 0
+                    )
                 )
-            )
-            .padding(.top, -30)
-            .padding(.horizontal, 20)
-        )
+                .padding(.top, -30)
+                .padding(.horizontal, 20)
+            }
+        }
         .onAppear {
             lastHapticIndex = currentIndex
         }
@@ -158,7 +172,7 @@ struct ControlCenterTabSelector: View {
             max(0, Int(round(pillPosition)))
         )
         let displayedTab = tabs[displayedIndex]
-        let pillAnimation = isDragging
+        let pillAnimation: Animation? = usesReducedMotion ? nil : isDragging
             ? Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86)
             : Animation.spring(response: 0.3, dampingFraction: 0.75)
         
@@ -202,21 +216,23 @@ struct ControlCenterTabSelector: View {
                         selectTab(tab)
                     }) {
                         HStack(spacing: 6) {
-                            Image(systemName: tab.icon)
+                            Image(systemName: icon(for: tab))
                                 .font(.system(size: 13.5, weight: .bold))
                                 .foregroundStyle(isHighlighted ? tab.color : Color.white.opacity(0.40))
                             
-                            Text(tab.rawValue.uppercased())
+                            Text(title(for: tab).uppercased())
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(isHighlighted ? .white : Color.white.opacity(0.45))
-                                .lineLimit(1)
+                                .lineLimit(isStandalone ? 2 : 1)
                                 .minimumScaleFactor(0.85)
+                                .multilineTextAlignment(.center)
                         }
                         .frame(width: tabW, height: tabH)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .animation(.easeInOut(duration: 0.15), value: isHighlighted)
+                    .accessibilityAddTraits(isStandalone && currentIndex == index ? .isSelected : [])
+                    .animation(usesReducedMotion ? nil : .easeInOut(duration: 0.15), value: isHighlighted)
                 }
             }
             .padding(.horizontal, innerPadding)
@@ -225,15 +241,16 @@ struct ControlCenterTabSelector: View {
             // A crisp label floats over the lens. Its visibility is derived from how much
             // of the destination tab the pill actually covers, so it never pops in abruptly.
             HStack(spacing: 6) {
-                Image(systemName: displayedTab.icon)
+                Image(systemName: icon(for: displayedTab))
                     .font(.system(size: 13.5, weight: .bold))
                     .foregroundStyle(Color(hex: "#C1AA78"))
 
-                Text(displayedTab.rawValue.uppercased())
+                Text(title(for: displayedTab).uppercased())
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
-                    .lineLimit(1)
+                    .lineLimit(isStandalone ? 2 : 1)
                     .minimumScaleFactor(0.85)
+                    .multilineTextAlignment(.center)
             }
             .frame(width: tabW, height: tabH)
             .modifier(
@@ -300,7 +317,7 @@ struct ControlCenterTabSelector: View {
                     lastHapticIndex = targetIndex
                     
                     impactFeedback.impactOccurred()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    withAnimation(usesReducedMotion ? nil : .spring(response: 0.3, dampingFraction: 0.75)) {
                         activeTab = tabs[targetIndex]
                         dragOffset = 0
                         isDragging = false

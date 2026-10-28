@@ -82,6 +82,16 @@ struct CashFlowMonth: Identifiable, Hashable {
     func isCurrent(at date: Date, calendar: Calendar = .current) -> Bool {
         self == CashFlowMonth(containing: date, calendar: calendar)
     }
+
+    func containsTransactionDate(_ value: String) -> Bool {
+        let parts = value.prefix(10).split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, let day = Int(parts[2]), (1...31).contains(day) else { return false }
+        return Int(parts[0]) == year && Int(parts[1]) == month
+    }
+}
+
+enum DuoTransactionSection: Equatable {
+    case all, cashFlow, transactions
 }
 
 struct ResolvedTransaction: Identifiable, Equatable {
@@ -814,6 +824,9 @@ struct PortfolioTransactionCenterView: View {
     var initiallyShowsReviewQueue: Bool = false
     /// Used only by the Duo inline pane. Nil preserves the existing iPhone sheet.
     var embeddedCompanyID: UUID? = nil
+    var embeddedSection: DuoTransactionSection = .all
+    var usesHolographicStyle = false
+    @State private var holographicCashFlowSelection: String?
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
@@ -843,6 +856,8 @@ struct PortfolioTransactionCenterView: View {
     private var filteredRecords: [ResolvedTransaction] {
         allRecords.filter { record in
             let transaction = record.transaction
+            if embeddedCompanyID != nil && embeddedSection == .transactions,
+               !cashFlowMonth.containsTransactionDate(transaction.date) { return false }
             guard TransactionIntelligence.matchesSearch(record, query: searchText) else { return false }
             if showNeedsReviewOnly && TransactionIntelligence.effectiveFlow(for: record) == .ignored { return false }
             if showNeedsReviewOnly && record.companyId != nil && !record.accountId.isEmpty { return false }
@@ -1075,25 +1090,30 @@ struct PortfolioTransactionCenterView: View {
     private var transactionList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                cashFlowInsightsCard
-                searchAndFilters
-                reviewQueueCard
-
-                if !detectedSubscriptions.isEmpty {
-                    DetectedSubscriptionsBanner(
-                        detected: detectedSubscriptions,
-                        cardId: nil,
-                        cardName: "your accounts",
-                        companyId: nil,
-                        vm: vm
-                    )
+                if embeddedSection != .transactions { cashFlowInsightsCard }
+                if embeddedSection == .transactions {
+                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: true)
                 }
+                if embeddedSection != .cashFlow {
+                    searchAndFilters
+                    reviewQueueCard
 
-                if filteredRecords.isEmpty {
-                    filteredEmptyState
-                } else {
-                    ForEach(groupedRecords, id: \.date) { group in
-                        transactionSection(group)
+                    if !detectedSubscriptions.isEmpty {
+                        DetectedSubscriptionsBanner(
+                            detected: detectedSubscriptions,
+                            cardId: nil,
+                            cardName: "your accounts",
+                            companyId: nil,
+                            vm: vm
+                        )
+                    }
+
+                    if filteredRecords.isEmpty {
+                        filteredEmptyState
+                    } else {
+                        ForEach(groupedRecords, id: \.date) { group in
+                            transactionSection(group)
+                        }
                     }
                 }
             }
@@ -1131,7 +1151,36 @@ struct PortfolioTransactionCenterView: View {
         }
     }
 
+    @ViewBuilder
     private var cashFlowInsightsCard: some View {
+        if usesHolographicStyle { holographicCashFlow } else { legacyCashFlowInsightsCard }
+    }
+
+    private var holographicCashFlow: some View {
+        let insights = cashFlowInsights
+        return VStack(alignment: .leading, spacing: 14) {
+            MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: true)
+            Text("NET CASH FLOW").font(.system(.caption, design: .monospaced).weight(.bold))
+                .tracking(1.3).foregroundStyle(.white.opacity(0.75))
+            Text(signedCurrency(insights.current.net))
+                .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(Color.zifrGold).shadow(color: Color.zifrGold.opacity(0.22), radius: 8)
+                .lineLimit(1).minimumScaleFactor(0.6)
+            DuoHolographicBreakdown(title: "CASH FLOW", slices: [
+                .init(id: "in", title: "Money in", value: insights.current.moneyIn, color: DuoHologram.cyan),
+                .init(id: "out", title: "Money out", value: insights.current.moneyOut, color: DuoHologram.coral)
+            ], selection: $holographicCashFlowSelection)
+            Text(cashFlowComparisonText(insights)).font(.caption).foregroundStyle(.white.opacity(0.8))
+            spendingByCategory(insights)
+            TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
+            if let syncError {
+                Label(syncError, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(DuoHologram.coral)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var legacyCashFlowInsightsCard: some View {
         let insights = cashFlowInsights
         return ZifrSheetCard(
             title: "CASH-FLOW INSIGHTS",

@@ -5,6 +5,16 @@ import enum SwiftUI.DynamicTypeSize
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
+    func testDuoTransactionMonthKeepsTheSelectedCalendarMonthSeparate() {
+        let month = CashFlowMonth(year: 2026, month: 10)
+        XCTAssertTrue(month.containsTransactionDate("2026-10-01"))
+        XCTAssertTrue(month.containsTransactionDate("2026-10-31T23:59:00Z"))
+        XCTAssertFalse(month.containsTransactionDate("2026-09-30"))
+        XCTAssertFalse(month.containsTransactionDate("2025-10-01"))
+        XCTAssertFalse(month.containsTransactionDate("2026-10-32"))
+        XCTAssertFalse(month.containsTransactionDate(""))
+    }
+
     func testReceiptSplitsMonthlyAndYearlyChargesByIndependentServiceType() {
         let owner = UUID(), company = UUID()
         let bill = Subscription(userId: owner, companyId: company, name: "Vehicle", cost: 400, subServices: [
