@@ -2,6 +2,8 @@ import XCTest
 import CryptoKit
 import class SwiftUI.ImageRenderer
 import enum SwiftUI.DynamicTypeSize
+import class SwiftUI.UIHostingController
+import UIKit
 @testable import Zifr
 
 final class PremiumEngineTests: XCTestCase {
@@ -1774,9 +1776,9 @@ final class PremiumEngineTests: XCTestCase {
         let movements: [(String, [String])] = [
             ("Zelle payment", ["Transfer"]),
             ("ATM withdrawal", ["Cash"]),
-            ("Payment To Auto Loan", ["Loan Payment"]),
-            ("Citi Autopay", ["Payment"]),
-            ("DLR AP Monthly Payment", [])
+            ("Citi Autopay", ["LOAN_PAYMENTS_CREDIT_CARD_PAYMENT"]),
+            ("Payment to Visa Card", []),
+            ("Card payment", [])
         ]
         let transactions = movements.flatMap { name, category in
             ["2027-03-01", "2027-04-01"].map { date -> Transaction in
@@ -1796,6 +1798,249 @@ final class PremiumEngineTests: XCTestCase {
             transactions: transactions,
             existingSubscriptions: []
         ).isEmpty)
+    }
+
+    func testMonthlyHistoryLongerThanAYearStaysMonthly() {
+        let owner = UUID(), company = UUID()
+        let transactions = (1...12).map {
+            makeTransaction(owner: owner, company: company, name: "Netflix", amount: 20,
+                date: String(format: "2027-%02d-05", $0))
+        }
+        XCTAssertEqual(SubscriptionDetector.detect(transactions: transactions, existingSubscriptions: []).first?.frequency, "Monthly")
+        let annual = ["2026-05-05", "2027-05-06"].map {
+            makeTransaction(owner: owner, company: company, name: "Adobe", amount: 120, date: $0)
+        }
+        XCTAssertEqual(SubscriptionDetector.detect(transactions: annual, existingSubscriptions: []).first?.frequency, "Yearly")
+    }
+
+    func testWeeklyQuarterlyAndIrregularPurchasesAreNotMonthlySubscriptions() {
+        let owner = UUID(), company = UUID()
+        for dates in [["2027-01-01", "2027-01-08", "2027-01-15", "2027-01-22"],
+                      ["2027-01-01", "2027-04-01", "2027-07-01"],
+                      ["2027-01-01", "2027-01-18", "2027-03-25"]] {
+            let transactions = dates.map {
+                makeTransaction(owner: owner, company: company, name: "Merchant", amount: 20, date: $0)
+            }
+            XCTAssertTrue(SubscriptionDetector.detect(transactions: transactions, existingSubscriptions: []).isEmpty)
+        }
+    }
+
+    func testVariableBillsAndLoanAutopayAreDetectedWithoutChangingCashFlowClassification() {
+        let owner = UUID(), company = UUID()
+        for (name, category) in [("City Electric Autopay", "RENT_AND_UTILITIES"),
+                                 ("Payment To Auto Loan", "LOAN_PAYMENTS_CAR_PAYMENT"),
+                                 ("DLR AP Monthly Payment", "Payment")] {
+            let transactions = zip(["2027-03-01", "2027-04-02"], [60.0, 180.0]).map { date, amount -> Transaction in
+                var transaction = makeTransaction(owner: owner, company: company, name: name, amount: amount, date: date)
+                transaction.personalFinancePrimary = category
+                return transaction
+            }
+            // Generic variable merchants need a third charge; classified bills do not.
+            let detected = SubscriptionDetector.detect(transactions: transactions, existingSubscriptions: [])
+            if name == "DLR AP Monthly Payment" {
+                let third = makeTransaction(owner: owner, company: company, name: name, amount: 95, date: "2027-05-01")
+                XCTAssertEqual(SubscriptionDetector.detect(transactions: transactions + [third], existingSubscriptions: []).count, 1)
+            } else {
+                XCTAssertEqual(detected.count, 1)
+                XCTAssertEqual(detected.first?.frequency, "Monthly")
+            }
+            XCTAssertTrue(TransactionIntelligence.isFinancialMovement(transactions[0]))
+        }
+    }
+
+    func testMerchantNamesReferencesAndWholeWordsAreMatchedSafely() {
+        let owner = UUID(), company = UUID()
+        var first = makeTransaction(owner: owner, company: company, name: "BANK REF 102030", amount: 20, date: "2027-03-01")
+        var second = makeTransaction(owner: owner, company: company, name: "OTHER BANK REF 405060", amount: 20, date: "2027-04-01")
+        first.merchantName = "Costco Membership"
+        second.merchantName = "Costco Membership"
+        let detected = SubscriptionDetector.detect(transactions: [first, second], existingSubscriptions: [])
+        XCTAssertEqual(detected.first?.merchantKey, "costco membership")
+        XCTAssertEqual(SubscriptionDetector.normalize("Microsoft 365"), "microsoft 365")
+        XCTAssertEqual(SubscriptionDetector.normalize("Spectrum Services Inc"), "spectrum")
+        XCTAssertEqual(SubscriptionDetector.normalize("Acme Autopay REF: 123456"), "acme")
+        XCTAssertEqual(SubscriptionDetector.normalize("Acme Autopay REF: 987654"), "acme")
+        let legacyRule = TransactionCategoryRule(userId: owner,
+            scopeKey: TransactionCategoryRule.scopeKey(companyId: company), merchantKey: "st membership",
+            merchantName: "Costco Membership", categoryPrimary: "GENERAL_SERVICES")
+        let records = TransactionIntelligence.resolveAll([first], companies: [], institutions: [], cards: [], categoryRules: [legacyRule])
+        XCTAssertEqual(records.first?.categoryRule?.id, legacyRule.id)
+    }
+
+    func testRecurringDetectionKeepsAccountsAndCurrenciesSeparate() {
+        let owner = UUID(), company = UUID()
+        let transactions = ["checking", "card"].flatMap { account in
+            ["EUR", "USD"].flatMap { currency in
+                ["2027-03-01", "2027-04-01"].map { date -> Transaction in
+                    var transaction = makeTransaction(owner: owner, company: company, name: "Notion", amount: currency == "EUR" ? 15 : 20, date: date)
+                    transaction.accountId = account
+                    transaction.currency = currency
+                    return transaction
+                }
+            }
+        }
+        let detected = SubscriptionDetector.detect(transactions: transactions, existingSubscriptions: [])
+        XCTAssertEqual(detected.count, 4)
+        XCTAssertEqual(Set(detected.map(\.id)).count, 4)
+        XCTAssertEqual(Set(detected.map(\.currency)), ["EUR", "USD"])
+        XCTAssertEqual(SubscriptionDetector.detect(transactions: transactions, existingSubscriptions: [], filterAccountId: "card").count, 2)
+    }
+
+    @MainActor
+    func testManualRecurringPaymentPrefillsBankCurrencyAndLocalRenewalDate() throws {
+        let owner = UUID(), company = Company(userId: UUID(), name: "Personal")
+        let bank = Institution(userId: owner, companyId: company.id, name: "Bank", accounts: [
+            InstitutionAccount(id: "checking", name: "Current account")
+        ])
+        var transaction = makeTransaction(owner: owner, company: company.id, name: "Utility autopay", amount: 125, date: "2027-03-17")
+        transaction.currency = "EUR"
+        transaction.personalFinancePrimary = "RENT_AND_UTILITIES"
+        let record = TransactionIntelligence.resolve(transaction, companies: [company], institutions: [bank], cards: [])
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let defaults = TransactionRecurringPaymentDefaults(record: record, transactions: [transaction], now: utcDate("2027-03-20"), calendar: calendar)
+        XCTAssertTrue(TransactionRecurringPaymentDefaults.canAdd(record))
+        XCTAssertEqual(defaults.billingCycle, "Monthly")
+        XCTAssertEqual(calendar.component(.day, from: defaults.renewalDate), 17)
+        XCTAssertEqual(calendar.component(.month, from: defaults.renewalDate), 4)
+        let saved = defaults.subscription(company: company, name: "Electricity", cost: 130, billingCycle: "Monthly",
+            renewalDate: defaults.renewalDate, serviceType: .bill, institutions: [bank], cards: [], calendar: calendar)
+        XCTAssertEqual(saved.userId, company.userId)
+        XCTAssertEqual(saved.companyId, company.id)
+        XCTAssertEqual(saved.currency, "EUR")
+        XCTAssertEqual(saved.cost, 130)
+        XCTAssertEqual(saved.paymentMethodId, bank.id)
+        XCTAssertEqual(saved.plaidAccountId, "checking")
+        XCTAssertEqual(saved.nextRenewal, "17")
+        XCTAssertTrue(defaults.isTracked(in: [saved], companyID: company.id, name: "Utility autopay"))
+        XCTAssertFalse(defaults.isTracked(in: [saved], companyID: UUID(), name: "Utility autopay"))
+        var followup = makeTransaction(owner: owner, company: company.id, name: "Utility autopay", amount: 125, date: "2027-04-17")
+        followup.currency = "EUR"
+        XCTAssertEqual(SubscriptionDetector.detect(transactions: [transaction, followup], existingSubscriptions: []).count, 1)
+        XCTAssertTrue(SubscriptionDetector.detect(transactions: [transaction, followup], existingSubscriptions: [saved]).isEmpty)
+    }
+
+    @MainActor
+    func testManualRecurringCardAnnualDefaultsAndPendingRefundEligibility() {
+        let owner = UUID(), company = UUID()
+        var first = makeTransaction(owner: owner, company: company, name: "Adobe", amount: 120, date: "2026-03-17")
+        first.accountId = "visa"
+        var latest = first
+        latest.id = UUID()
+        latest.date = "2027-03-17"
+        let card = FinancialCard(userId: owner, companyId: company, name: "Visa", plaidAccountId: "visa")
+        let record = TransactionIntelligence.resolve(latest, companies: [], institutions: [], cards: [card])
+        let defaults = TransactionRecurringPaymentDefaults(record: record, transactions: [first, latest], now: utcDate("2027-03-20"))
+        XCTAssertEqual(defaults.billingCycle, "Yearly")
+        let saved = defaults.subscription(company: Company(id: company, userId: owner, name: "Work"), name: "Adobe",
+            cost: 120, billingCycle: "Yearly", renewalDate: defaults.renewalDate, serviceType: .subscription, institutions: [], cards: [card])
+        XCTAssertEqual(saved.paymentMethodId, card.id)
+        latest.pending = true
+        XCTAssertFalse(TransactionRecurringPaymentDefaults.canAdd(TransactionIntelligence.resolve(latest, companies: [], institutions: [], cards: [])))
+        latest.pending = false
+        latest.amount = -120
+        XCTAssertFalse(TransactionRecurringPaymentDefaults.canAdd(TransactionIntelligence.resolve(latest, companies: [], institutions: [], cards: [])))
+    }
+
+    @MainActor
+    func testManualRecurringCreationRespectsSharedCollectionAccess() {
+        let owner = UUID(), actor = UUID()
+        let company = Company(userId: owner, name: "Shared")
+        let state = AppState()
+        state.portfolioUserID = actor
+        state.companies = [company]
+        let transaction = makeTransaction(owner: owner, company: company.id, name: "Notion", amount: 20, date: "2027-03-17")
+        let record = TransactionIntelligence.resolve(transaction, companies: [company], institutions: [], cards: [])
+        XCTAssertTrue(TransactionRecurringPaymentDefaults.eligibleCompanies(for: record, appState: state).isEmpty)
+        state.resourceShares = [ResourceShare(resourceId: UUID(), resourceType: "subscription", userId: actor, role: "Editor")]
+        XCTAssertTrue(TransactionRecurringPaymentDefaults.eligibleCompanies(for: record, appState: state).isEmpty)
+        state.resourceShares = [ResourceShare(resourceId: company.id, resourceType: "all_subscriptions", userId: actor, role: "Editor")]
+        XCTAssertEqual(TransactionRecurringPaymentDefaults.eligibleCompanies(for: record, appState: state).map(\.id), [company.id])
+    }
+
+    @MainActor
+    func testManualRecurringConfirmedSaveOnlyTracksAfterPersistence() async throws {
+        let owner = UUID(), company = Company(userId: UUID(), name: "Personal")
+        let state = AppState()
+        state.portfolioUserID = company.userId
+        state.companies = [company]
+        let transaction = makeTransaction(owner: owner, company: company.id, name: "Notion", amount: 20, date: "2027-03-17")
+        let record = TransactionIntelligence.resolve(transaction, companies: [company], institutions: [], cards: [])
+        let defaults = TransactionRecurringPaymentDefaults(record: record, transactions: [transaction])
+        let subscription = defaults.subscription(company: company, name: "Notion", cost: 20, billingCycle: "Monthly",
+            renewalDate: defaults.renewalDate, serviceType: .subscription, institutions: [], cards: [])
+        let vm = AppViewModel()
+        do {
+            _ = try await vm.saveSubscriptionConfirmed(subscription, appState: state, persist: { _, _ in
+                throw NSError(domain: "TestPersistence", code: 503)
+            })
+            XCTFail("A failed save must not appear as tracked")
+        } catch {
+            XCTAssertTrue(state.subscriptions.isEmpty)
+        }
+        var inserted = false
+        _ = try await vm.saveSubscriptionConfirmed(subscription, appState: state, persist: { value, exists in
+            XCTAssertFalse(exists)
+            XCTAssertEqual(value.plaidAccountId, "checking")
+            inserted = true
+        })
+        XCTAssertTrue(inserted)
+        XCTAssertEqual(state.subscriptions.count, 1)
+        XCTAssertTrue(defaults.isTracked(in: state.subscriptions, companyID: company.id, name: "Notion"))
+    }
+
+    @MainActor
+    func testManualRecurringPaymentFormRendersCompactAndAccessibleLayouts() async throws {
+        let owner = UUID(), company = Company(userId: UUID(), name: "Personal")
+        let state = AppState()
+        state.portfolioUserID = company.userId
+        state.companies = [company]
+        let transaction = makeTransaction(owner: owner, company: company.id, name: "City Electric", amount: 125.50, date: "2027-03-17")
+        let record = TransactionIntelligence.resolve(transaction, companies: [company], institutions: [], cards: [])
+        let defaults = TransactionRecurringPaymentDefaults(record: record, transactions: [transaction])
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        for size in [DynamicTypeSize.large, .accessibility1] {
+            let view = TransactionRecurringPaymentSheet(defaults: defaults)
+                .environment(state).environment(\.dynamicTypeSize, size)
+            let host = UIHostingController(rootView: view)
+            host.overrideUserInterfaceStyle = .dark
+            let previousWindow = scene.windows.first { $0.isKeyWindow }
+            let window = UIWindow(windowScene: scene)
+            window.frame = CGRect(x: 0, y: 0, width: 353, height: size == .large ? 850 : 1250)
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            defer {
+                window.isHidden = true
+                previousWindow?.makeKeyAndVisible()
+            }
+            host.view.frame = window.bounds
+            host.view.setNeedsLayout()
+            host.view.layoutIfNeeded()
+            try await Task.sleep(for: .milliseconds(250))
+            let renderer = UIGraphicsImageRenderer(size: window.bounds.size)
+            let image = renderer.image { _ in
+                XCTAssertTrue(window.drawHierarchy(in: window.bounds, afterScreenUpdates: true))
+            }
+            XCTAssertEqual(image.size.width, 353)
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "Recurring payment form - \(size)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
+    func testRenamedLegacyImportStaysTrackedWithBankMerchantNames() {
+        let owner = UUID(), company = UUID()
+        let transactions = ["2027-03-01", "2027-04-01"].map { date -> Transaction in
+            var transaction = makeTransaction(owner: owner, company: company, name: "Costco Membership", amount: 20, date: date)
+            transaction.merchantName = "Costco"
+            return transaction
+        }
+        let saved = Subscription(userId: owner, companyId: company, name: "Warehouse subscription",
+            plaidStreamId: "detected_st membership")
+        XCTAssertTrue(SubscriptionDetector.detect(transactions: transactions, existingSubscriptions: [saved]).isEmpty)
+        let record = TransactionIntelligence.resolve(transactions[0], companies: [], institutions: [], cards: [])
+        XCTAssertTrue(TransactionRecurringPaymentDefaults.isTracked(record: record, subscriptions: [saved], companyID: company, name: "Costco"))
     }
 
     func testImportedTransactionStreamIsSuppressedOnlyForItsCompany() {

@@ -16,7 +16,7 @@ struct DetectedSubscription: Identifiable, Hashable {
 
     /// Keeps identical merchants in different companies/accounts independent in SwiftUI.
     var id: String {
-        "\(companyId?.uuidString ?? "unscoped"):\(accountId):\(merchantKey)"
+        "\(companyId?.uuidString ?? "unscoped"):\(accountId):\(merchantKey)" + (currency == "USD" ? "" : ":\(currency)")
     }
 }
 
@@ -25,6 +25,8 @@ struct SubscriptionDetector {
     private struct GroupKey: Hashable {
         let merchant: String
         let companyId: UUID?
+        let accountId: String
+        let currency: String
     }
 
     /// Analyses raw transactions and returns recurring charges not yet in subscriptions
@@ -45,10 +47,10 @@ struct SubscriptionDetector {
         // Group by normalized merchant name (optionally filtered to one account)
         var txByKey: [GroupKey: [Transaction]] = [:]
         for tx in transactions {
-            guard let amount = tx.amount, amount > 0 else { continue }
-            guard tx.pending != true else { continue }
+            guard let amount = tx.amount, amount.isFinite, amount > 0 else { continue }
+            guard tx.pending != true, parseChargeDate(tx.date) != nil else { continue }
             if let filterAcc = filterAccountId, tx.accountId != filterAcc { continue }
-            let raw = tx.name ?? ""
+            let raw = merchantName(for: tx)
             guard !raw.isEmpty, !isExcludedFinancialMovement(tx) else { continue }
             let merchantKey = normalize(raw)
             let resolvedCompanyId = fallbackCompanyId ?? tx.companyId
@@ -63,8 +65,9 @@ struct SubscriptionDetector {
             }
             if merchantKey.isEmpty
                 || trackedNames.contains(merchantKey)
-                || trackedStreams.contains("detected_\(merchantKey)") { continue }
-            txByKey[GroupKey(merchant: merchantKey, companyId: resolvedCompanyId), default: []].append(tx)
+                || trackedStreams.contains("detected_\(merchantKey)")
+                || trackedStreams.contains("detected_\(legacyNormalize(tx.name ?? raw))") { continue }
+            txByKey[GroupKey(merchant: merchantKey, companyId: resolvedCompanyId, accountId: tx.accountId, currency: tx.currency), default: []].append(tx)
         }
         
         var results: [DetectedSubscription] = []
@@ -74,37 +77,32 @@ struct SubscriptionDetector {
             let amounts = txs.compactMap { $0.amount }
             let avg = amounts.reduce(0, +) / Double(amounts.count)
             
-            // Amounts must be within 25% of each other (recurring pattern)
-            let isSimilar = amounts.allSatisfy { abs($0 - avg) / avg < 0.25 }
-            guard isSimilar else { continue }
-            
             let sorted = txs.sorted { $0.date > $1.date }
-            let oldest = txs.sorted { $0.date < $1.date }.first!
-            
-            // Estimate frequency from date span
-            let days = dateDiff(from: oldest.date, to: sorted.first!.date)
-            let frequency: String
-            if days >= 300 {
-                frequency = "Yearly"
-            } else if days >= 15 {
-                frequency = "Monthly"
-            } else {
-                continue // too frequent to be a subscription (daily/weekly charges)
-            }
-            
-            let displayName = cleanDisplayName(sorted.first?.name ?? key.merchant)
-            
+            guard let frequency = billingFrequency(transactions: txs) else { continue }
+
+            let latest = sorted[0]
+            let displayName = cleanDisplayName(merchantName(for: latest))
+            let categories = (latest.category ?? [])
+                + [latest.personalFinancePrimary, latest.personalFinanceDetailed].compactMap { $0 }
+            let isBill = RecurringServiceClassifier.classify(
+                name: displayName, website: latest.merchantWebsite, categories: categories
+            ) == .bill
+            let isSimilar = amounts.allSatisfy { abs($0 - avg) / avg < 0.25 }
+            // Variable bills need cadence, not equal amounts. Other variable
+            // merchants need three charges to establish a recurring pattern.
+            guard isSimilar || isBill || Set(txs.map(\.date)).count >= 3 else { continue }
+
             let det = DetectedSubscription(
                 merchantKey: key.merchant,
                 name: displayName,
                 amount: (avg * 100).rounded() / 100,
-                currency: "USD",
+                currency: key.currency,
                 frequency: frequency,
                 accountId: sorted.first?.accountId ?? "",
                 companyId: key.companyId,
                 lastChargeDate: sorted.first?.date ?? "",
                 occurrences: txs.count,
-                category: sorted.first?.category,
+                category: categories,
                 website: sorted.compactMap(\.merchantWebsite).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
             )
             results.append(det)
@@ -115,23 +113,76 @@ struct SubscriptionDetector {
             .sorted { $0.amount > $1.amount }
     }
     
-    static func normalize(_ raw: String) -> String {
-        var s = raw.lowercased()
-        // Strip common prefixes
-        for prefix in ["sq *", "tst*", "paypal *", "amzn mkt", "sp *", "apl*", "apl *", "apple.com/bill"] {
-            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)) }
-        }
-        // Strip noise suffixes
-        s = s.replacingOccurrences(of: #"(\.com|digital|service|services|inc|llc|corp|ltd|co|payment|autopay|billing|recurring|#[0-9]+)"#, with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: #"[^a-z0-9\s]"#, with: "", options: .regularExpression)
-        s = s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).trimmingCharacters(in: .whitespaces)
-        return s
+    static func merchantName(for transaction: Transaction) -> String {
+        [transaction.merchantName, transaction.name].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty }) ?? ""
     }
 
-    private static func isExcludedFinancialMovement(_ transaction: Transaction) -> Bool {
-        TransactionIntelligence.isFinancialMovement(transaction)
+    static func normalize(_ raw: String) -> String {
+        var s = raw.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        for prefix in ["sq *", "tst*", "paypal *", "amzn mkt", "sp *", "apl*", "apl *"] {
+            if s.hasPrefix(prefix) { s = String(s.dropFirst(prefix.count)) }
+        }
+        // Remove labelled bank references, not digits in names like Microsoft 365.
+        s = s.replacingOccurrences(of: #"\b(?:ref|reference|invoice|inv|id)\s*[:#-]?\s*[a-z0-9-]*[0-9][a-z0-9-]*\b|#[0-9]+"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\b[0-9]{6,}\b$"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"\.com\b|\b(?:digital|services?|inc|llc|corp|ltd|co|payment|autopay|billing|recurring)\b"#, with: " ", options: .regularExpression)
+        s = s.replacingOccurrences(of: #"[^a-z0-9\s]"#, with: "", options: .regularExpression)
+        return s.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
+    /// Read compatibility for streams imported before merchant normalization was fixed.
+    static func legacyNormalize(_ raw: String) -> String {
+        var value = raw.lowercased()
+        for prefix in ["sq *", "tst*", "paypal *", "amzn mkt", "sp *", "apl*", "apl *", "apple.com/bill"] {
+            if value.hasPrefix(prefix) { value = String(value.dropFirst(prefix.count)) }
+        }
+        value = value.replacingOccurrences(of: #"(\.com|digital|service|services|inc|llc|corp|ltd|co|payment|autopay|billing|recurring|#[0-9]+)"#, with: "", options: .regularExpression)
+        value = value.replacingOccurrences(of: #"[^a-z0-9\s]"#, with: "", options: .regularExpression)
+        return value.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Subscription suggestions include recurring bills/loans. Keep this narrower
+    /// than cash-flow exclusions, which intentionally also omit loan payments.
+    static func isExcludedFinancialMovement(_ transaction: Transaction) -> Bool {
+        let categories = ((transaction.category ?? [])
+            + [transaction.personalFinancePrimary, transaction.personalFinanceDetailed].compactMap { $0 })
+            .joined(separator: " ").lowercased()
+        let categoryPatterns = [#"\btransfer"#, #"\bcash\b"#, #"\bdeposit"#, #"\bwithdrawal"#,
+                                #"credit[ _]card[ _]payment"#, #"credit card"#]
+        let name = TransactionIntelligence.displayName(for: transaction).lowercased()
+        let namePatterns = [#"\bzelle\b"#, #"\batm\b"#, #"\bwithdrawal\b"#,
+                            #"\b(?:credit card|card) payment\b"#, #"\bpayment to.*\b(?:credit card|card)\b"#,
+                            #"\btransfer (?:to|from)\b"#, #"\bmobile check deposit\b"#]
+        return categoryPatterns.contains { categories.range(of: $0, options: .regularExpression) != nil }
+            || namePatterns.contains { name.range(of: $0, options: .regularExpression) != nil }
+    }
+
+    static func billingFrequency(transactions: [Transaction]) -> String? {
+        let dates = Array(Set(transactions.compactMap { parseChargeDate($0.date) })).sorted()
+        guard dates.count >= 2 else { return nil }
+        let gaps = zip(dates, dates.dropFirst()).map { Int(($1.timeIntervalSince($0) / 86400).rounded()) }
+        if gaps.allSatisfy({ (330...400).contains($0) }) { return "Yearly" }
+        let monthlyGaps = gaps.filter { (24...38).contains($0) }.count
+        // Permit a missing month or two, but require observed monthly intervals.
+        if monthlyGaps * 2 >= gaps.count,
+           gaps.allSatisfy({ (24...38).contains($0) || (52...70).contains($0) || (82...100).contains($0) }) {
+            return "Monthly"
+        }
+        return nil
+    }
+
+    static func parseChargeDate(_ value: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.isLenient = false
+        return formatter.date(from: value)
+    }
+
     private static func cleanDisplayName(_ raw: String) -> String {
         // Title-case the first word, leave rest
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
@@ -143,13 +194,7 @@ struct SubscriptionDetector {
             }
             .joined(separator: " ")
     }
-    
-    private static func dateDiff(from start: String, to end: String) -> Int {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        guard let d1 = df.date(from: start), let d2 = df.date(from: end) else { return 0 }
-        return abs(Int(d2.timeIntervalSince(d1) / 86400))
-    }
+
 }
 
 // MARK: - Persistent suggestion lifecycle and import defaults
@@ -497,6 +542,7 @@ struct DetectedSubscriptionsSheet: View {
     
     @MainActor
     private func addSubscription(_ det: DetectedSubscription) async {
+        guard isAdding == nil else { return }
         isAdding = det.id
         
         let session = try? await SupabaseService.shared.client.auth.session
@@ -510,6 +556,16 @@ struct DetectedSubscriptionsSheet: View {
             appState.cards.first(where: { $0.plaidAccountId == det.accountId })
         
         guard let targetCompanyId = det.companyId ?? companyId ?? matchCard?.companyId ?? appState.companies.first?.id else {
+            isAdding = nil
+            return
+        }
+        // Two account-specific suggestions may resolve to the same service.
+        // Recheck after each awaited import, including within Add All.
+        if appState.subscriptions.contains(where: {
+            $0.companyId == targetCompanyId && (SubscriptionDetector.normalize($0.name) == det.merchantKey
+                || $0.plaidStreamId == "detected_\(det.merchantKey)")
+        }) {
+            added.insert(det.id)
             isAdding = nil
             return
         }

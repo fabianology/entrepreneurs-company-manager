@@ -562,7 +562,9 @@ enum TransactionIntelligence {
             $0[$1.transactionId] = $1
         }
         let categoryRulesByMerchant = categoryRules.reduce(into: [String: TransactionCategoryRule]()) {
-            $0[merchantRuleKey(scopeKey: $1.scopeKey, merchantKey: $1.merchantKey)] = $1
+            // Reindex older keys from the saved name (e.g. Costco lost "co").
+            let merchantKey = SubscriptionDetector.normalize($1.merchantName).nonEmpty ?? $1.merchantKey
+            $0[merchantRuleKey(scopeKey: $1.scopeKey, merchantKey: merchantKey)] = $1
         }
 
         return transactions
@@ -2254,6 +2256,232 @@ private struct SpendingCategorySheet: View {
     }
 }
 
+/// Defaults and identity shared by the transaction action and its confirmation form.
+struct TransactionRecurringPaymentDefaults {
+    let record: ResolvedTransaction
+    let name: String
+    let merchantKey: String
+    let billingCycle: String
+    let renewalDate: Date
+    let serviceType: RecurringServiceType
+
+    static func canAdd(_ record: ResolvedTransaction) -> Bool {
+        let amount = record.transaction.amount ?? 0
+        return record.transaction.pending != true && amount.isFinite && amount > 0
+            && !SubscriptionDetector.merchantName(for: record.transaction).isEmpty
+            && record.override?.flowOverride != .ignored
+            && record.override?.flowOverride != .income
+            && record.override?.flowOverride != .refund
+    }
+
+    static func eligibleCompanies(for record: ResolvedTransaction, appState: AppState) -> [Company] {
+        let freeCompanyID = appState.entitlementSnapshot.selectedFreeCompanyId
+            ?? appState.companies.filter { $0.userId == appState.portfolioUserID }
+                .sorted { $0.lastModified < $1.lastModified }.first?.id
+        return appState.companies.filter { company in
+            (record.companyId == nil || company.id == record.companyId)
+                && AppViewModel.resourceAllowsCreation(
+                    appState.resourceShares, actorID: appState.portfolioUserID,
+                    ownerID: company.userId, companyID: company.id, resourceType: "subscription",
+                    ownerCanEdit: appState.entitlementSnapshot.hasProAccess || company.id == freeCompanyID
+                )
+        }
+    }
+
+    init(record: ResolvedTransaction, transactions: [Transaction], now: Date = Date(), calendar: Calendar = .current) {
+        self.record = record
+        name = TransactionIntelligence.displayName(for: record)
+        let merchantKey = SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record))
+        self.merchantKey = merchantKey
+        let matching = transactions.filter {
+            $0.pending != true && ($0.amount ?? 0) > 0
+                && $0.accountId == record.accountId && $0.currency == record.transaction.currency
+                && ($0.companyId == nil || $0.companyId == record.companyId)
+                && SubscriptionDetector.normalize(SubscriptionDetector.merchantName(for: $0)) == merchantKey
+        }
+        billingCycle = SubscriptionDetector.billingFrequency(transactions: matching) ?? "Monthly"
+        renewalDate = Self.nextRenewalDate(transactionDate: record.transaction.date,
+            billingCycle: billingCycle, now: now, calendar: calendar)
+        serviceType = RecurringServiceClassifier.classify(
+            name: name, website: record.transaction.merchantWebsite,
+            categories: [TransactionIntelligence.categoryPrimary(for: record),
+                         TransactionIntelligence.categoryDetailed(for: record)].compactMap { $0 }
+        )
+    }
+
+    static func nextRenewalDate(transactionDate: String, billingCycle: String,
+                               now: Date = Date(), calendar: Calendar = .current) -> Date {
+        // Parse at local noon so a bank's calendar date does not shift a day west of UTC.
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        let chargedAt = formatter.date(from: "\(transactionDate) 12:00") ?? now
+        return SubscriptionRenewalScheduler.nextDueDate(
+            from: chargedAt, cycle: billingCycle == "Yearly" ? .yearly : .monthly,
+            now: now, calendar: calendar
+        )
+    }
+
+    func isTracked(in subscriptions: [Subscription], companyID: UUID, name: String) -> Bool {
+        Self.isTracked(record: record, subscriptions: subscriptions, companyID: companyID, name: name)
+    }
+
+    static func isTracked(record: ResolvedTransaction, subscriptions: [Subscription], companyID: UUID, name: String) -> Bool {
+        let keys = Set([SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: record)),
+                        SubscriptionDetector.normalize(SubscriptionDetector.merchantName(for: record.transaction)),
+                        SubscriptionDetector.normalize(name)])
+            .subtracting([""])
+        let legacyKey = SubscriptionDetector.legacyNormalize(record.transaction.name ?? "")
+        return subscriptions.contains { subscription in
+            subscription.companyId == companyID && (keys.contains(SubscriptionDetector.normalize(subscription.name))
+                || keys.contains(where: { "detected_\($0)" == subscription.plaidStreamId })
+                || (!legacyKey.isEmpty && subscription.plaidStreamId == "detected_\(legacyKey)"))
+        }
+    }
+
+    func subscription(company: Company, name: String, cost: Double, billingCycle: String,
+                      renewalDate: Date, serviceType: RecurringServiceType,
+                      institutions: [Institution], cards: [FinancialCard], calendar: Calendar = .current) -> Subscription {
+        let sourceCards = cards.filter { $0.companyId == company.id }
+        let sourceInstitutions = institutions.filter { $0.companyId == company.id }
+        let card = PaymentSourceResolver.card(paymentMethod: nil, paymentMethodId: nil,
+            plaidAccountId: record.accountId, cards: sourceCards)
+        let bank = PaymentSourceResolver.account(paymentMethod: nil, paymentMethodId: nil,
+            plaidAccountId: record.accountId, institutions: sourceInstitutions)
+        return Subscription(
+            userId: company.userId, companyId: company.id, name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            cost: cost, currency: record.transaction.currency, billingCycle: billingCycle,
+            paymentMethod: record.accountName, paymentMethodId: card?.id ?? bank?.institution.id,
+            nextRenewal: billingCycle == "Yearly"
+                ? SubscriptionRenewalScheduler.yearlyDisplayDate(renewalDate, calendar: calendar)
+                : String(calendar.component(.day, from: renewalDate)),
+            nextRenewalAt: renewalDate, website: record.transaction.merchantWebsite, serviceType: serviceType,
+            plaidStreamId: merchantKey.isEmpty ? nil : "detected_\(merchantKey)", plaidAccountId: record.accountId
+        )
+    }
+}
+
+struct TransactionRecurringPaymentSheet: View {
+    @Environment(AppState.self) private var appState
+    @Environment(\.dismiss) private var dismiss
+    @State private var vm = AppViewModel()
+    let defaults: TransactionRecurringPaymentDefaults
+    @State private var companyID: UUID?
+    @State private var name: String
+    @State private var cost: Double
+    @State private var billingCycle: String
+    @State private var renewalDate: Date
+    @State private var serviceType: RecurringServiceType
+    @State private var isSaving = false
+    @State private var saveError: String?
+
+    init(defaults: TransactionRecurringPaymentDefaults) {
+        self.defaults = defaults
+        _companyID = State(initialValue: defaults.record.companyId)
+        _name = State(initialValue: defaults.name)
+        _cost = State(initialValue: defaults.record.transaction.amount ?? 0)
+        _billingCycle = State(initialValue: defaults.billingCycle)
+        _renewalDate = State(initialValue: defaults.renewalDate)
+        _serviceType = State(initialValue: defaults.serviceType)
+    }
+
+    private var companies: [Company] {
+        TransactionRecurringPaymentDefaults.eligibleCompanies(for: defaults.record, appState: appState)
+    }
+    private var company: Company? { companies.first { $0.id == companyID } }
+    private var alreadyTracked: Bool {
+        guard let companyID else { return false }
+        return defaults.isTracked(in: appState.subscriptions, companyID: companyID, name: name)
+    }
+    private var canSave: Bool {
+        company != nil && name.nonEmpty != nil && cost.isFinite && cost > 0 && !alreadyTracked
+            && TransactionRecurringPaymentDefaults.canAdd(defaults.record)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                formContent
+            }
+            .background(Color(hex: "#1C1C1E"))
+            .navigationTitle("Recurring Payment")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) { Button("Cancel") { dismiss() }.disabled(isSaving) }
+            }
+            .disabled(isSaving)
+            .interactiveDismissDisabled(isSaving)
+            .alert("Recurring Payment Not Saved", isPresented: Binding(
+                get: { saveError != nil }, set: { if !$0 { saveError = nil } }
+            )) { Button("OK", role: .cancel) { saveError = nil } }
+            message: { Text(saveError ?? "") }
+        }
+        .tint(Color.zifrGold)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var formContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Confirm the recurring payment to track it in Services.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            PremiumInputField(label: "NAME", placeholder: "Merchant or service", text: $name)
+            PremiumDoubleField(label: "AMOUNT", placeholder: "0.00", currency: defaults.record.transaction.currency, value: $cost)
+            Picker("Company", selection: $companyID) {
+                Text("Select company").tag(nil as UUID?)
+                ForEach(companies) { Text($0.name).tag(Optional($0.id)) }
+            }
+            LabeledContent("Paid from", value: defaults.record.accountName)
+            CustomSegmentedControl(options: ["Monthly", "Yearly"], selection: $billingCycle)
+                .onChange(of: billingCycle) { _, newValue in
+                    renewalDate = TransactionRecurringPaymentDefaults.nextRenewalDate(
+                        transactionDate: defaults.record.transaction.date, billingCycle: newValue)
+                }
+            DatePicker("Next payment", selection: $renewalDate, displayedComponents: .date)
+            Picker("Service type", selection: $serviceType) {
+                ForEach(RecurringServiceType.allCases) { Text($0.title).tag($0) }
+            }
+            if alreadyTracked {
+                Label("This recurring payment is already in Services.", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(Color.zifrGold)
+            }
+            if companies.isEmpty {
+                Text("You need permission to add services for this company.")
+                    .foregroundStyle(.secondary)
+            }
+            Button {
+                Task { await save() }
+            } label: {
+                Text(isSaving ? "Saving…" : "Add recurring payment")
+                    .font(.system(size: 16, weight: .bold))
+                    .frame(maxWidth: .infinity, minHeight: 54)
+            }
+            .buttonStyle(MiloomPrimaryButtonStyle())
+            .disabled(!canSave || isSaving)
+            .accessibilityIdentifier("transaction.recurring.save")
+        }
+        .padding(20)
+    }
+
+    @MainActor
+    private func save() async {
+        guard !isSaving, canSave, let company else { return }
+        isSaving = true
+        defer { isSaving = false }
+        let subscription = defaults.subscription(company: company, name: name, cost: cost,
+            billingCycle: billingCycle, renewalDate: renewalDate, serviceType: serviceType,
+            institutions: appState.institutions, cards: appState.cards)
+        do {
+            _ = try await vm.saveSubscriptionConfirmed(subscription, appState: appState)
+            dismiss()
+        } catch {
+            saveError = ResourceSaveFailure.message(for: error, resource: "recurring payment")
+        }
+    }
+}
+
 struct TransactionDetailSheet: View {
     @Environment(AppState.self) private var appState
     @State private var showBusinessReview = false
@@ -2271,6 +2499,33 @@ struct TransactionDetailSheet: View {
     @State private var isSaving = false
     @State private var saveError: String?
     @State private var showResetConfirmation = false
+    @State private var showRecurringPayment = false
+
+    private var recurringDefaults: TransactionRecurringPaymentDefaults {
+        TransactionRecurringPaymentDefaults(record: record, transactions: appState.transactionsForAnalysis)
+    }
+
+    @ViewBuilder
+    private var recurringPaymentAction: some View {
+        if TransactionRecurringPaymentDefaults.canAdd(record) {
+            let tracked = record.companyId.map {
+                TransactionRecurringPaymentDefaults.isTracked(record: record, subscriptions: appState.subscriptions,
+                    companyID: $0, name: TransactionIntelligence.displayName(for: record))
+            } ?? false
+            Button {
+                showRecurringPayment = true
+            } label: {
+                Label(tracked ? "Recurring payment already in Services" : "Add recurring payment",
+                      systemImage: tracked ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+            }
+            .buttonStyle(.bordered)
+            .tint(Color.zifrGold)
+            .disabled(tracked || isSaving)
+            .accessibilityIdentifier("transaction.recurring.add")
+        }
+    }
 
     private static let primaryCategories = [
         "FOOD_AND_DRINK",
@@ -2306,31 +2561,13 @@ struct TransactionDetailSheet: View {
         }
 
         let matching = appState.transactions.filter { transaction in
-            guard transaction.pending != true,
-                  (transaction.amount ?? 0) > 0,
-                  !TransactionIntelligence.isFinancialMovement(transaction),
-                  SubscriptionDetector.normalize(TransactionIntelligence.displayName(for: transaction)) == merchantKey
-            else { return false }
-            return transaction.accountId == record.accountId || transaction.companyId == record.companyId
+            transaction.pending != true && (transaction.amount ?? 0) > 0
+                && !SubscriptionDetector.isExcludedFinancialMovement(transaction)
+                && SubscriptionDetector.normalize(SubscriptionDetector.merchantName(for: transaction)) == merchantKey
+                && transaction.accountId == record.accountId && transaction.currency == record.transaction.currency
+                && (transaction.companyId == nil || transaction.companyId == record.companyId)
         }
-        guard matching.count >= 2 else { return false }
-
-        let amounts = matching.compactMap(\.amount)
-        let average = amounts.reduce(0, +) / Double(amounts.count)
-        guard average > 0,
-              amounts.allSatisfy({ abs($0 - average) / average < 0.25 })
-        else { return false }
-
-        let dates = matching.compactMap { Self.transactionDate($0.date) }.sorted()
-        guard let first = dates.first, let last = dates.last else { return false }
-        return last.timeIntervalSince(first) >= 15 * 24 * 60 * 60
-    }
-
-    private static func transactionDate(_ value: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.date(from: value)
+        return SubscriptionDetector.billingFrequency(transactions: matching) != nil
     }
 
     init(
@@ -2401,6 +2638,7 @@ struct TransactionDetailSheet: View {
                     VStack(spacing: 16) {
                         transactionHero
                         sourceDetails
+                        recurringPaymentAction
                         TaxOpportunitiesButton(count: 0) { showBusinessReview = true }
                         if let review = appState.businessExpenseReviews.first(where: { $0.transactionId == record.id }) {
                             Text(review.statusLabel).font(.caption).foregroundStyle(Color.zifrGold)
@@ -2425,6 +2663,9 @@ struct TransactionDetailSheet: View {
                 }
             }
             .sheet(isPresented: $showBusinessReview) { BusinessExpenseReviewSheet(transaction: record) }
+            .sheet(isPresented: $showRecurringPayment) {
+                TransactionRecurringPaymentSheet(defaults: recurringDefaults)
+            }
             .navigationTitle("Transaction Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(Color(hex: "#1C1C1E"), for: .navigationBar)
