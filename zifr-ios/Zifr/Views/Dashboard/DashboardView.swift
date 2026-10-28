@@ -39,6 +39,7 @@ struct DashboardView: View {
     @State private var duoBottomControlsWindowCenterY: CGFloat?
     @State private var duoBottomToolbarWindowCenterY: CGFloat?
     @State private var showBriefing = false
+    @State private var showPortraitBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
     @State private var taxReviewCompany: Company?
@@ -96,12 +97,31 @@ struct DashboardView: View {
                 add: plusCommandMenu,
                 entities: EmptyView()
             ))
+            .allowsHitTesting(!showPortraitBriefing || !usesDuoPortraitDashboard || !vm.path.isEmpty)
+            .accessibilityHidden(showPortraitBriefing && usesDuoPortraitDashboard && vm.path.isEmpty)
+            .overlay {
+                if usesDuoPortraitDashboard && vm.path.isEmpty {
+                    MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: 62) {
+                        inlineBriefingPanel
+                    }
+                }
+            }
+            .onChange(of: usesDuoPortraitDashboard) { _, portrait in
+                if !portrait { showPortraitBriefing = false }
+            }
+            .onChange(of: vm.path.isEmpty) { _, dashboard in
+                if !dashboard { showPortraitBriefing = false }
+            }
         } else {
             dashboardSurface
         }
         #else
         dashboardSurface
         #endif
+    }
+
+    private var usesDuoPortraitDashboard: Bool {
+        duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
     }
 
     private var dashboardSurface: some View {
@@ -222,6 +242,23 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var dashboardBottomControls: some View {
+        if usesDuoPortraitDashboard {
+            GeometryReader { geometry in
+                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size,
+                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                dashboardBottomControlsRow
+                    .background {
+                        #if compiler(>=6.4)
+                        if #available(iOS 27.1, *) {
+                            DuoDashboardWindowCenterReader { duoBottomControlsWindowCenterY = $0 }
+                        }
+                        #endif
+                    }
+                    .frame(width: max(0, frames.page.width - 40))
+                    .offset(x: frames.page.minX + 20)
+            }
+            .frame(height: 56)
+        } else {
         #if compiler(>=6.4)
         if #available(iOS 27.1, *) {
             dashboardBottomControlsRow
@@ -242,6 +279,7 @@ struct DashboardView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 12)
         #endif
+        }
     }
 
     private var dashboardBottomControlsRow: some View {
@@ -656,7 +694,15 @@ struct DashboardView: View {
     @ViewBuilder
     private var portfolioPanels: some View {
         #if compiler(>=6.4)
-        if #available(iOS 27.1, *) {
+        if #available(iOS 27.1, *), usesDuoPortraitDashboard {
+            GeometryReader { geometry in
+                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size,
+                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                entityList(isDuoExpanded: true)
+                    .frame(width: frames.page.width, height: frames.page.height)
+                    .offset(x: frames.page.minX)
+            }
+        } else if #available(iOS 27.1, *) {
             DuoDashboardPanels(
                 bottomControlCenterY: duoBottomToolbarCenterY,
                 cards: { expanded in entityList(isDuoExpanded: expanded) },
@@ -692,39 +738,7 @@ struct DashboardView: View {
         }
     }
 
-    @ViewBuilder
     private func entityList(isDuoExpanded: Bool = false) -> some View {
-        if duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
-            && !companies.isEmpty && !onboardingState.isTutorialActive {
-            ScrollView {
-                VStack(spacing: 16) {
-                    if let issue = appState.portfolioLoadIssue {
-                        Button {
-                            Task { await DataRepository.shared.fetchAllData(appState: appState) }
-                        } label: {
-                            Label(issue, systemImage: "exclamationmark.arrow.triangle.2.circlepath")
-                                .font(.footnote).foregroundStyle(Color.zifrGold)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Retry loading entities: \(issue)")
-                    }
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
-                        ForEach(filteredCompanies) { company in
-                            companyCardRow(for: company, compact: true).frame(maxWidth: .infinity)
-                        }
-                    }
-                    .accessibilityIdentifier("duo.portraitEntityGrid")
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 16)
-            }
-            .scrollIndicators(.hidden)
-        } else {
-            legacyEntityList(isDuoExpanded: isDuoExpanded)
-        }
-    }
-
-    private func legacyEntityList(isDuoExpanded: Bool = false) -> some View {
                     List {
                         if let loadIssue = appState.portfolioLoadIssue {
                             Button {
@@ -1025,7 +1039,8 @@ struct DashboardView: View {
             showPremiumUpgrade = true
             return
         }
-        showBriefing = true
+        if usesDuoPortraitDashboard { showPortraitBriefing = true }
+        else { showBriefing = true }
     }
 
     private func dismissBriefing(then action: @escaping () -> Void) {
@@ -1175,6 +1190,7 @@ struct DashboardView: View {
             HStack(spacing: 8) {
                 Spacer()
                 if isDuoDevice && !usesDuoSideToolbar { dashboardShareControl }
+                if !usesDuoPortraitDashboard {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     presentBriefing(source: "dashboard_header_receipt")
@@ -1189,6 +1205,8 @@ struct DashboardView: View {
                 .accessibilityLabel("Executive briefing receipt")
                 .accessibilityHint("Opens the personal or business monthly briefing")
 
+                }
+
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showNotificationInbox = true
@@ -1198,7 +1216,7 @@ struct DashboardView: View {
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.82))
                             .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(0.32), in: Circle())
+                            .background(Color.black.opacity(usesDuoPortraitDashboard ? 0 : 0.32), in: Circle())
 
                         if appState.unreadNotificationCount > 0 {
                             Text(appState.unreadNotificationCount > 99 ? "99+" : "\(appState.unreadNotificationCount)")
@@ -1403,7 +1421,8 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
                     .frame(width: 52)
                     .padding(.top, 12)
                     .padding(.bottom, 12)
-                    .padding(.trailing, 12)
+                    // Match the expanded-portrait Wi-Fi indicator center on every page.
+                    .padding(.trailing, 22)
                     .frame(maxHeight: .infinity)
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("duo.portraitToolbar")

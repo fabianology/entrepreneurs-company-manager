@@ -339,16 +339,33 @@ struct MiloomDuoFilingTab: View {
 
 /// A square leading edge makes the sheet emerge from the phone's left side.
 /// The title stays in the inset card; a vertical pull handle sits on the glass.
+enum DuoReportPull {
+    static func stretch(translation: CGFloat, sheetWidth: CGFloat) -> CGFloat {
+        guard translation.isFinite, sheetWidth.isFinite else { return 0 }
+        return min(48, max(0, sheetWidth) / 9, max(0, translation) * 0.35)
+    }
+
+    static func shouldClose(translation: CGFloat, predicted: CGFloat) -> Bool {
+        guard translation.isFinite, predicted.isFinite else { return false }
+        return translation < -40 || predicted < -100 || translation > 64
+            || (translation > 28 && predicted > 180)
+    }
+}
+
 struct MiloomDuoPortraitSheet<Content: View>: View {
     let title: String
     let onClose: () -> Void
+    var showsCard = true
     @ViewBuilder let content: () -> Content
     @State private var dragOffset: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AccessibilityFocusState private var titleFocused: Bool
 
     var body: some View {
+        GeometryReader { geometry in
+        let stretch = DuoReportPull.stretch(translation: dragOffset, sheetWidth: geometry.size.width)
         VStack(spacing: 0) {
+            if showsCard {
             Text(title)
                 .font(.system(.headline, design: .monospaced).weight(.bold))
                 .foregroundStyle(Color.zifrGold)
@@ -358,35 +375,45 @@ struct MiloomDuoPortraitSheet<Content: View>: View {
                 .padding(.bottom, 8)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityFocused($titleFocused)
+            }
             content().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Color(hex: "#0D4635"), in: RoundedRectangle(cornerRadius: 20))
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .padding(.leading, 20)
+        .background(Color(hex: "#0D4635").opacity(showsCard ? 1 : 0), in: RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: showsCard ? 20 : 0))
+        .padding(.leading, 20 + stretch)
         // Preserve the previous 44-point control row plus its 4-point top inset.
         .padding([.top, .trailing, .bottom], 48)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: geometry.size.width + stretch, height: geometry.size.height)
         .background { clearGlass }
         .overlay(alignment: .trailing) {
-            Button(action: onClose) {
-                Capsule().fill(.white.opacity(0.6)).frame(width: 4, height: 36)
-                    .frame(width: 44, height: 80).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 2)
-            .accessibilityLabel("Close \(title)")
-            .accessibilityHint("Drag left or double tap to close the report")
-            .simultaneousGesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
-                .onChanged { dragOffset = min(0, $0.translation.width) }
-                .onEnded { value in
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.32)) { dragOffset = 0 }
-                    if value.translation.width < -40 || value.predictedEndTranslation.width < -100 { onClose() }
-                })
+            Capsule().fill(.white.opacity(0.6)).frame(width: 4, height: 36)
+                .frame(width: 44, height: 80).contentShape(Rectangle())
+                .padding(.trailing, 2)
+                .accessibilityLabel("Close \(title)")
+                .accessibilityHint("Pull firmly right, drag left, or double tap to close the report")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { onClose() }
+                .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                    .onChanged { dragOffset = $0.translation.width }
+                    .exclusively(before: TapGesture())
+                    .onEnded { result in
+                        switch result {
+                        case .first(let value):
+                            let closes = DuoReportPull.shouldClose(translation: value.translation.width,
+                                                                  predicted: value.predictedEndTranslation.width)
+                            withAnimation(reduceMotion ? nil : (closes ? .easeInOut(duration: 0.32) : .spring(response: 0.34, dampingFraction: 0.78))) {
+                                dragOffset = 0
+                            }
+                            if closes { onClose() }
+                        case .second: onClose()
+                        }
+                    })
         }
         .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-        .offset(x: dragOffset)
+        .offset(x: min(0, dragOffset))
         .accessibilityAction(.escape, onClose)
-        .onAppear { titleFocused = true }
+        .onAppear { titleFocused = showsCard }
+        }
     }
 
     @ViewBuilder private var clearGlass: some View {
@@ -425,6 +452,67 @@ struct MiloomDuoReportSelection<Financial: View, Subscriptions: View>: View {
             .pickerStyle(.segmented)
             .padding(16)
             if showsSubscriptions { subscriptions() } else { financial() }
+        }
+    }
+}
+
+
+/// Dashboard briefing uses the same edge divider, glass card and pull gestures
+/// as the portrait entity workspace, with the receipt directly on clear glass.
+struct MiloomDuoBriefingFile<Content: View>: View {
+    @Binding var isPresented: Bool
+    var tabTopInset: CGFloat = 0
+    @ViewBuilder let content: () -> Content
+    @State private var progress: CGFloat = 0
+    @State private var dragging = false
+    @State private var generation = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { geometry in
+            let frames = DuoBinderDrawerFrames.resolve(size: geometry.size, progress: progress, tabIndex: 0)
+            ZStack(alignment: .topLeading) {
+                if isPresented {
+                    Color.clear.contentShape(Rectangle()).onTapGesture { settle(open: false) }
+                        .accessibilityHidden(true).zIndex(1)
+                    MiloomDuoPortraitSheet(title: "Executive Briefing", onClose: { settle(open: false) }, showsCard: false) {
+                        content()
+                    }
+                    .frame(width: frames.sheet.width, height: frames.sheet.height)
+                    .offset(x: frames.sheet.minX)
+                    .transition(.identity).zIndex(2)
+                }
+                MiloomDuoFilingTab(title: "Executive Briefing", icon: "receipt", isSelected: false,
+                    action: { isPresented = true },
+                    onDragChanged: { translation in
+                        dragging = true
+                        if !isPresented { isPresented = true }
+                        progress = min(1, max(0, translation / max(1, frames.travel)))
+                    },
+                    onDragEnded: { _, predicted in settle(open: predicted / max(1, frames.travel) > 0.5) })
+                    .frame(width: frames.tab.width, height: frames.tab.height)
+                    .offset(y: frames.tab.minY + tabTopInset)
+                    .allowsHitTesting(!isPresented || dragging).accessibilityHidden(isPresented && !dragging)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .clipped()
+            .accessibilityElement(children: .contain)
+            .accessibilityAddTraits(isPresented ? .isModal : [])
+            .onChange(of: isPresented, initial: true) { _, visible in
+                if !visible { progress = 0 }
+                else if !dragging { settle(open: true) }
+            }
+        }
+    }
+
+    private func settle(open: Bool) {
+        dragging = false
+        generation += 1
+        let current = generation
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.32), completionCriteria: .logicallyComplete) {
+            progress = open ? 1 : 0
+        } completion: {
+            if !open && generation == current { isPresented = false }
         }
     }
 }

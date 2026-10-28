@@ -63,6 +63,23 @@ final class ExecutiveBriefingTests: XCTestCase {
         }
     }
 
+    func testDuoReportPullResistsAndBoundsRightwardStretch() {
+        XCTAssertEqual(DuoReportPull.stretch(translation: 40, sheetWidth: 630), 14, accuracy: 0.001)
+        XCTAssertEqual(DuoReportPull.stretch(translation: 400, sheetWidth: 630), 48)
+        XCTAssertEqual(DuoReportPull.stretch(translation: 400, sheetWidth: 90), 10)
+        XCTAssertEqual(DuoReportPull.stretch(translation: -40, sheetWidth: 630), 0)
+        XCTAssertEqual(DuoReportPull.stretch(translation: .nan, sheetWidth: 630), 0)
+    }
+
+    func testDuoReportPullDistinguishesGentleReleaseFromDeliberateClose() {
+        XCTAssertFalse(DuoReportPull.shouldClose(translation: 24, predicted: 500))
+        XCTAssertFalse(DuoReportPull.shouldClose(translation: 40, predicted: 45))
+        XCTAssertTrue(DuoReportPull.shouldClose(translation: 65, predicted: 65))
+        XCTAssertTrue(DuoReportPull.shouldClose(translation: 32, predicted: 200))
+        XCTAssertTrue(DuoReportPull.shouldClose(translation: -45, predicted: -45))
+        XCTAssertFalse(DuoReportPull.shouldClose(translation: .nan, predicted: 100))
+    }
+
     func testHolographicSectorSelectionDoesNotTurnCreditsOrInvalidValuesIntoDebt() {
         let slices: [DuoReportSlice] = [
             .init(id: "credit", title: "Credit balance", value: -20, color: .white),
