@@ -586,15 +586,15 @@ struct CompanyDetailView: View {
                     .environment(appState)
             }
         case .reports(let report):
-            MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }) {
+            MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }, showsCard: false) {
                 if report == .financial {
                     FinancialReceiptView(company: company, institutions: institutions,
                         cards: cards, loans: loans, subscriptions: subscriptions,
-                        isEmbedded: true, usesHolographicStyle: true)
+                        isEmbedded: true)
                 } else {
                     SubscriptionReceiptView(company: company, subscriptions: subscriptions,
                         institutions: institutions, cards: cards,
-                        isEmbedded: true, usesHolographicStyle: true)
+                        isEmbedded: true)
                 }
             }
         }
