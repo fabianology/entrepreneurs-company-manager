@@ -8,6 +8,7 @@ struct FinancialReceiptView: View {
     let subscriptions: [Subscription]
     var isEmbedded = false
     var usesHolographicStyle = false
+    var fillsEmbeddedSheet = false
     @State private var showsAccountDetails = false
     
     @Environment(\.dismiss) private var dismiss
@@ -123,8 +124,8 @@ struct FinancialReceiptView: View {
                 .padding(24)
                 .background(paperColor)
             }
-            .padding(.vertical, 32)
-            .padding(.horizontal, 16)
+            .padding(.vertical, fillsEmbeddedSheet ? 0 : 32)
+            .padding(.horizontal, fillsEmbeddedSheet ? 0 : 16)
             .shadow(color: .white.opacity(0.1), radius: 20, x: 0, y: 10)
         }
         .background {

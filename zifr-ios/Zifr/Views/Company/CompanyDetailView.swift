@@ -590,11 +590,11 @@ struct CompanyDetailView: View {
                 if report == .financial {
                     FinancialReceiptView(company: company, institutions: institutions,
                         cards: cards, loans: loans, subscriptions: subscriptions,
-                        isEmbedded: true)
+                        isEmbedded: true, fillsEmbeddedSheet: true)
                 } else {
                     SubscriptionReceiptView(company: company, subscriptions: subscriptions,
                         institutions: institutions, cards: cards,
-                        isEmbedded: true)
+                        isEmbedded: true, fillsEmbeddedSheet: true)
                 }
             }
         }

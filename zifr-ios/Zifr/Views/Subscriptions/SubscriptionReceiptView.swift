@@ -139,6 +139,7 @@ struct SubscriptionReceiptView: View {
     let cards: [FinancialCard]
     var isEmbedded = false
     var usesHolographicStyle = false
+    var fillsEmbeddedSheet = false
     @State private var showsServices = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -178,8 +179,8 @@ struct SubscriptionReceiptView: View {
     private var receiptScroll: some View {
         ScrollView(.vertical) {
             reportContent
-                .padding(.horizontal, usesHolographicStyle ? 0 : 20)
-                .padding(.vertical, usesHolographicStyle ? 0 : 16)
+                .padding(.horizontal, usesHolographicStyle || fillsEmbeddedSheet ? 0 : 20)
+                .padding(.vertical, usesHolographicStyle || fillsEmbeddedSheet ? 0 : 16)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         .scrollIndicators(.hidden)
