@@ -101,7 +101,8 @@ struct DashboardView: View {
             .accessibilityHidden(showPortraitBriefing && usesDuoPortraitDashboard && vm.path.isEmpty)
             .overlay {
                 if usesDuoPortraitDashboard && vm.path.isEmpty {
-                    MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: 62) {
+                    MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: 62,
+                        additionalControls: AnyView(notificationInboxButton)) {
                         inlineBriefingPanel
                     }
                 }
@@ -1176,14 +1177,47 @@ struct DashboardView: View {
         return items.sorted { $0.createdAt > $1.createdAt }
     }
 
+    private var notificationInboxButton: some View {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showNotificationInbox = true
+                } label: {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: appState.unreadNotificationCount > 0 ? "bell.fill" : "bell")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(usesDuoPortraitDashboard ? Color.zifrGold : Color.white.opacity(0.82))
+                            .frame(width: usesDuoPortraitDashboard ? 44 : 40, height: usesDuoPortraitDashboard ? 44 : 40)
+                            .background(Color.black.opacity(usesDuoPortraitDashboard ? 0 : 0.32), in: Circle())
+
+                        if appState.unreadNotificationCount > 0 {
+                            Text(appState.unreadNotificationCount > 99 ? "99+" : "\(appState.unreadNotificationCount)")
+                                .font(.system(size: 8, weight: .black))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .frame(minWidth: 17, minHeight: 17)
+                                .background(Color.red, in: Capsule())
+                                .offset(x: 3, y: -2)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Notification inbox")
+                .accessibilityValue(appState.unreadNotificationCount == 0
+                    ? "No unread alerts"
+                    : "\(appState.unreadNotificationCount) unread alerts")
+    }
+
     private var headerSection: some View {
         ZStack {
             GeometryReader { geometry in
+                let cardFrames = DuoPortraitFilingFrames.resolve(size: geometry.size,
+                    landscapePageWidth: duoLayout.portraitEntityWidth)
                 Image("miloom_text_embossed")
                     .resizable()
                     .scaledToFit()
                     .frame(width: geometry.size.width * 0.35)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .position(x: usesDuoPortraitDashboard ? cardFrames.page.midX : geometry.size.width / 2,
+                              y: geometry.size.height / 2)
                     .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
             }
 
@@ -1207,33 +1241,7 @@ struct DashboardView: View {
 
                 }
 
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showNotificationInbox = true
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: appState.unreadNotificationCount > 0 ? "bell.fill" : "bell")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.82))
-                            .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(usesDuoPortraitDashboard ? 0 : 0.32), in: Circle())
-
-                        if appState.unreadNotificationCount > 0 {
-                            Text(appState.unreadNotificationCount > 99 ? "99+" : "\(appState.unreadNotificationCount)")
-                                .font(.system(size: 8, weight: .black))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 5)
-                                .frame(minWidth: 17, minHeight: 17)
-                                .background(Color.red, in: Capsule())
-                                .offset(x: 3, y: -2)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Notification inbox")
-                .accessibilityValue(appState.unreadNotificationCount == 0
-                    ? "No unread alerts"
-                    : "\(appState.unreadNotificationCount) unread alerts")
+                if !usesDuoPortraitDashboard { notificationInboxButton }
             }
             .padding(.trailing, 20)
         }

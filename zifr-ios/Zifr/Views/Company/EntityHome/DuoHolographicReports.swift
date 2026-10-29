@@ -296,6 +296,24 @@ private struct DuoBinderDividerShape: Shape {
     }
 }
 
+/// Shared clear-glass rail for portrait report actions.
+struct MiloomDuoReportIconBar<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 16) { content() }
+            .padding(.vertical, 12)
+            .padding(.horizontal, 6)
+            .background {
+                if #available(iOS 26.0, *) {
+                    Color.clear.glassEffect(.clear.interactive(), in: Capsule())
+                } else {
+                    Capsule().fill(.ultraThinMaterial)
+                }
+            }
+    }
+}
+
 /// One persistent divider is the pull handle during both tap and drag gestures.
 struct MiloomDuoFilingTab: View {
     let title: String
@@ -308,14 +326,20 @@ struct MiloomDuoFilingTab: View {
     var body: some View {
         Button(action: action) {
             GeometryReader { geometry in
-                Label(title, systemImage: icon)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1).minimumScaleFactor(0.8)
-                    .frame(width: max(0, geometry.size.height - 20), height: 24)
-                    .rotationEffect(.degrees(-90))
-                    .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                let label = title == "Transactions" ? "TRANSACTIONS" : "REPORT"
+                let letterSize = min(12, max(1, (geometry.size.height - 34) / (CGFloat(label.count) * 1.25)))
+                VStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.zifrGold)
+                    Text(label.map(String.init).joined(separator: "\n"))
+                        .font(.system(size: letterSize, weight: .semibold, design: .monospaced))
+                        .multilineTextAlignment(.center)
+                        .fixedSize()
+                        .foregroundStyle(.white)
+                }
+                .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
             }
-            .foregroundStyle(isSelected ? Color.zifrGold : .white.opacity(0.85))
             .background { tabGlass }
             .contentShape(Rectangle())
         }
@@ -462,6 +486,7 @@ struct MiloomDuoReportSelection<Financial: View, Subscriptions: View>: View {
 struct MiloomDuoBriefingFile<Content: View>: View {
     @Binding var isPresented: Bool
     var tabTopInset: CGFloat = 0
+    var additionalControls: AnyView? = nil
     @ViewBuilder let content: () -> Content
     @State private var progress: CGFloat = 0
     @State private var dragging = false
@@ -482,16 +507,27 @@ struct MiloomDuoBriefingFile<Content: View>: View {
                     .offset(x: frames.sheet.minX)
                     .transition(.identity).zIndex(2)
                 }
-                MiloomDuoFilingTab(title: "Executive Briefing", icon: "receipt", isSelected: false,
-                    action: { isPresented = true },
-                    onDragChanged: { translation in
+                MiloomDuoReportIconBar {
+                    Button { isPresented = true } label: {
+                        Image(systemName: "receipt")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(Color.zifrGold)
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Executive Briefing")
+                    if let additionalControls { additionalControls }
+                }
+                .simultaneousGesture(DragGesture(minimumDistance: 10, coordinateSpace: .global)
+                    .onChanged { value in
                         dragging = true
                         if !isPresented { isPresented = true }
-                        progress = min(1, max(0, translation / max(1, frames.travel)))
-                    },
-                    onDragEnded: { _, predicted in settle(open: predicted / max(1, frames.travel) > 0.5) })
-                    .frame(width: frames.tab.width, height: frames.tab.height)
-                    .offset(y: frames.tab.minY + tabTopInset)
+                        progress = min(1, max(0, value.translation.width / max(1, frames.travel)))
+                    }
+                    .onEnded { value in
+                        settle(open: value.predictedEndTranslation.width / max(1, frames.travel) > 0.5)
+                    })
+                    .offset(x: 22, y: tabTopInset)
                     .allowsHitTesting(!isPresented || dragging).accessibilityHidden(isPresented && !dragging)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

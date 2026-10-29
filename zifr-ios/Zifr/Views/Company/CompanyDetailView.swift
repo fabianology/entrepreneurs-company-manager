@@ -22,8 +22,8 @@ private enum DuoPortraitSheet: Identifiable {
     var icon: String {
         switch self {
         case .transactions: return "list.bullet.rectangle.portrait"
-        case .reports(.financial): return "chart.pie"
-        case .reports(.subscriptions): return "arrow.triangle.2.circlepath"
+        case .reports(.financial): return EntityHomeTab.financial.icon
+        case .reports(.subscriptions): return EntityHomeTab.subscriptions.icon
         }
     }
     var id: String {
@@ -507,23 +507,11 @@ struct CompanyDetailView: View {
                             .transition(.identity)
                             .zIndex(2)
                     }
-                    ForEach(Array(DuoPortraitSheet.files.enumerated()), id: \.element.id) { index, sheet in
-                        let selected = duoPortraitSheet?.id == sheet.id
-                        let tab = DuoBinderDrawerFrames.resolve(size: geometry.size,
-                            progress: selected ? duoBinderProgress : 0, tabIndex: index).tab
-                        MiloomDuoFilingTab(title: sheet.title, icon: sheet.icon, isSelected: selected,
-                            action: { togglePortraitFile(sheet) },
-                            onDragChanged: { dragPortraitFile(sheet, translation: $0, travel: drawer.travel) },
-                            onDragEnded: { _, predicted in
-                                let target = duoBinderDragStart + predicted / max(1, drawer.travel)
-                                settlePortraitFile(open: target > 0.5)
-                            })
-                            .frame(width: tab.width, height: tab.height)
-                            .offset(x: tab.minX, y: tab.minY)
-                            .zIndex(0)
-                            .allowsHitTesting(duoPortraitSheet == nil)
-                            .accessibilityHidden(duoPortraitSheet != nil)
-                    }
+                    portraitReportBar
+                        .padding(.leading, 22)
+                        .padding(.top, tutFrameHeader.height)
+                        .allowsHitTesting(duoPortraitSheet == nil)
+                        .accessibilityHidden(duoPortraitSheet != nil)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .clipped()
@@ -535,6 +523,23 @@ struct CompanyDetailView: View {
                 }
             }
         }
+    }
+
+    private var portraitReportBar: some View {
+        MiloomDuoReportIconBar {
+            ForEach(DuoPortraitSheet.files) { sheet in
+                Button { togglePortraitFile(sheet) } label: {
+                    Image(systemName: sheet.icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(Color.zifrGold)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(sheet.title)
+            }
+        }
+
+        .accessibilityElement(children: .contain)
     }
 
     private func togglePortraitFile(_ sheet: DuoPortraitSheet) {
