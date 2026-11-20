@@ -88,6 +88,8 @@ struct ResourceCredentialAccessCard: View {
     let ownerUserID: UUID
     var onStatusChange: ((String) -> Void)? = nil
 
+    @Environment(AuthViewModel.self) private var authVM
+    @Environment(AppState.self) private var appState
     @Environment(\.scenePhase) private var scenePhase
     @State private var status: String?
     @State private var plaintextFields: [String: String] = [:]
@@ -99,6 +101,7 @@ struct ResourceCredentialAccessCard: View {
     @State private var revealGate = ResourceCredentialRevealGate()
     private var operationID: UUID { revealGate.operationID }
     @State private var isRevealing = false
+    @State private var showActivationConfirmation = false
 
     private struct AccountCredentials: Codable, Identifiable {
         let id: String
@@ -249,6 +252,35 @@ struct ResourceCredentialAccessCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .font(.subheadline)
             }
+        } else if status == "not_ready", authVM.currentUser?.id == ownerUserID {
+            ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Activate encrypted credentials for this resource only. You need a trusted, unlocked Password Vault and readable existing credentials.")
+                        .foregroundStyle(.secondary)
+                    Text("Activation replaces this resource's legacy credential fields. An Editor or Admin still needs to request access from an approved device, and you must approve that request separately.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    actionButton("Activate for This Resource", symbol: "lock.shield", action: {
+                        showActivationConfirmation = true
+                    })
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .confirmationDialog(
+                "Activate this resource's encrypted credentials?",
+                isPresented: $showActivationConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Activate This Resource") { activate() }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Miloom will verify the encrypted copy before replacing legacy credential fields. This does not automatically share a password with anyone.")
+            }
         } else if errorMessage != nil {
             ZifrSheetCard(title: "SECURE CREDENTIALS", icon: "lock.shield") {
                 VStack(alignment: .leading, spacing: 12) {
@@ -259,7 +291,8 @@ struct ResourceCredentialAccessCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        // Keep the whole card absent on older backends and for unactivated keys.
+        // Keep the whole card absent on older backends and for unactivated
+        // collaborator keys. Only the owner sees the activation action.
         Color.clear.frame(height: 0)
             .task(id: resourceID) { await loadStatus() }
             .onDisappear { clearPlaintext() }
@@ -386,6 +419,26 @@ struct ResourceCredentialAccessCard: View {
         isWorking = true
         Task {
             await loadStatus()
+            isWorking = false
+        }
+    }
+
+    private func activate() {
+        guard !isWorking, authVM.currentUser?.id == ownerUserID else { return }
+        isWorking = true
+        errorMessage = nil
+        Task {
+            do {
+                try await VaultService.shared.activateOwnedResourceSecret(
+                    type: resourceType, id: resourceID,
+                    expectedOwnerUserID: ownerUserID
+                )
+                await loadStatus()
+                await DataRepository.shared.fetchAllData(appState: appState, force: true)
+            } catch {
+                await loadStatus()
+                errorMessage = error.localizedDescription
+            }
             isWorking = false
         }
     }

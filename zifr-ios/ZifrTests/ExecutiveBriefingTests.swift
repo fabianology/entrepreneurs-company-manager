@@ -3,8 +3,279 @@ import SwiftUI
 @testable import Zifr
 
 final class ExecutiveBriefingTests: XCTestCase {
+    func testDuoEntityPortraitWidensContentAndKeepsItRightOfCenter() {
+        let size = CGSize(width: 700, height: 1000)
+        let landscape = DuoEntityPanelFrames.resolve(size: CGSize(width: 972, height: 700),
+            expanded: true, portrait: false)
+        let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true,
+            landscapePageWidth: landscape.page.width)
+        XCTAssertEqual(frames.page.width, min(size.width - 124, landscape.page.width * 1.2), accuracy: 0.001)
+        XCTAssertEqual(frames.page.minX, min(size.width - frames.page.width, (size.width - frames.page.width) / 2 + 44))
+        XCTAssertEqual(frames.page.height, size.height)
+        XCTAssertLessThan(frames.sections.maxX, frames.page.minX)
+        XCTAssertGreaterThanOrEqual(frames.sections.width, 44)
+        XCTAssertEqual(frames.sections.minX, 0)
+        XCTAssertEqual(frames.panel, .zero)
+        XCTAssertEqual(frames.divider, .zero)
+    }
+
+    func testDuoEntityPortraitFilingFramesStayInBoundsForSmallWindows() {
+        for size in [CGSize.zero, CGSize(width: 80, height: 30), CGSize(width: 320, height: 200), CGSize(width: 700, height: 1000)] {
+            let frames = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: true,
+                division: CGRect(x: 0, y: size.height / 2, width: size.width, height: 40), landscapePageWidth: 480)
+            XCTAssertGreaterThanOrEqual(frames.page.minX, 0)
+            XCTAssertGreaterThanOrEqual(frames.page.width, 0)
+            XCTAssertEqual(frames.page.minX, min(size.width - frames.page.width, (size.width - frames.page.width) / 2 + 44))
+            XCTAssertEqual(frames.page.height, size.height)
+            XCTAssertLessThanOrEqual(frames.sections.maxX, frames.page.minX)
+            XCTAssertLessThanOrEqual(frames.sections.maxY, size.height)
+            XCTAssertEqual(frames.panel, .zero)
+        }
+    }
+
+    func testDuoBinderDrawerUsesNinetyPercentWidthAndLeavesDividersAtLeftEdge() {
+        let size = CGSize(width: 700, height: 1000)
+        for progress: CGFloat in [0, 0.25, 0.5, 0.75, 1] {
+            let frames = DuoBinderDrawerFrames.resolve(size: size, progress: progress, tabIndex: 1)
+            XCTAssertEqual(frames.sheet.width, 630)
+            XCTAssertEqual(frames.tab.minX, 0)
+            XCTAssertEqual(frames.sheet.minX, (progress - 1) * 630, accuracy: 0.001)
+        }
+        let open = DuoBinderDrawerFrames.resolve(size: size, progress: 1, tabIndex: 1)
+        XCTAssertEqual(open.sheet.minX, 0)
+        XCTAssertEqual(open.sheet.maxX, 630)
+        let closed = DuoBinderDrawerFrames.resolve(size: size, progress: 0, tabIndex: 1)
+        XCTAssertEqual(closed.sheet.maxX, 0)
+    }
+
+    func testDuoBinderDrawerClampsProgressAndFitsAllDividerTabs() {
+        for size in [CGSize.zero, CGSize(width: 30, height: 20), CGSize(width: 700, height: 1000)] {
+            for progress: CGFloat in [-1, 0, 1, 2, .nan] {
+                for index in 0..<3 {
+                    let frames = DuoBinderDrawerFrames.resolve(size: size, progress: progress, tabIndex: index)
+                    XCTAssertGreaterThanOrEqual(frames.tab.minX, 0)
+                    XCTAssertLessThanOrEqual(frames.tab.maxX, size.width)
+                    XCTAssertGreaterThanOrEqual(frames.tab.minY, 0)
+                    XCTAssertLessThanOrEqual(frames.tab.maxY, size.height)
+                    XCTAssertTrue(frames.sheet.minX.isFinite)
+                }
+            }
+        }
+    }
+
+    func testDuoReportPullResistsAndBoundsRightwardStretch() {
+        XCTAssertEqual(DuoReportPull.stretch(translation: 40, sheetWidth: 630), 14, accuracy: 0.001)
+        XCTAssertEqual(DuoReportPull.stretch(translation: 400, sheetWidth: 630), 48)
+        XCTAssertEqual(DuoReportPull.stretch(translation: 400, sheetWidth: 90), 10)
+        XCTAssertEqual(DuoReportPull.stretch(translation: -40, sheetWidth: 630), 0)
+        XCTAssertEqual(DuoReportPull.stretch(translation: .nan, sheetWidth: 630), 0)
+    }
+
+    func testDuoReportPullDistinguishesGentleReleaseFromDeliberateClose() {
+        XCTAssertFalse(DuoReportPull.shouldClose(translation: 24, predicted: 500))
+        XCTAssertFalse(DuoReportPull.shouldClose(translation: 40, predicted: 45))
+        XCTAssertTrue(DuoReportPull.shouldClose(translation: 65, predicted: 65))
+        XCTAssertTrue(DuoReportPull.shouldClose(translation: 32, predicted: 200))
+        XCTAssertTrue(DuoReportPull.shouldClose(translation: -45, predicted: -45))
+        XCTAssertFalse(DuoReportPull.shouldClose(translation: .nan, predicted: 100))
+    }
+
+    func testHolographicSectorSelectionDoesNotTurnCreditsOrInvalidValuesIntoDebt() {
+        let slices: [DuoReportSlice] = [
+            .init(id: "credit", title: "Credit balance", value: -20, color: .white),
+            .init(id: "invalid", title: "Invalid", value: .nan, color: .white),
+            .init(id: "cards", title: "Cards", value: 200, color: .white),
+            .init(id: "loans", title: "Loans", value: 300, color: .white)
+        ]
+        XCTAssertEqual(DuoReportSeries.selectedID(at: 0, in: slices), "cards")
+        XCTAssertEqual(DuoReportSeries.selectedID(at: 199.9, in: slices), "cards")
+        XCTAssertEqual(DuoReportSeries.selectedID(at: 200, in: slices), "loans")
+        XCTAssertNil(DuoReportSeries.selectedID(at: 500, in: slices))
+        XCTAssertNil(DuoReportSeries.selectedID(at: .nan, in: slices))
+        XCTAssertNil(DuoReportSeries.selectedID(at: -1, in: slices))
+        XCTAssertNil(DuoReportSeries.selectedID(at: nil, in: slices))
+    }
+
+    func testDuoEntityClosedAndLandscapePlacementRemainUnchanged() {
+        let size = CGSize(width: 1000, height: 700)
+        for portrait in [true, false] {
+            let closed = DuoEntityPanelFrames.resolve(size: size, expanded: false, portrait: portrait)
+            XCTAssertEqual(closed.page, CGRect(origin: .zero, size: size))
+            XCTAssertEqual(closed.panel, .zero)
+            XCTAssertEqual(closed.divider, .zero)
+        }
+        let division = CGRect(x: 480, y: 0, width: 40, height: 700)
+        let original = DuoDashboardPanelFrames.resolve(size: size, expanded: true, division: division)
+        let current = DuoEntityPanelFrames.resolve(size: size, expanded: true, portrait: false, division: division)
+        XCTAssertEqual(current.page, original.cards)
+        XCTAssertEqual(current.panel, original.receipt)
+        XCTAssertEqual(current.divider, .zero)
+    }
+
     private let owner = UUID()
     private var now: Date { ISO8601DateFormatter().date(from: "2027-08-30T12:00:00Z")! }
+
+
+    func testDuoLandscapePlacesReceiptLeftAndCardsRight() {
+        let frames = DuoDashboardPanelFrames.resolve(size: CGSize(width: 1000, height: 700), expanded: true)
+        XCTAssertEqual(frames.receipt.minX, 0)
+        XCTAssertEqual(frames.cards.maxX, 1000)
+        XCTAssertLessThan(frames.receipt.maxX, frames.cards.minX)
+        XCTAssertEqual(frames.cards.height, 700)
+        XCTAssertEqual(frames.receipt.height, 700)
+    }
+
+    func testDuoPortraitPlacesCardsAboveReceiptAndAvoidsDivision() {
+        let frames = DuoDashboardPanelFrames.resolve(
+            size: CGSize(width: 700, height: 1000), expanded: true,
+            division: CGRect(x: 0, y: 480, width: 700, height: 40)
+        )
+        XCTAssertEqual(frames.cards.minY, 0)
+        XCTAssertEqual(frames.cards.maxY, 480)
+        XCTAssertEqual(frames.receipt.minY, 520)
+        XCTAssertEqual(frames.receipt.maxY, 1000)
+    }
+
+    func testClosedDashboardKeepsCardsFullSizeWithoutReceipt() {
+        let size = CGSize(width: 390, height: 844)
+        let frames = DuoDashboardPanelFrames.resolve(size: size, expanded: false)
+        XCTAssertEqual(frames.cards, CGRect(origin: .zero, size: size))
+        XCTAssertEqual(frames.receipt, .zero)
+    }
+
+    func testDuoLandscapeChromeLeavesReceiptFullHeightAndAlignsSearchWithPlus() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 1000, height: 700), expanded: true,
+            division: CGRect(x: 480, y: 0, width: 40, height: 700),
+            headerHeight: 62, footerHeight: 56, footerControlCenterY: 670
+        )
+        XCTAssertEqual(frames.receipt, CGRect(x: 0, y: 0, width: 480, height: 700))
+        XCTAssertEqual(frames.header.minX, 520)
+        XCTAssertEqual(frames.footer.minX, 520)
+        XCTAssertEqual(frames.footer.maxX, 1000)
+        XCTAssertEqual(frames.footer.minY + 22, 670)
+        XCTAssertEqual(frames.cards.minY, frames.header.maxY)
+        XCTAssertEqual(frames.cards.maxY, frames.footer.minY)
+    }
+
+    func testDuoPortraitChromeRemainsPageWideAndRespectsHinge() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 700, height: 1000), expanded: true,
+            division: CGRect(x: 0, y: 480, width: 700, height: 40),
+            headerHeight: 62, footerHeight: 64, footerControlCenterY: 100
+        )
+        XCTAssertEqual(frames.header.width, 700)
+        XCTAssertEqual(frames.footer.minY, 936)
+        XCTAssertEqual(frames.cards.minY, 62)
+        XCTAssertEqual(frames.cards.maxY, 480)
+        XCTAssertEqual(frames.receipt.minY, 520)
+        XCTAssertEqual(frames.receipt.maxY, 936)
+    }
+
+    func testLandscapeSearchCanFollowPlusIntoBottomSafeArea() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 1000, height: 700), expanded: true,
+            headerHeight: 62, footerHeight: 56, footerControlCenterY: 685
+        )
+        XCTAssertEqual(frames.footer.minY + 22, 685)
+        XCTAssertEqual(frames.receipt.maxY, 700)
+    }
+
+    func testClosedDuoChromeKeepsLegacyFullWidthRegions() {
+        let frames = DuoDashboardChromeFrames.resolve(
+            size: CGSize(width: 390, height: 844), expanded: false,
+            headerHeight: 62, footerHeight: 56, footerControlCenterY: 100
+        )
+        XCTAssertEqual(frames.header, CGRect(x: 0, y: 0, width: 390, height: 62))
+        XCTAssertEqual(frames.cards, CGRect(x: 0, y: 62, width: 390, height: 726))
+        XCTAssertEqual(frames.footer, CGRect(x: 0, y: 788, width: 390, height: 56))
+        XCTAssertEqual(frames.receipt, .zero)
+    }
+
+    @MainActor
+    func testDuoWorkerUsesImmutableInputsAndRunsOffUIThread() async throws {
+        let state = AppState()
+        let company = Company(userId: owner, name: "Business", structure: "LLC")
+        state.companies = [company]
+        state.hasLoadedPortfolio = true
+        state.portfolioUserID = owner
+        state.transactions = (0..<1000).map { _ in transaction(company: company.id, amount: 20) }
+        let input = SearchIndexSnapshot(state)
+        let legacy = ExecutiveBriefingSnapshot(appState: state, scope: .business, now: now)
+        let key = duoKey(state: state, scope: .business)
+        state.transactions.removeAll()
+        let report = try await DuoBriefingBuilder().build(input: input, key: key, now: now)
+        XCTAssertFalse(report.builtOnMainThread)
+        XCTAssertEqual(report.snapshot.records.count, 1000)
+        XCTAssertEqual(report.financials.first?.insight.current.moneyOut, legacy.financials.first?.insight.current.moneyOut)
+        XCTAssertTrue(state.transactions.isEmpty)
+        XCTAssertEqual(state.companies, [company])
+    }
+
+    @MainActor
+    func testDuoReportCacheReusesScopeAndMonthWithoutRebuilding() async {
+        let state = AppState()
+        state.companies = [Company(userId: owner, name: "Business", structure: "LLC")]
+        state.hasLoadedPortfolio = true
+        state.portfolioUserID = owner
+        let input = SearchIndexSnapshot(state)
+        let store = DuoBriefingStore()
+        let business = duoKey(state: state, scope: .business)
+        let personal = duoKey(state: state, scope: .personal)
+        await store.prepare(input: input, key: business, now: now)
+        await store.prepare(input: input, key: business, now: now)
+        XCTAssertEqual(store.completedBuildCount, 1)
+        await store.prepare(input: input, key: personal, now: now)
+        XCTAssertEqual(store.completedBuildCount, 2)
+        await store.prepare(input: input, key: business, now: now)
+        XCTAssertEqual(store.completedBuildCount, 2)
+        XCTAssertEqual(store.report?.key, business)
+    }
+
+    @MainActor
+    func testDuoCancelledPreparationDoesNotPublishAndInvalidationClearsReceipt() async {
+        let state = AppState()
+        state.hasLoadedPortfolio = true
+        state.portfolioUserID = owner
+        let input = SearchIndexSnapshot(state)
+        let key = duoKey(state: state, scope: .personal)
+        let store = DuoBriefingStore()
+        let cancelled = Task { await store.prepare(input: input, key: key, now: now) }
+        cancelled.cancel()
+        await cancelled.value
+        XCTAssertNil(store.report)
+        XCTAssertEqual(store.completedBuildCount, 0)
+        await store.prepare(input: input, key: key, now: now)
+        XCTAssertNotNil(store.report)
+        store.invalidate()
+        XCTAssertNil(store.report)
+        XCTAssertFalse(store.isRefreshing)
+    }
+
+    @MainActor
+    func testDuoPrivacyAndAccountKeysCannotKeepPreviousFiguresVisible() {
+        let state = AppState()
+        state.portfolioUserID = owner
+        let key = duoKey(state: state, scope: .business)
+        let otherUser = DuoBriefingKey(userID: UUID(), revision: key.revision,
+            privacyRevision: key.privacyRevision, scope: key.scope, month: key.month,
+            minute: key.minute, ignoredDataIssueIDs: [])
+        let changedPermission = DuoBriefingKey(userID: owner, revision: key.revision,
+            privacyRevision: key.privacyRevision + 1, scope: key.scope, month: key.month,
+            minute: key.minute, ignoredDataIssueIDs: [])
+        XCTAssertFalse(otherUser.canKeepVisible(key))
+        XCTAssertFalse(changedPermission.canKeepVisible(key))
+    }
+
+    @MainActor
+    private func duoKey(state: AppState, scope: OwnerBriefingScope) -> DuoBriefingKey {
+        DuoBriefingKey(
+            userID: state.portfolioUserID, revision: state.searchRevision,
+            privacyRevision: state.resourceShares.hashValue, scope: scope,
+            month: CashFlowMonth(containing: now), minute: Int(now.timeIntervalSince1970 / 60),
+            ignoredDataIssueIDs: []
+        )
+    }
 
     func testScopeAndCompanyFilterPreserveInventoryAndConnections() {
         let state = AppState()

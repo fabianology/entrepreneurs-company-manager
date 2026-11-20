@@ -137,7 +137,11 @@ struct SubscriptionReceiptView: View {
     let subscriptions: [Subscription]
     let institutions: [Institution]
     let cards: [FinancialCard]
+    var isEmbedded = false
+    var usesHolographicStyle = false
+    var fillsEmbeddedSheet = false
     @State private var showsServices = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var activeSubscriptions: [Subscription] {
         subscriptions.filter { $0.status == "Active" }
@@ -151,34 +155,55 @@ struct SubscriptionReceiptView: View {
         activeSubscriptions.reduce(0) { $0 + 1 + $1.subServices.count }
     }
 
-    private let ink = BriefingReceiptTheme.ink
-    private let muted = BriefingReceiptTheme.fadedInk
+    private var ink: Color { usesHolographicStyle ? .white : BriefingReceiptTheme.ink }
+    private var muted: Color { usesHolographicStyle ? .white.opacity(0.75) : BriefingReceiptTheme.fadedInk }
 
+    @ViewBuilder
     var body: some View {
+        if isEmbedded {
+            if usesHolographicStyle {
+                receiptScroll
+            } else {
+                receiptScroll.environment(\.colorScheme, .light)
+            }
+        } else {
+            receiptScroll
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .preferredColorScheme(.light)
+        }
+    }
+
+    private var receiptScroll: some View {
         ScrollView(.vertical) {
             reportContent
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.horizontal, usesHolographicStyle || fillsEmbeddedSheet ? 0 : 20)
+                .padding(.vertical, usesHolographicStyle || fillsEmbeddedSheet ? 0 : 16)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         .scrollIndicators(.hidden)
-        .background(Color(hex: "#1C1C1E").ignoresSafeArea())
-        .presentationDetents([.large])
-        .presentationDragIndicator(.visible)
-        .presentationCornerRadius(24)
-        .presentationBackground(Color(hex: "#1C1C1E"))
-        .preferredColorScheme(.light)
+        .background {
+            if !isEmbedded {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+            }
+        }
     }
 
     // Also used by rendering tests, without a navigation or scrolling container.
     var reportContent: some View {
         VStack(alignment: .leading, spacing: 14) {
-            reportHeader
-            sectionHeader("PAYMENT SOURCES", icon: "creditcard")
-            paymentBreakdown
+            if usesHolographicStyle {
+                DuoHolographicSubscriptionSummary(summary: summary)
+            } else {
+                reportHeader
+                sectionHeader("PAYMENT SOURCES", icon: "creditcard")
+                paymentBreakdown
+            }
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    withAnimation(.smooth(duration: 0.3)) {
+                    withAnimation(usesHolographicStyle && reduceMotion ? nil : .smooth(duration: 0.3)) {
                         showsServices.toggle()
                     }
                 } label: {
@@ -192,7 +217,7 @@ struct SubscriptionReceiptView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                    .background(ink, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(usesHolographicStyle ? Color.black.opacity(0.12) : ink, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -233,21 +258,23 @@ struct SubscriptionReceiptView: View {
                 }
             }
             .clipped()
+            if !usesHolographicStyle {
             sectionHeader("CHARGE SUMMARY", icon: "sum")
             reportFooter
             Text("END OF REPORT")
                 .font(.system(.caption2, design: .monospaced).weight(.medium))
                 .foregroundStyle(muted)
                 .frame(maxWidth: .infinity)
+            }
         }
-        .padding(22)
-        .background(BriefingReceiptTheme.paper)
+        .padding(usesHolographicStyle ? 24 : 22)
+        .background(usesHolographicStyle ? Color.clear : BriefingReceiptTheme.paper)
         .clipShape(ReceiptPaperShape())
         .overlay {
-            ReceiptPaperShape().stroke(ink.opacity(0.14), lineWidth: 1)
+            ReceiptPaperShape().stroke(ink.opacity(usesHolographicStyle ? 0 : 0.14), lineWidth: 1)
         }
         .foregroundStyle(ink)
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+        .shadow(color: .black.opacity(usesHolographicStyle ? 0 : 0.12), radius: 12, y: 6)
     }
 
     private var reportHeader: some View {

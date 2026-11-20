@@ -415,7 +415,7 @@ struct FinancialView: View {
                     .zIndex(100)
             }
         }
-        .frame(width: UIScreen.main.bounds.width)
+        .frame(maxWidth: .infinity)
     }
     
     private func handleDeepLink(id: UUID?, proxy: ScrollViewProxy) {
@@ -553,7 +553,7 @@ struct FinancialView: View {
                     
                     FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
                         .id(card.id)
-                        .frame(maxWidth: UIScreen.main.bounds.width - 40)
+                        .frame(maxWidth: .infinity)
                         .frame(height: isPopped ? fullCardH : cardH)
                         .scaleEffect(scale, anchor: .bottom)
                         .rotation3DEffect(
@@ -622,7 +622,7 @@ struct FinancialView: View {
                     
                     FinancialCardVisual(card: card, isPopped: isPopped, canAccessCredentials: canAccessCredentials)
                         .id(card.id)
-                        .frame(maxWidth: UIScreen.main.bounds.width - 40)
+                        .frame(maxWidth: .infinity)
                         .frame(height: fullCardH)
                         .scaleEffect(scale, anchor: .bottom)
                         .rotation3DEffect(

@@ -82,6 +82,16 @@ struct CashFlowMonth: Identifiable, Hashable {
     func isCurrent(at date: Date, calendar: Calendar = .current) -> Bool {
         self == CashFlowMonth(containing: date, calendar: calendar)
     }
+
+    func containsTransactionDate(_ value: String) -> Bool {
+        let parts = value.prefix(10).split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 3, let day = Int(parts[2]), (1...31).contains(day) else { return false }
+        return Int(parts[0]) == year && Int(parts[1]) == month
+    }
+}
+
+enum DuoTransactionSection: Equatable {
+    case all, cashFlow, transactions
 }
 
 struct ResolvedTransaction: Identifiable, Equatable {
@@ -313,6 +323,7 @@ enum CashFlowInsightEngine {
 struct MiloomMonthPicker: View {
     @Binding var selection: CashFlowMonth
     let anchorDate: Date
+    var usesSearchGlass = false
 
     private var months: [CashFlowMonth] {
         CashFlowMonth.recent(from: anchorDate)
@@ -354,6 +365,8 @@ struct MiloomMonthPicker: View {
         .buttonStyle(.plain)
         .tint(Color.miloomGold)
         .background { pickerGlass(Capsule()) }
+        .shadow(color: usesSearchGlass ? Color.black.opacity(0.4) : .clear,
+                radius: 6, x: 0, y: 3)
         .accessibilityLabel("Choose transaction month")
         .accessibilityValue(selection.title())
         .accessibilityHint("Shows the latest twelve calendar months")
@@ -364,7 +377,9 @@ struct MiloomMonthPicker: View {
         if #available(iOS 26.0, *) {
             Color.clear
                 .glassEffect(
-                    .clear.interactive(),
+                    usesSearchGlass
+                        ? .clear.tint(Color.zifrTabBarFill.opacity(0.28)).interactive()
+                        : .clear.interactive(),
                     in: shape
                 )
         } else {
@@ -374,10 +389,33 @@ struct MiloomMonthPicker: View {
     }
 }
 
-private struct TransactionCenterAnalysis {
+struct TransactionCenterAnalysis {
     let records: [ResolvedTransaction]
     let detectedSubscriptions: [DetectedSubscription]
     let duplicateAlerts: [DuplicateChargeAlert]
+
+    static func prepare(
+        transactions: [Transaction], companies: [Company], institutions: [Institution],
+        cards: [FinancialCard], subscriptions: [Subscription],
+        overrides: [TransactionOverride] = [], categoryRules: [TransactionCategoryRule] = [],
+        companyID: UUID? = nil
+    ) -> Self {
+        // Resolve inferred Plaid ownership before scoping. Every insight and
+        // review banner must use the same entity as the visible transaction rows.
+        let resolved = TransactionIntelligence.resolveAll(
+            transactions, companies: companies, institutions: institutions,
+            cards: cards, overrides: overrides, categoryRules: categoryRules
+        )
+        let records = companyID.map { id in resolved.filter { $0.companyId == id } } ?? resolved
+        return Self(
+            records: records,
+            detectedSubscriptions: SubscriptionDetector.detect(
+                transactions: TransactionIntelligence.enrichedTransactions(from: records),
+                existingSubscriptions: subscriptions
+            ),
+            duplicateAlerts: DuplicateChargeDetector.detect(records: records)
+        )
+    }
 }
 
 struct DuplicateChargeAlert: Identifiable, Equatable {
@@ -786,6 +824,11 @@ struct PortfolioTransactionCenterView: View {
     @Bindable var vm: AppViewModel
     var initialTransactionID: UUID? = nil
     var initiallyShowsReviewQueue: Bool = false
+    /// Used only by the Duo inline pane. Nil preserves the existing iPhone sheet.
+    var embeddedCompanyID: UUID? = nil
+    var embeddedSection: DuoTransactionSection = .all
+    var usesHolographicStyle = false
+    @State private var holographicCashFlowSelection: String?
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
 
@@ -815,6 +858,8 @@ struct PortfolioTransactionCenterView: View {
     private var filteredRecords: [ResolvedTransaction] {
         allRecords.filter { record in
             let transaction = record.transaction
+            if embeddedCompanyID != nil && embeddedSection == .transactions,
+               !cashFlowMonth.containsTransactionDate(transaction.date) { return false }
             guard TransactionIntelligence.matchesSearch(record, query: searchText) else { return false }
             if showNeedsReviewOnly && TransactionIntelligence.effectiveFlow(for: record) == .ignored { return false }
             if showNeedsReviewOnly && record.companyId != nil && !record.accountId.isEmpty { return false }
@@ -883,6 +928,7 @@ struct PortfolioTransactionCenterView: View {
 
     private var analysisInputSignature: Int {
         var hasher = Hasher()
+        hasher.combine(embeddedCompanyID)
         for transaction in appState.transactions {
             hasher.combine(transaction.id)
             hasher.combine(transaction.companyId)
@@ -921,15 +967,65 @@ struct PortfolioTransactionCenterView: View {
         )
     }
 
+    @ViewBuilder
     var body: some View {
-        transactionNavigation
-            .presentationDetents([.fraction(0.92), .large])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(24)
-            .presentationBackground(Color(hex: "#1C1C1E"))
-            .task(id: analysisInputSignature) {
-                await rebuildAnalysis(showLoading: allRecords.isEmpty)
-            }
+        if let embeddedCompanyID {
+            embeddedTransactions(companyID: embeddedCompanyID)
+                .task(id: analysisInputSignature) {
+                    await rebuildAnalysis(showLoading: allRecords.isEmpty)
+                }
+        } else {
+            transactionNavigation
+                .presentationDetents([.fraction(0.92), .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(24)
+                .presentationBackground(Color(hex: "#1C1C1E"))
+                .task(id: analysisInputSignature) {
+                    await rebuildAnalysis(showLoading: allRecords.isEmpty)
+                }
+        }
+    }
+
+    private var taxReviewCount: Int {
+        appState.businessExpenseReviews.filter {
+            BusinessExpenseFilter.needsReview.includes($0) && $0.belongs(to: embeddedCompanyID)
+        }.count
+    }
+
+    private var cashFlowActionBackground: Color {
+        embeddedCompanyID == nil ? .zifrBG : Color(hex: "#0D4635")
+    }
+
+    private func embeddedTransactions(companyID: UUID) -> some View {
+        VStack(spacing: 0) {
+            transactionContent
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .sheet(isPresented: $showTaxOpportunities) { TaxOpportunitiesView(initialCompanyId: companyID) }
+        .sheet(isPresented: $showSpendingCategories) {
+            SpendingCategorySheet(
+                insights: cashFlowInsights, month: cashFlowMonth,
+                onSave: { draft, record in try await saveOverride(draft, for: record) },
+                onReset: { record in try await resetOverride(for: record) }
+            )
+        }
+        .sheet(isPresented: $showDuplicateReview) {
+            DuplicateChargeReviewSheet(
+                alerts: duplicateAlerts,
+                onDismissAlert: { alert in
+                    DuplicateChargeDismissalStore.dismiss(alert)
+                    dismissedDuplicateIds.insert(alert.id)
+                }
+            )
+        }
+        .sheet(item: $selectedTransaction) { record in
+            TransactionDetailSheet(
+                record: record,
+                onSave: { draft in try await saveOverride(draft, for: record) },
+                onReset: { try await resetOverride(for: record) }
+            )
+        }
     }
 
     private var transactionNavigation: some View {
@@ -974,7 +1070,9 @@ struct PortfolioTransactionCenterView: View {
     @ViewBuilder
     private var transactionContent: some View {
         ZStack {
-            Color(hex: "#1C1C1E").ignoresSafeArea()
+            if embeddedCompanyID == nil {
+                Color(hex: "#1C1C1E").ignoresSafeArea()
+            }
 
             if isPreparing {
                 loadingState("Preparing transactions…")
@@ -982,7 +1080,7 @@ struct PortfolioTransactionCenterView: View {
                 loadingState("Syncing all accounts…")
             } else if allRecords.isEmpty {
                 VStack {
-                    TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }.padding(20)
+                    TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }.padding(20)
                     emptyState
                 }
             } else {
@@ -994,25 +1092,30 @@ struct PortfolioTransactionCenterView: View {
     private var transactionList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                cashFlowInsightsCard
-                searchAndFilters
-                reviewQueueCard
-
-                if !detectedSubscriptions.isEmpty {
-                    DetectedSubscriptionsBanner(
-                        detected: detectedSubscriptions,
-                        cardId: nil,
-                        cardName: "your accounts",
-                        companyId: nil,
-                        vm: vm
-                    )
+                if embeddedSection != .transactions { cashFlowInsightsCard }
+                if embeddedSection == .transactions {
+                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: true)
                 }
+                if embeddedSection != .cashFlow {
+                    searchAndFilters
+                    reviewQueueCard
 
-                if filteredRecords.isEmpty {
-                    filteredEmptyState
-                } else {
-                    ForEach(groupedRecords, id: \.date) { group in
-                        transactionSection(group)
+                    if !detectedSubscriptions.isEmpty {
+                        DetectedSubscriptionsBanner(
+                            detected: detectedSubscriptions,
+                            cardId: nil,
+                            cardName: "your accounts",
+                            companyId: nil,
+                            vm: vm
+                        )
+                    }
+
+                    if filteredRecords.isEmpty {
+                        filteredEmptyState
+                    } else {
+                        ForEach(groupedRecords, id: \.date) { group in
+                            transactionSection(group)
+                        }
                     }
                 }
             }
@@ -1050,13 +1153,43 @@ struct PortfolioTransactionCenterView: View {
         }
     }
 
+    @ViewBuilder
     private var cashFlowInsightsCard: some View {
+        if usesHolographicStyle { holographicCashFlow } else { legacyCashFlowInsightsCard }
+    }
+
+    private var holographicCashFlow: some View {
+        let insights = cashFlowInsights
+        return VStack(alignment: .leading, spacing: 14) {
+            MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: true)
+            Text("NET CASH FLOW").font(.system(.caption, design: .monospaced).weight(.bold))
+                .tracking(1.3).foregroundStyle(.white.opacity(0.75))
+            Text(signedCurrency(insights.current.net))
+                .font(.system(size: 34, weight: .semibold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(Color.zifrGold).shadow(color: Color.zifrGold.opacity(0.22), radius: 8)
+                .lineLimit(1).minimumScaleFactor(0.6)
+            DuoHolographicBreakdown(title: "CASH FLOW", slices: [
+                .init(id: "in", title: "Money in", value: insights.current.moneyIn, color: DuoHologram.cyan),
+                .init(id: "out", title: "Money out", value: insights.current.moneyOut, color: DuoHologram.coral)
+            ], selection: $holographicCashFlowSelection)
+            Text(cashFlowComparisonText(insights)).font(.caption).foregroundStyle(.white.opacity(0.8))
+            spendingByCategory(insights)
+            TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
+            if let syncError {
+                Label(syncError, systemImage: "exclamationmark.triangle").font(.caption).foregroundStyle(DuoHologram.coral)
+            }
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var legacyCashFlowInsightsCard: some View {
         let insights = cashFlowInsights
         return ZifrSheetCard(
             title: "CASH-FLOW INSIGHTS",
             icon: "waveform.path.ecg",
             subtitle: cashFlowMonth.title().uppercased(),
-            showsBorder: false,
+            showsBorder: embeddedCompanyID != nil,
+            usesClearGlass: embeddedCompanyID != nil,
             contentHorizontalPadding: 20,
             contentTopPadding: 18,
             contentBottomPadding: 18,
@@ -1070,12 +1203,12 @@ struct PortfolioTransactionCenterView: View {
             },
             content: {
                 VStack(alignment: .leading, spacing: 16) {
-                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date())
+                    MiloomMonthPicker(selection: $cashFlowMonth, anchorDate: Date(), usesSearchGlass: embeddedCompanyID != nil)
 
                     if insights.hasCurrentActivity {
                         cashFlowNetSummary(insights)
                         spendingByCategory(insights)
-                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
 
                         VStack(spacing: 0) {
                             if let largestExpense = insights.largestExpense {
@@ -1100,7 +1233,7 @@ struct PortfolioTransactionCenterView: View {
                                 .stroke(Color.white.opacity(0.06), lineWidth: 1)
                         )
                     } else {
-                        TaxOpportunitiesButton(count: appState.businessExpenseReviews.filter { BusinessExpenseFilter.needsReview.includes($0) }.count) { showTaxOpportunities = true }
+                        TaxOpportunitiesButton(count: taxReviewCount, backgroundColor: cashFlowActionBackground) { showTaxOpportunities = true }
                         HStack(spacing: 12) {
                             Image(systemName: "calendar.badge.exclamationmark")
                                 .font(.system(size: 19, weight: .semibold))
@@ -1138,7 +1271,7 @@ struct PortfolioTransactionCenterView: View {
                 cashFlowMetric(
                     title: "MONEY IN",
                     value: formatCurrency(insights.current.moneyIn),
-                    color: Color.zifrBG
+                    color: embeddedCompanyID == nil ? Color.zifrBG : .white
                 )
                 cashFlowMetric(
                     title: "MONEY OUT",
@@ -1157,7 +1290,7 @@ struct PortfolioTransactionCenterView: View {
             .padding(.vertical, 2)
         }
         .padding(18)
-        .background(Color(hex: "#2C2C2E"))
+        .background(embeddedCompanyID == nil ? Color(hex: "#2C2C2E") : .clear)
         .clipShape(RoundedRectangle(cornerRadius: 15))
         .overlay(
             RoundedRectangle(cornerRadius: 15)
@@ -1170,7 +1303,7 @@ struct PortfolioTransactionCenterView: View {
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 1.5
+                    lineWidth: embeddedCompanyID == nil ? 1.5 : 0
                 )
         )
         .accessibilityElement(children: .ignore)
@@ -1262,7 +1395,7 @@ struct PortfolioTransactionCenterView: View {
         }
         .buttonStyle(.plain)
         .accessibilityHint("Opens a pie chart with transactions by category")
-        .background(Color.zifrBG)
+        .background(cashFlowActionBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
@@ -1288,6 +1421,7 @@ struct PortfolioTransactionCenterView: View {
     }
 
     private func netCashFlowColor(_ value: Double) -> Color {
+        if embeddedCompanyID != nil { return .zifrGold }
         if value > 0.005 { return Color.zifrBG }
         if value < -0.005 { return .orange }
         return .white
@@ -1337,13 +1471,15 @@ struct PortfolioTransactionCenterView: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    filterMenu(
-                        title: selectedCompanyId.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All Companies",
-                        icon: "building.2"
-                    ) {
-                        Button("All Companies") { selectedCompanyId = nil }
-                        ForEach(appState.companies.sorted { $0.name < $1.name }) { company in
-                            Button(company.name) { selectedCompanyId = company.id }
+                    if embeddedCompanyID == nil {
+                        filterMenu(
+                            title: selectedCompanyId.flatMap { id in appState.companies.first { $0.id == id }?.name } ?? "All Companies",
+                            icon: "building.2"
+                        ) {
+                            Button("All Companies") { selectedCompanyId = nil }
+                            ForEach(appState.companies.sorted { $0.name < $1.name }) { company in
+                                Button(company.name) { selectedCompanyId = company.id }
+                            }
                         }
                     }
 
@@ -1745,23 +1881,13 @@ struct PortfolioTransactionCenterView: View {
         let subscriptions = appState.subscriptions
         let overrides = appState.transactionOverrides
         let categoryRules = appState.transactionCategoryRules
+        let companyID = embeddedCompanyID
 
         let analysis = await Task.detached(priority: .userInitiated) {
-            let records = TransactionIntelligence.resolveAll(
-                transactions,
-                companies: companies,
-                institutions: institutions,
-                cards: cards,
-                overrides: overrides,
-                categoryRules: categoryRules
-            )
-            return TransactionCenterAnalysis(
-                records: records,
-                detectedSubscriptions: SubscriptionDetector.detect(
-                    transactions: TransactionIntelligence.enrichedTransactions(from: records),
-                    existingSubscriptions: subscriptions
-                ),
-                duplicateAlerts: DuplicateChargeDetector.detect(records: records)
+            TransactionCenterAnalysis.prepare(
+                transactions: transactions, companies: companies, institutions: institutions,
+                cards: cards, subscriptions: subscriptions, overrides: overrides,
+                categoryRules: categoryRules, companyID: companyID
             )
         }.value
 

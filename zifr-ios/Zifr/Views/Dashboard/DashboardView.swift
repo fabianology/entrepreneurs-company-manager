@@ -1,6 +1,7 @@
 import SwiftUI
 struct DashboardView: View {
     @Environment(AppState.self) private var appState
+    @Environment(MiloomDuoLayoutState.self) private var duoLayout
     @Environment(AuthViewModel.self) private var authViewModel
     @Environment(OnboardingStateManager.self) private var onboardingState
     @Environment(AccessController.self) private var accessController
@@ -18,6 +19,7 @@ struct DashboardView: View {
     @State private var editingCompany: Company?
     @State private var companyToDelete: Company?
     @State private var companyToShare: Company?
+    @State private var duoSharingRequest: DuoDashboardSharingRequest?
     
     // Shared Item states
     @State private var selectedSubscription: Subscription?
@@ -29,7 +31,15 @@ struct DashboardView: View {
     @State private var showPremiumUpgrade = false
     @State private var showDowngradeSelection = false
     @State private var showConnectionGraph = false
+    @State private var duoBriefing = DuoBriefingStore()
+    @State private var usesDuoSideToolbar = false
+    @State private var isDuoDevice = false
+    @State private var usesDuoLandscapeDashboard = false
+    @State private var duoBottomToolbarCenterY: CGFloat?
+    @State private var duoBottomControlsWindowCenterY: CGFloat?
+    @State private var duoBottomToolbarWindowCenterY: CGFloat?
     @State private var showBriefing = false
+    @State private var showPortraitBriefing = false
     @State private var showNotificationInbox = false
     @State private var showTransactionCenter = false
     @State private var taxReviewCompany: Company?
@@ -67,129 +77,347 @@ struct DashboardView: View {
 
     var body: some View {
         NavigationStack(path: $vm.path) {
+            dashboardWithToolbar
+        }
+    }
+
+    @ViewBuilder
+    private var dashboardWithToolbar: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            dashboardSurface.modifier(DuoSideToolbar(
+                usesSideToolbar: $usesDuoSideToolbar,
+                bottomControlCenterY: $duoBottomToolbarCenterY,
+                bottomControlWindowCenterY: $duoBottomToolbarWindowCenterY,
+                isLandscapeExpanded: $usesDuoLandscapeDashboard,
+                reportsDuoDevice: $isDuoDevice,
+                isActive: vm.path.isEmpty,
+                admin: dashboardAdminButton,
+                primaryAction: dashboardShareControl.frame(width: 52, height: 52),
+                add: plusCommandMenu,
+                entities: EmptyView()
+            ))
+            .allowsHitTesting(!showPortraitBriefing || !usesDuoPortraitDashboard || !vm.path.isEmpty)
+            .accessibilityHidden(showPortraitBriefing && usesDuoPortraitDashboard && vm.path.isEmpty)
+            .overlay {
+                if usesDuoPortraitDashboard && vm.path.isEmpty {
+                    MiloomDuoBriefingFile(isPresented: $showPortraitBriefing, tabTopInset: 62,
+                        additionalControls: AnyView(notificationInboxButton)) {
+                        inlineBriefingPanel
+                    }
+                }
+            }
+            .onChange(of: usesDuoPortraitDashboard) { _, portrait in
+                if !portrait { showPortraitBriefing = false }
+            }
+            .onChange(of: vm.path.isEmpty) { _, dashboard in
+                if !dashboard { showPortraitBriefing = false }
+            }
+        } else {
+            dashboardSurface
+        }
+        #else
+        dashboardSurface
+        #endif
+    }
+
+    private var usesDuoPortraitDashboard: Bool {
+        duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
+    }
+
+    private var dashboardSurface: some View {
             ZStack(alignment: .top) {
                 Color.zifrBG.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Sticky Header (Miloom Logo & Quote)
-                    headerSection
-                        .padding(.top, 3)
-                        .padding(.bottom, 7)
-
-                    List {
-                        if companies.isEmpty && !appState.hasLoadedCompanies && appState.portfolioLoadIssue == nil && !onboardingState.isTutorialActive {
-                            ProgressView("Loading your companies…")
-                                .tint(Color.zifrGold)
-                                .font(.system(size: 14, weight: .medium))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 48)
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                        }
-
-                        if let loadIssue = appState.portfolioLoadIssue {
-                            Button {
-                                Task { await DataRepository.shared.fetchAllData(appState: appState, force: true) }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
-                                        .foregroundStyle(Color.zifrGold)
-                                    Text(loadIssue)
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(Color.white.opacity(0.78))
-                                        .multilineTextAlignment(.leading)
-                                    Spacer(minLength: 4)
-                                    Text("RETRY")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(Color.zifrGold)
-                                }
-                                .padding(12)
-                                .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    if !usesDuoLandscapeDashboard { dashboardHeader }
+                    portfolioPresentedPanels
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !usesDuoLandscapeDashboard { dashboardBottomControls }
+            }
+            } // End ZStack
+            .coordinateSpace(name: "dashboard")
+            // ── Real onboarding spotlights (needsEntity / needsAssistant) ──
+            .overlayPreferenceValue(SpotlightBoundsKey.self) { anchors in
+                if !anchors.isEmpty {
+                    if onboardingState.isSpotlightingEntity {
+                        SpotlightOverlayView(
+                            anchors: anchors,
+                            message: "Welcome! Let's start by adding your first business entity or individual account.",
+                            stepIndex: 1, totalSteps: 8,
+                            onSkip: { onboardingState.skipOnboarding() },
+                            onTapTarget: {
+                                onboardingState.currentStep = .notStarted
+                                requestAddCompany()
                             }
-                            .buttonStyle(.plain)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
-                        }
-
-                        ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
-                            let row = companyCardRow(for: company)
-                            let isLast = index == filteredCompanies.count - 1
-                            let hasPlaceholder = companies.isEmpty || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
-                            row
-                                .background(tutorialFrameCapture(index: index))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? 120 : 16, trailing: 20))
-                        }
-
-                        // Add company button / empty state placeholder under the dummy company
-                        Group {
-                            if (companies.isEmpty && appState.hasLoadedCompanies) || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
-                                // Un-blurred only while the tutorial is actively running.
-                                if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
-                                    // Tutorial in progress: show demo card fully visible
-                                    CompanyCardView(
-                                        company: dummyCompany,
-                                        institutionsCount: 2,
-                                        subscriptionsCount: 4,
-                                        docsCount: 3,
-                                        onEdit: {}
-                                    )
-                                    .allowsHitTesting(false)
-                                    .padding(.top, 4)
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear.onAppear {
-                                                tutorialEntityFrame = geo.frame(in: .named("dashboard"))
-                                            }.onChange(of: geo.frame(in: .named("dashboard"))) { _, f in
-                                                tutorialEntityFrame = f
-                                            }
-                                        }
-                                    )
-                                } else {
-                                    // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
-                                    Button {
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        requestAddCompany()
-                                    } label: {
-                                        ZStack {
-                                            CompanyCardView(
-                                                company: dummyCompany,
-                                                institutionsCount: 0,
-                                                subscriptionsCount: 0,
-                                                docsCount: 0,
-                                                onEdit: {}
-                                            )
-                                            .allowsHitTesting(false)
-                                            .blur(radius: 3)
-                                            .opacity(0.8)
-
-                                            VStack(spacing: 16) {
-                                                Image(systemName: "plus.app.fill")
-                                                    .font(.system(size: 28))
-                                                    .foregroundStyle(.white)
-                                                Text("ADD YOUR COMPANY OR ENTITY")
-                                                    .font(.system(size: 11, weight: .black))
-                                                    .textCase(.uppercase)
-                                                    .tracking(2)
-                                                    .foregroundStyle(.white)
-                                            }
-                                        }
-                                    }
-                                    .padding(.top, 4)
-                                    .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
-                                }
+                        )
+                    } else if onboardingState.isSpotlightingAssistant {
+                        SpotlightOverlayView(
+                            anchors: anchors,
+                            message: "Meet your AI Assistant! It can help you manage your entity, answer questions, and even add accounts for you.",
+                            onSkip: { onboardingState.skipOnboarding() },
+                            onTapTarget: {
+                                onboardingState.completeOnboarding()
+                                showAssistant = true
                             }
-                        }
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 120, trailing: 20))
+                        )
                     }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-            .scrollIndicators(.hidden)
+                }
+            }
+            // ── Tutorial spotlight overlay (steps 1–4 and 15) on Dashboard ──
+            .overlay {
+                if onboardingState.isTutorialActive && !onboardingState.isTutorialDone {
+                    let isDashboardStep: Bool = {
+                        switch onboardingState.currentStep {
+                        case .tutorialEntityCard, .tutorialQuickActions,
+                             .tutorialSearch, .tutorialAssistant:
+                            return true
+                        default: return false
+                        }
+                    }()
+
+                    if isDashboardStep {
+                        let targetFrame: CGRect = {
+                            switch onboardingState.currentStep {
+                            case .tutorialEntityCard, .tutorialQuickActions:
+                                return tutorialEntityFrame
+                            case .tutorialSearch:
+                                return tutorialSearchFrame
+                            case .tutorialAssistant:
+                                return tutorialAssistantFrame
+                            default:
+                                return .zero
+                            }
+                        }()
+
+                        if targetFrame != .zero {
+                            TutorialSpotlightOverlayView(
+                                anchor: targetFrame,
+                                stepIndex: onboardingState.tutorialStepIndex,
+                                totalSteps: onboardingState.tutorialTotalSteps,
+                                title: tutorialTitle(for: onboardingState.currentStep),
+                                message: tutorialMessage(for: onboardingState.currentStep),
+                                segment: onboardingState.tutorialSegmentLabel,
+                                onBack: onboardingState.tutorialStepIndex > 1 ? { onboardingState.tutorialBack() } : nil,
+                                onNext: { onboardingState.tutorialNext() },
+                                onSkip: { onboardingState.exitTutorial(appState: appState) }
+                            )
+                            .transition(.opacity.animation(.easeInOut(duration: 0.2)))
+                        }
+                    }
+                }
+            }
+            // ── Step 8: Completion overlay ──
+            .overlay {
+                if onboardingState.isTutorialDone {
+                    TutorialCompletionOverlay(
+                        onGetStarted: {
+                            onboardingState.exitTutorial(appState: appState)
+                            requestAddCompany()
+                        },
+                        onExplore: {
+                            onboardingState.exitTutorial(appState: appState)
+                        }
+                    )
+                    .transition(.opacity)
+                }
+            }
+    }
+
+
+
+    private var alignsClosedDuoSearch: Bool {
+        usesDuoSideToolbar && !usesDuoLandscapeDashboard
+    }
+
+    private var closedDuoSearchOffset: CGFloat {
+        guard alignsClosedDuoSearch,
+              let bottomControlY = duoBottomToolbarWindowCenterY,
+              let rowY = duoBottomControlsWindowCenterY else { return 0 }
+        let adjustment = bottomControlY - rowY
+        // Ignore measurements from different fold/rotation passes until both
+        // hosts have settled. The final alignment is less than one hit target.
+        return abs(adjustment) <= 44 ? adjustment : 0
+    }
+
+    @ViewBuilder
+    private var dashboardBottomControls: some View {
+        if usesDuoPortraitDashboard {
+            GeometryReader { geometry in
+                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size,
+                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                dashboardBottomControlsRow
+                    .background {
+                        #if compiler(>=6.4)
+                        if #available(iOS 27.1, *) {
+                            DuoDashboardWindowCenterReader { duoBottomControlsWindowCenterY = $0 }
+                        }
+                        #endif
+                    }
+                    .frame(width: max(0, frames.page.width - 40))
+                    .offset(x: frames.page.minX + 20)
+            }
+            .frame(height: 56)
+        } else {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *) {
+            dashboardBottomControlsRow
+                .background {
+                    DuoDashboardWindowCenterReader { value in
+                        duoBottomControlsWindowCenterY = value
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+        } else {
+            dashboardBottomControlsRow
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
+        }
+        #else
+        dashboardBottomControlsRow
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+        #endif
+        }
+    }
+
+    private var dashboardBottomControlsRow: some View {
+        HStack(spacing: 10) {
+            if !usesDuoSideToolbar { dashboardAdminButton }
+            dashboardSearchButton
+                .offset(y: closedDuoSearchOffset)
+            dashboardAssistantButton
+                .offset(y: closedDuoSearchOffset)
+            if !usesDuoSideToolbar {
+                plusCommandMenu
+            }
+        }
+    }
+
+    private var dashboardHeader: some View {
+        headerSection
+            .padding(.top, 3)
+            .padding(.bottom, 7)
+    }
+
+    private var dashboardAdminButton: some View {
+        Button {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            vm.path.append(AppViewModel.AppRoute.adminSettings)
+        } label: {
+            ZStack {
+                bottomControlGlass(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color(hex: "#918457"),
+                                        Color(hex: "#918457").opacity(0.3)
+                                    ],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                ),
+                                lineWidth: 1.5
+                            )
+                    )
+                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+            .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Admin settings")
+    }
+
+    private var dashboardSearchButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            vm.showSearch = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                Text("search")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.5))
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(bottomControlGlass(Capsule()))
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            )
+            .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .background(
+            Group {
+                if onboardingState.isTutorialActive {
+                    GeometryReader { geo in
+                        Color.clear.onAppear {
+                            tutorialSearchFrame = geo.frame(in: .global)
+                        }.onChange(of: geo.frame(in: .global)) { _, f in
+                            tutorialSearchFrame = f
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    private var dashboardAssistantButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            showAssistant = true
+        } label: {
+            dashboardGeminiIcon
+                .frame(width: isDuoDevice ? 44 : 52, height: isDuoDevice ? 44 : 52)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Open Gemini Live")
+        .accessibilityHint("Starts a voice conversation with Miloom")
+        .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
+        .background(
+            Group {
+                if onboardingState.isTutorialActive {
+                    GeometryReader { geo in
+                        Color.clear.onAppear {
+                            tutorialAssistantFrame = geo.frame(in: .global)
+                        }.onChange(of: geo.frame(in: .global)) { _, f in
+                            tutorialAssistantFrame = f
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+
+    private var portfolioLifecyclePanels: some View {
+        portfolioPanels
             .task {
                 // Fallback for OAuth/root-view timing: the dashboard should never
                 // remain on its placeholder simply because the first auth callback
@@ -204,7 +432,7 @@ struct DashboardView: View {
             .onChange(of: appState.companies.count) { _, _ in
                 let previousStep = onboardingState.currentStep
                 onboardingState.evaluateState(appState: appState)
-                
+
                 if (previousStep == .needsEntity || previousStep == .notStarted)
                     && onboardingState.currentStep == .needsBank
                     && !showAddCompany {
@@ -254,12 +482,17 @@ struct DashboardView: View {
                     Text("Are you sure you want to delete this company? All associated data will be removed for everyone.")
                 }
             }
+            // Only the legacy host has a sidebar toggle to remove. Duo uses a
+            // single stack; removing a native item there can hide its Share label.
+            .navigationBarBackButtonHidden(true)
+            .toolbar(removing: !isDuoDevice && vm.path.isEmpty ? .sidebarToggle : nil)
             .navigationDestination(for: Company.self) { company in
                 CompanyDetailView(
                     company: company,
                     vm: vm,
                     onShowAllEntities: { showBriefing = false }
                 )
+                .id(company.id)
             }
             .navigationDestination(for: AppViewModel.AppRoute.self) { route in
                 if route == .adminSettings {
@@ -273,6 +506,12 @@ struct DashboardView: View {
             }
             .sheet(item: $companyToShare) { company in
                 ShareEntitySheet(resourceId: company.id, resourceType: "company", resourceTitle: company.name)
+            }
+            .sheet(item: $duoSharingRequest) { request in
+                ShareEntitySheet(
+                    resourceId: request.company.id, resourceType: request.scope.rawValue,
+                    resourceTitle: request.scope == .company ? request.company.name : request.scope.title
+                )
             }
             .sheet(isPresented: $showAddCompany) {
                 NewEntitySheet(vm: vm) { company in
@@ -343,6 +582,10 @@ struct DashboardView: View {
                 }
                 .environment(appState)
             }
+    }
+
+    private var portfolioPresentedPanels: some View {
+        portfolioLifecyclePanels
             .sheet(item: $selectedSubscription) { sub in
                 EditSubscriptionSheet(sub: sub, institutions: institutions, cards: cards, vm: vm, isNew: false, onSave: {})
             }
@@ -444,209 +687,173 @@ struct DashboardView: View {
                 openPendingSearch()
             }
             .onChange(of: appState.companies.count) { _, _ in checkDowngradeSelection() }
+            .onChange(of: appState.portfolioUserID) { _, _ in duoBriefing.invalidate() }
+            .onChange(of: accessController.effectiveSnapshot) { _, _ in duoBriefing.invalidate() }
             .onChange(of: accessController.snapshot.status) { _, _ in checkDowngradeSelection() }
+    }
+
+    @ViewBuilder
+    private var portfolioPanels: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.1, *), usesDuoPortraitDashboard {
+            GeometryReader { geometry in
+                let frames = DuoPortraitFilingFrames.resolve(size: geometry.size,
+                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                entityList(isDuoExpanded: true)
+                    .frame(width: frames.page.width, height: frames.page.height)
+                    .offset(x: frames.page.minX)
             }
-            .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 10) {
-                    Button {
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
-                        vm.path.append(AppViewModel.AppRoute.adminSettings)
-                    } label: {
-                        ZStack {
-                            bottomControlGlass(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color(hex: "#918457"),
-                                                    Color(hex: "#918457").opacity(0.3)
-                                                ],
-                                                startPoint: .top,
-                                                endPoint: .bottom
-                                            ),
-                                            lineWidth: 1.5
-                                        )
-                                )
-                                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.85))
-                        }
-                        .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        vm.showSearch = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(Color.white.opacity(0.85))
-                            Text("search")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.5))
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 16)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(bottomControlGlass(Capsule()))
-                        .overlay(
-                            Capsule()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(hex: "#918457"),
-                                            Color(hex: "#918457").opacity(0.3)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-                        .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .background(
-                        Group {
-                            if onboardingState.isTutorialActive {
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        tutorialSearchFrame = geo.frame(in: .global)
-                                    }.onChange(of: geo.frame(in: .global)) { _, f in
-                                        tutorialSearchFrame = f
-                                    }
-                                }
-                            }
-                        }
-                    )
-
-                    Button {
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        showAssistant = true
-                    } label: {
-                        dashboardGeminiIcon
-                            .frame(width: 52, height: 52)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open Gemini Live")
-                    .accessibilityHint("Starts a voice conversation with Miloom")
-                    .spotlightTarget(isActive: onboardingState.isSpotlightingAssistant)
-                    .background(
-                        Group {
-                            if onboardingState.isTutorialActive {
-                                GeometryReader { geo in
-                                    Color.clear.onAppear {
-                                        tutorialAssistantFrame = geo.frame(in: .global)
-                                    }.onChange(of: geo.frame(in: .global)) { _, f in
-                                        tutorialAssistantFrame = f
-                                    }
-                                }
-                            }
-                        }
-                    )
-
-                    plusCommandMenu
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
-            }
-            } // End ZStack
-            .coordinateSpace(name: "dashboard")
-            // ── Real onboarding spotlights (needsEntity / needsAssistant) ──
-            .overlayPreferenceValue(SpotlightBoundsKey.self) { anchors in
-                if !anchors.isEmpty {
-                    if onboardingState.isSpotlightingEntity {
-                        SpotlightOverlayView(
-                            anchors: anchors,
-                            message: "Welcome! Let's start by adding your first business entity or individual account.",
-                            stepIndex: 1, totalSteps: 8,
-                            onSkip: { onboardingState.skipOnboarding() },
-                            onTapTarget: {
-                                onboardingState.currentStep = .notStarted
-                                requestAddCompany()
-                            }
-                        )
-                    } else if onboardingState.isSpotlightingAssistant {
-                        SpotlightOverlayView(
-                            anchors: anchors,
-                            message: "Meet your AI Assistant! It can help you manage your entity, answer questions, and even add accounts for you.",
-                            onSkip: { onboardingState.skipOnboarding() },
-                            onTapTarget: {
-                                onboardingState.completeOnboarding()
-                                showAssistant = true
-                            }
-                        )
-                    }
-                }
-            }
-            // ── Tutorial spotlight overlay (steps 1–4 and 15) on Dashboard ──
-            .overlay {
-                if onboardingState.isTutorialActive && !onboardingState.isTutorialDone {
-                    let isDashboardStep: Bool = {
-                        switch onboardingState.currentStep {
-                        case .tutorialEntityCard, .tutorialQuickActions,
-                             .tutorialSearch, .tutorialAssistant:
-                            return true
-                        default: return false
-                        }
-                    }()
-
-                    if isDashboardStep {
-                        let targetFrame: CGRect = {
-                            switch onboardingState.currentStep {
-                            case .tutorialEntityCard, .tutorialQuickActions:
-                                return tutorialEntityFrame
-                            case .tutorialSearch:
-                                return tutorialSearchFrame
-                            case .tutorialAssistant:
-                                return tutorialAssistantFrame
-                            default:
-                                return .zero
-                            }
-                        }()
-
-                        if targetFrame != .zero {
-                            TutorialSpotlightOverlayView(
-                                anchor: targetFrame,
-                                stepIndex: onboardingState.tutorialStepIndex,
-                                totalSteps: onboardingState.tutorialTotalSteps,
-                                title: tutorialTitle(for: onboardingState.currentStep),
-                                message: tutorialMessage(for: onboardingState.currentStep),
-                                segment: onboardingState.tutorialSegmentLabel,
-                                onBack: onboardingState.tutorialStepIndex > 1 ? { onboardingState.tutorialBack() } : nil,
-                                onNext: { onboardingState.tutorialNext() },
-                                onSkip: { onboardingState.exitTutorial(appState: appState) }
-                            )
-                            .transition(.opacity.animation(.easeInOut(duration: 0.2)))
-                        }
-                    }
-                }
-            }
-            // ── Step 8: Completion overlay ──
-            .overlay {
-                if onboardingState.isTutorialDone {
-                    TutorialCompletionOverlay(
-                        onGetStarted: {
-                            onboardingState.exitTutorial(appState: appState)
-                            requestAddCompany()
-                        },
-                        onExplore: {
-                            onboardingState.exitTutorial(appState: appState)
-                        }
-                    )
-                    .transition(.opacity)
-                }
-            }
+        } else if #available(iOS 27.1, *) {
+            DuoDashboardPanels(
+                bottomControlCenterY: duoBottomToolbarCenterY,
+                cards: { expanded in entityList(isDuoExpanded: expanded) },
+                receipt: { inlineBriefingPanel },
+                header: { dashboardHeader },
+                footer: { dashboardBottomControls }
+            )
+        } else {
+            entityList()
         }
+        #else
+        entityList()
+        #endif
+    }
+
+    @ViewBuilder
+    private var inlineBriefingPanel: some View {
+        if accessController.permits(.ownerBriefing, appState: appState, userId: currentUserId) {
+            DuoInlineBriefingView(
+                vm: vm, store: duoBriefing, isActive: vm.path.isEmpty,
+                onOpenResource: openBriefingResource,
+                onOpenHealthResource: openHealthResource,
+                onExploreConnections: { showConnectionGraph = true }
+            )
+        } else {
+            ScrollView {
+                DuoBriefingPlaceholder(
+                    message: "Your executive briefing is available with Miloom Pro.",
+                    action: { presentBriefing(source: "duo_dashboard_inline") }
+                )
+            }
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func entityList(isDuoExpanded: Bool = false) -> some View {
+                    List {
+                        if companies.isEmpty && !appState.hasLoadedCompanies && appState.portfolioLoadIssue == nil && !onboardingState.isTutorialActive {
+                            ProgressView("Loading your companies…")
+                                .tint(Color.zifrGold)
+                                .font(.system(size: 14, weight: .medium))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 48)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                        }
+
+                        if let loadIssue = appState.portfolioLoadIssue {
+                            Button {
+                                Task { await DataRepository.shared.fetchAllData(appState: appState, force: true) }
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
+                                        .foregroundStyle(Color.zifrGold)
+                                    Text(loadIssue)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color.white.opacity(0.78))
+                                        .multilineTextAlignment(.leading)
+                                    Spacer(minLength: 4)
+                                    Text("RETRY")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(Color.zifrGold)
+                                }
+                                .padding(12)
+                                .background(Color.black.opacity(0.34), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: 10, trailing: 20))
+                        }
+
+                        ForEach(Array(filteredCompanies.enumerated()), id: \.element.id) { index, company in
+                            let row = companyCardRow(for: company)
+                            let isLast = index == filteredCompanies.count - 1
+                            let hasPlaceholder = (companies.isEmpty && appState.hasLoadedCompanies) || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive)
+                            row
+                                .background(tutorialFrameCapture(index: index))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: (isLast && !hasPlaceholder) ? (isDuoExpanded ? 16 : 120) : 16, trailing: 20))
+                        }
+
+                        // Add company button / empty state placeholder under the dummy company
+                        Group {
+                            if (companies.isEmpty && appState.hasLoadedCompanies) || (onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive) {
+                                // Un-blurred only while the tutorial is actively running.
+                                if onboardingState.tutorialHasBeenRun && onboardingState.isTutorialActive {
+                                    // Tutorial in progress: show demo card fully visible
+                                    CompanyCardView(
+                                        company: dummyCompany,
+                                        institutionsCount: 2,
+                                        subscriptionsCount: 4,
+                                        docsCount: 3,
+                                        onEdit: {}
+                                    )
+                                    .allowsHitTesting(false)
+                                    .padding(.top, 4)
+                                    .background(
+                                        GeometryReader { geo in
+                                            Color.clear.onAppear {
+                                                tutorialEntityFrame = geo.frame(in: .global)
+                                            }.onChange(of: geo.frame(in: .global)) { _, f in
+                                                tutorialEntityFrame = f
+                                            }
+                                        }
+                                    )
+                                } else {
+                                    // Empty state (pre-tutorial, or after tutorial): blurred card + CTA
+                                    Button {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        requestAddCompany()
+                                    } label: {
+                                        ZStack {
+                                            CompanyCardView(
+                                                company: dummyCompany,
+                                                institutionsCount: 0,
+                                                subscriptionsCount: 0,
+                                                docsCount: 0,
+                                                onEdit: {}
+                                            )
+                                            .allowsHitTesting(false)
+                                            .blur(radius: 3)
+                                            .opacity(0.8)
+
+                                            VStack(spacing: 16) {
+                                                Image(systemName: "plus.app.fill")
+                                                    .font(.system(size: 28))
+                                                    .foregroundStyle(.white)
+                                                Text("ADD YOUR COMPANY OR ENTITY")
+                                                    .font(.system(size: 11, weight: .black))
+                                                    .textCase(.uppercase)
+                                                    .tracking(2)
+                                                    .foregroundStyle(.white)
+                                            }
+                                        }
+                                    }
+                                    .padding(.top, 4)
+                                    .spotlightTarget(isActive: onboardingState.isSpotlightingEntity)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 20, bottom: isDuoExpanded ? 16 : 120, trailing: 20))
+                    }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .scrollIndicators(.hidden)
     }
 
     private var filteredCompanies: [Company] {
@@ -712,35 +919,28 @@ struct DashboardView: View {
                 .allowsHitTesting(false)
 
             // Gemini's four-point sparkle, rendered sharply at every display scale.
-            Path { path in
-                path.move(to: CGPoint(x: 12, y: 0))
-                path.addCurve(to: CGPoint(x: 24, y: 12),
-                              control1: CGPoint(x: 13.8, y: 7.8),
-                              control2: CGPoint(x: 16.2, y: 10.2))
-                path.addCurve(to: CGPoint(x: 12, y: 24),
-                              control1: CGPoint(x: 16.2, y: 13.8),
-                              control2: CGPoint(x: 13.8, y: 16.2))
-                path.addCurve(to: CGPoint(x: 0, y: 12),
-                              control1: CGPoint(x: 10.2, y: 16.2),
-                              control2: CGPoint(x: 7.8, y: 13.8))
-                path.addCurve(to: CGPoint(x: 12, y: 0),
-                              control1: CGPoint(x: 7.8, y: 10.2),
-                              control2: CGPoint(x: 10.2, y: 7.8))
-                path.closeSubpath()
-            }
-            .fill(LinearGradient(
-                colors: [Color(hex: "#4CA6FF"), Color(hex: "#8D8BFF"), Color(hex: "#D495D9")],
-                startPoint: .bottomLeading,
-                endPoint: .topTrailing
-            ))
-            .frame(width: 24, height: 24)
-            .accessibilityHidden(true)
+            MiloomGeminiSparkle()
         }
         .frame(width: 44, height: 44)
     }
 
     @ViewBuilder
     private var plusCommandMenu: some View {
+        if isDuoDevice {
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                requestAddCompany()
+            } label: {
+                dashboardPlusLabel
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Add entity")
+        } else {
+            legacyPlusCommandMenu
+        }
+    }
+
+    private var legacyPlusCommandMenu: some View {
         Menu {
             if !companies.isEmpty {
                 Section("Share Entity") {
@@ -755,34 +955,76 @@ struct DashboardView: View {
                 }
             }
         } label: {
-            ZStack {
-                bottomControlGlass(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        Color(hex: "#918457"),
-                                        Color(hex: "#918457").opacity(0.3)
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-                    .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
-
-                Image(systemName: "plus")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.85))
-            }
-            .frame(width: 44, height: 44)
+            dashboardPlusLabel
         } primaryAction: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             requestAddCompany()
         }
         .buttonStyle(.plain)
+    }
+
+    private var dashboardPlusLabel: some View {
+        ZStack {
+            bottomControlGlass(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#918457"),
+                                    Color(hex: "#918457").opacity(0.3)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+                .shadow(color: Color.black.opacity(0.4), radius: 6, x: 0, y: 3)
+
+            Image(systemName: "plus")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Color.white.opacity(0.85))
+        }
+        .frame(width: 44, height: 44)
+    }
+
+    private var shareableDuoCompanies: [Company] {
+        companies.filter { company in
+            AppViewModel.resourceAllowsSharing(
+                appState.resourceShares, actorID: appState.portfolioUserID,
+                ownerID: company.userId, companyID: company.id
+            )
+        }
+    }
+
+    private var dashboardShareControl: some View {
+        Menu {
+            Section("Share Entity") {
+                ForEach(shareableDuoCompanies) { company in
+                    Menu(company.name.isEmpty ? "New Business" : company.name) {
+                        ForEach(EntitySharingScope.allCases) { scope in
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                duoSharingRequest = DuoDashboardSharingRequest(company: company, scope: scope)
+                            } label: {
+                                Label(scope.title, systemImage: scope.icon)
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            MiloomCircularToolbarLabel {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(shareableDuoCompanies.isEmpty)
+        .accessibilityLabel("Share access")
+        .accessibilityHint("Choose an entity and which records to share")
     }
 
     private func requestAddCompany() {
@@ -808,7 +1050,8 @@ struct DashboardView: View {
             showPremiumUpgrade = true
             return
         }
-        showBriefing = true
+        if usesDuoPortraitDashboard { showPortraitBriefing = true }
+        else { showBriefing = true }
     }
 
     private func dismissBriefing(then action: @escaping () -> Void) {
@@ -944,33 +1187,7 @@ struct DashboardView: View {
         return items.sorted { $0.createdAt > $1.createdAt }
     }
 
-    private var headerSection: some View {
-        ZStack {
-            GeometryReader { geometry in
-                Image("miloom_text_embossed")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: geometry.size.width * 0.35)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
-            }
-
-            HStack(spacing: 8) {
-                Spacer()
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    presentBriefing(source: "dashboard_header_receipt")
-                } label: {
-                    Image(systemName: "receipt")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.82))
-                        .frame(width: 40, height: 40)
-                        .background(Color.black.opacity(0.32), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Executive briefing receipt")
-                .accessibilityHint("Opens the personal or business monthly briefing")
-
+    private var notificationInboxButton: some View {
                 Button {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     showNotificationInbox = true
@@ -978,9 +1195,9 @@ struct DashboardView: View {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: appState.unreadNotificationCount > 0 ? "bell.fill" : "bell")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.82))
-                            .frame(width: 40, height: 40)
-                            .background(Color.black.opacity(0.32), in: Circle())
+                            .foregroundStyle(usesDuoPortraitDashboard ? Color.zifrGold : Color.white.opacity(0.82))
+                            .frame(width: usesDuoPortraitDashboard ? 44 : 40, height: usesDuoPortraitDashboard ? 44 : 40)
+                            .background(Color.black.opacity(usesDuoPortraitDashboard ? 0 : 0.32), in: Circle())
 
                         if appState.unreadNotificationCount > 0 {
                             Text(appState.unreadNotificationCount > 99 ? "99+" : "\(appState.unreadNotificationCount)")
@@ -998,6 +1215,43 @@ struct DashboardView: View {
                 .accessibilityValue(appState.unreadNotificationCount == 0
                     ? "No unread alerts"
                     : "\(appState.unreadNotificationCount) unread alerts")
+    }
+
+    private var headerSection: some View {
+        ZStack {
+            GeometryReader { geometry in
+                let cardFrames = DuoPortraitFilingFrames.resolve(size: geometry.size,
+                    landscapePageWidth: duoLayout.portraitEntityWidth)
+                Image("miloom_text_embossed")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: geometry.size.width * 0.35)
+                    .position(x: usesDuoPortraitDashboard ? cardFrames.page.midX : geometry.size.width / 2,
+                              y: geometry.size.height / 2)
+                    .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+            }
+
+            HStack(spacing: 8) {
+                Spacer()
+                if isDuoDevice && !usesDuoSideToolbar { dashboardShareControl }
+                if !usesDuoPortraitDashboard {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    presentBriefing(source: "dashboard_header_receipt")
+                } label: {
+                    Image(systemName: "receipt")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.82))
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.32), in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Executive briefing receipt")
+                .accessibilityHint("Opens the personal or business monthly briefing")
+
+                }
+
+                if !usesDuoPortraitDashboard { notificationInboxButton }
             }
             .padding(.trailing, 20)
         }
@@ -1005,15 +1259,22 @@ struct DashboardView: View {
     }
     
     @ViewBuilder
-    private func companyCardRow(for company: Company) -> some View {
+    private func companyCardRow(for company: Company, compact: Bool = false) -> some View {
         let iCount = institutions.filter { $0.companyId == company.id }.count
         let sCount = subscriptions.filter { $0.companyId == company.id }.count
         let dCount = documents.filter { $0.companyId == company.id }.count
         
-        let isSharedWithMe = (company.userId != currentUserId)
-        let isSharedByMe = (company.userId == currentUserId) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
+        #if DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW
+        // Show fixture ownership only in the labeled simulator preview. Do not
+        // create an authenticated session or alter any persistence authorization.
+        let cardViewerID: UUID? = MiloomLayoutPreviewData.ownerID
+        #else
+        let cardViewerID = currentUserId
+        #endif
+        let isSharedWithMe = (company.userId != cardViewerID)
+        let isSharedByMe = (company.userId == cardViewerID) && appState.resourceShares.contains(where: { $0.resourceId == company.id })
         let role = appState.resourceShares.first(where: {
-            $0.resourceType == "company" && $0.resourceId == company.id && $0.userId == currentUserId
+            $0.resourceType == "company" && $0.resourceId == company.id && $0.userId == cardViewerID
         })?.role ?? "Limited access"
         let canEdit = !isSharedWithMe || ["Editor", "Admin"].contains(role)
 
@@ -1032,14 +1293,15 @@ struct DashboardView: View {
             docsCount: dCount,
             onEdit: { editingCompany = company },
             canEdit: canEdit,
-            onShare: isSharedWithMe ? nil : { companyToShare = company },
+            onShare: isDuoDevice || isSharedWithMe ? nil : { companyToShare = company },
             shareRole: role,
             isSharedWithMe: isSharedWithMe,
             isSharedByMe: isSharedByMe,
             onTapSubscriptions: { navigateAction(.subscriptions) },
             onTapInstitutions: { navigateAction(.financial) },
             onTapDocuments: { navigateAction(.documents) },
-            onTapMain: { navigateAction(.financial) }
+            onTapMain: { navigateAction(.financial) },
+            usesCompactLayout: compact
         )
     }
 
@@ -1100,10 +1362,191 @@ struct DashboardView: View {
     }
 }
 
+private struct DuoDashboardSharingRequest: Identifiable {
+    let company: Company
+    let scope: EntitySharingScope
+    var id: String { "\(company.id)-\(scope.rawValue)" }
+}
 
 
-// MARK: - Shared With Me View
+
+/// Shared vector glyph; dashboard and Duo entity controls use the same mark.
+struct MiloomGeminiSparkle: View {
+    var body: some View {
+        Path { path in
+            path.move(to: CGPoint(x: 12, y: 0))
+            path.addCurve(to: CGPoint(x: 24, y: 12),
+                          control1: CGPoint(x: 13.8, y: 7.8),
+                          control2: CGPoint(x: 16.2, y: 10.2))
+            path.addCurve(to: CGPoint(x: 12, y: 24),
+                          control1: CGPoint(x: 16.2, y: 13.8),
+                          control2: CGPoint(x: 13.8, y: 16.2))
+            path.addCurve(to: CGPoint(x: 0, y: 12),
+                          control1: CGPoint(x: 10.2, y: 16.2),
+                          control2: CGPoint(x: 7.8, y: 13.8))
+            path.addCurve(to: CGPoint(x: 12, y: 0),
+                          control1: CGPoint(x: 7.8, y: 10.2),
+                          control2: CGPoint(x: 10.2, y: 7.8))
+            path.closeSubpath()
+        }
+        .fill(LinearGradient(
+            colors: [Color(hex: "#4CA6FF"), Color(hex: "#8D8BFF"), Color(hex: "#D495D9")],
+            startPoint: .bottomLeading, endPoint: .topTrailing
+        ))
+        .frame(width: 24, height: 24)
+        .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Shared Duo toolbar
 import SwiftUI
+#if compiler(>=6.4)
+@available(iOS 27.1, *)
+struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: View>: ViewModifier {
+    @Environment(MiloomDuoLayoutState.self) private var layout
+    @Binding var usesSideToolbar: Bool
+    @Binding var bottomControlCenterY: CGFloat?
+    @Binding var bottomControlWindowCenterY: CGFloat?
+    @Binding var isLandscapeExpanded: Bool
+    @Binding var reportsDuoDevice: Bool
+    let isActive: Bool
+    let admin: Admin
+    let primaryAction: PrimaryAction
+    let add: Add
+    let entities: Entities
+    var showsPrimaryActions = true
+
+    // Do not gate native toolbar creation on its own emitted edge: the edge
+    // can briefly disappear during a fold and prevent the items returning.
+    private var hasNativeSideToolbar: Bool { layout.isDuoDevice && (!layout.isExpanded || layout.isLandscape) }
+    private var hasPortraitToolbar: Bool { layout.isDuoDevice && layout.isExpanded && !layout.isLandscape }
+    private var hasSideToolbar: Bool { hasNativeSideToolbar || hasPortraitToolbar }
+    private var hasLandscapeDashboard: Bool { layout.isDuoDevice && layout.isExpanded && layout.isLandscape }
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .trailing, spacing: 8) {
+                if hasPortraitToolbar && isActive {
+                    VStack(spacing: 16) {
+                        if showsPrimaryActions {
+                            primaryAction
+                            add
+                        }
+                        Spacer(minLength: 24)
+                        entities
+                        measuredAdmin
+                    }
+                    .frame(width: 52)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
+                    // Match the expanded-portrait Wi-Fi indicator center on every page.
+                    .padding(.trailing, 22)
+                    .frame(maxHeight: .infinity)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("duo.portraitToolbar")
+                }
+            }
+            .toolbar {
+                if hasNativeSideToolbar && isActive {
+                    if showsPrimaryActions {
+                        ToolbarItem(placement: .topBarLeading) {
+                            VStack(spacing: 16) {
+                                primaryAction
+                                add
+                            }
+                        }
+                        .axisBehavior(.verticalPreferred)
+                        .sharedBackgroundVisibility(.hidden)
+                    }
+
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Spacer()
+                        entities
+                        measuredAdmin
+                    }
+                    .axisBehavior(.verticalPreferred)
+                    .sharedBackgroundVisibility(.hidden)
+                }
+            }
+            .onChange(of: layout.isDuoDevice, initial: true) { _, next in
+                if reportsDuoDevice != next { reportsDuoDevice = next }
+            }
+            .onChange(of: hasLandscapeDashboard, initial: true) { _, value in
+                if isActive { isLandscapeExpanded = value }
+            }
+            .onChange(of: isActive) { _, value in
+                // Reconcile once on return from a navigation destination, even
+                // if the root pane's orientation did not change while hidden.
+                if value {
+                    isLandscapeExpanded = hasLandscapeDashboard
+                    usesSideToolbar = hasSideToolbar
+                }
+            }
+            .onChange(of: hasSideToolbar, initial: true) { _, value in
+                usesSideToolbar = value
+            }
+    }
+
+    private var measuredAdmin: some View {
+        admin
+            .onGeometryChange(for: CGFloat.self) { geometry in
+                geometry.frame(in: .global).midY
+            } action: { bottomControlCenterY = $0 }
+            .background {
+                DuoDashboardWindowCenterReader { bottomControlWindowCenterY = $0 }
+            }
+    }
+}
+
+/// Native toolbar items and collapsed content can have different SwiftUI global
+/// coordinate roots. Compare window coordinates for the closed alignment only.
+@available(iOS 27.1, *)
+struct DuoDashboardWindowCenterReader: UIViewRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeUIView(context: Context) -> CenterView {
+        let view = CenterView()
+        view.isUserInteractionEnabled = false
+        return view
+    }
+
+    func updateUIView(_ view: CenterView, context: Context) {
+        view.onChange = onChange
+        view.scheduleReport()
+    }
+
+    final class CenterView: UIView {
+        var onChange: (CGFloat) -> Void = { _ in }
+        private var previousCenter: CGFloat?
+        private var reportQueued = false
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            scheduleReport()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            scheduleReport()
+        }
+
+        func scheduleReport() {
+            guard !reportQueued else { return }
+            reportQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                reportQueued = false
+                guard window != nil else { return }
+                let center = convert(CGPoint(x: bounds.midX, y: bounds.midY), to: nil).y
+                guard previousCenter != center else { return }
+                previousCenter = center
+                onChange(center)
+            }
+        }
+    }
+}
+#endif
+
 struct SharedWithMeView: View {
     @Bindable var vm: AppViewModel
     @Environment(AppState.self) private var appState

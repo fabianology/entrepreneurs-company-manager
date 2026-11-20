@@ -499,7 +499,7 @@ struct MissingDataDetailSheet: View {
                 }
             }
         }
-        .overlay(alignment: .bottom) {
+        .safeAreaInset(edge: .bottom) {
             if let lastIgnored {
                 HStack(spacing: 10) {
                     Text("Suggestion ignored")
@@ -645,7 +645,7 @@ struct OwnerBriefingView: View {
                 BriefingPreferencesSheet()
             }
         }
-        .overlay(alignment: .bottom) {
+        .safeAreaInset(edge: .bottom) {
             if pendingDismissal != nil {
                 HStack(spacing: 12) {
                     Image(systemName: "xmark.circle.fill")

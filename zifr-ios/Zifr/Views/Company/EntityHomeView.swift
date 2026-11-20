@@ -32,6 +32,7 @@ struct EntityHomeView: View {
     @State private var expandedCategories: Set<String> = []
     
     @Binding var activeInternalTab: EntityHomeTab
+    var compactTopSpacing = false
     
     // Quick Add States
     @State private var newSub: Subscription? = nil
@@ -104,6 +105,9 @@ struct EntityHomeView: View {
                     .id("documentSection")
                 }
             }
+            // Expanded Duo portrait reclaims the excess gap beneath its main
+            // selector. Keep the selector and fade mask fixed in place.
+            .padding(.top, compactTopSpacing ? -16 : 0)
             .mask(
                 VStack(spacing: 0) {
                     // Fully disappeared (clear) at and above the top 1/3 of the tab bar
@@ -140,7 +144,6 @@ struct EntityHomeView: View {
         }
         .frame(maxWidth: .infinity)
         .background(Color.clear)
-        .ignoresSafeArea(edges: .bottom)
         .sheet(item: $newSub) { sub in
             AddSubscriptionWizard(sub: sub, institutions: institutions, cards: cards, vm: vm)
                 .presentationDetents([.fraction(0.9), .large])

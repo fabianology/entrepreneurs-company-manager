@@ -58,18 +58,10 @@ struct DocumentListView: View {
         contentTopInset + 214
     }
 
-    private var systemBottomSafeAreaInset: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .safeAreaInsets.bottom ?? 0
-    }
-
     private var scanButtonBottomInset: CGFloat {
-        // Clears the Home indicator, 44-point command bar, its 12-point padding,
-        // and leaves a stable 10-point gap above the search control.
-        hideActionBar ? systemBottomSafeAreaInset + 66 : 20
+        // The parent reserves its command bar with safeAreaInset. Only the
+        // designed gap belongs here, not another window's home-indicator inset.
+        hideActionBar ? 10 : 20
     }
 
     var grouped: [String: [CompanyDocument]] {
@@ -271,7 +263,11 @@ struct DocumentListView: View {
                 }
             }
         }
-        .task { await TaxOpportunitiesViewModel().refresh(appState) }
+        .task {
+            #if !(DEBUG && targetEnvironment(simulator) && MILOOM_LAYOUT_PREVIEW)
+            await TaxOpportunitiesViewModel().refresh(appState)
+            #endif
+        }
         .sheet(item: $receiptReview) { review in
             BusinessExpenseReviewSheet(initialReview: review)
         }

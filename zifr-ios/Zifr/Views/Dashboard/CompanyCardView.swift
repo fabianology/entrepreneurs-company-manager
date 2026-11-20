@@ -13,6 +13,7 @@ struct CompanyCardView: View {
     var isSharedWithMe: Bool = false
     var isSharedByMe: Bool = false
     var sharedBy: String? = nil
+    var usesCompactLayout = false
 
     // Tap callbacks
     let onTapSubscriptions: (() -> Void)?
@@ -35,7 +36,8 @@ struct CompanyCardView: View {
         onTapSubscriptions: (() -> Void)? = nil,
         onTapInstitutions: (() -> Void)? = nil,
         onTapDocuments: (() -> Void)? = nil,
-        onTapMain: (() -> Void)? = nil
+        onTapMain: (() -> Void)? = nil,
+        usesCompactLayout: Bool = false
     ) {
         self.company = company
         self.institutionsCount = institutionsCount
@@ -52,6 +54,7 @@ struct CompanyCardView: View {
         self.onTapInstitutions = onTapInstitutions
         self.onTapDocuments = onTapDocuments
         self.onTapMain = onTapMain
+        self.usesCompactLayout = usesCompactLayout
     }
 
     private var resolvedBrandColor: Color {
@@ -66,15 +69,16 @@ struct CompanyCardView: View {
             HStack(alignment: .center, spacing: 0) {
                 HStack(alignment: .center, spacing: 0) {
                     // Logo
-                    CompanyAvatar(company: company, size: 48)
-                        .padding(.trailing, 14)
+                    CompanyAvatar(company: company, size: usesCompactLayout ? 36 : 48)
+                        .padding(.trailing, usesCompactLayout ? 10 : 14)
 
                     // Name + Structure
                     VStack(alignment: .leading, spacing: 4) {
                         Text(company.name.isEmpty ? "New Business" : company.name)
-                            .font(.system(size: 17, weight: .semibold))
+                            .font(.system(size: usesCompactLayout ? 15 : 17, weight: .semibold))
                             .foregroundStyle(.white)
-                            .lineLimit(1)
+                            .lineLimit(usesCompactLayout ? 2 : 1)
+                            .frame(minHeight: usesCompactLayout ? 36 : nil, alignment: .leading)
                         
                         HStack(spacing: 6) {
                             Text(company.structure)
