@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		D00128A10000000000000001 /* DuoHolographicReports.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00128A10000000000000002 /* DuoHolographicReports.swift */; };
+		D00128A20000000000000001 /* DuoGlassReports.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00128A20000000000000002 /* DuoGlassReports.swift */; };
 		A17917200000000000000004 /* SearchOverviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17917200000000000000003 /* SearchOverviewCard.swift */; };
 		A17917200000000000000002 /* SearchOverview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A17917200000000000000001 /* SearchOverview.swift */; };
 		A17092700000000000000001 /* AppShortcuts.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A17092700000000000000002 /* AppShortcuts.xcstrings */; };
@@ -162,6 +163,7 @@
 
 /* Begin PBXFileReference section */
 		D00128A10000000000000002 /* DuoHolographicReports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoHolographicReports.swift; sourceTree = "<group>"; };
+		D00128A20000000000000002 /* DuoGlassReports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuoGlassReports.swift; sourceTree = "<group>"; };
 		A17917200000000000000003 /* SearchOverviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchOverviewCard.swift; sourceTree = "<group>"; };
 		A17917200000000000000001 /* SearchOverview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchOverview.swift; sourceTree = "<group>"; };
 		A17092700000000000000002 /* AppShortcuts.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = AppShortcuts.xcstrings; sourceTree = "<group>"; };
@@ -462,6 +464,7 @@
 				9527B3A94D5AF9697F46A147 /* EntitySubscriptionSection.swift */,
 				F564E5574B9B03EDA84362FA /* FinancialReceiptView.swift */,
 				D00128A10000000000000002 /* DuoHolographicReports.swift */,
+				D00128A20000000000000002 /* DuoGlassReports.swift */,
 				4861EC0D60AFBE606028390E /* ControlCenterTabSelector.swift */,
 				3592587797EA9749DAE7591A /* SubscriptionCoverFlow.swift */,
 				DED9E3791E6144EF3D1E230C /* DocumentCategoryCoverFlow.swift */,
@@ -828,6 +831,7 @@
 				74D76977C55D740A6CB6337A /* FinancialCardVisual.swift in Sources */,
 				E8C0EDD7920B1ECC3814BB0E /* FinancialReceiptView.swift in Sources */,
 				D00128A10000000000000001 /* DuoHolographicReports.swift in Sources */,
+				D00128A20000000000000001 /* DuoGlassReports.swift in Sources */,
 				46CFAE72D8A339D9D82C3BFC /* FinancialView.swift in Sources */,
 				FC2184DCACD5FE946FD1A704 /* GeminiLiveClient.swift in Sources */,
 				69D91C3C7B5CDA51965F9B7C /* GeminiLiveModels.swift in Sources */,

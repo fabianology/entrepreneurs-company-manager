@@ -603,14 +603,15 @@ struct CompanyDetailView: View {
             }
         case .reports(let report):
             MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }, showsCard: false) {
-                if report == .financial {
+                switch report {
+                case .financial:
                     FinancialReceiptView(company: company, institutions: institutions,
                         cards: cards, loans: loans, subscriptions: subscriptions,
-                        isEmbedded: true, fillsEmbeddedSheet: true)
-                } else {
+                        isEmbedded: true, usesGlassSummaryStyle: true)
+                case .subscriptions:
                     SubscriptionReceiptView(company: company, subscriptions: subscriptions,
                         institutions: institutions, cards: cards,
-                        isEmbedded: true, fillsEmbeddedSheet: true)
+                        isEmbedded: true, usesGlassSummaryStyle: true)
                 }
             }
         }

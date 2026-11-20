@@ -452,35 +452,6 @@ struct MiloomDuoPortraitSheet<Content: View>: View {
 }
 
 
-/// Seed the choice from the sheet item itself, rather than a separate state
-/// write that can be captured before SwiftUI presents the first sheet frame.
-struct MiloomDuoReportSelection<Financial: View, Subscriptions: View>: View {
-    @State private var showsSubscriptions: Bool
-    let financial: () -> Financial
-    let subscriptions: () -> Subscriptions
-
-    init(initiallyShowsSubscriptions: Bool,
-         @ViewBuilder financial: @escaping () -> Financial,
-         @ViewBuilder subscriptions: @escaping () -> Subscriptions) {
-        _showsSubscriptions = State(initialValue: initiallyShowsSubscriptions)
-        self.financial = financial
-        self.subscriptions = subscriptions
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Picker("Report", selection: $showsSubscriptions) {
-                Text("Financial").tag(false)
-                Text("Subscriptions").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .padding(16)
-            if showsSubscriptions { subscriptions() } else { financial() }
-        }
-    }
-}
-
-
 /// Dashboard briefing uses the same edge divider, glass card and pull gestures
 /// as the portrait entity workspace, with the receipt directly on clear glass.
 struct MiloomDuoBriefingFile<Content: View>: View {

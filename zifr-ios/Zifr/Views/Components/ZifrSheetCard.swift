@@ -105,22 +105,23 @@ struct ZifrSheetCard<Content: View, Trailing: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         .overlay {
             if showsBorder {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hex: "#918457"),
-                                Color(hex: "#918457").opacity(0.3)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        ),
-                        lineWidth: 1.5
-                    )
+                ZifrSheetCardOutline(shape: RoundedRectangle(cornerRadius: cornerRadius))
             }
         }
         .shadow(color: usesClearGlass ? Color.black.opacity(0.4) : .clear,
                 radius: 6, x: 0, y: 3)
+    }
+}
+
+struct ZifrSheetCardOutline: View {
+    let shape: RoundedRectangle
+
+    var body: some View {
+        let gold = Color(hex: "#918457")
+        shape.stroke(
+            LinearGradient(colors: [gold, gold.opacity(0.3)], startPoint: .top, endPoint: .bottom),
+            lineWidth: 1.5
+        )
     }
 }
 

@@ -139,7 +139,7 @@ struct SubscriptionReceiptView: View {
     let cards: [FinancialCard]
     var isEmbedded = false
     var usesHolographicStyle = false
-    var fillsEmbeddedSheet = false
+    var usesGlassSummaryStyle = false
     @State private var showsServices = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -155,13 +155,15 @@ struct SubscriptionReceiptView: View {
         activeSubscriptions.reduce(0) { $0 + 1 + $1.subServices.count }
     }
 
-    private var ink: Color { usesHolographicStyle ? .white : BriefingReceiptTheme.ink }
-    private var muted: Color { usesHolographicStyle ? .white.opacity(0.75) : BriefingReceiptTheme.fadedInk }
+    private var ink: Color { usesHolographicStyle || usesGlassSummaryStyle ? .white : BriefingReceiptTheme.ink }
+    private var muted: Color { usesHolographicStyle || usesGlassSummaryStyle ? .white.opacity(0.75) : BriefingReceiptTheme.fadedInk }
 
     @ViewBuilder
     var body: some View {
         if isEmbedded {
-            if usesHolographicStyle {
+            if usesGlassSummaryStyle {
+                glassScroll
+            } else if usesHolographicStyle {
                 receiptScroll
             } else {
                 receiptScroll.environment(\.colorScheme, .light)
@@ -176,11 +178,25 @@ struct SubscriptionReceiptView: View {
         }
     }
 
+    private var glassScroll: some View {
+        DuoGlassReportBody {
+            DuoGlassSubscriptionSummary(summary: summary)
+
+            DuoGlassReportDisclosure(title: "Payment sources") {
+                paymentBreakdown
+            }
+
+            DuoGlassReportDisclosure(title: "Services detailed") {
+                serviceDetails
+            }
+        }
+    }
+
     private var receiptScroll: some View {
         ScrollView(.vertical) {
             reportContent
-                .padding(.horizontal, usesHolographicStyle || fillsEmbeddedSheet ? 0 : 20)
-                .padding(.vertical, usesHolographicStyle || fillsEmbeddedSheet ? 0 : 16)
+                .padding(.horizontal, usesHolographicStyle ? 0 : 20)
+                .padding(.vertical, usesHolographicStyle ? 0 : 16)
         }
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         .scrollIndicators(.hidden)
@@ -225,34 +241,7 @@ struct SubscriptionReceiptView: View {
                 .zIndex(1)
 
                 if showsServices {
-                    Group {
-                        if activeSubscriptions.isEmpty {
-                            note("No active services.")
-                        }
-                        VStack(spacing: 0) {
-                            ForEach(Array(activeSubscriptions.enumerated()), id: \.element.id) { index, sub in
-                                if !sub.subServices.isEmpty,
-                                   index == 0 || activeSubscriptions[index - 1].subServices.isEmpty {
-                                    supplementalGroupDivider
-                                }
-                                mainService(sub)
-                                if !sub.subServices.isEmpty {
-                                    Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)) · \(sub.name.isEmpty ? "Unnamed Service" : sub.name)")
-                                        .font(.system(.caption2, design: .monospaced).weight(.bold))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 6)
-                                        .background(ink.opacity(0.06))
-                                        .padding(.top, 6)
-                                        .accessibilityAddTraits(.isHeader)
-                                }
-                                ForEach(sub.subServices) { service in
-                                    supplementalService(service, parent: sub)
-                                }
-                                if !sub.subServices.isEmpty { supplementalGroupDivider }
-                            }
-                        }
-                    }
+                    serviceDetails
                     .padding(.top, 14)
                     .transition(.move(edge: .top))
                 }
@@ -275,6 +264,37 @@ struct SubscriptionReceiptView: View {
         }
         .foregroundStyle(ink)
         .shadow(color: .black.opacity(usesHolographicStyle ? 0 : 0.12), radius: 12, y: 6)
+    }
+
+    private var serviceDetails: some View {
+        Group {
+            if activeSubscriptions.isEmpty {
+                note("No active services.")
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(activeSubscriptions.enumerated()), id: \.element.id) { index, sub in
+                    if !sub.subServices.isEmpty,
+                       index == 0 || activeSubscriptions[index - 1].subServices.isEmpty {
+                        supplementalGroupDivider
+                    }
+                    mainService(sub)
+                    if !sub.subServices.isEmpty {
+                        Text("SUPPLEMENTAL SERVICES (\(sub.subServices.count)) · \(sub.name.isEmpty ? "Unnamed Service" : sub.name)")
+                            .font(.system(.caption2, design: .monospaced).weight(.bold))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 6)
+                            .background(ink.opacity(0.06))
+                            .padding(.top, 6)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    ForEach(sub.subServices) { service in
+                        supplementalService(service, parent: sub)
+                    }
+                    if !sub.subServices.isEmpty { supplementalGroupDivider }
+                }
+            }
+        }
     }
 
     private var reportHeader: some View {
