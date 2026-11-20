@@ -347,6 +347,7 @@ struct CompanyDetailView: View {
     @State private var showTransactionCenter = false
     @State private var duoReport: DuoEntityReport?
     @State private var duoSection: DuoEntitySection = .cashFlow
+    @State private var duoVaultCategory = "All"
     @State private var duoPortraitSheet: DuoPortraitSheet?
     @State private var duoBinderProgress: CGFloat = 0
     @State private var duoBinderIsDragging = false
@@ -401,6 +402,10 @@ struct CompanyDetailView: View {
         duoLayout.isDuoDevice && duoLayout.isExpanded && duoLayout.isLandscape
     }
 
+    private var usesDuoVaultSplit: Bool {
+        usesInlineEntityPanel && vm.activeTab == .documents
+    }
+
     private var usesDuoPortraitLayout: Bool {
         duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
     }
@@ -423,7 +428,9 @@ struct CompanyDetailView: View {
     }
 
     private var duoLeftPanel: some View {
-        VStack(spacing: 8) {
+        let showsReport = !usesDuoVaultSplit && duoSection == .reports
+        let showsCashFlow = !usesDuoVaultSplit && !showsReport
+        return VStack(spacing: 8) {
             ZStack {
                 // One analysis instance survives section/report/pose changes.
                 PortfolioTransactionCenterView(
@@ -431,11 +438,21 @@ struct CompanyDetailView: View {
                     embeddedSection: .all
                 )
                 .environment(appState)
-                .opacity(duoSection == .reports ? 0 : 1)
-                .allowsHitTesting(duoSection != .reports)
-                .accessibilityHidden(duoSection == .reports)
+                .opacity(showsCashFlow ? 1 : 0)
+                .allowsHitTesting(showsCashFlow)
+                .accessibilityHidden(!showsCashFlow)
 
-                if duoSection == .reports {
+                if usesDuoVaultSplit {
+                    DocumentListView(
+                        company: company,
+                        documents: documents,
+                        vm: vm,
+                        hideActionBar: true,
+                        canEdit: canEditCompany,
+                        presentation: .attachments,
+                        categorySelection: $duoVaultCategory
+                    )
+                } else if showsReport {
                     VStack(spacing: 0) {
                             HStack {
                                 Button {
@@ -603,7 +620,7 @@ struct CompanyDetailView: View {
     private func presentReport(_ report: DuoEntityReport) {
         if usesDuoPortraitLayout {
             duoPortraitSheet = .reports(report)
-        } else if usesInlineEntityPanel {
+        } else if usesInlineEntityPanel && !usesDuoVaultSplit {
             duoReport = report
             duoSection = .reports
         } else {
@@ -695,6 +712,11 @@ struct CompanyDetailView: View {
                 institutions: institutions,
                 cards: cards
             )
+        }
+        .onChange(of: vm.activeTab) { oldTab, _ in
+            if oldTab == .documents && duoLayout.isDuoDevice {
+                duoVaultCategory = "All"
+            }
         }
         .onChange(of: usesDuoPortraitLayout) { _, portrait in
             if !portrait {
@@ -793,7 +815,9 @@ struct CompanyDetailView: View {
             canAccessCredentials: canAccessCompanyCredentials,
             vm: vm,
             activeInternalTab: $vm.activeTab,
-            compactTopSpacing: false
+            compactTopSpacing: false,
+            vaultPresentation: usesDuoVaultSplit ? .categories : .combined,
+            vaultCategorySelection: duoLayout.isDuoDevice ? $duoVaultCategory : nil
         )
     }
 

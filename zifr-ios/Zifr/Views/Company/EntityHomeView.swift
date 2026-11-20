@@ -33,6 +33,8 @@ struct EntityHomeView: View {
     
     @Binding var activeInternalTab: EntityHomeTab
     var compactTopSpacing = false
+    var vaultPresentation: DocumentListView.Presentation = .combined
+    var vaultCategorySelection: Binding<String>?
     
     // Quick Add States
     @State private var newSub: Subscription? = nil
@@ -100,7 +102,9 @@ struct EntityHomeView: View {
                         documents: documents,
                         vm: vm,
                         hideActionBar: true,
-                        canEdit: canEdit
+                        canEdit: canEdit,
+                        presentation: vaultPresentation,
+                        categorySelection: vaultCategorySelection
                     )
                     .id("documentSection")
                 }
