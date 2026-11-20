@@ -75,7 +75,6 @@ struct AdminSettingsView: View {
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: .constant(nil),
                 bottomControlWindowCenterY: .constant(nil),
-                isLandscapeExpanded: .constant(false),
                 reportsDuoDevice: .constant(false),
                 isActive: true,
                 admin: duoAdminIndicator,
@@ -620,7 +619,7 @@ struct AdminSettingsView: View {
                 await authVM.fetchActiveSessions()
             }
         }
-        .navigationBarHidden(!usesDuoSideToolbar || (duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape))
+        .navigationBarHidden(!usesDuoSideToolbar || duoLayout.usesExpandedPortrait)
         .navigationBarBackButtonHidden(true)
         .onReceive(NotificationCenter.default.publisher(for: .miloomInvitationLinkOpened)) { notification in
             guard collaboratorsSheetNeedsDismissal else { return }

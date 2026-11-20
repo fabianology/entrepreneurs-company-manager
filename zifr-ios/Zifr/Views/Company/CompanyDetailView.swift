@@ -378,7 +378,6 @@ struct CompanyDetailView: View {
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: .constant(nil),
                 bottomControlWindowCenterY: $duoAdminWindowCenterY,
-                isLandscapeExpanded: .constant(false),
                 reportsDuoDevice: $isDuoDevice,
                 isActive: true,
                 admin: profileControlButton,
@@ -399,7 +398,7 @@ struct CompanyDetailView: View {
     }
 
     private var usesInlineEntityPanel: Bool {
-        duoLayout.isDuoDevice && duoLayout.isExpanded && duoLayout.isLandscape
+        duoLayout.usesExpandedLandscape
     }
 
     private var usesDuoVaultSplit: Bool {
@@ -407,7 +406,7 @@ struct CompanyDetailView: View {
     }
 
     private var usesDuoPortraitLayout: Bool {
-        duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
+        duoLayout.usesExpandedPortrait
     }
 
     @ViewBuilder

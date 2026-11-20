@@ -5,10 +5,24 @@ final class MiloomDuoLayoutState {
     var isDuoDevice = false
     var isExpanded = false
     var isPartiallyOpen = false
-    var isLandscape = false
     var dashboardRequest = 0
     var windowSize: CGSize = .zero
     var landscapeEntityWidth: CGFloat?
+
+    private var hasRoomForExpandedLayout: Bool {
+        // Full Duo layouts keep space for two panes or the portrait filing
+        // controls. Measure the app window so either side of Split View can
+        // use the closed layout even while the hinge is open.
+        isDuoDevice && isExpanded && windowSize.width >= 600
+    }
+
+    var usesExpandedPortrait: Bool {
+        hasRoomForExpandedLayout && windowSize.height > windowSize.width
+    }
+
+    var usesExpandedLandscape: Bool {
+        hasRoomForExpandedLayout && windowSize.width >= windowSize.height
+    }
 
     var portraitEntityWidth: CGFloat? {
         if let landscapeEntityWidth { return landscapeEntityWidth }
@@ -202,8 +216,6 @@ private struct MiloomDuoLayoutObserver: ViewModifier {
                 }
                 .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
                     if layout.windowSize != size { layout.windowSize = size }
-                    let landscape = size.width >= size.height
-                    if layout.isLandscape != landscape { layout.isLandscape = landscape }
                 }
         } else {
             content

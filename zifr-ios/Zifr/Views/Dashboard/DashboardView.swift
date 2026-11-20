@@ -34,7 +34,6 @@ struct DashboardView: View {
     @State private var duoBriefing = DuoBriefingStore()
     @State private var usesDuoSideToolbar = false
     @State private var isDuoDevice = false
-    @State private var usesDuoLandscapeDashboard = false
     @State private var duoBottomToolbarCenterY: CGFloat?
     @State private var duoBottomControlsWindowCenterY: CGFloat?
     @State private var duoBottomToolbarWindowCenterY: CGFloat?
@@ -89,7 +88,6 @@ struct DashboardView: View {
                 usesSideToolbar: $usesDuoSideToolbar,
                 bottomControlCenterY: $duoBottomToolbarCenterY,
                 bottomControlWindowCenterY: $duoBottomToolbarWindowCenterY,
-                isLandscapeExpanded: $usesDuoLandscapeDashboard,
                 reportsDuoDevice: $isDuoDevice,
                 isActive: vm.path.isEmpty,
                 admin: dashboardAdminButton,
@@ -122,7 +120,11 @@ struct DashboardView: View {
     }
 
     private var usesDuoPortraitDashboard: Bool {
-        duoLayout.isDuoDevice && duoLayout.isExpanded && !duoLayout.isLandscape
+        duoLayout.usesExpandedPortrait
+    }
+
+    private var usesDuoLandscapeDashboard: Bool {
+        duoLayout.usesExpandedLandscape
     }
 
     private var dashboardSurface: some View {
@@ -705,6 +707,7 @@ struct DashboardView: View {
             }
         } else if #available(iOS 27.1, *) {
             DuoDashboardPanels(
+                expanded: usesDuoLandscapeDashboard,
                 bottomControlCenterY: duoBottomToolbarCenterY,
                 cards: { expanded in entityList(isDuoExpanded: expanded) },
                 receipt: { inlineBriefingPanel },
@@ -1397,7 +1400,6 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
     @Binding var usesSideToolbar: Bool
     @Binding var bottomControlCenterY: CGFloat?
     @Binding var bottomControlWindowCenterY: CGFloat?
-    @Binding var isLandscapeExpanded: Bool
     @Binding var reportsDuoDevice: Bool
     let isActive: Bool
     let admin: Admin
@@ -1408,10 +1410,9 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
 
     // Do not gate native toolbar creation on its own emitted edge: the edge
     // can briefly disappear during a fold and prevent the items returning.
-    private var hasNativeSideToolbar: Bool { layout.isDuoDevice && (!layout.isExpanded || layout.isLandscape) }
-    private var hasPortraitToolbar: Bool { layout.isDuoDevice && layout.isExpanded && !layout.isLandscape }
+    private var hasNativeSideToolbar: Bool { layout.isDuoDevice && !hasPortraitToolbar }
+    private var hasPortraitToolbar: Bool { layout.usesExpandedPortrait }
     private var hasSideToolbar: Bool { hasNativeSideToolbar || hasPortraitToolbar }
-    private var hasLandscapeDashboard: Bool { layout.isDuoDevice && layout.isExpanded && layout.isLandscape }
 
     func body(content: Content) -> some View {
         content
@@ -1461,16 +1462,8 @@ struct DuoSideToolbar<Admin: View, PrimaryAction: View, Add: View, Entities: Vie
             .onChange(of: layout.isDuoDevice, initial: true) { _, next in
                 if reportsDuoDevice != next { reportsDuoDevice = next }
             }
-            .onChange(of: hasLandscapeDashboard, initial: true) { _, value in
-                if isActive { isLandscapeExpanded = value }
-            }
             .onChange(of: isActive) { _, value in
-                // Reconcile once on return from a navigation destination, even
-                // if the root pane's orientation did not change while hidden.
-                if value {
-                    isLandscapeExpanded = hasLandscapeDashboard
-                    usesSideToolbar = hasSideToolbar
-                }
+                if value { usesSideToolbar = hasSideToolbar }
             }
             .onChange(of: hasSideToolbar, initial: true) { _, value in
                 usesSideToolbar = value

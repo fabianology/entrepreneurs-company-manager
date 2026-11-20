@@ -1842,16 +1842,17 @@ private struct DuoDashboardPanelLayout: Layout {
 #if compiler(>=6.4)
 @available(iOS 27.1, *)
 struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View>: View {
-    @State private var expanded = false
+    let expanded: Bool
     let bottomControlCenterY: CGFloat?
     let cards: (Bool) -> Cards
     let receipt: () -> Receipt
     let header: () -> Header
     let footer: () -> Footer
 
-    init(bottomControlCenterY: CGFloat?,
+    init(expanded: Bool, bottomControlCenterY: CGFloat?,
          @ViewBuilder cards: @escaping (Bool) -> Cards, @ViewBuilder receipt: @escaping () -> Receipt,
          @ViewBuilder header: @escaping () -> Header, @ViewBuilder footer: @escaping () -> Footer) {
+        self.expanded = expanded
         self.bottomControlCenterY = bottomControlCenterY
         self.cards = cards
         self.receipt = receipt
@@ -1893,11 +1894,6 @@ struct DuoDashboardPanels<Cards: View, Receipt: View, Header: View, Footer: View
                     if landscape { footer() }
                 }
                 .frame(height: landscape ? nil : 0)
-            }
-            .onHingeChange { _, context in
-                // A nil hinge is a non-Duo device. Ignore continuous angle ticks.
-                let next = context.hinge.map { $0.status != .closed } ?? false
-                if expanded != next { expanded = next }
             }
         }
     }

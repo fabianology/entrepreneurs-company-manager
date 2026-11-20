@@ -3,6 +3,35 @@ import SwiftUI
 @testable import Zifr
 
 final class ExecutiveBriefingTests: XCTestCase {
+    func testDuoExpandedLayoutsRequireRoomInTheAppWindow() {
+        let layout = MiloomDuoLayoutState()
+        layout.isDuoDevice = true
+        layout.isExpanded = true
+
+        layout.windowSize = CGSize(width: 475, height: 669)
+        XCTAssertFalse(layout.usesExpandedPortrait)
+        XCTAssertFalse(layout.usesExpandedLandscape)
+
+        layout.windowSize = CGSize(width: 475, height: 320)
+        XCTAssertFalse(layout.usesExpandedPortrait)
+        XCTAssertFalse(layout.usesExpandedLandscape)
+
+        layout.windowSize = CGSize(width: 669, height: 951)
+        XCTAssertTrue(layout.usesExpandedPortrait)
+        XCTAssertFalse(layout.usesExpandedLandscape)
+
+        layout.windowSize = CGSize(width: 951, height: 669)
+        XCTAssertFalse(layout.usesExpandedPortrait)
+        XCTAssertTrue(layout.usesExpandedLandscape)
+
+        layout.isExpanded = false
+        XCTAssertFalse(layout.usesExpandedLandscape)
+
+        layout.isExpanded = true
+        layout.isDuoDevice = false
+        XCTAssertFalse(layout.usesExpandedLandscape)
+    }
+
     func testDuoEntityPortraitWidensContentAndKeepsItRightOfCenter() {
         let size = CGSize(width: 700, height: 1000)
         let landscape = DuoEntityPanelFrames.resolve(size: CGSize(width: 972, height: 700),
