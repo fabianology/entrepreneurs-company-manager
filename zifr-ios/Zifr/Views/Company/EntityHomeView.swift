@@ -33,6 +33,8 @@ struct EntityHomeView: View {
     
     @Binding var activeInternalTab: EntityHomeTab
     var compactTopSpacing = false
+    var tabSelectorHeaderHeight: CGFloat?
+    var tabSelectorBottomInset: CGFloat?
     var vaultPresentation: DocumentListView.Presentation = .combined
     var vaultCategorySelection: Binding<String>?
     
@@ -66,6 +68,7 @@ struct EntityHomeView: View {
 
     // MARK: - Body
     var body: some View {
+        let tabSelectorTopPadding: CGFloat = 6
         ZStack(alignment: .top) {
             // ACTIVE TAB CONTENT (scrolls behind tabs)
             Group {
@@ -136,6 +139,9 @@ struct EntityHomeView: View {
             // TAB SELECTOR (floating on top)
             ControlCenterTabSelector(
                 activeTab: $activeInternalTab,
+                isStandalone: tabSelectorHeaderHeight != nil,
+                backgroundTopExtension: tabSelectorHeaderHeight.map { $0 + tabSelectorTopPadding } ?? 0,
+                contentBottomInset: tabSelectorBottomInset,
                 institutions: institutions,
                 loans: loans,
                 subscriptions: subscriptions,
@@ -143,7 +149,7 @@ struct EntityHomeView: View {
                 documents: documents,
                 totalDebt: model.totalDebt
             )
-            .padding(.top, 6)
+            .padding(.top, tabSelectorTopPadding)
             .padding(.bottom, 10)
         }
         .frame(maxWidth: .infinity)

@@ -53,6 +53,8 @@ struct ControlCenterTabSelector: View {
     var labels: [EntityHomeTab: String] = [:]
     var icons: [EntityHomeTab: String] = [:]
     var isStandalone = false
+    var backgroundTopExtension: CGFloat = 0
+    var contentBottomInset: CGFloat?
     var usesReducedMotion = false
 
     private func title(for tab: EntityHomeTab) -> String { labels[tab] ?? tab.rawValue }
@@ -73,6 +75,8 @@ struct ControlCenterTabSelector: View {
     var totalDebt: Double = 0
     
     private let tabs = EntityHomeTab.allCases
+    private let tabHeight: CGFloat = 48
+    private let trackPadding: CGFloat = 4
     private let selectionFeedback = UISelectionFeedbackGenerator()
     private let impactFeedback = UIImpactFeedbackGenerator(style: .light)
     
@@ -115,12 +119,14 @@ struct ControlCenterTabSelector: View {
     var body: some View {
         GeometryReader { geometry in
             selector(width: geometry.size.width)
+                .offset(y: contentBottomInset.map { trackPadding - $0 } ?? 0)
         }
-        .frame(height: 56)
+        .frame(height: tabHeight + trackPadding * 2)
         .padding(.horizontal, 20)
         .background {
             if isStandalone {
                 tabBarGlassBackground(RoundedRectangle(cornerRadius: 16))
+                    .padding(.top, -backgroundTopExtension)
                     .padding(.horizontal, 20)
             } else {
                 tabBarGlassBackground(
@@ -146,10 +152,9 @@ struct ControlCenterTabSelector: View {
     }
 
     private func selector(width totalW: CGFloat) -> some View {
-        let innerPadding: CGFloat = 4
+        let innerPadding = trackPadding
         let availableW = max(0, totalW - (innerPadding * 2))
         let tabW = max(1, availableW / CGFloat(tabs.count))
-        let tabH: CGFloat = 48
         
         let baseOffset = innerPadding + (CGFloat(currentIndex) * tabW)
         let targetOffset = baseOffset + dragOffset
@@ -182,7 +187,7 @@ struct ControlCenterTabSelector: View {
                 RoundedRectangle(cornerRadius: 14),
                 tintOpacity: 0.42
             )
-                .frame(width: tabW, height: tabH)
+                .frame(width: tabW, height: tabHeight)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(
@@ -227,7 +232,7 @@ struct ControlCenterTabSelector: View {
                                 .minimumScaleFactor(0.85)
                                 .multilineTextAlignment(.center)
                         }
-                        .frame(width: tabW, height: tabH)
+                        .frame(width: tabW, height: tabHeight)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
@@ -252,7 +257,7 @@ struct ControlCenterTabSelector: View {
                     .minimumScaleFactor(0.85)
                     .multilineTextAlignment(.center)
             }
-            .frame(width: tabW, height: tabH)
+            .frame(width: tabW, height: tabHeight)
             .modifier(
                 ActiveTabLensLabelMotion(
                     position: pillPosition,
@@ -266,7 +271,7 @@ struct ControlCenterTabSelector: View {
             .accessibilityHidden(true)
             .zIndex(2)
         }
-        .frame(width: totalW, height: tabH + (innerPadding * 2), alignment: .leading)
+        .frame(width: totalW, height: tabHeight + (innerPadding * 2), alignment: .leading)
         .contentShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,

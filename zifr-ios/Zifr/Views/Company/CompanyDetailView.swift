@@ -803,6 +803,8 @@ struct CompanyDetailView: View {
             vm: vm,
             activeInternalTab: $vm.activeTab,
             compactTopSpacing: false,
+            tabSelectorHeaderHeight: usesDuoPortraitLayout ? tutFrameHeader.height : nil,
+            tabSelectorBottomInset: usesDuoPortraitLayout ? companyHeaderVerticalPadding : nil,
             vaultPresentation: usesDuoVaultSplit ? .categories : .combined,
             vaultCategorySelection: duoLayout.isDuoDevice ? $duoVaultCategory : nil
         )
@@ -1054,6 +1056,8 @@ struct CompanyDetailView: View {
     }
 
     // MARK: - Entity Command Plate
+    private let companyHeaderVerticalPadding: CGFloat = 12
+
     private var companyHeader: some View {
         HStack(alignment: .center, spacing: 10) {
             ZStack {
@@ -1087,37 +1091,42 @@ struct CompanyDetailView: View {
                     }
                 }
 
-                // Dynamic metrics sub-line per tab (full width below)
-                metricSubLine
+                if !usesDuoPortraitLayout {
+                    metricSubLine
+                }
             }
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, companyHeaderVerticalPadding)
         .padding(.leading, 12)
         .padding(.trailing, 16)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.zifrBG)
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.zifrTabBarFill.opacity(0.70))
+        .background {
+            if !usesDuoPortraitLayout {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.zifrBG)
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.zifrTabBarFill.opacity(0.70))
+                }
             }
-        )
+        }
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(hex: "#918457"),
-                            Color(hex: "#918457").opacity(0.3)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
-        )
-        .shadow(color: Color.black.opacity(0.45), radius: 6, x: 0, y: 3)
+        .overlay {
+            if !usesDuoPortraitLayout {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#918457"),
+                                Color(hex: "#918457").opacity(0.3)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1.5
+                    )
+            }
+        }
+        .shadow(color: usesDuoPortraitLayout ? .clear : .black.opacity(0.45), radius: 6, x: 0, y: 3)
     }
 
     private var transactionHeaderButton: some View {
