@@ -596,9 +596,9 @@ struct CompanyDetailView: View {
     private func portraitSheet(_ sheet: DuoPortraitSheet) -> some View {
         switch sheet {
         case .transactions:
-            MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }) {
+            MiloomDuoPortraitSheet(title: sheet.title, onClose: { settlePortraitFile(open: false) }, showsCard: false) {
                 PortfolioTransactionCenterView(vm: vm, embeddedCompanyID: company.id,
-                    embeddedSection: .all, usesHolographicStyle: true)
+                    embeddedSection: .all, usesGlassSummaryStyle: true)
                     .environment(appState)
             }
         case .reports(let report):
